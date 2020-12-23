@@ -1,3 +1,4 @@
+-R ./lib/InteractionTrees/theories ITree
 -Q theories OGS
 
 theories/LC.v

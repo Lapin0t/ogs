@@ -1,5 +1,10 @@
-all: Makefile.coq
+ITREEDIR=./lib/InteractionTrees
+
+all: Makefile.coq itree
 	@+$(MAKE) -f Makefile.coq all
+
+itree:
+	@+$(MAKE) -C $(ITREEDIR)
 
 clean: Makefile.coq
 	@+$(MAKE) -f Makefile.coq cleanall
@@ -13,4 +18,4 @@ force _CoqProject Makefile: ;
 %: Makefile.coq force
 	@+$(MAKE) -f Makefile.coq $@
 
-.PHONY: all clean force
+.PHONY: all clean force itree
