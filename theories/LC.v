@@ -2,12 +2,19 @@ From ITree Require Import ITree Events.Dependent.
 From Equations Require Import Equations.
 Require Setoid.
 
+From ExtLib.Structures Require Import Monad.
+Import MonadNotation.
+Open Scope monad_scope.
+
 Import Compare_dec Lt PeanoNat.Nat Plus.
 
-(** Dependent version of stuff in ITree.Interp.Recursion *)
-Section dep_rec. 
+Notation endo T := (T -> T).
 Arguments depE : clear implicits.  (* index is usually hard to infer *)
-Local Notation endo T := (T -> T).
+Notation "f # g" := (Basics.compose f g) (at level 60) : function_scope. 
+
+(********************************************************)
+(* Dependent version of stuff in ITree.Interp.Recursion *)
+Section dep_rec. 
 
 Equations dcalling' {A B} {F : Type -> Type}
           (f : forall a, itree F (B a)) : depE A B ~> itree F :=
@@ -27,6 +34,10 @@ Definition drec_fix {E : Type -> Type} {A B}
   := drec (body dcall).
 End dep_rec.
 
+
+(**************************************************)
+(* strictly bounded naturals, non-inductive style *)
+
 Record fin (n : nat) : Type := Fin { fin_nat :> nat ; fin_prf : fin_nat < n }.
 Arguments Fin {n}.
 Arguments fin_nat {n}.
@@ -38,6 +49,10 @@ Definition fin_su {m} (i : fin m) : fin (S m) := Fin (S i) (lt_n_S _ _ (fin_prf 
 Definition fin_add {m} (n : nat) (i : fin m) : fin (n + m) :=
   Fin (n + i) (plus_lt_compat_l _ _ _ (fin_prf i)).
 
+
+(**************************)
+(* terms and substitution *)
+
 Inductive term {n : nat} : Type :=
 (* Let's work with DeBruijn for now. Might want to consider
    using autosubst2 once things get serious *)
@@ -46,6 +61,9 @@ Inductive term {n : nat} : Type :=
 | Lam : @term (S n) -> @term n
 .
 Arguments term : clear implicits.
+
+Record term' : Type := T' { fv : nat; tm : term fv }.
+
 
 Equations t_shift {m n} (t : term m) (e : fin m -> fin n) : term n :=
   t_shift (Var i)   e := Var (e i) ;
@@ -58,17 +76,15 @@ exact fin_ze.
 exact (fin_su (e (Fin _ (lt_S_n _ _ prf)))).
 Defined.
 
-
 Equations t_subst_aux {m n} p (t : term (p + m)) (e : fin m -> term n) : term (p + n) :=
-  t_subst_aux p (Var i)   e := _ ;
+  t_subst_aux p (Var (Fin i_n i_p)) e with lt_dec i_n p => {
+    | left h => Var (Fin i_n (lt_lt_add_r _ _ _ h)) ;
+    | right h => t_shift (e (Fin (i_n - p) _)) (fin_add p)
+    } ;
   t_subst_aux p (App a b) e := App (t_subst_aux p a e) (t_subst_aux p b e) ;
   t_subst_aux p (Lam a)   e := Lam (t_subst_aux (S p) a e)
 .
 Obligation 1.
-destruct i as [i_n i_p].
-destruct (lt_dec i_n p) as [h|h].
-exact (Var (Fin i_n (lt_lt_add_r _ _ _ h))).
-refine (t_shift (e (Fin (i_n - p) _)) (fin_add p)).
 apply (add_lt_mono_l _ _ p).
 apply le_ngt in h.
 rewrite<- (Minus.le_plus_minus _ _ h).
@@ -76,6 +92,13 @@ exact i_p.
 Defined.
 
 Definition t_subst {m n} := @t_subst_aux m n O.
+
+Equations env1 {n} (u : term n) (i : fin (S n)) : term n :=
+  env1 u (Fin O _)     := u ;
+  env1 u (Fin (S i) p) := Var (Fin i (lt_S_n _ _ p)).
+
+Definition t_subst1 {n} u v := t_subst u (@env1 n v).
+
 (* alternative inefficient but more logical solution
 Equations t_subst {m n} (t : term m) (e : fin m -> term n) : term n :=
   t_subst (Var i)   e := e i ;
@@ -112,44 +135,22 @@ with whne_to_term {n} (v : wh_ne n) : term n :=
   end
 .
 
-Record ev_arg : Type := EArg {
-  ev_m : nat ;
-  ev_n : nat ;
-  ev_tm : term ev_m ;
-  ev_ctx : fin ev_m -> wh_nf ev_n
-}.
-Arguments EArg {ev_m} {ev_n}.
-Definition ev_out (a : ev_arg) : Type := wh_nf (ev_n a).
 
-Print callE.
-Definition t_eval (arg : ev_arg) : itree void1 (ev_out arg).
-  refine (@drec_fix _ ev_arg ev_out (fun h => _) arg).
-  intro a; destruct a as [m n t e].
-  destruct t as [ i | a b | a ].
-  + exact (Ret (e i)).
-  + refine (ITree.bind (h (EArg a e)) (fun f => _)).
-    refine (ITree.bind (h (EArg b e)) (fun v => _)).
-    destruct f as [ neu | lam ].
-    - exact (Ret (NNeu (NApp neu v))).
-    - refine (h (EArg lam (fun i => _))).
-      destruct i as [i_n i_p]; destruct i_n.
-      * exact v.
-      * refine (NNeu (NVar (Fin i_n _))).
-        apply (add_lt_mono_l _ _ 1).
-        rewrite add_1_l.
-        exact i_p.
-  + refine (ITree.bind (h (EArg a _)) (fun a => Ret (NLam (whnf_to_term a)))).
-    intro i; destruct i as [i_n i_p]; destruct i_n.
-    - exact (NNeu (NVar (Fin 0 (lt_0_succ _)))).
-    - refine (t_shift )
-  + refine (NLam (h (T_Ctx a _)).
-    intro i; destruct i as [i_n i_p]; destruct i_n.
-      Search (0 < _).
-    - refine (NNeu (NVar (Fin 0 _))).
-      exact (match (i with | O => v | (S i) => e i end).
-      destruct i.
-      *
-    Check (ITree.bind _ _).
-  Print itreeF.
-  exact (Ret )
-Search itree.
+(*************)
+(* evaluator *)
+
+Equations t_eval_aux : endo (forall t, itree (depE term' (wh_nf # fv) +' void1)
+                                             (wh_nf (fv t))) :=
+ t_eval_aux h (T' _ (Var i))   := ret (NNeu (NVar i)) ;
+ t_eval_aux h (T' n (App u v)) :=
+   f <- dcall (T' n u) ;;
+   a <- dcall (T' n v) ;;
+   match f with
+   | NNeu e => ret (NNeu (NApp e a))
+   | NLam e => dcall (T' _ (t_subst1 e (whnf_to_term a)))
+   end ;
+ t_eval_aux h (T' _ (Lam u))   := ret (NLam u)
+.
+
+Definition t_eval {n} (t : term n) : itree void1 (wh_nf n) :=
+  drec_fix t_eval_aux (T' n t).
