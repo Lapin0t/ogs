@@ -1,13 +1,13 @@
-From ExtLib.Structures Require Import Monad.
+From ExtLib.Structures Require Import Functor Monad.
+From ExtLib.Data Require Import Nat Fin.
+From ITree Require Import ITree Events.Dependent Basics.Basics.
+Import Monads.
 Import MonadNotation.
 Open Scope monad_scope.
 
-(*Import Compare_dec Lt PeanoNat.Nat Plus.*)
-
-From ITree Require Import ITree Events.Dependent.
 From Paco Require Import paco.
 From Equations Require Import Equations.
-Require Setoid.
+
 
 (*************************)
 (* notations and prelude *)
@@ -15,11 +15,13 @@ Notation endo T := (T -> T).
 Arguments depE : clear implicits.  (* index is usually hard to infer *)
 Notation "f # g" := (Basics.compose f g) (at level 60) : function_scope. 
 
-Definition T0 := Empty_set.
-Definition T1 := unit.
-Definition T2 := bool.
+Variant T0 := .
+Variant T1 := t1_0.
+Variant T2 := t2_0 | t2_1.
+Variant T3 := t3_0 | t3_1 | t3_2.
 
 Definition boom {A : Type} (bot : T0) : A := match bot with end.
+
 
 (********************************************************)
 (* Dependent version of stuff in ITree.Interp.Recursion *)
@@ -44,42 +46,9 @@ Definition drec_fix {E : Type -> Type} {A B}
 End dep_rec.
 
 
-(**************************************************)
-(* strictly bounded naturals, non-inductive style *)
-
-(*Record fin (n : nat) : Type := Fin { fin_nat :> nat ; fin_prf : fin_nat < n }.
-Arguments Fin {n}.
-Arguments fin_nat {n}.
-Arguments fin_prf {n}.
-
-Definition fin_ze {m} : fin (S m) := Fin O (lt_0_succ _). 
-Definition fin_su {m} (i : fin m) : fin (S m) := Fin (S i) (lt_n_S _ _ (fin_prf i)).
-
-Definition fin_add {m} (n : nat) (i : fin m) : fin (n + m) :=
-  Fin (n + i) (plus_lt_compat_l _ _ _ (fin_prf i)).*)
-
 
 (**************************)
 (* terms and substitution *)
-
-(*Inductive termF (X : nat -> Type) (n : nat) : Type :=
-| Var : fin n -> termF X n
-| App : X n -> X n -> termF X n
-| Lam : X (S n) -> termF X n
-.*)
-
-(*Inductive termF_sh (n : nat) : Type :=
-| Var : fin n -> termF_sh n
-| App : termF_sh n
-| Lam : termF_sh n
-.
-
-Inductive termF_ar (n : nat) : Type :=
-
-Record t_alg : Type := TAlg {
-  carrier :> nat -> Type ;
-  alg : forall n, termF carrier n -> carrier n
-}.*)
 
 Record eF (E : Type -> Type) (X : Type) := EF {
   eF_R : Type ;
@@ -87,25 +56,31 @@ Record eF (E : Type -> Type) (X : Type) := EF {
   eF_k : eF_R -> X
 }.
 
+Notation "[ E ]e" := (eF E).
 Arguments EF {E} {X} {eF_R}.
 Arguments eF_R {E} {X}.
 Arguments eF_q {E} {X}.
 Arguments eF_k {E} {X}.
 
-Definition e_alg (E E' : Type -> Type) (X : Type) := eF E (itree E' X) -> itree E' X.
 
-Equations e_fold_aux {E E' : Type -> Type} {X : Type}
-          (f : eF E (itree E' X) -> itree E' X)
-          (h : itree E X -> itree E' X) : itree' E X -> itree E' X :=
-  e_fold_aux f h (RetF x)   := Ret x ;
-  e_fold_aux f h (TauF t)   := Tau (h t) ;
-  e_fold_aux f h (VisF e k) := f (EF e (h # k))
-.
-Definition e_fold {E E' X} (f : eF E (itree E' X) -> itree E' X) : itree E X -> itree E' X
-.
-cofix e_fold_.
-exact (e_fold_aux f e_fold_ # observe).
-Admitted.
+(*
+   \o/ it works
+   variation of ITree.Interp.Interp.interp that folds over events instead
+   of mapping them
+*)
+Definition interp {E M : Type -> Type}
+           {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
+           {X : Type} (h : [ E ]e (M X) -> M X) : itree E X -> M X :=
+  iter (fun x => match observe x with
+                 | RetF r => ret (inr r)
+                 | TauF t => ret (inl t)
+                 | VisF e k => fmap inr (h (EF e (iter (ret # inl) # k)))
+                 end).
+
+Definition interp_ad {E M : Type -> Type} {A X : Type}
+           {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
+           (h : [ E ]e (stateT A M X) -> stateT A M X) (x : itree E X) : A -> M X
+  := fmap snd # interp h x.
 
 (* usual term definition *)
 Inductive term : Type :=
@@ -128,15 +103,19 @@ Equations termA : termC -> Type :=
 .
 
 Definition termE := depE termC termA.
-Definition termT := itree termE T0.
+Definition termT {X : Type} := itree termE X.
+Definition termT0 := itree termE T0.
 
 Notation VarE i := (Dep (VarC i)).
 Notation AppE := (Dep AppC).
 Notation LamE := (Dep LamC).
 
-Definition VarT i : termT := Vis (VarE i) (fun x : T0 => match x with end).
-Definition AppT u v : termT := Vis AppE (fun x : T2 => if x then u else v).
-Definition LamT u : termT := Vis LamE (fun x : T1 => match x with tt => u end).
+Definition VarT {X} i : @termT X :=
+  Vis (VarE i) (fun x : T0 => match x with end).
+Definition AppT {X} u v : @termT X :=
+  Vis AppE (fun x : T2 => match x with t2_0 => u | t2_1 => v end).
+Definition LamT {X} u : @termT X :=
+  Vis LamE (fun x : T1 => match x with t1_0 => u end).
 
 Equations t_evalE : term -> itree termE T0 :=
   t_evalE (Var i)   := VarT i ;
@@ -145,64 +124,70 @@ Equations t_evalE : term -> itree termE T0 :=
 .
 
 
-Equations t_shift (e : nat -> nat) : e_alg termE termE T0 :=
-  t_shift e (EF (VarE i) k) := VarT (e i) ;
-  t_shift e (EF AppE     k) := AppT (k true) (k false) ;
-  t_shift e (EF LamE     k) := LamT
-.
-Obligation 1.
+Equations t_shift_aux : [ termE ]e (stateT (nat -> nat) (itree termE) T0)
+                      -> stateT (nat -> nat) (itree termE) T0 :=
+  t_shift_aux (EF (VarE i) k) e := VarT (e i) ;
+  t_shift_aux (EF AppE     k) e := AppT (k t2_0 e) (k t2_1 e) ;
+  t_shift_aux (EF LamE     k) e := LamT (k t1_0 (fun i => match i with
+                                                        | O => O
+                                                        | S i => S (e i)
+                                                        end)).
+Definition t_shift : termT0 -> (nat -> nat) -> termT0 := interp_ad t_shift_aux.
 
-Equations t_shift (t : term) (e : nat -> nat) : term :=
-  t_shift (Var i)   e := Var (e i) ;
-  t_shift (App u v) e := App (t_shift u e) (t_shift v e) ;
-  t_shift (Lam u)   e := Lam (t_shift u (fun i => match i with
-                                                  | O => O
-                                                  | S i => S (e i)
-                                                  end))
-.
 
-Equations t_subst (t : term) (e : nat -> term) : term :=
-  t_subst (Var i)   e := e i ;
-  t_subst (App u v) e := App (t_subst u e) (t_subst v e) ;
-  t_subst (Lam u)   e := Lam (t_subst u (fun i => match i with
-                                                  | O => Var O
+Equations t_subst_aux : [ termE ]e (stateT (nat -> termT0) (itree termE) T0)
+                      -> stateT (nat -> termT0) (itree termE) T0 :=
+  t_subst_aux (EF (VarE i) k) e := fmap (fun x => pair e x) (e i) ;
+  t_subst_aux (EF AppE k)     e := AppT (k t2_0 e) (k t2_1 e) ;
+  t_subst_aux (EF LamE k)     e := LamT (k t1_0 (fun i => match i with
+                                                  | O => VarT O
                                                   | S i => t_shift (e i) S
-                                                  end))
-.
+                                                  end)).
+Definition t_subst : termT0 -> (nat -> termT0) -> termT0 := interp_ad t_subst_aux.
 
-Equations env1 (u : term) : nat -> term :=
+Equations env1 (u : termT0) : nat -> termT0 :=
   env1 u O     := u ;
-  env1 u (S i) := Var i
-.
+  env1 u (S i) := VarT i.
 
 Definition t_subst1 u v := t_subst u (env1 v).
 
-Inductive nf (n : nat) : Type :=
-| NLam : nf (S n) -> nf n
-| NNeu : ne n -> nf n
-with ne (n : nat) : Type :=
-| NVar : fin n -> ne n
-| NApp : ne n -> nf n -> ne n
-.
 
-Arguments NLam {n}.
-Arguments NNeu {n}.
-Arguments NVar {n}.
-Arguments NApp {n}.
+(******************************)
+(* normal forms and evaluation*)
+Variant normC : Type := NLamC | NRedC : nat -> nat -> normC.
+Equations normA : normC -> Type :=
+  normA NLamC := T1 ;
+  normA (NRedC _ i) := fin i.
 
-Fixpoint nf_to_term {n} (v : nf n) : term n :=
-  match v with
-  | NNeu ne => ne_to_term ne
-  | NLam a => Lam (nf_to_term a)
-  end
-with ne_to_term {n} (v : ne n) : term n :=
-  match v with
-  | NVar i => Var i
-  | NApp a b => App (ne_to_term a) (nf_to_term b)
-  end
-.
+Definition normE := depE normC normA.
+Definition normT {X : Type} := itree normE X.
+Definition normT0 := itree normE T0.
 
-Search "translate".
+Notation NLamE := (Dep NLamC).
+Notation NRedE i j := (Dep (NRedC i j)).
+
+Definition NLamT {X} u : @normT X :=
+  Vis NLamE (fun x : T1 => match x with t1_0 => u end).
+Definition NRedT {X} (i j : nat) (f : fin j -> @normT X) : @normT X :=
+  Vis (NRedE i j) f.
+
+Equations norm2term_aux : [ normE ]e (itree termE T0) -> itree termE T0 :=
+  norm2term_aux (EF NLamE k)       := LamT (k t1_0);
+  norm2term_aux (EF (NRedE i j) k) := spine j (VarT i) k
+  where spine (n : nat) : termT0 -> (fin n -> termT0) -> termT0 := {
+    spine O     x f := x ;
+    spine (S i) x f := spine i (AppT x (f (F0))) (f # FS) }.
+Definition norm2term : normT0 -> termT0 := interp norm2term_aux.
+
+
+Equations eval_aux : [ termE ]e (itree normE T0) -> itree normE T0 :=
+  eval_aux (EF (VarE i) k) := NRedT i 0 (fun i => match i with end);
+  eval_aux (EF LamE     k) := NLamT (k t1_0);
+  eval_aux (EF AppE     k) := _.
+
+(* WIP HERE*)
+
+
 Equations t_eval_aux : endo (forall t, itree (depE term' (nf # fv) +' void1)
                                              (nf (fv t))) :=
   t_eval_aux h (T' _ (Var i))   := ret (NNeu (NVar i)) ;
@@ -215,28 +200,7 @@ Equations t_eval_aux : endo (forall t, itree (depE term' (nf # fv) +' void1)
     end ;
   t_eval_aux h (T' _ (Lam u))   :=
     a <- dcall (T' _ u) ;;
-    ret (NLam a)
-.
+    ret (NLam a).
 
-(*************)
-(* evaluator *)
-
-(*Equations t_eval_aux : endo (forall t, itree (depE term' (wh_nf # fv) +' void1)
-                                             (wh_nf (fv t))) :=
- t_eval_aux h (T' _ (Var i))   := ret (WNeu (WVar i)) ;
- t_eval_aux h (T' _ (App u v)) :=
-   f <- dcall (T' _ u) ;;
-   a <- dcall (T' _ v) ;;
-   match f with
-   | WNeu e => ret (WNeu (WApp e a))
-   | WLam e => dcall (T' _ (t_subst1 e (whnf_to_term a)))
-   end ;
- t_eval_aux h (T' _ (Lam u))   := ret (WLam u)
-.*)
 Definition t_eval {n} (t : term n) : itree void1 (nf n) :=
   drec_fix t_eval_aux (T' n t).
-
-Definition Y : term 0 :=
-  let u := Lam (App (Var fin_ze) (Var fin_ze)) in
-  App u u.
-Compute (burn 10 (t_eval Y)).
