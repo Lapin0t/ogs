@@ -88,27 +88,26 @@ Definition translate_rec {D E : Type -> Type}
            (ctx : D ~> itree (D +' E)) : itree D ~> itree E :=
   fun _ => @interp_mrec _ _ ctx _ # @translate _ _ inl1 _.
 
-Definition foldE {E M : Type -> Type}
-           {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
-           {X : Type} (h : [ E ]e (M X) -> M (itree E X + X)%type) : itree E X -> M X :=
-  iter (fun x => match observe x with
+Definition foldE {E M X} {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
+           (h : [ E ]e (M X) -> M (itree E X + X)%type) : itree E X -> M X
+  := iter (fun x => match observe x with
                  | RetF r => ret (inr r)
                  | TauF t => ret (inl t)
                  | VisF e k => h (EF e (iter (ret # inl) # k))
                  end).
 
-Definition caseE {E X Y} (x : itree E X) (h : ([ E ]e (itree E X) -> itree E (Y + X)))
-  : itree E (Y + X)
-  := iter (fun x => match observe x with
-                         | RetF r => ret (inr (inr r))
-                         | TauF t => ret (inl t)
-                         | VisF e k => fmap inr (h (EF e k))
-               end) x.
-
-Definition foldE_ad {E M : Type -> Type} {A X : Type}
-           {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
-           (h : [ E ]e (stateT A M X) -> stateT A M (itree E X + X)) (x : itree E X) : A -> M X
+Definition foldE_ad {E M A X} {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
+           (h : [ E ]e (stateT A M X) -> stateT A M _) (x : itree E X) : A -> M X
   := fmap snd # foldE h x.
+
+
+Definition caseE {E M X Y} {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
+           (f : X -> Y) (x : itree E X) (h : [ E ]e (itree E X) -> M Y) : M Y
+  := iter (fun x => match observe x with
+                    | RetF r => ret (inr (f r))
+                    | TauF t => ret (inl t)
+                    | VisF e k => fmap inr (h (EF e k))
+                    end) x.
 
 (* usual term definition *)
 Inductive term : Type :=
@@ -210,7 +209,7 @@ Definition norm2term : normT0 -> termT0 := foldE (fmap inr # norm2term_aux).
 Equations eval_aux : [ termE ]e normT0 -> itree normE (termT0 + T0) :=
   eval_aux (EF (VarE i) k) := NRedT i 0 (fun i => match i with end) ;
   eval_aux (EF LamE k) := NLamT (fmap inr (k t1_0)) ;
-  eval_aux (EF AppE k) := caseE (k t2_0) app_case
+  eval_aux (EF AppE k) := caseE inr (k t2_0) app_case
   where app_case : [ normE ]e _ ->  _ :=  {
         app_case (EF NLamE       k1) := ret (inl (t_subst1 (norm2term (k1 t1_0))
                                                            (norm2term (k t2_1)))) ;
