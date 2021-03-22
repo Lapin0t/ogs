@@ -22,10 +22,14 @@ Variant T3 := t3_0 | t3_1 | t3_2.
 
 Definition boom {A : Type} (bot : T0) : A := match bot with end.
 
+Variant prod1 (D E : Type -> Type) : Type -> Type :=
+  | pair1 : forall {X Y}, D X -> E Y -> prod1 D E (X * Y).
+
+Notation "D *' E" := (prod1 D E) (at level 50).
 
 (********************************************************)
 (* Dependent version of stuff in ITree.Interp.Recursion *)
-Section dep_rec. 
+Section dep_rec.
 
 Equations dcalling' {A B} {F : Type -> Type}
           (f : forall a, itree F (B a)) : depE A B ~> itree F :=
@@ -39,10 +43,10 @@ Definition drec {E : Type -> Type} {A B}
 Definition dcall {E A B} (a : A) : itree (depE A B +' E) (B a) :=
   ITree.trigger (inl1 (Dep a)).
 
-Definition drec_fix {E : Type -> Type} {A B}
-           (body : endo (forall a, itree (depE A B +' E) (B a)))
+(*Definition drec_fix {E : Type -> Type} {A B}
+           (body : endo (forall a, itree E (B a)))
   : forall a, itree E (B a)
-  := drec (body dcall).
+  := drec (body dcall).*)
 End dep_rec.
 
 
@@ -62,25 +66,49 @@ Arguments eF_R {E} {X}.
 Arguments eF_q {E} {X}.
 Arguments eF_k {E} {X}.
 
+Definition wrap {E X} (t : [ E ]e (itree E X)) : itree E X :=
+  vis (eF_q t) (eF_k t).
+
+Instance Functor_E {E} : Functor ([ E ]e) := {|
+  fmap _ _ f := fun x => EF (eF_q x) (f # eF_k x)
+|}. 
+Search "Functor".
+
+Instance Functor_E_itree {E} : Functor ([ E ]e # itree E) := {|
+  fmap _ _ f := fun x => EF (eF_q x) (fmap f # eF_k x)
+|}.
 
 (*
    \o/ it works
    variation of ITree.Interp.Interp.interp that folds over events instead
    of mapping them
 *)
-Definition interp {E M : Type -> Type}
+
+Definition translate_rec {D E : Type -> Type}
+           (ctx : D ~> itree (D +' E)) : itree D ~> itree E :=
+  fun _ => @interp_mrec _ _ ctx _ # @translate _ _ inl1 _.
+
+Definition foldE {E M : Type -> Type}
            {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
-           {X : Type} (h : [ E ]e (M X) -> M X) : itree E X -> M X :=
+           {X : Type} (h : [ E ]e (M X) -> M (itree E X + X)%type) : itree E X -> M X :=
   iter (fun x => match observe x with
                  | RetF r => ret (inr r)
                  | TauF t => ret (inl t)
-                 | VisF e k => fmap inr (h (EF e (iter (ret # inl) # k)))
+                 | VisF e k => h (EF e (iter (ret # inl) # k))
                  end).
 
-Definition interp_ad {E M : Type -> Type} {A X : Type}
+Definition caseE {E X Y} (x : itree E X) (h : ([ E ]e (itree E X) -> itree E (Y + X)))
+  : itree E (Y + X)
+  := iter (fun x => match observe x with
+                         | RetF r => ret (inr (inr r))
+                         | TauF t => ret (inl t)
+                         | VisF e k => fmap inr (h (EF e k))
+               end) x.
+
+Definition foldE_ad {E M : Type -> Type} {A X : Type}
            {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
-           (h : [ E ]e (stateT A M X) -> stateT A M X) (x : itree E X) : A -> M X
-  := fmap snd # interp h x.
+           (h : [ E ]e (stateT A M X) -> stateT A M (itree E X + X)) (x : itree E X) : A -> M X
+  := fmap snd # foldE h x.
 
 (* usual term definition *)
 Inductive term : Type :=
@@ -104,7 +132,7 @@ Equations termA : termC -> Type :=
 
 Definition termE := depE termC termA.
 Definition termT {X : Type} := itree termE X.
-Definition termT0 := itree termE T0.
+Definition termT0 : Type := itree termE T0.
 
 Notation VarE i := (Dep (VarC i)).
 Notation AppE := (Dep AppC).
@@ -117,7 +145,7 @@ Definition AppT {X} u v : @termT X :=
 Definition LamT {X} u : @termT X :=
   Vis LamE (fun x : T1 => match x with t1_0 => u end).
 
-Equations t_evalE : term -> itree termE T0 :=
+Equations t_evalE : term -> termT0 :=
   t_evalE (Var i)   := VarT i ;
   t_evalE (App u v) := AppT (t_evalE u) (t_evalE v) ;
   t_evalE (Lam u)   := LamT (t_evalE u)
@@ -132,7 +160,7 @@ Equations t_shift_aux : [ termE ]e (stateT (nat -> nat) (itree termE) T0)
                                                         | O => O
                                                         | S i => S (e i)
                                                         end)).
-Definition t_shift : termT0 -> (nat -> nat) -> termT0 := interp_ad t_shift_aux.
+Definition t_shift : termT0 -> (nat -> nat) -> termT0 := foldE_ad (fmap inr # t_shift_aux).
 
 
 Equations t_subst_aux : [ termE ]e (stateT (nat -> termT0) (itree termE) T0)
@@ -143,7 +171,7 @@ Equations t_subst_aux : [ termE ]e (stateT (nat -> termT0) (itree termE) T0)
                                                   | O => VarT O
                                                   | S i => t_shift (e i) S
                                                   end)).
-Definition t_subst : termT0 -> (nat -> termT0) -> termT0 := interp_ad t_subst_aux.
+Definition t_subst : termT0 -> (nat -> termT0) -> termT0 := foldE_ad (fmap inr # t_subst_aux).
 
 Equations env1 (u : termT0) : nat -> termT0 :=
   env1 u O     := u ;
@@ -171,36 +199,25 @@ Definition NLamT {X} u : @normT X :=
 Definition NRedT {X} (i j : nat) (f : fin j -> @normT X) : @normT X :=
   Vis (NRedE i j) f.
 
-Equations norm2term_aux : [ normE ]e (itree termE T0) -> itree termE T0 :=
+Equations norm2term_aux : [ normE ]e termT0 -> termT0 :=
   norm2term_aux (EF NLamE k)       := LamT (k t1_0);
   norm2term_aux (EF (NRedE i j) k) := spine j (VarT i) k
   where spine (n : nat) : termT0 -> (fin n -> termT0) -> termT0 := {
     spine O     x f := x ;
     spine (S i) x f := spine i (AppT x (f (F0))) (f # FS) }.
-Definition norm2term : normT0 -> termT0 := interp norm2term_aux.
+Definition norm2term : normT0 -> termT0 := foldE (fmap inr # norm2term_aux).
 
+Equations eval_aux : [ termE ]e normT0 -> itree normE (termT0 + T0) :=
+  eval_aux (EF (VarE i) k) := NRedT i 0 (fun i => match i with end) ;
+  eval_aux (EF LamE k) := NLamT (fmap inr (k t1_0)) ;
+  eval_aux (EF AppE k) := caseE (k t2_0) app_case
+  where app_case : [ normE ]e _ ->  _ :=  {
+        app_case (EF NLamE       k1) := ret (inl (t_subst1 (norm2term (k1 t1_0))
+                                                           (norm2term (k t2_1)))) ;
+        app_case (EF (NRedE i j) k1) := vis (NRedE i (S j)) red_arg
+        where red_arg : normA (NRedC i (S j)) -> _ := {
+              red_arg F0     := fmap inr (k t2_1) ;
+              red_arg (FS i) := fmap inr (k1 i) }
+        }.
 
-Equations eval_aux : [ termE ]e (itree normE T0) -> itree normE T0 :=
-  eval_aux (EF (VarE i) k) := NRedT i 0 (fun i => match i with end);
-  eval_aux (EF LamE     k) := NLamT (k t1_0);
-  eval_aux (EF AppE     k) := _.
-
-(* WIP HERE*)
-
-
-Equations t_eval_aux : endo (forall t, itree (depE term' (nf # fv) +' void1)
-                                             (nf (fv t))) :=
-  t_eval_aux h (T' _ (Var i))   := ret (NNeu (NVar i)) ;
-  t_eval_aux h (T' _ (App u v)) :=
-    f <- dcall (T' _ u) ;;
-    a <- dcall (T' _ v) ;;
-    match f with
-    | NNeu e => ret (NNeu (NApp e a))
-    | NLam e => dcall (T' _ (t_subst1 (nf_to_term e) (nf_to_term a)))
-    end ;
-  t_eval_aux h (T' _ (Lam u))   :=
-    a <- dcall (T' _ u) ;;
-    ret (NLam a).
-
-Definition t_eval {n} (t : term n) : itree void1 (nf n) :=
-  drec_fix t_eval_aux (T' n t).
+Definition eval : termT0 -> normT0 := foldE eval_aux.
