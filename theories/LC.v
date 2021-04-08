@@ -1,7 +1,15 @@
 From Coq.Logic Require Import FunctionalExtensionality.
+Require Import RelationClasses.
 From ExtLib.Structures Require Import Functor Monad.
 From ExtLib.Data Require Import Nat Fin.
-From ITree Require Import ITree Events.Dependent Basics.Basics.
+From ITree Require Import
+     ITree
+     Events.Dependent
+     Basics.Basics
+     Eq.Eq
+     Interp.InterpFacts
+     Interp.RecursionFacts
+     Interp.TranslateFacts.
 Import Monads.
 Import MonadNotation.
 Open Scope monad_scope.
@@ -79,6 +87,29 @@ Instance Functor_E_itree {E} : Functor ([ E ]e # itree E) := {|
   fmap _ _ f := fun x => EF (eF_q x) (fmap f # eF_k x)
 |}.
 
+(*****************)
+
+(*
+Section euttG_bind.
+Context {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
+Context (rL rH gL gH : itree E R1 -> itree E R2 -> Prop).
+Variant euttG_bind_clo : itree E R1 -> itree E R2 -> Prop :=
+| i_gbind_clo t1 t2 k1 k2 :
+      euttG RR rL rH gL gH t1 t2 ->
+      (forall u1 u2, RR u1 u2 -> euttG RR rL rH gL gH (k1 u1) (k2 u2))
+  ->  euttG_bind_clo (ITree.bind t1 k1) (ITree.bind t2 k2)
+.
+Hint Constructors euttG_bind_clo: core.
+Print eqit_.
+Lemma euttG_clo_bind vclo
+      (MON: monotone2 vclo)
+      (CMP: compose (eqitC RR b1 b2) vclo <3= compose vclo (eqitC RR b1 b2))
+      (ID: id <3= vclo) :
+    euttG_bind_clo b1 b2 <3= gupaco2 (eqit_ RR b1 b2 vclo) (eqitC RR b1 b2).
+*)
+
+(*****************)
+
 (*
    \o/ it works
    variation of ITree.Interp.Interp.interp that folds over events instead
@@ -132,6 +163,23 @@ Inductive term : Type := T : termF term -> term.
 Notation Var i := (T (VarF i)).
 Notation App u v := (T (AppF u v)).
 Notation Lam u := (T (LamF u)).
+
+Inductive t_ctx (X : Type) : Type :=
+| CHole : t_ctx X
+| CVar : nat -> t_ctx X
+| CApp_l : X -> t_ctx X -> t_ctx X
+| CApp_r : t_ctx X -> X -> t_ctx X
+| CLam : t_ctx X -> t_ctx X
+.
+
+Equations plug (C : t_ctx term) (x : term) : term :=
+  plug CHole        t := t ;
+  plug (CVar i)     t := Var i ;
+  plug (CApp_l u C) t := App u (plug C t) ;
+  plug (CApp_r C u) t := App (plug C t) u ;
+  plug (CLam C)     t := Lam (plug C t).
+
+
 (* itree term definitions *)
 
 
@@ -205,19 +253,74 @@ Equations term_of_whn (w : whn) : term :=
   term_of_whn (WLam u) := Lam u ;
   term_of_whn (WApp i xs) := app_many (Var i) xs.
 
-Definition eval_whn : term -> itree void1 whn :=
-  rec (fun t =>
-        match t with
-        | Var i => ret (WApp i nil)
-        | App u v =>
-          u' <- call u ;;
-          v' <- call v ;;
-          match u' with
-          | WLam w => call (t_subst1 w (term_of_whn v'))
-          | WApp i xs => ret (WApp i (cons (term_of_whn v') xs))
-          end
-        | Lam u => ret (WLam u)
-        end).
+Equations ev_whn' (t : term) : itree (callE term whn +' void1) whn :=
+  ev_whn' (Var i) := ret (WApp i nil) ;
+  ev_whn' (App u v) :=
+    u' <- call u ;;
+    v' <- call v ;;
+    match u' with
+    | WLam w => call (t_subst1 w (term_of_whn v'))
+    | WApp i xs => ret (WApp i (cons (term_of_whn v') xs))
+    end ;
+  ev_whn' (Lam u) := ret (WLam u).
+
+Definition ev_whn : term -> itree void1 whn := rec ev_whn'.
+
+Equations term_of_norm (u : norm) : term :=
+  term_of_norm (NLam u) := Lam (term_of_norm u) ;
+  term_of_norm (NApp i xs) := app_many (Var i) (List.map term_of_norm xs).
+
+Equations ev_norm' (t : term) : itree (callE term norm +' void1) norm :=
+  ev_norm' (Var i) := ret (NApp i nil) ;
+  ev_norm' (App u v) :=
+    u' <- call u ;;
+    v' <- call v ;;
+    match u' with
+    | NLam w => call (t_subst1 (term_of_norm w) (term_of_norm v'))
+    | NApp i xs => ret (NApp i (cons v' xs))
+    end ;
+  ev_norm' (Lam u) := u' <- call u ;; ret (NLam u').
+
+Definition ev_norm : term -> itree void1 norm := rec ev_norm'.
+
+Lemma norm_cong (s t : term) (p : ev_norm s ≈ ev_norm t)
+  : forall C : t_ctx term, ev_norm (plug C s) ≈ ev_norm (plug C t).
+  induction C.
+  + rewrite 2 plug_equation_1.
+    eauto.
+  + reflexivity.
+  + rewrite 2 plug_equation_3.
+    unfold ev_norm.
+    rewrite 2 rec_as_interp.
+    rewrite 2 ev_norm'_equation_2; unfold ";;";simpl.
+    rewrite 2 interp_bind.
+    apply eutt_eq_bind.
+    intro u.
+    rewrite 2 interp_bind.
+    eapply eutt_clo_bind.
+    - rewrite 2 interp_recursive_call.
+      exact IHC.
+    - intros u1 u2 e; rewrite e; reflexivity.
+  + rewrite 2 plug_equation_4.
+    unfold ev_norm.
+    rewrite 2 rec_as_interp.
+    rewrite 2 ev_norm'_equation_2; unfold ";;"; simpl.
+    rewrite 2 interp_bind.
+    eapply eutt_clo_bind.
+    - rewrite 2 interp_recursive_call.
+      exact IHC.
+    - intros u1 u2 e; rewrite e; reflexivity.
+  + rewrite 2 plug_equation_5.
+    unfold ev_norm.
+    rewrite 2 rec_as_interp.
+    rewrite 2 ev_norm'_equation_3; unfold ";;"; simpl.
+    rewrite 2 interp_bind.
+    eapply eutt_clo_bind.
+    - rewrite 2 interp_recursive_call.
+      exact IHC.
+    - intros u1 u2 e; rewrite e; reflexivity.
+Qed.
+
 
 (* w_inj k (W x) := wrap (F2E (fmap k x)) *)
 (* this is because normF == [ boehmE ]e *)
@@ -226,5 +329,64 @@ Equations w_inj {X} : (term -> itree boehmE X) -> whn -> itree boehmE X :=
   w_inj k (WApp i xs) := Vis (BAppC i (length xs)) (k # l_get xs).
 
 (* magic :D *)
-Definition eval_boehmE : term -> normT :=
-  iter (fun t => bind (translate elim_void1 (eval_whn t)) (w_inj (ret # inl))).
+Definition ev_boehmE' (t : term) : itree boehmE (term + T0) :=
+  ITree.bind (translate elim_void1 (ev_whn t)) (w_inj (ret # inl)).
+Definition eval_boehmE : term -> normT := iter ev_boehmE'.
+
+Equations elim_r {T} (x : T + T0) : T := elim_r (inl t) := t.
+
+(*
+Lemma boehmE'_cong {C : t_ctx term} (s t : term) (p : eval_boehmE s ≈ eval_boehmE t)
+  : eutt (fun a b => eval_boehmE (elim_r a) ≈ eval_boehmE (elim_r b))
+         (ev_boehmE' (plug C s))
+         (ev_boehmE' (plug C t)).
+  induction C.
+  + rewrite 2 plug_equation_1.
+*)
+
+Lemma boehmE_cong {C : t_ctx term} (s t : term) (p : eval_boehmE s ≈ eval_boehmE t)
+  : eval_boehmE (plug C s) ≈ eval_boehmE (plug C t).
+  induction C.
+  + rewrite 2 plug_equation_1.
+    exact p.
+  + rewrite 2 plug_equation_2.
+    reflexivity.
+  + rewrite 2 plug_equation_3.
+    unfold eval_boehmE, ";;", iter, MonadIter_itree; simpl.
+    rewrite 2 unfold_iter.
+    eapply eutt_clo_bind.
+    * unfold ev_boehmE', ev_whn.
+      rewrite 2 rec_as_interp.
+      eapply eutt_clo_bind.
+      - eapply eutt_translate'.
+        rewrite 2 ev_whn'_equation_2; unfold ";;"; simpl.
+        rewrite 2 interp_bind.
+        eapply eutt_clo_bind.
+          reflexivity.
+          intros u1 u2 e.
+          rewrite 2 interp_bind.
+          eapply eutt_clo_bind.
+          rewrite 2 interp_recursive_call.
+          fold ev_whn.
+          
+      eapply eutt_clo_bind.
+      - rewrite 2 interp_bind.
+        Search translate.
+        eapply eutt_translate'.
+      Search translate.
+  unfold eval_boehmE, ";;", iter, MonadIter_itree; simpl.
+  rewrite 2 unfold_iter.
+  rewrite 2 bind_bind.
+  + 
+  Search ITree.iter.
+  induction C.
+    Search ITree.iter.
+    rewrite 2 unfold_iter.
+    rewrite 2 bind_bind; simpl.
+  
+  + rewrite plug_equation_1,plug_equation_1.
+    exact (@RelationClasses.reflexivity _ _ (Reflexive_eqit eq _ _ _) _).
+  + rewrite plug_equation_2,plug_equation_2.
+    compute [eval_boehmE].
+    rewrite unfold_iter,unfold_iter.
+    Search ITree.iter.
