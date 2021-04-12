@@ -69,7 +69,10 @@ Section Interleave.
         | VisF e k => vis e (fun x => F t1 (k x))
         end.
 
-  (* This version is roughly a version of [interleave] that inlines [get_hd] *)
+  (* This version is roughly a version of [interleave] that inlines [get_hd].
+     The structure of the collected trees is slightly different, but at a quick
+     glance it should again be the same up to bijection up to eutt.
+   *)
   Definition interleave'' : itree E1 X1 -> itree E2 X2 -> itree (SchedE +' E1 +' E2) (X1 * X2) :=
     cofix F (t1 : itree E1 X1) (t2 : itree E2 X2) :=
       match observe t1, observe t2 with
@@ -156,6 +159,5 @@ Section Synchro.
       | _, TauF t2             => Tau (para_synch t1 t2)
       | VisF e1 k1, VisF e2 k2 => vis (pair1 e1 e2) (fun '(x1,x2) => para_synch (k1 x1) (k2 x2))
       end.
-
 
 End Synchro.
