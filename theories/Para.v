@@ -69,6 +69,23 @@ Section Interleave.
         | VisF e k => vis e (fun x => F t1 (k x))
         end.
 
+  (* This version is roughly a version of [interleave] that inlines [get_hd] *)
+  Definition interleave'' : itree E1 X1 -> itree E2 X2 -> itree (SchedE +' E1 +' E2) (X1 * X2) :=
+    cofix F (t1 : itree E1 X1) (t2 : itree E2 X2) :=
+      match observe t1, observe t2 with
+      | TauF t1, TauF t2 => Tau (F t1 t2)
+      | TauF t1, _ => Tau (F t1 t2)
+      | _, TauF t2 => Tau (F t1 t2)
+      | VisF e1 k1, VisF e2 k2 =>
+        b <- (trigger Sched: itree (SchedE +' E1 +' E2) _);;
+        if b : bool 
+        then vis e1 (fun x => F (k1 x) t2)
+        else vis e2 (fun x => F t1 (k2 x))
+      | RetF x, RetF y => Ret (x,y)
+      | RetF x, _ => ITree.map (fun y => (x,y)) (translate (fun _ e => inr1 (inr1 e)) t2)
+      | _, RetF y => ITree.map (fun x => (x,y)) (translate (fun _ e => inr1 (inl1 e)) t1)
+      end.
+
   (** * Implementing the non-determinism induced by the underlying scheduler *)
 
   (* Collecting propositionally all computations *)
@@ -81,6 +98,11 @@ Section Interleave.
     fun T => interp_prop (case_ schedulers trigger_prop) T eq.
 
   (* Could alternatively parameterize the handler by a scheduler given by a stream of bits and quantify at the meta level over all schedules *)
+
+  (* Note: a benefit of having a deterministic handler parameterized by a schedule with a meta quantification is that we can easily restrict the set of schedulers we quantify over.
+     Typically, one may want to consider only fair schedulers, but such a restriction is intrinsically global (unless we were to fix an upper bound on the fairness naturally), and
+hence difficult if possible at all to internalize.
+   *)
 
 End Interleave.
 
