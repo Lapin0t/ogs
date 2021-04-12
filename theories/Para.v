@@ -30,6 +30,7 @@ Section Interleave.
      - Only returns when both computations return. In particular, does not observe the pure value computed by a terminating computation if the other one diverges.
      - Interprets each domain of events as disjoint
      - If one of the computations diverges silently, then the silent divergence is a valid behavior of the parallel composition even if the other computation is productive (i.e. we consider the unfair scheduler)
+     - Definitely non-deterministic
    *)
 
   Definition interleave : itree E1 X1 -> itree E2 X2 -> itree (SchedE +' E1 +' E2) (X1 * X2) :=
@@ -49,6 +50,24 @@ Section Interleave.
                          | inr (existT2 _ _ x e k) => vis e (fun x0 : x => F t1 (k x0))
                          end)
   . 
+
+  (* This version exposes silent steps to the scheduler. After interpretation, w.r.t. bijection up-to eutt, I think they are semantically equivalent *)
+  Definition interleave' : itree E1 X1 -> itree E2 X2 -> itree (SchedE +' E1 +' E2) (X1 * X2) :=
+    cofix F (t1 : itree E1 X1) (t2 : itree E2 X2) :=
+      b <- (trigger Sched: itree (SchedE +' E1 +' E2) _);;
+      if b : bool 
+      then 
+        match observe t1 with
+        | RetF x => ITree.map (fun y => (x,y)) (translate (fun _ e => inr1 (inr1 e)) t2)
+        | TauF t1 => Tau (F t1 t2)
+        | VisF e k => vis e (fun x => F (k x) t2)
+        end
+      else
+        match observe t2 with
+        | RetF y => ITree.map (fun x => (x,y)) (translate (fun _ e => inr1 (inl1 e)) t1)
+        | TauF t2 => Tau (F t1 t2)
+        | VisF e k => vis e (fun x => F t1 (k x))
+        end.
 
   (** * Implementing the non-determinism induced by the underlying scheduler *)
 
@@ -75,6 +94,7 @@ Section Synchro.
      - After any synchronization, diverges silently iff one of the computations diverges silently.
      - If both computations return in synch, return the product of the results.
      - If a computation terminates while the other one still produces (i.e. if an event cannot be synchronize), fails.
+     - Completely deterministic
    *)
 
   Definition FailureE := exceptE unit.
