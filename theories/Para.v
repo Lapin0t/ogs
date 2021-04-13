@@ -117,6 +117,36 @@ hence difficult if possible at all to internalize.
 
 End Interleave.
 
+Section Sharing.
+
+  Variable (E : Type -> Type).
+  Variable (X1 X2 : Type).
+
+  (* Parallel interleaving of two computations [t1] and [t2] over a shared domain of events:
+     essentially all options for interleaving can also be considered over a shared domain of events.
+     If the events are the interactions with some kind of states, the former models each thread working
+     over their own memory with on interaction possible, the latter a shared memory.
+  *) 
+  Definition share : itree E X1 -> itree E X2 -> itree (SchedE +' E) (X1 * X2) :=
+    cofix F (t1 : itree E X1) (t2 : itree E X2) :=
+      b <- (trigger Sched: itree (SchedE +' E) _);;
+      if b : bool 
+      then embed_void (get_hd t1) >>=
+                      (fun res : X1 + (sigT2 E (fun Y : Type => Y -> itree E X1)) =>
+                         match res with
+                         | inl x => ITree.map (fun y => (x,y)) (translate inr1 t2)
+                         | inr (existT2 _ _ x e k) => vis e (fun x0 : x => F (k x0) t2)
+                         end) 
+      else embed_void (get_hd t2) >>=
+                      (fun res : X2 + (sigT2 E (fun Y : Type => Y -> itree E X2)) =>
+                         match res with
+                         | inl y => ITree.map (fun x => (x,y)) (translate inr1 t1)
+                         | inr (existT2 _ _ x e k) => vis e (fun x0 : x => F t1 (k x0))
+                         end)
+  . 
+
+End Sharing.
+
 Section Synchro.
 
   Variable (E1 E2 : Type -> Type).
