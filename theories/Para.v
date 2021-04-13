@@ -146,6 +146,18 @@ Section Interleave.
   Definition schedule {E} : itree (SchedE +' E) ~> PropT E :=
     fun T => interp_prop (case_ schedulers trigger_prop) T eq.
 
+  Definition meta_schedule (S: Type) : Type := S -> S * bool.
+  Definition linearizeH {S E} (sched : meta_schedule S) :
+    SchedE ~> Monads.stateT S (itree E) :=
+    fun _ 'Sched s => Ret (sched s).
+  Definition trigger_state {S E} : forall R, E R -> (Monads.stateT S (itree E) R) :=
+    fun R e m => r <- trigger e ;; ret (m, r).
+
+  Definition linearize {S E} (sched : meta_schedule S)
+    : itree (SchedE +' E) ~> Monads.stateT S (itree E) :=
+    interp (case_ (linearizeH sched) trigger_state).
+
+
   (* Could alternatively parameterize the handler by a scheduler given by a stream of bits and quantify at the meta level over all schedules *)
 
   (* Note: a benefit of having a deterministic handler parameterized by a schedule with a meta quantification is that we can easily restrict the set of schedulers we quantify over.
