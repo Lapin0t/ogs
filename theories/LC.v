@@ -343,6 +343,7 @@ Equations ectx_split (t : term) : eager_term :=
       | ERedex C u0 u1 := ERedex (ECApp_r C v1) u0 u1 } ;
     | ERedex C v0 v1 := ERedex (ECApp_l u C) v0 v1 }.
 
+#[local] Transparent ectx_split.
 #[local] Transparent term_of_eterm.
 #[local] Transparent term_of_value.
 #[local] Transparent ec_plug.
@@ -352,6 +353,27 @@ Lemma ectx_split_correct (t : term) : term_of_eterm (ectx_split t) = t.
   first [ rewrite Heq in Hind;   exact Hind
         | rewrite Heq0 in Hind0; exact Hind0 ].
 Qed.
+
+Equations ec_plug_e (C : eager_ctx) (x : eager_term) : eager_term :=
+  ec_plug_e ECHole        x := x ;
+  ec_plug_e (ECApp_l t C) x with ec_plug_e C x := {
+    | EValue v with ectx_split t := {
+      | EValue v0       := ERedex ECHole v0 v ;
+      | ERedex C' v0 v1 := ERedex (ECApp_r C' v) v0 v1 };
+    | ERedex C' v0 v1 := ERedex (ECApp_l t C') v0 v1 };
+  ec_plug_e (ECApp_r C v) x with ec_plug_e C x := {
+    | EValue v0 := ERedex ECHole v0 v ;
+    | ERedex C' v0 v1 := ERedex (ECApp_r C' v) v0 v1 } .
+#[local] Transparent ec_plug_e.
+
+
+Lemma ectx_split_plug (C : eager_ctx) (t : term) : ectx_split (ec_plug C t) = ec_plug_e C (ectx_split t).
+  induction C; cbn; auto; rewrite<- IHC.
+  + destruct (ectx_split (ec_plug C t)); cbn; auto.
+    destruct (ectx_split t0); auto.
+  + destruct v; cbn; destruct (ectx_split (ec_plug C t)); auto.
+Qed.
+    
 
 Inductive enf : Type :=
 | ENValue : value -> enf
@@ -369,17 +391,24 @@ Equations eval_enf' (t : term) : itree (callE term enf +' void1) enf :=
   }.
 Definition eval_enf : term -> itree void1 enf := rec eval_enf'.
 
-(* <<WIP
+(* <<WIP *)
 #[local] Transparent plug.
-Lemma eval_enf_congr (C : t_ctx term) {t1 t2} (p : eval_enf t1 ≈ eval_enf t2)
-  : eval_enf (plug C t1) ≈ eval_enf (plug C t2).
-  unfold eval_enf; rewrite 2 rec_as_interp.
-
+Lemma eval_enf_congr (C : eager_ctx) {t1 t2} (p : eval_enf t1 ≈ eval_enf t2)
+  : eval_enf (ec_plug C t1) ≈ eval_enf (ec_plug C t2).
+  (*unfold eval_enf; rewrite 2 rec_as_interp.
+  Search "eval_enf'".
+  rewrite 2 eval_enf'_equation_1.
+  rewrite 2 ectx_split_plug.
+  Search "clause_1_equation".*)
+  induction C; auto;
+    unfold eval_enf; rewrite 2 rec_as_interp;
+    rewrite 2 eval_enf'_equation_1; rewrite 2 ectx_split_plug.
   induction C; cbn.
   + exact p.
   + unfold eval_enf; rewrite 2 rec_as_interp.
+    funind eval_enf'.
     Search "eval_enf'".
-WIP>> *)
+(* WIP>> *)
   
 
 Inductive enfE : Type -> Type :=
