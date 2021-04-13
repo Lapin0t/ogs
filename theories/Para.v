@@ -97,6 +97,44 @@ Section Interleave.
       | _, RetF y => ITree.map (fun x => (x,y)) (translate (fun _ e => inr1 (inl1 e)) t1)
       end.
 
+
+  (* All the solutions above interleave two sequential computations, and introduce a scheduler in the process.
+     We now turn to the interleaving of non-deterministic computations.
+     We basically simply give a special treatment to the scheduling event to crawl through it as we do for Tau nodes.
+     This introduces an asymmetry in the tree since we prioritize left scheduling events, but it should be harmless.
+   *)
+  Definition inj1 : SchedE +' E1 ~> SchedE +' E1 +' E2 :=
+    fun _ e => match e with | inl1 e => inl1 e | inr1 e => inr1 (inl1 e) end. 
+  Definition inj2 : SchedE +' E2 ~> SchedE +' E1 +' E2 :=
+    fun _ e => match e with | inl1 e => inl1 e | inr1 e => inr1 (inr1 e) end.
+
+  Definition interleave''' : itree (SchedE +' E1) X1 -> itree (SchedE +' E2) X2 -> itree (SchedE +' E1 +' E2) (X1 * X2) :=
+    cofix F (t1 : itree (SchedE +' E1) X1) (t2 : itree (SchedE +' E2) X2) := 
+      match observe t1, observe t2 with
+      | TauF t1, TauF t2 => Tau (F t1 t2)
+      | TauF t1, _ => Tau (F t1 t2)
+      | _, TauF t2 => Tau (F t1 t2)
+      | VisF e1 k1, VisF e2 k2 => 
+        (match e1, e2 with
+         | inl1 e1, _ =>
+           match e1 in (SchedE T) return ((T -> itree (SchedE +' E1) X1) -> itree (SchedE +' E1 +' E2) (X1 * X2)) with
+           | Sched => fun k1 => vis Sched (fun b : bool => F (k1 b) t2)
+           end k1
+         | _, inl1 e2 =>
+           match e2 in (SchedE T) return ((T -> itree (SchedE +' E2) X2) -> itree (SchedE +' E1 +' E2) (X1 * X2)) with
+           | Sched => fun k2 => vis Sched (fun b : bool => F t1 (k2 b))
+           end k2
+         | inr1 s, inr1 s' =>
+           b <- (trigger Sched: itree (SchedE +' E1 +' E2) _);;
+           if b : bool 
+           then vis e1 (fun x => F (k1 x) t2)
+           else vis e2 (fun x => F t1 (k2 x))
+         end)     
+      | RetF x, RetF y => Ret (x,y)
+      | RetF x, _ => ITree.map (fun y => (x,y)) (translate inj2 t2)
+      | _, RetF y => ITree.map (fun x => (x,y)) (translate inj1 t1)
+      end.
+
   (** * Implementing the non-determinism induced by the underlying scheduler *)
 
   (* Collecting propositionally all computations *)
