@@ -72,6 +72,14 @@ Section Interleave.
   (* This version is roughly a version of [interleave] that inlines [get_hd].
      The structure of the collected trees is slightly different, but at a quick
      glance it should again be the same up to bijection up to eutt.
+
+     Actually I take that back, it is not: this diverges as soon as a computation
+     diverges silently, while [interleave] admits the scheduler that lets the
+     other computation produce.
+
+     This is definitely a weird one: the scheduler admits any interleaving of visible
+     events, but only after checking that both threads are available to play.
+     
    *)
   Definition interleave'' : itree E1 X1 -> itree E2 X2 -> itree (SchedE +' E1 +' E2) (X1 * X2) :=
     cofix F (t1 : itree E1 X1) (t2 : itree E2 X2) :=
