@@ -30,7 +30,19 @@ Variant T1 := t1_0.
 Variant T2 := t2_0 | t2_1.
 Variant T3 := t3_0 | t3_1 | t3_2.
 
-Definition boom {A : Type} (bot : T0) : A := match bot with end.
+Equations l_get {X} (xs : list X) : fin (length xs) -> X :=
+  l_get (cons x xs) F0     := x ;
+  l_get (cons x xs) (FS i) := l_get xs i.
+
+Equations l_acc {X} (n : nat) (f : fin n -> X) : list X :=
+  l_acc O     f := nil ;
+  l_acc (S n) f := cons (f F0) (l_acc n (f # FS)).
+
+Equations len_acc {X} n (f : fin n -> X) : length (l_acc n f) = n :=
+  len_acc O     f := eq_refl ;
+  len_acc (S n) f := f_equal S (len_acc n (f # FS)).
+
+Definition ex_falso {A : Type} (bot : T0) : A := match bot with end.
 
 Variant prod1 (D E : Type -> Type) : Type -> Type :=
   | pair1 : forall {X Y}, D X -> E Y -> prod1 D E (X * Y).
@@ -142,7 +154,13 @@ Definition caseE {E M X Y} {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
                     | VisF e k => fmap inr (h (EF e k))
                     end) x.
 
-(* usual term definition *)
+Definition trans_void {E T} : itree void1 T -> itree E T :=
+  @translate _ E elim_void1 T.
+          
+(* ======================================= *)
+(* Terms, contexts, substitution, renaming *)
+(* ======================================= *)
+
 Variant termF (X : Type) : Type :=
 | VarF : nat -> termF X
 | AppF : X -> X -> termF X
@@ -166,160 +184,267 @@ Notation Lam u := (T (LamF u)).
 
 Inductive t_ctx (X : Type) : Type :=
 | CHole : t_ctx X
-| CVar : nat -> t_ctx X
 | CApp_l : X -> t_ctx X -> t_ctx X
 | CApp_r : t_ctx X -> X -> t_ctx X
 | CLam : t_ctx X -> t_ctx X
 .
 
+(* /!\ not capture avoiding, rename beforehand or use t_subst *)
 Equations plug (C : t_ctx term) (x : term) : term :=
-  plug CHole        t := t ;
-  plug (CVar i)     t := Var i ;
+  plug CHole        t := t ;  (* dumb *)
   plug (CApp_l u C) t := App u (plug C t) ;
   plug (CApp_r C u) t := App (plug C t) u ;
   plug (CLam C)     t := Lam (plug C t).
 
-
-(* itree term definitions *)
-
-
+(* multi-renaming *)
 Equations t_rename (f : nat -> nat) (t : term) : term :=
-  t_rename f (Var i) := Var (f i) ;
+  t_rename f (Var i)   := Var (f i) ;
   t_rename f (App u v) := App (t_rename f u) (t_rename f v) ;
-  t_rename f (Lam u) := Lam (t_rename f' u)
+  t_rename f (Lam u)   := Lam (t_rename f' u)
     where f' : nat -> nat := {
           f' O     := O ;
-          f' (S i) := S (f i)}.
+          f' (S i) := S (f i) }.
 
+(* multi-substitution *)
 Equations t_subst (f : nat -> term) (t : term) : term :=
-  t_subst f (Var i) := f i ;
+  t_subst f (Var i)   := f i ;
   t_subst f (App u v) := App (t_subst f u) (t_subst f v) ;
-  t_subst f (Lam u) := Lam (t_subst f' u)
+  t_subst f (Lam u)   := Lam (t_subst f' u)
     where f' : nat -> term := {
           f' O     := Var O ;
-          f' (S i) := t_rename S (f i)}.
+          f' (S i) := t_rename S (f i) }.
 
 Equations env1 (u : term) : nat -> term :=
   env1 u O     := u ;
   env1 u (S i) := Var i.
 
+(* mono-substitution *)
 Definition t_subst1 u v := t_subst (env1 v) u.
 
+(* 'app_many t [u_0, u_1, ... u_n]' == 't u_n ... u_1 u_0' *)
+Equations app_many : term -> list term -> term :=
+  app_many a nil         := a ;
+  app_many a (cons x xs) := App (app_many a xs) x.
 
-(******************************)
-(* normal forms and evaluation*)
+
+Section normal_cbv.
+
+(* =============================== *)
+(* evaluation to normal form (CBV) *)
+(* =============================== *)
 
 Variant normF (X : Type) : Type :=
 | NLamF : X -> normF X
-| NAppF : nat -> list X -> normF X
-.
-
+| NAppF : nat -> list X -> normF X.
 Arguments NLamF {X}.
 Arguments NAppF {X}.
 
-Variant whn : Type := W : normF term -> whn.
-Inductive norm : Type := N : normF norm -> norm.
-
-Search "whn".
-
-Notation WLam u := (W (NLamF u)).
-Notation WApp i xs := (W (NAppF i xs)).
+Inductive nf : Type := N : normF nf -> nf.
 Notation NLam u := (N (NLamF u)).
 Notation NApp i xs := (N (NAppF i xs)).
 
-Variant boehmE : Type -> Type :=
-| BLamC : boehmE T1
-| BAppC : forall i j : nat, boehmE (fin j)
-.
+Equations term_of_nf (u : nf) : term :=
+  term_of_nf (NLam u)    := Lam (term_of_nf u) ;
+  term_of_nf (NApp i xs) := app_many (Var i) (List.map term_of_nf xs).
 
-Equations l_get {X} (xs : list X) : fin (length xs) -> X :=
-  l_get (cons x xs) F0     := x ;
-  l_get (cons x xs) (FS i) := l_get xs i.
-
-Definition BLamT {X} u : itree boehmE X :=
-  Vis BLamC (fun x => match x with t1_0 => u end).
-Definition BAppT {X} i xs : itree boehmE X :=
-  Vis (BAppC i (length xs)) (l_get xs).
-Check (@Vis _ _).
-
-
-Definition normT := itree boehmE T0.
-
-Equations app_many : term -> list term -> term :=
-  app_many a nil := a ;
-  app_many a (cons x xs) := App (app_many a xs) x.
-
-Equations term_of_whn (w : whn) : term :=
-  term_of_whn (WLam u) := Lam u ;
-  term_of_whn (WApp i xs) := app_many (Var i) xs.
-
-Equations ev_whn' (t : term) : itree (callE term whn +' void1) whn :=
-  ev_whn' (Var i) := ret (WApp i nil) ;
-  ev_whn' (App u v) :=
+Equations eval_nf' (t : term) : itree (callE term nf +' void1) nf :=
+  eval_nf' (Var i) := ret (NApp i nil) ;
+  eval_nf' (App u v) :=
     u' <- call u ;;
     v' <- call v ;;
     match u' with
-    | WLam w => call (t_subst1 w (term_of_whn v'))
-    | WApp i xs => ret (WApp i (cons (term_of_whn v') xs))
-    end ;
-  ev_whn' (Lam u) := ret (WLam u).
-
-Definition ev_whn : term -> itree void1 whn := rec ev_whn'.
-
-Equations term_of_norm (u : norm) : term :=
-  term_of_norm (NLam u) := Lam (term_of_norm u) ;
-  term_of_norm (NApp i xs) := app_many (Var i) (List.map term_of_norm xs).
-
-Equations ev_norm' (t : term) : itree (callE term norm +' void1) norm :=
-  ev_norm' (Var i) := ret (NApp i nil) ;
-  ev_norm' (App u v) :=
-    u' <- call u ;;
-    v' <- call v ;;
-    match u' with
-    | NLam w => call (t_subst1 (term_of_norm w) (term_of_norm v'))
+    | NLam w => call (t_subst1 (term_of_nf w) (term_of_nf v'))
     | NApp i xs => ret (NApp i (cons v' xs))
     end ;
-  ev_norm' (Lam u) := u' <- call u ;; ret (NLam u').
+  eval_nf' (Lam u) := u' <- call u ;; ret (NLam u').
 
-Definition ev_norm : term -> itree void1 norm := rec ev_norm'.
+Definition eval_nf : term -> itree void1 nf := rec eval_nf'.
 
-Lemma norm_cong (s t : term) (p : ev_norm s ≈ ev_norm t)
-  : forall C : t_ctx term, ev_norm (plug C s) ≈ ev_norm (plug C t).
-  induction C.
-  + rewrite 2 plug_equation_1.
-    eauto.
-  + reflexivity.
-  + rewrite 2 plug_equation_3.
-    unfold ev_norm.
-    rewrite 2 rec_as_interp.
-    rewrite 2 ev_norm'_equation_2; unfold ";;";simpl.
-    rewrite 2 interp_bind.
-    apply eutt_eq_bind.
-    intro u.
-    rewrite 2 interp_bind.
-    eapply eutt_clo_bind.
-    - rewrite 2 interp_recursive_call.
-      exact IHC.
-    - intros u1 u2 e; rewrite e; reflexivity.
-  + rewrite 2 plug_equation_4.
-    unfold ev_norm.
-    rewrite 2 rec_as_interp.
-    rewrite 2 ev_norm'_equation_2; unfold ";;"; simpl.
-    rewrite 2 interp_bind.
-    eapply eutt_clo_bind.
-    - rewrite 2 interp_recursive_call.
-      exact IHC.
-    - intros u1 u2 e; rewrite e; reflexivity.
-  + rewrite 2 plug_equation_5.
-    unfold ev_norm.
-    rewrite 2 rec_as_interp.
-    rewrite 2 ev_norm'_equation_3; unfold ";;"; simpl.
-    rewrite 2 interp_bind.
-    eapply eutt_clo_bind.
-    - rewrite 2 interp_recursive_call.
-      exact IHC.
-    - intros u1 u2 e; rewrite e; reflexivity.
+Definition eutt_bind_eq {E R U} (t1 t2 : itree E U) (k : U -> itree E R) 
+             (h : t1 ≈ t2) : t1 >>= k ≈ t2 >>= k.
+  eapply eutt_clo_bind.
+  exact h.
+  intros ? ? e; rewrite e; reflexivity.
 Qed.
+
+#[local] Transparent plug.
+#[local] Transparent eval_nf'.
+
+Lemma eval_nf_congr (s t : term) (p : eval_nf s ≈ eval_nf t) (C : t_ctx term)
+  : eval_nf (plug C s) ≈ eval_nf (plug C t).
+  induction C; cbn.
+  + (* CHole *) exact p.
+  + (* CApp_l x C *)
+    unfold eval_nf; rewrite 2 rec_as_interp; cbn.
+    rewrite 2 interp_bind; apply eutt_eq_bind; intro u.
+    rewrite 2 interp_bind; eapply eutt_bind_eq.
+    rewrite 2 interp_recursive_call; exact IHC.
+  + (* CApp_r C x *)
+    unfold eval_nf; rewrite 2 rec_as_interp; cbn.
+    rewrite 2 interp_bind; eapply eutt_bind_eq.
+    rewrite 2 interp_recursive_call; exact IHC.
+  + (* CLam C *)
+    unfold eval_nf; rewrite 2 rec_as_interp; cbn.
+    rewrite 2 interp_bind; eapply eutt_bind_eq.
+    rewrite 2 interp_recursive_call; exact IHC.
+Qed.
+End normal_cbv.
+
+
+Section eager_lassen.
+
+(* =============================================== *)
+(* eager normal form bisimulation, ie Lassen trees *)
+(* =============================================== *)
+  
+Inductive value : Type :=
+| VVar : nat -> value
+| VLam : term -> value
+.
+
+Equations term_of_value (v : value) : term :=
+  term_of_value (VVar i) := Var i ;
+  term_of_value (VLam t) := Lam t .
+
+Inductive eager_ctx : Type :=
+| ECHole : eager_ctx
+| ECApp_l : term -> eager_ctx -> eager_ctx
+| ECApp_r : eager_ctx -> value -> eager_ctx
+.
+
+Equations ec_plug (C : eager_ctx) (t : term) : term :=
+  ec_plug ECHole t := t ;
+  ec_plug (ECApp_l u C) t := App u (ec_plug C t) ;
+  ec_plug (ECApp_r C v) t := App (ec_plug C t) (term_of_value v) .
+
+(* fill the hole (metavar) with a fresh variable *)
+Equations ec_fresh (C : eager_ctx) : term :=
+  ec_fresh ECHole        := Var 0;
+  ec_fresh (ECApp_l t C) := App (t_rename S t) (ec_fresh C) ;
+  ec_fresh (ECApp_r C v) := App (ec_fresh C) (t_rename S (term_of_value v)).
+
+(* decomposition of a term as either a value or E[v1 v2] *)
+Inductive eager_term : Type :=
+| EValue : value -> eager_term
+| ERedex : eager_ctx -> value -> value -> eager_term
+.
+
+Equations term_of_eterm (e : eager_term) : term :=
+  term_of_eterm (EValue v)       := term_of_value v ;
+  term_of_eterm (ERedex C v0 v1) :=
+    ec_plug C (App (term_of_value v0) (term_of_value v1)) .
+
+Equations ectx_split (t : term) : eager_term :=
+  ectx_split (Var i)   := EValue (VVar i) ;
+  ectx_split (Lam u)   := EValue (VLam u) ;
+  ectx_split (App u v) with ectx_split v := {
+    | EValue v1 with ectx_split u := {
+      | EValue u0 := ERedex ECHole u0 v1 ;
+      | ERedex C u0 u1 := ERedex (ECApp_r C v1) u0 u1 } ;
+    | ERedex C v0 v1 := ERedex (ECApp_l u C) v0 v1 }.
+
+#[local] Transparent term_of_eterm.
+#[local] Transparent term_of_value.
+#[local] Transparent ec_plug.
+Lemma ectx_split_correct (t : term) : term_of_eterm (ectx_split t) = t.
+  funelim (ectx_split t);
+  intros; cbn; repeat f_equal;
+  first [ rewrite Heq in Hind;   exact Hind
+        | rewrite Heq0 in Hind0; exact Hind0 ].
+Qed.
+
+Inductive enf : Type :=
+| ENValue : value -> enf
+| ENRedex : eager_ctx -> nat -> value -> enf.
+
+Equations term_of_enf (e : enf) : term :=
+  term_of_enf (ENValue v)     := term_of_value v ;
+  term_of_enf (ENRedex C i v) := ec_plug C (App (Var i) (term_of_value v)) .
+
+Equations eval_enf' (t : term) : itree (callE term enf +' void1) enf :=
+  eval_enf' t with ectx_split t := {
+    | EValue v            := ret (ENValue v) ;
+    | ERedex C (VVar i) v := ret (ENRedex C i v) ;
+    | ERedex C (VLam u) v := call (ec_plug C (t_subst1 u (term_of_value v)))
+  }.
+Definition eval_enf : term -> itree void1 enf := rec eval_enf'.
+
+(* <<WIP
+#[local] Transparent plug.
+Lemma eval_enf_congr (C : t_ctx term) {t1 t2} (p : eval_enf t1 ≈ eval_enf t2)
+  : eval_enf (plug C t1) ≈ eval_enf (plug C t2).
+  unfold eval_enf; rewrite 2 rec_as_interp.
+
+  induction C; cbn.
+  + exact p.
+  + unfold eval_enf; rewrite 2 rec_as_interp.
+    Search "eval_enf'".
+WIP>> *)
+  
+
+Inductive enfE : Type -> Type :=
+| ENVarE : nat -> enfE T0
+| ENLamE : enfE T1
+| ENRedexE : nat -> enfE T2
+.
+
+Definition ENVarT {X} (i : nat) : itree enfE X := Vis (ENVarE i) ex_falso.
+Definition ENLamT {X} (t : itree enfE X) : itree enfE X :=
+  Vis ENLamE (fun x : T1 => match x with t1_0 => t end).
+Definition ENRedexT {X} (i : nat) (t0 t1 : itree enfE X) : itree enfE X :=
+  Vis (ENRedexE i) (fun x : T2 => match x with t2_0 => t0 | t2_1 => t1 end).
+
+Equations lassen_val (v : value) : itree enfE (term + T0) :=
+  lassen_val (VVar i) := ENVarT i ;
+  lassen_val (VLam u) := ENLamT (ret (inl u)).
+
+Equations lassen_enf (t : enf) : itree enfE (term + T0) :=
+  lassen_enf (ENValue v)     := lassen_val v ;
+  lassen_enf (ENRedex C i v) := ENRedexT i (ret (inl (ec_fresh C))) (lassen_val v).
+
+Definition eval_lassen : term -> itree enfE T0 :=
+  iter (fun t => translate elim_void1 (eval_enf t) >>= lassen_enf).
+
+End eager_lassen.
+
+
+(* ============== *)
+(* old left-overs *)
+(* ============== *)
+
+(* Weak Head Normal Form *)
+Variant whnf : Type := W : normF term -> whnf.
+Notation WLam u := (W (NLamF u)).
+Notation WApp i xs := (W (NAppF i xs)).
+
+(* boehm tree encoded as itrees *)
+Variant boehmE : Type -> Type :=
+| BLamE : boehmE T1
+| BAppE : forall i j : nat, boehmE (fin j).
+
+Definition boehm_tree := itree boehmE T0.
+
+Definition BLam {X} u : itree boehmE X :=
+  Vis BLamE (fun x => match x with t1_0 => u end).
+Definition BApp {X} i xs : itree boehmE X :=
+  Vis (BAppE i (length xs)) (l_get xs).
+
+Equations term_of_whnf (w : whnf) : term :=
+  term_of_whnf (WLam u) := Lam u ;
+  term_of_whnf (WApp i xs) := app_many (Var i) xs.
+
+(* Non-total function computing the whnf of a term by CBN reduction *)
+Equations eval_whnf' (t : term) : itree (callE term whnf +' void1) whnf :=
+  eval_whnf' (Var i) := ret (WApp i nil) ;
+  eval_whnf' (App u v) :=
+    u' <- call u ;;
+    match u' with
+    | WLam w => call (t_subst1 w v)
+    | WApp i xs => ret (WApp i (cons v xs))
+    end ;
+  eval_whnf' (Lam u) := ret (WLam u).
+
+Definition eval_whnf : term -> itree void1 whnf := rec eval_whnf'.
 
 
 (* w_inj k (W x) := wrap (F2E (fmap k x)) *)
@@ -329,33 +454,39 @@ Equations w_inj {X} : (term -> itree boehmE X) -> whn -> itree boehmE X :=
   w_inj k (WApp i xs) := Vis (BAppC i (length xs)) (k # l_get xs).
 
 (* magic :D *)
-Definition ev_boehmE' (t : term) : itree boehmE (term + T0) :=
+Definition lassen' (t : term) : itree boehmE (term + T0) :=
   ITree.bind (translate elim_void1 (ev_whn t)) (w_inj (ret # inl)).
-Definition eval_boehmE : term -> normT := iter ev_boehmE'.
+Definition lassen : term -> normT := iter lassen'.
+
+Variant eqv_whn : whn -> whn -> Prop :=
+  | Eqv_wlam : forall u v, eutt eq (lassen u) (lassen v) -> eqv_whn (WLam u) (WLam v)
+  | Eqv_wapp : forall i n f g, (forall j, eutt eq (lassen (f j)) (lassen (g j)))
+             -> eqv_whn (WApp i (l_acc n f)) (WApp i (l_acc n g))
+.
 
 Equations elim_r {T} (x : T + T0) : T := elim_r (inl t) := t.
 
 (*
-Lemma boehmE'_cong {C : t_ctx term} (s t : term) (p : eval_boehmE s ≈ eval_boehmE t)
-  : eutt (fun a b => eval_boehmE (elim_r a) ≈ eval_boehmE (elim_r b))
-         (ev_boehmE' (plug C s))
-         (ev_boehmE' (plug C t)).
+Lemma boehmE'_cong {C : t_ctx term} (s t : term) (p : lassen s ≈ lassen t)
+  : eutt (fun a b => lassen (elim_r a) ≈ lassen (elim_r b))
+         (lassen' (plug C s))
+         (lassen' (plug C t)).
   induction C.
   + rewrite 2 plug_equation_1.
 *)
 
-Lemma boehmE_cong {C : t_ctx term} (s t : term) (p : eval_boehmE s ≈ eval_boehmE t)
-  : eval_boehmE (plug C s) ≈ eval_boehmE (plug C t).
+Lemma boehmE_cong {C : t_ctx term} (s t : term) (p : lassen s ≈ lassen t)
+  : lassen (plug C s) ≈ lassen (plug C t).
   induction C.
   + rewrite 2 plug_equation_1.
     exact p.
   + rewrite 2 plug_equation_2.
     reflexivity.
   + rewrite 2 plug_equation_3.
-    unfold eval_boehmE, ";;", iter, MonadIter_itree; simpl.
+    unfold lassen, ";;", iter, MonadIter_itree; simpl.
     rewrite 2 unfold_iter.
     eapply eutt_clo_bind.
-    * unfold ev_boehmE', ev_whn.
+    * unfold lassen', ev_whn.
       rewrite 2 rec_as_interp.
       eapply eutt_clo_bind.
       - eapply eutt_translate'.
@@ -374,7 +505,7 @@ Lemma boehmE_cong {C : t_ctx term} (s t : term) (p : eval_boehmE s ≈ eval_boeh
         Search translate.
         eapply eutt_translate'.
       Search translate.
-  unfold eval_boehmE, ";;", iter, MonadIter_itree; simpl.
+  unfold lassen, ";;", iter, MonadIter_itree; simpl.
   rewrite 2 unfold_iter.
   rewrite 2 bind_bind.
   + 
@@ -387,6 +518,6 @@ Lemma boehmE_cong {C : t_ctx term} (s t : term) (p : eval_boehmE s ≈ eval_boeh
   + rewrite plug_equation_1,plug_equation_1.
     exact (@RelationClasses.reflexivity _ _ (Reflexive_eqit eq _ _ _) _).
   + rewrite plug_equation_2,plug_equation_2.
-    compute [eval_boehmE].
+    compute [lassen].
     rewrite unfold_iter,unfold_iter.
     Search ITree.iter.
