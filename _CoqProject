@@ -2,3 +2,5 @@
 -Q theories OGS
 
 theories/LC.v
+theories/Utils.v
+theories/Poly.v

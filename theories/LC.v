@@ -19,144 +19,10 @@ From Equations Require Import Equations.
 
 Set Primitive Projections.
 
-(*************************)
-(* notations and prelude *)
-Notation endo T := (T -> T).
-Arguments depE : clear implicits.  (* index is usually hard to infer *)
-Notation "f # g" := (Basics.compose f g) (at level 60) : function_scope. 
-
-Variant T0 := .
-Variant T1 := t1_0.
-Variant T2 := t2_0 | t2_1.
-Variant T3 := t3_0 | t3_1 | t3_2.
-
-Equations l_get {X} (xs : list X) : fin (length xs) -> X :=
-  l_get (cons x xs) F0     := x ;
-  l_get (cons x xs) (FS i) := l_get xs i.
-
-Equations l_acc {X} (n : nat) (f : fin n -> X) : list X :=
-  l_acc O     f := nil ;
-  l_acc (S n) f := cons (f F0) (l_acc n (f # FS)).
-
-Equations len_acc {X} n (f : fin n -> X) : length (l_acc n f) = n :=
-  len_acc O     f := eq_refl ;
-  len_acc (S n) f := f_equal S (len_acc n (f # FS)).
-
-Definition ex_falso {A : Type} (bot : T0) : A := match bot with end.
-
-Variant prod1 (D E : Type -> Type) : Type -> Type :=
-  | pair1 : forall {X Y}, D X -> E Y -> prod1 D E (X * Y).
-
-Notation "D *' E" := (prod1 D E) (at level 50).
-
-(********************************************************)
-(* Dependent version of stuff in ITree.Interp.Recursion *)
-Section dep_rec.
-
-Equations dcalling' {A B} {F : Type -> Type}
-          (f : forall a, itree F (B a)) : depE A B ~> itree F :=
-dcalling' f _ (Dep a) := f a.
-
-Definition drec {E : Type -> Type} {A B}
-           (body : forall a, itree (depE A B +' E) (B a)) :
-  forall a, itree E (B a) :=
-  fun a => mrec (dcalling' body) (Dep a).
-
-Definition dcall {E A B} (a : A) : itree (depE A B +' E) (B a) :=
-  ITree.trigger (inl1 (Dep a)).
-
-(*Definition drec_fix {E : Type -> Type} {A B}
-           (body : endo (forall a, itree E (B a)))
-  : forall a, itree E (B a)
-  := drec (body dcall).*)
-End dep_rec.
+From OGS Require Import Utils.
 
 
 
-(**************************)
-(* terms and substitution *)
-
-Record eF (E : Type -> Type) (X : Type) := EF {
-  eF_R : Type ;
-  eF_q : E eF_R ;
-  eF_k : eF_R -> X
-}.
-
-Notation "[ E ]e" := (eF E).
-Arguments EF {E} {X} {eF_R}.
-Arguments eF_R {E} {X}.
-Arguments eF_q {E} {X}.
-Arguments eF_k {E} {X}.
-
-Definition wrap {E X} (t : [ E ]e (itree E X)) : itree E X :=
-  vis (eF_q t) (eF_k t).
-
-Instance Functor_E {E} : Functor ([ E ]e) := {|
-  fmap _ _ f := fun x => EF (eF_q x) (f # eF_k x)
-|}. 
-
-Instance Functor_E_itree {E} : Functor ([ E ]e # itree E) := {|
-  fmap _ _ f := fun x => EF (eF_q x) (fmap f # eF_k x)
-|}.
-
-(*****************)
-
-(*
-Section euttG_bind.
-Context {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
-Context (rL rH gL gH : itree E R1 -> itree E R2 -> Prop).
-Variant euttG_bind_clo : itree E R1 -> itree E R2 -> Prop :=
-| i_gbind_clo t1 t2 k1 k2 :
-      euttG RR rL rH gL gH t1 t2 ->
-      (forall u1 u2, RR u1 u2 -> euttG RR rL rH gL gH (k1 u1) (k2 u2))
-  ->  euttG_bind_clo (ITree.bind t1 k1) (ITree.bind t2 k2)
-.
-Hint Constructors euttG_bind_clo: core.
-Print eqit_.
-Lemma euttG_clo_bind vclo
-      (MON: monotone2 vclo)
-      (CMP: compose (eqitC RR b1 b2) vclo <3= compose vclo (eqitC RR b1 b2))
-      (ID: id <3= vclo) :
-    euttG_bind_clo b1 b2 <3= gupaco2 (eqit_ RR b1 b2 vclo) (eqitC RR b1 b2).
-*)
-
-(*****************)
-
-(*
-   \o/ it works
-   variation of ITree.Interp.Interp.interp that folds over events instead
-   of mapping them
-*)
-
-Definition translate_rec {D E : Type -> Type}
-           (ctx : D ~> itree (D +' E)) : itree D ~> itree E :=
-  fun _ => @interp_mrec _ _ ctx _ # @translate _ _ inl1 _.
-
-Definition foldE {E M X} {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
-           (h : [ E ]e (M X) -> M (itree E X + X)%type) : itree E X -> M X
-  := iter (fun x => match observe x with
-                 | RetF r => ret (inr r)
-                 | TauF t => ret (inl t)
-                 | VisF e k => h (EF e (iter (ret # inl) # k))
-                 end).
-
-(* foldE with additional data *)
-Definition foldE_ad {E M A X} {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
-           (h : [ E ]e (stateT A M X) -> stateT A M _) (x : itree E X) : A -> M X
-  := fmap snd # foldE h x.
-
-
-Definition caseE {E M X Y} {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
-           (f : X -> Y) (x : itree E X) (h : [ E ]e (itree E X) -> M Y) : M Y
-  := iter (fun x => match observe x with
-                    | RetF r => ret (inr (f r))
-                    | TauF t => ret (inl t)
-                    | VisF e k => fmap inr (h (EF e k))
-                    end) x.
-
-Definition trans_void {E T} : itree void1 T -> itree E T :=
-  @translate _ E elim_void1 T.
-          
 (* ======================================= *)
 (* Terms, contexts, substitution, renaming *)
 (* ======================================= *)
@@ -296,7 +162,7 @@ Section eager_lassen.
 (* =============================================== *)
 (* eager normal form bisimulation, ie Lassen trees *)
 (* =============================================== *)
-  
+
 Inductive value : Type :=
 | VVar : nat -> value
 | VLam : term -> value
@@ -305,6 +171,9 @@ Inductive value : Type :=
 Equations term_of_value (v : value) : term :=
   term_of_value (VVar i) := Var i ;
   term_of_value (VLam t) := Lam t .
+
+Definition val_app_fresh (v : value) : term :=
+  App (t_rename S (term_of_value v)) (Var O).
 
 Inductive eager_ctx : Type :=
 | ECHole : eager_ctx
@@ -328,6 +197,7 @@ Inductive eager_term : Type :=
 | EValue : value -> eager_term
 | ERedex : eager_ctx -> value -> value -> eager_term
 .
+Derive NoConfusion for eager_term.
 
 Equations term_of_eterm (e : eager_term) : term :=
   term_of_eterm (EValue v)       := term_of_value v ;
@@ -343,6 +213,10 @@ Equations ectx_split (t : term) : eager_term :=
       | ERedex C u0 u1 := ERedex (ECApp_r C v1) u0 u1 } ;
     | ERedex C v0 v1 := ERedex (ECApp_l u C) v0 v1 }.
 
+Lemma ectx_split_val (v : value) : ectx_split (term_of_value v) = EValue v.
+  destruct v; auto.
+Qed.
+
 #[local] Transparent ectx_split.
 #[local] Transparent term_of_eterm.
 #[local] Transparent term_of_value.
@@ -354,26 +228,83 @@ Lemma ectx_split_correct (t : term) : term_of_eterm (ectx_split t) = t.
         | rewrite Heq0 in Hind0; exact Hind0 ].
 Qed.
 
+Lemma ectx_split_coherent (t : eager_term) : ectx_split (term_of_eterm t) = t.
+funelim (term_of_eterm t).
++ exact (ectx_split_val v).
++ revert v0 v1.
+  induction e; intros v0 v1; cbn.
+  destruct (ectx_split (term_of_value v1)) eqn:?; cbn;
+    rewrite (ectx_split_val v1) in Heqe;
+    try (discriminate Heqe); 
+    injection Heqe as H; rewrite H.
+  - destruct (ectx_split (term_of_value v0)) eqn:?; cbn;
+      rewrite (ectx_split_val v0) in Heqe;
+      try (discriminate Heqe).
+    injection Heqe as H0.
+    rewrite H0; reflexivity.
+  - rewrite (IHe v0 v1); reflexivity.
+  - destruct (ectx_split (term_of_value v)) eqn:He; cbn;
+      rewrite (ectx_split_val v) in He;
+      try (discriminate He).
+    injection He as H; rewrite H.
+    rewrite (IHe v0 v1); reflexivity.
+Qed.
+
+Lemma ectx_split_unique {x y} : x = term_of_eterm y <-> ectx_split x = y.
+  econstructor.
+  - intro p.
+    rewrite<- ectx_split_coherent.
+    f_equal; exact p.
+  - intro p.
+    rewrite<- ectx_split_correct at 1.
+    f_equal; exact p.
+Qed.
+
+Lemma ectx_split_inj {x y} : ectx_split x = ectx_split y -> x = y.
+  intro p.
+  rewrite<- ectx_split_unique in p.
+  rewrite ectx_split_correct in p.
+  exact p.
+Qed.
+
+Equations ec_compose (C D : eager_ctx) : eager_ctx :=
+  ec_compose ECHole        D := D ;
+  ec_compose (ECApp_l t C) D := ECApp_l t (ec_compose C D) ;
+  ec_compose (ECApp_r C v) D := ECApp_r (ec_compose C D) v .
+#[local] Transparent ec_compose.
+
 Equations ec_plug_e (C : eager_ctx) (x : eager_term) : eager_term :=
-  ec_plug_e ECHole        x := x ;
-  ec_plug_e (ECApp_l t C) x with ec_plug_e C x := {
-    | EValue v with ectx_split t := {
-      | EValue v0       := ERedex ECHole v0 v ;
-      | ERedex C' v0 v1 := ERedex (ECApp_r C' v) v0 v1 };
-    | ERedex C' v0 v1 := ERedex (ECApp_l t C') v0 v1 };
-  ec_plug_e (ECApp_r C v) x with ec_plug_e C x := {
-    | EValue v0 := ERedex ECHole v0 v ;
-    | ERedex C' v0 v1 := ERedex (ECApp_r C' v) v0 v1 } .
+  ec_plug_e C (EValue v)        := ectx_split (ec_plug C (term_of_value v)) ;
+  ec_plug_e C (ERedex C' v0 v1) := ERedex (ec_compose C C') v0 v1.
 #[local] Transparent ec_plug_e.
 
+Lemma ec_plug_e_hole {x} : ec_plug_e ECHole x = x.
+  destruct x.
+  + exact (ectx_split_val _).
+  + auto.
+Qed.
 
 Lemma ectx_split_plug (C : eager_ctx) (t : term) : ectx_split (ec_plug C t) = ec_plug_e C (ectx_split t).
-  induction C; cbn; auto; rewrite<- IHC.
-  + destruct (ectx_split (ec_plug C t)); cbn; auto.
-    destruct (ectx_split t0); auto.
-  + destruct v; cbn; destruct (ectx_split (ec_plug C t)); auto.
+destruct (ectx_split t) eqn:He; cbn;
+  rewrite<- ectx_split_unique in He.
+- rewrite He; reflexivity.
+- rewrite<- ectx_split_unique.
+  induction C; cbn; try (f_equal; f_equal); auto.
 Qed.
-    
+
+Lemma ec_plug_e_inv_val {C x v} (p : ec_plug_e C x = EValue v) : C = ECHole /\ x = EValue v.
+  rewrite<- (@ectx_split_coherent x) in p.
+  rewrite<- ectx_split_plug in p.
+  rewrite<- ectx_split_unique in p; cbn in p.
+  induction C; try (destruct v; cbn in p; discriminate p).
+  cbn in p; symmetry in p; rewrite ectx_split_unique in p.
+  rewrite ectx_split_val in p.
+  rewrite p; auto.
+Qed.
+
+(*Lemma ec_plug_e_inv_red {C x C' i v} (p : ec_plug_e C x = ERedex C' i v) :*)
+  
+
 
 Inductive enf : Type :=
 | ENValue : value -> enf
@@ -391,41 +322,113 @@ Equations eval_enf' (t : term) : itree (callE term enf +' void1) enf :=
   }.
 Definition eval_enf : term -> itree void1 enf := rec eval_enf'.
 
-(* <<WIP *)
-#[local] Transparent plug.
 Lemma eval_enf_congr (C : eager_ctx) {t1 t2} (p : eval_enf t1 ≈ eval_enf t2)
   : eval_enf (ec_plug C t1) ≈ eval_enf (ec_plug C t2).
-  (*unfold eval_enf; rewrite 2 rec_as_interp.
-  Search "eval_enf'".
-  rewrite 2 eval_enf'_equation_1.
-  rewrite 2 ectx_split_plug.
-  Search "clause_1_equation".*)
-  induction C; auto;
-    unfold eval_enf; rewrite 2 rec_as_interp;
-    rewrite 2 eval_enf'_equation_1; rewrite 2 ectx_split_plug.
+unfold eval_enf in *.
+rewrite 2 rec_as_interp in *.
+rewrite 2 eval_enf'_equation_1 in *.
+rewrite 2 ectx_split_plug.
+
+destruct (ectx_split t1) eqn:H, (ectx_split t2) eqn:H1; cbn.
++ cbn in p.
+  rewrite 2 interp_ret in p; apply eqit_Ret in p; injection p as peq.
+  rewrite peq in H.
+  rewrite<- H in H1.
+  apply ectx_split_inj in H1.
+  rewrite H1, peq.
+  reflexivity.
++ cbn in p.
+  destruct v0.
+  - rewrite 2 interp_ret in p.
+    apply eqit_Ret in p.
+    discriminate p.
+  - shelve.
++ shelve.
++ cbn in p.
+  destruct v, v1; cbn.
+  - rewrite 2 interp_ret in p; apply eqit_Ret in p; injection p; intros.
+    rewrite H0, H2, H3; reflexivity.
+  - 
+    * 
+  - induction C; cbn.
+    * rewrite ectx_split_val; exact p.
+    * 
+    
+  destruct (ectx_split (ec_plug C (term_of_value v))) eqn:H2,
+           (ectx_split (ec_plug C (term_of_value v0))) eqn:H3; cbn.
+  - rewrite 2 interp_ret; apply eqit_Ret.
+                               
   induction C; cbn.
-  + exact p.
-  + unfold eval_enf; rewrite 2 rec_as_interp.
-    funind eval_enf'.
-    Search "eval_enf'".
-(* WIP>> *)
-  
+  - rewrite 2 ectx_split_val; cbn.
+    rewrite 2 interp_ret; apply eqit_Ret.    
+    exact p.
+  - 
++ rewrite<- ectx_split_unique in H; cbn in H.
+  rewrite<- ectx_split_unique in H1; cbn in H1.
+  cbn in p.
++ destruct (ec_plug_e_inv_val H).
+  rewrite<- ectx_split_unique in H1; cbn in H1.
+  rewrite H1 in p.
+  rewrite (ectx_split_val v) in p.
+  cbn in p.
+  rewrite interp_ret in p.
+  destruct (ectx_split t2) eqn:H2; cbn.
+  - rewrite H0; cbn; rewrite (ectx_split_val v0); cbn.
+    rewrite 2 interp_ret; apply eqit_Ret.
+    cbn in p; rewrite interp_ret in p; apply eqit_Ret in p.
+    exact p.
+  - cbn in p.
+    destruct v0; cbn in p.
+    rewrite interp_ret in p.
+    apply eqit_Ret in p.
+    discriminate p.
+    rewrite H0; cbn.
+    rewrite interp_ret.
+    exact p.
++ destruct (ec_plug_e C (ectx_split t2)) eqn:H1; cbn.
+  - destruct (ec_plug_e_inv_val H1).
+    destruct (ectx_split t1) eqn:?.
+    * rewrite H0 in H; cbn in H. rewrite ectx_split_val in H.
+      discriminate H.
+    * cbn in H.
+      injection H; intros.
+      rewrite H2, H3, H4, H5 in *.
+      cbn in *.
+      destruct v; cbn in *.
+      rewrite 2 interp_ret in p.
+      apply eqit_Ret in p; discriminate p.
+      Search recursive.
+      rewrite interp_recursive_call in p.
+      rewrite rec_as_interp in p.
+      rewrite<- ectx_split_coherent in H2; cbn in H2.
+      rewrite ectx_split_val in H2.
+      rewrite H2 in H1
+      rewrite H2 in p.
+      cbn in p.
+      rewrite 2 interp_ret in p.
+      apply eqit_Ret in p.
+      destruct v.
+    rewrite 
+    * 
+    * cbn.
+    
+    Search "interp" "ret".
+induction C; cbn.
+
+
 
 Inductive enfE : Type -> Type :=
-| ENVarE : nat -> enfE T0
-| ENLamE : enfE T1
-| ENRedexE : nat -> enfE T2
-.
+| ENValE : enfE T1
+| ENRedexE : nat -> enfE T2.
 
-Definition ENVarT {X} (i : nat) : itree enfE X := Vis (ENVarE i) ex_falso.
-Definition ENLamT {X} (t : itree enfE X) : itree enfE X :=
-  Vis ENLamE (fun x : T1 => match x with t1_0 => t end).
+(* helpers for lassen-tree events *)
+Definition ENValT {X} (t : itree enfE X) : itree enfE X :=
+  Vis ENValE (fun x : T1 => match x with t1_0 => t end).
 Definition ENRedexT {X} (i : nat) (t0 t1 : itree enfE X) : itree enfE X :=
   Vis (ENRedexE i) (fun x : T2 => match x with t2_0 => t0 | t2_1 => t1 end).
 
-Equations lassen_val (v : value) : itree enfE (term + T0) :=
-  lassen_val (VVar i) := ENVarT i ;
-  lassen_val (VLam u) := ENLamT (ret (inl u)).
+Definition lassen_val (v : value) : itree enfE (term + T0) :=
+  ENValT (ret (inl (App (t_rename S (term_of_value v)) (Var O)))) .
 
 Equations lassen_enf (t : enf) : itree enfE (term + T0) :=
   lassen_enf (ENValue v)     := lassen_val v ;
@@ -434,8 +437,124 @@ Equations lassen_enf (t : enf) : itree enfE (term + T0) :=
 Definition eval_lassen : term -> itree enfE T0 :=
   iter (fun t => translate elim_void1 (eval_enf t) >>= lassen_enf).
 
+Definition eqv_lassen (x y : term) : Prop := eval_lassen x ≈ eval_lassen y.
+
+(* ============================= *)
+(* representing values as leaves *)
+(* ============================= *)
+
+Inductive enfE_v : Type -> Type := ENRedexE_v : nat -> enfE_v T2.
+Definition ENRedexT_v {X} (i : nat) (t0 t1 : itree enfE_v X) : itree enfE_v X :=
+  Vis (ENRedexE_v i) (fun x : T2 => match x with t2_0 => t0 | t2_1 => t1 end).
+
+Equations enfE_v_inj {X} : enfE_v X -> enfE X :=
+  enfE_v_inj (ENRedexE_v i) := ENRedexE i.
+Definition lassen_v_inj {X} : itree enfE_v X -> itree enfE X :=
+  @translate _ _ (@enfE_v_inj) X.
+
+Equations lassen_enf_v (t : enf) : itree enfE_v (term + value) :=
+  lassen_enf_v (ENValue v)     := Ret (inr v) ;
+  lassen_enf_v (ENRedex C i v) := ENRedexT_v i (Ret (inl (ec_fresh C)))
+                                               (Ret (inr v)).
+
+Definition eval_lassen_v : term -> itree enfE_v value :=
+  iter (fun t => translate elim_void1 (eval_enf t) >>= lassen_enf_v).
+
+(* unfold leaves by coinductively eta-expanding values *)
+Definition expand_v : itree enfE_v value -> itree enfE T0 :=
+  ITree.iter (fun t => v <- lassen_v_inj t ;;
+                       Ret (inl (Ret v))).
+  (*cofix expand_ t := ITree.bind (lassen_v_inj t)
+                                (tau # expand_ # eval_lassen_v # val_app_fresh).*)
+
+Equations _expand_v : itree' enfE_v value -> itree enfE T0 :=
+  _expand_v (RetF r) := expand_v (eval_lassen_v (val_app_fresh r)) ;
+  _expand_v (TauF t) := tau (expand_v t) ;
+  _expand_v (VisF e k) := Vis (enfE_v_inj e) (fun r => expand_v (k r)).
+
+Lemma unfold_expand_v (x : itree enfE_v value) : expand_v x ≅ _expand_v (observe x).
+  unfold expand_v.
+  rewrite unfold_iter; cbn.
+  rewrite bind_bind; cbn.
+  unfold lassen_v_inj.
+  Search "bind".
+  bind_translate.
+  destruct (observe x); cbn.
+
+Lemma eval_lassen_v_lem (x : term) : eval_lassen x ≈ expand_v (eval_lassen_v x).
+  induction x; induction t; cbn.
+  Admitted.
+
+(* LassenV trees are bisimilar and coinductively, leaves (values) applied to 
+   a fresh variable have bisimilar lassen' trees.
+   We
+*)
+Definition eqv_lassen_v : term -> term -> Prop :=
+  paco2 (fun R x y => eutt (fun v1 v2 => R (val_app_fresh v1) (val_app_fresh v2))
+                           (eval_lassen_v x)
+                           (eval_lassen_v y))
+        bot2.
+
+Lemma eqv_lassen_v_lem (x y : term) :
+  eqv_lassen_v x y <-> expand_v (eval_lassen_v x) ≈ expand_v (eval_lassen_v y).
+econstructor.
++ einit.
+  ecofix H.
+  intro e.
+  unfold expand_v.
+  econstructor.
+  Search gpaco2.
+  eapply gpaco2_step.
+  - shelve.
+  - unfold eqit_. cbn.
+    econstructor.
+Admitted.
+
+Lemma eqv_lassen_v_correct (x y : term) : eqv_lassen x y <-> eqv_lassen_v x y.
+constructor;
+  unfold eqv_lassen;
+  rewrite (eval_lassen_v_lem x), (eval_lassen_v_lem y);
+  [ exact (proj2 (eqv_lassen_v_lem x y)) |
+    exact (proj1 (eqv_lassen_v_lem x y)) ].
+Qed.
 End eager_lassen.
 
+(* ================ *)
+
+
+
+Variant FreeF (E : Type -> Type) (A : Type) (X : Type) : Type :=
+| FRetF : forall (r : X), FreeF E A X
+| FVisF : forall {R} (e : E R) (k : R -> A), FreeF E A X
+.
+Arguments FRetF {_} {_} {_}.
+Arguments FVisF {_} {_} {_} {_}.
+
+Inductive Free (E : Type -> Type) (X : Type) : Type :=
+| F : FreeF E (Free E X) X -> Free E X
+.
+Arguments F {_} {_}.
+Notation FRet r := (F (FRetF r)).
+Notation FVis e k := (F (FVisF e k)).
+
+Definition unfold1 {E X} : itree E X -> itree void1 (FreeF E (itree E X) X) :=
+  cofix _unfold x :=
+    match observe x with
+    | RetF r => Ret (FRetF r)
+    | TauF t => Tau (_unfold t)
+    | VisF e k => Ret (FVisF e k)
+    end.
+
+
+
+  
+    
+  
+
+
+
+
+(*Definition explore {E}*)
 
 (* ============== *)
 (* old left-overs *)
