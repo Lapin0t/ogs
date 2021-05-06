@@ -43,6 +43,14 @@ Equations len_acc {X} n (f : fin n -> X) : length (l_acc n f) = n :=
   len_acc O     f := eq_refl ;
   len_acc (S n) f := f_equal S (len_acc n (f # FS)).
 
+Equations dvec {X} (ty : X -> Type) (xs : list X) : Type :=
+  dvec ty nil := T0 ;
+  dvec ty (cons x xs) := ty x * dvec ty xs.
+Transparent dvec.
+
+Equations d_get {X ty} (c : list X) (d : dvec ty c) (i : fin (length c)) : ty (l_get c i) :=
+  d_get (cons t ts) r F0     := fst r ;
+  d_get (cons t ts) r (FS i) := d_get ts (snd r) i.
 
 (********************************************************)
 (* Dependent version of stuff in ITree.Interp.Recursion *)

@@ -208,16 +208,22 @@ Equations ectx_split (t : term) : eager_term :=
   ectx_split (Var i)   := EValue (VVar i) ;
   ectx_split (Lam u)   := EValue (VLam u) ;
   ectx_split (App u v) with ectx_split v := {
-    | EValue v1 with ectx_split u := {
-      | EValue u0 := ERedex ECHole u0 v1 ;
-      | ERedex C u0 u1 := ERedex (ECApp_r C v1) u0 u1 } ;
+    | EValue v0 with ectx_split u := {
+      | EValue u0 := ERedex ECHole u0 v0 ;
+      | ERedex C u0 u1 := ERedex (ECApp_r C v0) u0 u1 } ;
     | ERedex C v0 v1 := ERedex (ECApp_l u C) v0 v1 }.
+#[local] Transparent ectx_split.
 
 Lemma ectx_split_val (v : value) : ectx_split (term_of_value v) = EValue v.
   destruct v; auto.
 Qed.
 
-#[local] Transparent ectx_split.
+Lemma ectx_split_app u v : { C : _ & { v0 : _ & { v1 : _ & ectx_split (App u v) = ERedex C v0 v1 }}}.
+  cbn; destruct (ectx_split v) eqn:d1;
+  cbn; [destruct (ectx_split u) eqn:d2|];
+  cbn; repeat econstructor; auto.
+Qed.
+
 #[local] Transparent term_of_eterm.
 #[local] Transparent term_of_value.
 #[local] Transparent ec_plug.
@@ -251,19 +257,13 @@ funelim (term_of_eterm t).
 Qed.
 
 Lemma ectx_split_unique {x y} : x = term_of_eterm y <-> ectx_split x = y.
-  econstructor.
-  - intro p.
-    rewrite<- ectx_split_coherent.
-    f_equal; exact p.
-  - intro p.
-    rewrite<- ectx_split_correct at 1.
-    f_equal; exact p.
+  econstructor; intro p.
+  rewrite<- (ectx_split_coherent y); f_equal; exact p.
+  rewrite<- (ectx_split_correct x); f_equal; exact p.
 Qed.
 
-Lemma ectx_split_inj {x y} : ectx_split x = ectx_split y -> x = y.
-  intro p.
-  rewrite<- ectx_split_unique in p.
-  rewrite ectx_split_correct in p.
+Lemma ectx_split_inj {x y} (p : ectx_split x = ectx_split y) : x = y.
+  rewrite<- ectx_split_correct, ectx_split_unique.
   exact p.
 Qed.
 
@@ -280,13 +280,12 @@ Equations ec_plug_e (C : eager_ctx) (x : eager_term) : eager_term :=
 
 Lemma ec_plug_e_hole {x} : ec_plug_e ECHole x = x.
   destruct x.
-  + exact (ectx_split_val _).
-  + auto.
+  exact (ectx_split_val _).
+  auto.
 Qed.
 
 Lemma ectx_split_plug (C : eager_ctx) (t : term) : ectx_split (ec_plug C t) = ec_plug_e C (ectx_split t).
-destruct (ectx_split t) eqn:He; cbn;
-  rewrite<- ectx_split_unique in He.
+destruct (ectx_split t) eqn:He; cbn; rewrite<- ectx_split_unique in He.
 - rewrite He; reflexivity.
 - rewrite<- ectx_split_unique.
   induction C; cbn; try (f_equal; f_equal); auto.
@@ -306,7 +305,7 @@ Qed.
   
 
 
-Inductive enf : Type :=
+Variant enf : Type :=
 | ENValue : value -> enf
 | ENRedex : eager_ctx -> nat -> value -> enf.
 
@@ -324,98 +323,7 @@ Definition eval_enf : term -> itree void1 enf := rec eval_enf'.
 
 Lemma eval_enf_congr (C : eager_ctx) {t1 t2} (p : eval_enf t1 ≈ eval_enf t2)
   : eval_enf (ec_plug C t1) ≈ eval_enf (ec_plug C t2).
-unfold eval_enf in *.
-rewrite 2 rec_as_interp in *.
-rewrite 2 eval_enf'_equation_1 in *.
-rewrite 2 ectx_split_plug.
-
-destruct (ectx_split t1) eqn:H, (ectx_split t2) eqn:H1; cbn.
-+ cbn in p.
-  rewrite 2 interp_ret in p; apply eqit_Ret in p; injection p as peq.
-  rewrite peq in H.
-  rewrite<- H in H1.
-  apply ectx_split_inj in H1.
-  rewrite H1, peq.
-  reflexivity.
-+ cbn in p.
-  destruct v0.
-  - rewrite 2 interp_ret in p.
-    apply eqit_Ret in p.
-    discriminate p.
-  - shelve.
-+ shelve.
-+ cbn in p.
-  destruct v, v1; cbn.
-  - rewrite 2 interp_ret in p; apply eqit_Ret in p; injection p; intros.
-    rewrite H0, H2, H3; reflexivity.
-  - 
-    * 
-  - induction C; cbn.
-    * rewrite ectx_split_val; exact p.
-    * 
-    
-  destruct (ectx_split (ec_plug C (term_of_value v))) eqn:H2,
-           (ectx_split (ec_plug C (term_of_value v0))) eqn:H3; cbn.
-  - rewrite 2 interp_ret; apply eqit_Ret.
-                               
-  induction C; cbn.
-  - rewrite 2 ectx_split_val; cbn.
-    rewrite 2 interp_ret; apply eqit_Ret.    
-    exact p.
-  - 
-+ rewrite<- ectx_split_unique in H; cbn in H.
-  rewrite<- ectx_split_unique in H1; cbn in H1.
-  cbn in p.
-+ destruct (ec_plug_e_inv_val H).
-  rewrite<- ectx_split_unique in H1; cbn in H1.
-  rewrite H1 in p.
-  rewrite (ectx_split_val v) in p.
-  cbn in p.
-  rewrite interp_ret in p.
-  destruct (ectx_split t2) eqn:H2; cbn.
-  - rewrite H0; cbn; rewrite (ectx_split_val v0); cbn.
-    rewrite 2 interp_ret; apply eqit_Ret.
-    cbn in p; rewrite interp_ret in p; apply eqit_Ret in p.
-    exact p.
-  - cbn in p.
-    destruct v0; cbn in p.
-    rewrite interp_ret in p.
-    apply eqit_Ret in p.
-    discriminate p.
-    rewrite H0; cbn.
-    rewrite interp_ret.
-    exact p.
-+ destruct (ec_plug_e C (ectx_split t2)) eqn:H1; cbn.
-  - destruct (ec_plug_e_inv_val H1).
-    destruct (ectx_split t1) eqn:?.
-    * rewrite H0 in H; cbn in H. rewrite ectx_split_val in H.
-      discriminate H.
-    * cbn in H.
-      injection H; intros.
-      rewrite H2, H3, H4, H5 in *.
-      cbn in *.
-      destruct v; cbn in *.
-      rewrite 2 interp_ret in p.
-      apply eqit_Ret in p; discriminate p.
-      Search recursive.
-      rewrite interp_recursive_call in p.
-      rewrite rec_as_interp in p.
-      rewrite<- ectx_split_coherent in H2; cbn in H2.
-      rewrite ectx_split_val in H2.
-      rewrite H2 in H1
-      rewrite H2 in p.
-      cbn in p.
-      rewrite 2 interp_ret in p.
-      apply eqit_Ret in p.
-      destruct v.
-    rewrite 
-    * 
-    * cbn.
-    
-    Search "interp" "ret".
-induction C; cbn.
-
-
+Admitted.
 
 Inductive enfE : Type -> Type :=
 | ENValE : enfE T1
@@ -435,7 +343,7 @@ Equations lassen_enf (t : enf) : itree enfE (term + T0) :=
   lassen_enf (ENRedex C i v) := ENRedexT i (ret (inl (ec_fresh C))) (lassen_val v).
 
 Definition eval_lassen : term -> itree enfE T0 :=
-  iter (fun t => translate elim_void1 (eval_enf t) >>= lassen_enf).
+  ITree.iter (fun t => translate elim_void1 (eval_enf t) >>= lassen_enf).
 
 Definition eqv_lassen (x y : term) : Prop := eval_lassen x ≈ eval_lassen y.
 
@@ -458,37 +366,44 @@ Equations lassen_enf_v (t : enf) : itree enfE_v (term + value) :=
                                                (Ret (inr v)).
 
 Definition eval_lassen_v : term -> itree enfE_v value :=
-  iter (fun t => translate elim_void1 (eval_enf t) >>= lassen_enf_v).
+  ITree.iter (fun t => translate elim_void1 (eval_enf t) >>= lassen_enf_v).
 
 (* unfold leaves by coinductively eta-expanding values *)
 Definition expand_v : itree enfE_v value -> itree enfE T0 :=
   ITree.iter (fun t => v <- lassen_v_inj t ;;
-                       Ret (inl (Ret v))).
+                       Ret (inl (eval_lassen_v (val_app_fresh v)))).
   (*cofix expand_ t := ITree.bind (lassen_v_inj t)
                                 (tau # expand_ # eval_lassen_v # val_app_fresh).*)
 
 Equations _expand_v : itree' enfE_v value -> itree enfE T0 :=
-  _expand_v (RetF r) := expand_v (eval_lassen_v (val_app_fresh r)) ;
+  _expand_v (RetF r) := tau (expand_v (eval_lassen_v (val_app_fresh r))) ;
   _expand_v (TauF t) := tau (expand_v t) ;
   _expand_v (VisF e k) := Vis (enfE_v_inj e) (fun r => expand_v (k r)).
 
 Lemma unfold_expand_v (x : itree enfE_v value) : expand_v x ≅ _expand_v (observe x).
-  unfold expand_v.
-  rewrite unfold_iter; cbn.
-  rewrite bind_bind; cbn.
+  unfold expand_v ; rewrite unfold_iter; cbn.
+  change (ITree.iter _) with (expand_v).
   unfold lassen_v_inj.
-  Search "bind".
-  bind_translate.
-  destruct (observe x); cbn.
+  rewrite unfold_translate.
+  rewrite unfold_bind.
+  destruct (observe x) eqn:?; cbn.
+  + reflexivity.
+  + unfold expand_v; change (translate _ _) with (lassen_v_inj t); cbn.
+    rewrite<- (unfold_iter (fun t => ITree.bind (lassen_v_inj t) _)).
+    change (ITree.iter _ t) with (expand_v t).
+    reflexivity.
+  + rewrite _expand_v_equation_3.
+    apply eqit_Vis; intro r.
+    unfold expand_v; change (translate _ _) with (lassen_v_inj (k r)); cbn.
+    rewrite<- (unfold_iter (fun t => ITree.bind (lassen_v_inj t) _) (k r)).
+    reflexivity.
+Qed.
 
 Lemma eval_lassen_v_lem (x : term) : eval_lassen x ≈ expand_v (eval_lassen_v x).
-  induction x; induction t; cbn.
   Admitted.
 
 (* LassenV trees are bisimilar and coinductively, leaves (values) applied to 
-   a fresh variable have bisimilar lassen' trees.
-   We
-*)
+   a fresh variable have bisimilar lassen' trees. *)
 Definition eqv_lassen_v : term -> term -> Prop :=
   paco2 (fun R x y => eutt (fun v1 v2 => R (val_app_fresh v1) (val_app_fresh v2))
                            (eval_lassen_v x)
@@ -497,28 +412,89 @@ Definition eqv_lassen_v : term -> term -> Prop :=
 
 Lemma eqv_lassen_v_lem (x y : term) :
   eqv_lassen_v x y <-> expand_v (eval_lassen_v x) ≈ expand_v (eval_lassen_v y).
-econstructor.
-+ einit.
-  ecofix H.
-  intro e.
-  unfold expand_v.
-  econstructor.
-  Search gpaco2.
-  eapply gpaco2_step.
-  - shelve.
-  - unfold eqit_. cbn.
-    econstructor.
 Admitted.
 
-Lemma eqv_lassen_v_correct (x y : term) : eqv_lassen x y <-> eqv_lassen_v x y.
-constructor;
-  unfold eqv_lassen;
-  rewrite (eval_lassen_v_lem x), (eval_lassen_v_lem y);
-  [ exact (proj2 (eqv_lassen_v_lem x y)) |
-    exact (proj1 (eqv_lassen_v_lem x y)) ].
+Lemma eqv_lassen_v_correct (x y : term) : eqv_lassen_v x y <-> eqv_lassen x y.
+  unfold eqv_lassen; rewrite 2 eval_lassen_v_lem.
+  exact (eqv_lassen_v_lem x y).
 Qed.
+
 End eager_lassen.
 
+Section OGS.
+  Variable idx : Type.
+  Variable conf : idx -> Type.
+  Variable OA : idx -> Type.
+  Variable PA : Type.
+  Variable i_nxt : forall i (oa : OA i), PA -> idx.
+
+  Record NEXT {i} (oa : OA i) : Type :=
+    Next { N_play : PA ;
+           N_conf : conf (i_nxt _ oa N_play) }.
+
+  Definition STRAT : Type :=
+    forall {i} (c : conf i) (oa : OA i), itree void1 (NEXT oa). 
+
+  Variant ogsE : Type -> Type :=
+  | StepO i : ogsE (OA i)
+  | StepP : PA -> ogsE T1.
+
+  Definition eval_ogs (body : STRAT) : { i : idx & conf i } -> itree ogsE T0.
+  refine (rec (fun (c : {i : idx & conf i}) => oa <- trigger (StepO _) ;; _ )).
+  refine (x <- translate elim_void1 (body _ (projT2 c) oa) ;; _).
+  refine (_ <- trigger (StepP ( x.(N_play _) )) ;; _).
+  refine (call (existT _ _ x.(N_conf _))).
+  Defined.
+End OGS.    
+
+Section OGS_cbv.
+
+Variant K_ty : Type := KCtx | KVal. 
+Equations kty_e : K_ty -> Type :=
+  kty_e KCtx := eager_ctx ;
+  kty_e KVal := value.
+Variant PA_cbv : Type := PVal | PRed (i : nat).
+
+Definition idx_cbv : Type := list K_ty.
+Definition conf_cbv : idx_cbv -> Type := dvec kty_e.
+
+Definition OA_cbv (c : idx_cbv) : Type := fin (length c).
+Equations nxt_cbv i (oa : OA_cbv i) : PA_cbv -> idx_cbv :=
+  nxt_cbv xs _ PVal     := cons KVal xs ;
+  nxt_cbv xs _ (PRed i) := cons KCtx (cons KVal xs).
+#[local] Transparent nxt_cbv.
+
+Definition ogsE_cbv := ogsE idx_cbv OA_cbv PA_cbv.
+Definition STRAT_cbv := STRAT _ conf_cbv OA_cbv PA_cbv nxt_cbv.
+Definition NEXT_cbv {i} oa := @NEXT _ conf_cbv OA_cbv PA_cbv nxt_cbv i oa.
+
+Equations strat_enf {i} (c : conf_cbv i) oa : enf -> @NEXT_cbv i oa :=
+  strat_enf c _ (ENValue v)     := {| N_play := PVal ; N_conf := _ |} ;
+  strat_enf c _ (ENRedex C i v) := {| N_play := (PRed i) ; N_conf := _ |}.
+Obligation 1.
+unfold conf_cbv; rewrite dvec_equation_2.
+exact (v , c).
+Defined.
+Obligation 2.
+unfold conf_cbv. rewrite 2 dvec_equation_2.
+exact (C , (v , c)).
+Defined.
+
+Definition strat_cbv : STRAT _ conf_cbv OA_cbv PA_cbv nxt_cbv.
+  unfold STRAT; intros; unfold OA_cbv in oa.
+  destruct (l_get i oa) eqn:H; set (x := d_get i c oa); rewrite H in x.
+  + exact (ITree.map (strat_enf c oa) (eval_enf (ec_fresh x))).
+  + exact (ITree.map (strat_enf c oa) (eval_enf (App (t_rename S (term_of_value x))
+                                                     (Var O)))).
+Defined.
+
+Definition eval_ogs_cbv (t : term) : itree ogsE_cbv T0.
+  refine (ITree.bind (translate elim_void1 (eval_enf t)) (fun e => _)).
+  refine (eval_ogs _ _ _ _ _ strat_cbv _).
+  destruct (@strat_enf nil e).
+
+bad
+End OGS_cbv.
 (* ================ *)
 
 

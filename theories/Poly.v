@@ -24,3 +24,7 @@ Instance Functor_E {E} : Functor ([ E ]e) := {|
 Instance Functor_E_itree {E} : Functor ([ E ]e # itree E) := {|
   fmap _ _ f := fun x => EF (eF_q x) (fmap f # eF_k x)
 |}.
+
+Inductive dtree (E : Type -> Type) (X : Type) :=
+| DVis {R} (e : E R) (k : R -> itree E X) (focus : R) : dtree E X.
+
