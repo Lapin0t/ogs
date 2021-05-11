@@ -1,3 +1,5 @@
+Set Universe Polymorphism.
+
 From ExtLib.Data Require Import Nat Fin.
 From ITree Require Import ITree Events.Dependent.
 
@@ -44,7 +46,7 @@ Equations len_acc {X} n (f : fin n -> X) : length (l_acc n f) = n :=
   len_acc (S n) f := f_equal S (len_acc n (f # FS)).
 
 Equations dvec {X} (ty : X -> Type) (xs : list X) : Type :=
-  dvec ty nil := T0 ;
+  dvec ty nil := T1 ;
   dvec ty (cons x xs) := ty x * dvec ty xs.
 Transparent dvec.
 
@@ -68,3 +70,45 @@ Definition drec {E : Type -> Type} {A B}
 
 Definition dcall {E A B} (a : A) : itree (depE A B +' E) (B a) :=
   ITree.trigger (inl1 (Dep a)).
+
+Declare Scope indexed_scope.
+Open Scope indexed_scope.
+Delimit Scope indexed_scope with indexed.
+
+Definition iarrow {I} (X Y : I -> Type) : Type := forall {i}, X i -> Y i.
+Infix "==>" := (iarrow) (at level 20) : indexed_scope.
+
+Definition isum {I} (X Y : I -> Type) (i : I) : Type := X i + Y i.
+Infix "+i" := (isum) (at level 20) : indexed_scope.
+
+
+Inductive pin_at {I} (X : Type) (i : I) : I -> Type := Pin : X -> pin_at X i i.
+Notation "X @ i" := (pin_at X i) (at level 20) : indexed_scope.
+Arguments Pin {_ _ _}.
+Derive NoConfusion for pin_at.
+
+Equations pin_lift {I X Y} {i : I} : ((X @ i) ==> Y) -> (X -> Y i) :=
+  pin_lift f x := f i (Pin x).
+
+
+Inductive fiber {A B} (f : A -> B) : B -> Type := FOk a : fiber f (f a).
+
+Definition psh@{a b} (I : Type@{a}) : Type@{max(a,b+1)} := I -> Type@{b}.
+
+
+(*
+Equations pin_elim {I X Y} {i : I} : (X -> Y i) -> (X @ i ==> Y) :=
+  pin_elim f (Pin x) := f x.
+
+Definition pin_iso_1 {I X Y} {i : I} (f : X -> Y i)
+  : forall x, pin_lift (pin_elim f) x = f x
+  := ltac:(auto).
+
+Definition pin_iso_2 {I X Y} {i : I} (f : X @ i ==> Y)
+  : forall x, pin_elim (pin_lift f) x = f i x
+  := ltac:(destruct x; auto).
+
+Equations pin_sum {I X Y} {i : I} : (X + Y) @ i ==> ((X @ i) +i (Y @ i)) :=
+  pin_sum (Pin (inl x)) := inl (Pin x) ;
+  pin_sum (Pin (inr y)) := inr (Pin y) .
+*)

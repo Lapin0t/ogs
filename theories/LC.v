@@ -424,23 +424,29 @@ End eager_lassen.
 Section OGS.
   Variable idx : Type.
   Variable conf : idx -> Type.
+  Variable PA : idx -> Type.
   Variable OA : idx -> Type.
-  Variable PA : Type.
-  Variable i_nxt : forall i (oa : OA i), PA -> idx.
+  Variable Pnxt : forall i, PA i -> idx.
+  Variable Onxt : forall i, OA i -> idx.
+  (*Variable nxt : forall i (pa : PA i) (oa : OA i pa), idx.*)
 
-  Record NEXT {i} (oa : OA i) : Type :=
-    Next { N_play : PA ;
-           N_conf : conf (i_nxt _ oa N_play) }.
+  Record NEXT i : Type :=
+    Next { N_play : PA i ;
+           N_conf : conf (Pnxt i N_play) }.
 
   Definition STRAT : Type :=
-    forall {i} (c : conf i) (oa : OA i), itree void1 (NEXT oa). 
+    forall {i} (c : conf i) (oa : OA i), itree void1 (NEXT (Onxt i oa)). 
 
   Variant ogsE : Type -> Type :=
-  | StepO i : ogsE (OA i)
-  | StepP : PA -> ogsE T1.
+  | StepE i (pa : PA i) : ogsE (OA (Pnxt i pa)).
+  (*| StepP : PA -> ogsE T1.*)
 
-  Definition eval_ogs (body : STRAT) : { i : idx & conf i } -> itree ogsE T0.
-  refine (rec (fun (c : {i : idx & conf i}) => oa <- trigger (StepO _) ;; _ )).
+  Definition eval_ogs (f : STRAT) : { i & (conf i * OA i)%type } -> itree ogsE T0.
+  refine (rec (fun c => _ )).
+  destruct c as [i [c o]].
+  refine (x <- translate elim_void1 (f i c o) ;; _).
+  
+  refine (oa <- trigger (StepE i p) ;; _).
   refine (x <- translate elim_void1 (body _ (projT2 c) oa) ;; _).
   refine (_ <- trigger (StepP ( x.(N_play _) )) ;; _).
   refine (call (existT _ _ x.(N_conf _))).
@@ -491,6 +497,9 @@ Defined.
 Definition eval_ogs_cbv (t : term) : itree ogsE_cbv T0.
   refine (ITree.bind (translate elim_void1 (eval_enf t)) (fun e => _)).
   refine (eval_ogs _ _ _ _ _ strat_cbv _).
+  destruct e eqn:?.
+  + exact (existT _ (cons KVal nil) (v , t1_0)).
+  + refine (existT _ (cons KCtx (cons KVal xs))).
   destruct (@strat_enf nil e).
 
 bad
