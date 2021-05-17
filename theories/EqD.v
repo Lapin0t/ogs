@@ -1,6 +1,7 @@
 From OGS Require Import Utils EventD ITreeD.
 From Paco Require Import paco.
-Require Import Program.Tactics.
+Require Import Program.Tactics Logic RelationClasses .
+Import EqNotations.
 
 Tactic Notation "hinduction" hyp(IND) "before" hyp(H)
   := move IND before H; revert_until IND; induction IND.
@@ -63,19 +64,19 @@ Section eqit.
   Infix "≈" := (eutt eq) (at level 70) : type_scope.
 End eqit.
 
-Global Hint Constructors eqitF: core.
-Global Hint Unfold eqit_: core.
-Global Hint Resolve eqit__mono : paco.
-Global Hint Resolve eqit_idclo_mono : paco.
-Global Hint Unfold eqit: core.
-(*Global Hint Unfold eq_itree: core.*)
-Global Hint Unfold eutt: core.
-(*Global Hint Unfold euttge: core.*)
-Global Hint Unfold id: core.
+#[global] Hint Constructors eqitF: core.
+#[global] Hint Unfold eqit_: core.
+#[global] Hint Resolve eqit__mono : paco.
+#[global] Hint Resolve eqit_idclo_mono : paco.
+#[global] Hint Unfold eqit: core.
+(*#[global] Hint Unfold eq_itree: core.*)
+#[global] Hint Unfold eutt: core.
+(*#[global] Hint Unfold euttge: core.*)
+#[global] Hint Unfold id: core.
 
 
 Section eqit_trans.
-   Context {I} {E : event I} {R1 R2 : psh I} (RR : forall i, R1 i -> R2 i -> Prop).
+  Context {I} {E : event I} {R1 R2 : psh I} (RR : forall i, R1 i -> R2 i -> Prop).
   Inductive eqit_trans_clo b1 b2 b1' b2'
                (r : forall i, itree E R1 i -> itree E R2 i -> Prop) i
            : itree E R1 i -> itree E R2 i -> Prop :=
@@ -83,8 +84,8 @@ Section eqit_trans.
       (EQVl: eqit RR1 b1 b1' i t1 t1')
       (EQVr: eqit RR2 b2 b2' i t2 t2')
       (REL: r i t1' t2')
-      (LERR1: forall x x' y, RR1 i x x' -> RR i x' y -> RR i x y)
-      (LERR2: forall x y y', RR2 i y y' -> RR i x y' -> RR i x y)
+      (LERR1: forall i x x' y, RR1 i x x' -> RR i x' y -> RR i x y)
+      (LERR2: forall i x y y', RR2 i y y' -> RR i x y' -> RR i x y)
   : eqit_trans_clo b1 b2 b1' b2' r i t1 t2
 .
 Hint Constructors eqit_trans_clo: core.
@@ -100,33 +101,30 @@ Lemma eqitC_mon b1 b2 r1 r2 i t1 t2
 Qed.
 Hint Resolve eqitC_mon : paco.
 
-Lemma eq_inv_VisF_weak {E R X1 X2} (e1 : E X1) (e2 : E X2) (k1 : X1 -> itree E R) (k2 : X2 -> itree E R)
+Lemma eq_inv_VisF_weak {R i} (e1 e2 : E.(qry) i)
+      (k1 : forall r, itree E R _) (k2 : forall r, itree E R _)
   : VisF (R := R) e1 k1 = VisF (R := R) e2 k2 ->
-    exists p : X1 = X2, eqeq E p e1 e2 /\ eqeq (fun X => X -> itree E R) p k1 k2.
-Proof.
-  refine (fun H =>
-    match H in _ = t return
-      match t with
-      | VisF e2 k2 => _
-      | _ => True
-      end
-    with
-    | eq_refl => _
-    end); cbn.
-  exists eq_refl; cbn; auto.
+    { p : e1 = e2 & rew [ fun _ => forall r, _ ] p in k1 = k2 }.
+  intros.
+  injection H as _ H1.
+  inversion_sigma.
+  eauto.
 Qed.
+
 
 Ltac unfold_eqit :=
   (try match goal with [|- eqit_ _ _ _ _ _ _ _ _ ] => red end);
   (repeat match goal with [H: eqit_ _ _ _ _ _ _ _ _ |- _ ] => red in H end).
 
 Ltac inv H := inversion H; clear H; subst.
+
 Ltac inv_Vis :=
   discriminate +
   match goal with
   | [ E : VisF _ _ = VisF _ _ |- _ ] =>
-     apply eq_inv_VisF_weak in E; destruct E as [ <- [ <- <- ]]
+     apply eq_inv_VisF_weak in E; destruct E as [ <- <- ]
   end.
+
 
 Lemma eqitC_wcompat b1 b2 vclo
       (MON: monotone3 vclo)
@@ -147,3 +145,119 @@ Lemma eqitC_wcompat b1 b2 vclo
     pclearbot. econstructor. gclo. econstructor; eauto with paco.
   + remember (VisF e k1) as x.
     hinduction EQVl before r; intros; try discriminate Heqx; eauto; inv_Vis.
+    remember (VisF e k3) as y.
+    hinduction EQVr before r; intros; try discriminate Heqy; eauto; inv_Vis.
+    econstructor. intros. pclearbot.
+    eapply MON.
+    * apply CMP. econstructor; eauto.
+    * intros. apply gpaco3_clo, PR.
+  + remember (TauF t1) as x.
+    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; eauto.
+    pclearbot. punfold REL.
+  + remember (TauF t2) as y.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; eauto.
+    pclearbot. punfold REL.
+Qed.
+
+Hint Resolve eqitC_wcompat : paco.
+
+Lemma eqit_idclo_compat b1 b2: compose (eqitC b1 b2) id <4= compose id (eqitC b1 b2).
+  intros. apply PR.
+Qed.
+Hint Resolve eqit_idclo_compat : paco.
+
+
+Lemma eqitC_dist b1 b2:
+  forall r1 r2, eqitC b1 b2 (r1 \3/ r2) <3= (eqitC b1 b2 r1 \3/ eqitC b1 b2 r2).
+  intros. destruct PR. destruct REL; eauto.
+Qed.
+
+Hint Resolve eqitC_dist : paco.
+
+Lemma eqit_clo_trans b1 b2 vclo
+      (MON: monotone3 vclo)
+      (CMP: compose (eqitC b1 b2) vclo <4= compose vclo (eqitC b1 b2)):
+  eqit_trans_clo b1 b2 false false <4= gupaco3 (eqit_ RR b1 b2 vclo) (eqitC b1 b2).
+  intros. destruct PR. gclo. econstructor; eauto with paco.
+Qed.
+
+End eqit_trans.
+#[global] Hint Unfold eqitC: core.
+#[global] Hint Resolve eqitC_mon : paco.
+#[global] Hint Resolve eqitC_wcompat : paco.
+#[global] Hint Resolve eqit_idclo_compat : paco.
+#[global] Hint Resolve eqitC_dist : paco.
+Arguments eqit_clo_trans : clear implicits.
+#[global] Hint Constructors eqit_trans_clo: core.
+
+
+Section eqit_gen.
+Context {I} {E : event I} {R: I -> Type} (RR : forall i, R i -> R i -> Prop).
+
+Global Instance Reflexive_eqitF b1 b2 (sim : forall i, itree E R i -> itree E R i -> Prop)
+: (forall i, Reflexive (RR i)) -> (forall i, Reflexive (sim i)) -> (forall i, Reflexive (eqitF RR b1 b2 id sim i)).
+intros.
+red. destruct x; constructor; eauto.
+exact (H i r).
+exact (H0 i t).
+intro v. exact (H0 _ (k v)).
+Qed.
+
+Global Instance Symmetric_eqitF b (sim : forall i, itree E R i -> itree E R i -> Prop)
+: (forall i, Symmetric (RR i)) -> (forall i, Symmetric (sim i)) -> (forall i, Symmetric (eqitF RR b b id sim i)).
+  red. induction 3; constructor; subst; eauto.
+  exact (H i _ _ REL).
+  exact (H0 i _ _ REL).
+  intro v. exact (H0 _ _ _ (REL v)).
+Qed.
+
+Global Instance Reflexive_eqit_ b1 b2 (sim : forall i, itree E R i -> itree E R i -> Prop)
+: (forall i, Reflexive (RR i)) -> (forall i, Reflexive (sim i)) -> (forall i, Reflexive (eqit_ RR b1 b2 id sim i)).
+repeat red. intros. reflexivity. Qed.
+
+Global Instance Symmetric_eqit_ b (sim : forall i, itree E R i -> itree E R i -> Prop)
+: (forall i, Symmetric (RR i)) -> (forall i, Symmetric (sim i)) -> (forall i, Symmetric (eqit_ RR b b id sim i)).
+repeat red; symmetry; auto. Qed.
+
+(* FAILLING HERE *)
+Global Instance Reflexive_eqit_gen b1 b2 (r rg: forall i, itree E R i -> itree E R i -> Prop) :
+  (forall i, Reflexive (RR i)) -> (forall i, Reflexive (gpaco3 (eqit_ RR b1 b2 id) (eqitC RR b1 b2) r rg i)).
+  pcofix CIH. gstep; intros.
+  repeat red. destruct (observe x); eauto with paco.
+  reflexivity.
+Qed.
+
+Global Instance Reflexive_eqit b1 b2 : Reflexive RR -> Reflexive (@eqit E _ _ RR b1 b2).
+Proof.
+  red; intros. ginit. apply Reflexive_eqit_gen; eauto.
+Qed.
+
+Global Instance Symmetric_eqit b : Symmetric RR -> Symmetric (@eqit E _ _ RR b b).
+Proof.
+  red; intros. apply eqit_flip.
+  eapply eqit_mon, H0; eauto.
+Qed.
+
+Global Instance eq_sub_euttge:
+  subrelation (@eq_itree E _ _ RR) (euttge RR).
+Proof.
+  ginit. pcofix CIH. intros.
+  punfold H0. gstep. red in H0 |- *.
+  hinduction H0 before CIH; subst; econstructor; try inv CHECK; pclearbot; eauto 7 with paco.
+Qed.
+
+Global Instance euttge_sub_eutt:
+  subrelation (@euttge E _ _ RR) (eutt RR).
+Proof.
+  ginit. pcofix CIH. intros.
+  punfold H0. gstep. red in H0 |- *.
+  hinduction H0 before CIH; subst; econstructor; pclearbot; eauto 7 with paco.
+Qed.
+
+Global Instance eq_sub_eutt:
+  subrelation (@eq_itree E _ _ RR) (eutt RR).
+Proof.
+  red; intros. eapply euttge_sub_eutt. eapply eq_sub_euttge. apply H.
+Qed.
+
+End eqit_gen.
