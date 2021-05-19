@@ -9,12 +9,7 @@ From Equations Require Import Equations.
 (* misc notations *)
 
 #[global] Notation endo T := (T -> T).
-#[global] Notation "f # g" := (Basics.compose f g) (at level 60) : function_scope. 
-
-Variant prod1 (D E : Type -> Type) : Type -> Type :=
-| pair1 : forall {X Y}, D X -> E Y -> prod1 D E (X * Y).
-
-#[global] Notation "D *' E" := (prod1 D E) (at level 50).
+#[global] Notation "f ∘ g" := (Basics.compose f g) (at level 60) : function_scope. 
 
 Definition tau {E R} (t : itree E R) : itree E R := Tau t.
 
@@ -37,13 +32,15 @@ Equations l_get {X} (xs : list X) : fin (length xs) -> X :=
   l_get (cons x xs) F0     := x ;
   l_get (cons x xs) (FS i) := l_get xs i.
 
+Notation "xs .[ i ]" := (l_get xs i) (at level 10).
+
 Equations l_acc {X} (n : nat) (f : fin n -> X) : list X :=
   l_acc O     f := nil ;
-  l_acc (S n) f := cons (f F0) (l_acc n (f # FS)).
+  l_acc (S n) f := cons (f F0) (l_acc n (f ∘ FS)).
 
 Equations len_acc {X} n (f : fin n -> X) : length (l_acc n f) = n :=
   len_acc O     f := eq_refl ;
-  len_acc (S n) f := f_equal S (len_acc n (f # FS)).
+  len_acc (S n) f := f_equal S (len_acc n (f ∘ FS)).
 
 Equations dvec {X} (ty : X -> Type) (xs : list X) : Type :=
   dvec ty nil := T1 ;
@@ -75,40 +72,40 @@ Declare Scope indexed_scope.
 Open Scope indexed_scope.
 Delimit Scope indexed_scope with indexed.
 
-Definition iarrow {I} (X Y : I -> Type) : Type := forall {i}, X i -> Y i.
-Infix "==>" := (iarrow) (at level 20) : indexed_scope.
+Variant prod1 (D E : Type -> Type) : Type -> Type :=
+| pair1 : forall {X Y}, D X -> E Y -> prod1 D E (X * Y).
 
-Definition isum {I} (X Y : I -> Type) (i : I) : Type := X i + Y i.
-Infix "+i" := (isum) (at level 20) : indexed_scope.
+#[global] Notation "D *' E" := (prod1 D E) (at level 50).
+
+(* (covariant) presheaves *)
+Definition psh (I : Type) : Type := I -> Type.
+
+(* pointwise arrows *)
+Definition arrᵢ {I} (X Y : psh I) : Type := forall {i}, X i -> Y i.
+#[global] Infix "⇒ᵢ" := (arrᵢ) (at level 20) : indexed_scope.
+
+(* pointwise coproduct *)
+Definition sumᵢ {I} (X Y : psh I) : psh I := fun i => (X i + Y i)%type.
+Infix "+ᵢ" := (sumᵢ) (at level 20) : indexed_scope.
+
+(* pointwise arrows between F G : endo (psh I) *)
+Notation "F ⟹ G" := (forall X : psh _, F X ⇒ᵢ G X) (at level 30).
 
 
-Inductive pin_at {I} (X : Type) (i : I) : I -> Type := Pin : X -> pin_at X i i.
-Notation "X @ i" := (pin_at X i) (at level 20) : indexed_scope.
-Arguments Pin {_ _ _}.
-Derive NoConfusion for pin_at.
+Inductive fiber {A B} (f : A -> B) : B -> Type := Fib a : fiber f (f a).
+Arguments Fib {A B f}.
+Derive NoConfusion for fiber.
 
-Equations pin_lift {I X Y} {i : I} : ((X @ i) ==> Y) -> (X -> Y i) :=
-  pin_lift f x := f i (Pin x).
-
-
-Inductive fiber {A B} (f : A -> B) : B -> Type := FOk a : fiber f (f a).
-
-Definition psh@{a b} (I : Type@{a}) : Type@{max(a,b+1)} := I -> Type@{b}.
-
-
-(*
-Equations pin_elim {I X Y} {i : I} : (X -> Y i) -> (X @ i ==> Y) :=
-  pin_elim f (Pin x) := f x.
-
-Definition pin_iso_1 {I X Y} {i : I} (f : X -> Y i)
-  : forall x, pin_lift (pin_elim f) x = f x
-  := ltac:(auto).
-
-Definition pin_iso_2 {I X Y} {i : I} (f : X @ i ==> Y)
-  : forall x, pin_elim (pin_lift f) x = f i x
-  := ltac:(destruct x; auto).
-
-Equations pin_sum {I X Y} {i : I} : (X + Y) @ i ==> ((X @ i) +i (Y @ i)) :=
-  pin_sum (Pin (inl x)) := inl (Pin x) ;
-  pin_sum (Pin (inr y)) := inr (Pin y) .
+(* These two functions actually form an isomorphism (extensionally)
+      (fiber f ⇒ᵢ X) ≅ (∀ a → X (f a))
 *)
+Equations fiber_elim {A B} {f : A -> B} X (h : forall a, X (f a)) : fiber f ⇒ᵢ X :=
+  fiber_elim _ h i (Fib a) := h a.
+Equations fiber_lift {A B} {f : A -> B} X (h : fiber f ⇒ᵢ X) a : X (f a) :=
+  fiber_lift _ h a := h _ (Fib a).
+
+
+Notation "X @ i" := (fiber (fun (_ : X) => i)) (at level 20) : indexed_scope.
+Definition pin {I X} (i : I) : X -> (X @ i) i := Fib.
+Definition pin_from {I X Y} {i : I} : ((X @ i) ⇒ᵢ Y) -> (X -> Y i) := fiber_lift _.
+Definition pin_into {I X Y} {i : I} : (X -> Y i) -> (X @ i ⇒ᵢ Y) := fiber_elim _.

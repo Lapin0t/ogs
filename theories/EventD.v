@@ -10,8 +10,8 @@ Record event (I : Type) : Type := Event {
   nxt {i} (q : qry i) : rsp q -> I
 }.
 
-Definition e_eval {I} (E : event I) (X : I -> Type) (i : I) : Type :=
-  { q : E.(qry) i & forall r : E.(rsp) q, X (E.(nxt) q r) }.
+Definition e_eval {I} (E : event I) : endo (psh I) :=
+  fun X i => { q : E.(qry) i & forall r : E.(rsp) q, X (E.(nxt) q r) }.
 
 Notation "⟦ E ⟧" := (e_eval E) (at level 20).
 
@@ -20,30 +20,24 @@ Instance FunctorEvent {I} (E : event I) : Functor (⟦ E ⟧).
   exact (existT _ e (fun r => f _ (k r))).
 Defined.
 
-Definition e_ₑarr {I : Type} (E : event I) (F : (I -> Type) -> (I -> Type)) : Type :=
+Definition e_arrow {I : Type} (E : event I) (F : endo (psh I)) : Type :=
   forall i (q : E.(qry) i), F (fiber (E.(nxt) q)) i.
 
+Notation "E ₑ⇒ F" := (e_arrow E F) (at level 30).
+Notation "E ⇒ₑ F" := (E ₑ⇒ ⟦ F ⟧) (at level 30).
 
-Notation "E ₑ⇒ F" := (earrow_fam E F) (at level 30).
+Definition e_arrow_eval {I} {E : event I} {F : endo (psh I)} {FF : Functor F}
+           : E ₑ⇒ F -> ⟦ E ⟧ ⟹ F :=
+  fun m _ _ x => fiber_elim _ (projT2 x) <$> m _ (projT1 x).
+Arguments e_arrow_eval {I} {E} {F} {FF} m X.
+Notation "⟦⇒ m ⟧ X" := (e_arrow_eval m X) (at level 30).
 
-Definition ea_eval_fam {I} {E : event I} {F : psh I -> psh I} {FF : Functor F}
-           (m : E ₑ⇒ F) X : ⟦ E ⟧ X ==> F X.
-intros i [ e k].
-unfold earrow_fam in m.
-refine (fmap _ _ (m _ e)).
-intros j []. exact (k a).
-Defined.
-Arguments ea_eval_fam {I} {E} {F} {FF} m X.
-
-Notation "⟦ₑ⇒ m ⟧ X" := (ea_eval_fam m X) (at level 100).
-
-Definition earrow {I} (E F : event I) := earrow_fam E (⟦ F ⟧).
-Notation "E ⇒ₑ F" := (earrow E F) (at level 30).
-
-Definition eeval_arrow {I} {E F : event I} (m : E ⇒ₑ F) X : ⟦ E ⟧ X ==> ⟦ F ⟧ X :=
-  ea_eval_fam m X.
-
-Notation "⟦⇒ₑ m ⟧ X" := (eeval_arrow m X) (at level 100).
+(* inverse of e_arrow_eval, meaning that the functor ⟦-⟧ : event I → endo (psh I)
+   is fully-faithfull (i think the proof requires function extensionality
+   and parametricity) *)
+Definition e_arrow_mk {I} {E : event I} {F : endo (psh I)} {FF : Functor F}
+           : ⟦ E ⟧ ⟹ F -> E ₑ⇒ F :=
+  fun m i q => m (fiber (nxt E q)) _ (existT _ q Fib).
 
 (* alternate *)
 Record e_arrow' {I : Type} (E F : event I) := EArrow {
