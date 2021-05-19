@@ -1,5 +1,5 @@
 From OGS Require Import Utils EventD ITreeD CatD.
-
+Check esum.
 
 Definition iter {I} {E : event I} {X Y : I -> Type} (body : X ==> itree E (X +i Y))
              : X ==> itree E Y :=
@@ -22,3 +22,32 @@ Definition interp {I} {E : event I}
           end).
   refine (ea_eval_fam h _ _ (existT _ e k)).
 Defined.
+
+Definition interp_mrec {I} {E F : event I}
+           (body : earrow_fam E (itree (esum E F)))
+           {X} : itree (esum E F) X ==> itree F X.
+  refine (iter (fun _ t => match (observe t) with
+                | RetF r => Ret (inr r)
+                | TauF t => Ret (inl t)
+                | VisF q k => _
+                end)).
+  destruct q.
+  - exact (Ret (inl (body _ q ?>= (fun _ o => match o with FOk _ r => k r end)))).
+  - exact (Vis q (fun r => Ret (inl (k r)))).
+Defined.
+
+Definition interp_mrec' {I} {E F : event I}
+           (body : forall X, ⟦ E ]] X ==> itree (esum E F) X)
+           {X} : itree (esum E F) X ==> itree F X.
+  refine (iter (fun _ t => match (observe t) with
+                | RetF r => Ret (inr r)
+                | TauF t => Ret (inl t)
+                | VisF q k => _
+                end)).
+  destruct q.
+  - exact (Ret (inl (body _ q ?>= (fun _ o => match o with FOk _ r => k r end)))).
+  - exact (Vis q (fun r => Ret (inl (k r)))).
+Defined.
+Definition mrec {I} {E F : event I} (body : earrow_fam E (itree (esum E F)))
+           : earrow_fam E (itree F) :=
+  fun _ q => interp_mrec body _ (body _ q).

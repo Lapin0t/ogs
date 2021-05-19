@@ -9,3 +9,4 @@ theories/ITreeD.v
 theories/CatD.v
 theories/RecD.v
 theories/EqD.v
+theories/LCD.v

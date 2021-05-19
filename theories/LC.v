@@ -422,18 +422,18 @@ Qed.
 End eager_lassen.
 
 Section OGS.
-  Variable idx : Type.
-  Variable conf : idx -> Type.
-  Variable PA : idx -> Type.
-  Variable OA : idx -> Type.
-  Variable Pnxt : forall i, PA i -> idx.
-  Variable Onxt : forall i, OA i -> idx.
-  (*Variable nxt : forall i (pa : PA i) (oa : OA i pa), idx.*)
+  Variable idx : Type.           (* contexte de typage des configurations *)
+  Variable conf : idx -> Type.    (* configurations *)
+  Variable PA : idx -> Type.      (* actions joueur *)
+  Variable OA : idx -> Type.      (* actions opposant *)
+  Variable Pnxt : forall i, PA i -> idx.  (* évolution du contexte de typage, joueur *)
+  Variable Onxt : forall i, OA i -> idx.  (* évolution du contexte de typage, opposant *)
 
-  Record NEXT i : Type :=
-    Next { N_play : PA i ;
-           N_conf : conf (Pnxt i N_play) }.
+  Definition NEXT i : Type := { pa : PA i & conf (Pnxt i pa) }.
 
+  (* stratégie: étant donné une configuration et une action opposant,
+     donner un calcul ([itree void1]) retournant une action joueur ainsi
+     qu'une nouvelle configuration *)
   Definition STRAT : Type :=
     forall {i} (c : conf i) (oa : OA i), itree void1 (NEXT (Onxt i oa)). 
 
@@ -445,11 +445,8 @@ Section OGS.
   refine (rec (fun c => _ )).
   destruct c as [i [c o]].
   refine (x <- translate elim_void1 (f i c o) ;; _).
-  
-  refine (oa <- trigger (StepE i p) ;; _).
-  refine (x <- translate elim_void1 (body _ (projT2 c) oa) ;; _).
-  refine (_ <- trigger (StepP ( x.(N_play _) )) ;; _).
-  refine (call (existT _ _ x.(N_conf _))).
+  refine (Vis (inr1 (StepE _ (projT1 x))) (fun o' => _)).
+  refine (call (existT _ _ ((projT2 x) , o'))).
   Defined.
 End OGS.    
 
