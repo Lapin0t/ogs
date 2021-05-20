@@ -30,7 +30,7 @@ Notation "E ⇒ₑ F" := (E ₑ⇒ ⟦ F ⟧) (at level 30).
 
 Definition e_arrow_eval {I} {E : event I} {F : endo (psh I)} {FF : Functor F}
            : E ₑ⇒ F -> ⟦ E ⟧ ⟹ F :=
-  fun m _ _ x => fiber_elim _ (projT2 x) <$> m _ (projT1 x).
+  fun m _ _ x => fiber_into _ (projT2 x) <$> m _ (projT1 x).
 Arguments e_arrow_eval {I} {E} {F} {FF} m X.
 Notation "⟦⇒ m ⟧ X" := (e_arrow_eval m X) (at level 30).
 
@@ -65,6 +65,19 @@ intros; cbn; destruct (projT2 (m i q) r); reflexivity.
 Defined.
 Print e_arrow_to_arrow'.
 
+(* non-dependent events *)
+
+Definition event0 : Type := event T1.
+Definition e_eval0 (E : event0) : Type -> Type := fun X => ⟦ E ⟧ (fun _ => X) t1_0.
+Definition e_arrow0 (E : event0) (F : Type -> Type) : Type :=
+  forall q : E.(qry) t1_0, F (E.(rsp) q).
+Notation "E ₑ⇒₀ F" := (e_arrow0 E F) (at level 30).
+Definition lift_fam0 (F : Type -> Type) (X : psh T1) : psh T1 := fun _ => F (X t1_0).
+Definition arrow_of_arrow0 {E F} {FF : Functor (lift_fam0 F)} (m : E ₑ⇒₀ F) : E ₑ⇒ (lift_fam0 F).
+  intros [] q.
+  unfold e_arrow0 in m.
+  Check (@fmap T1 (lift_fam0 F) FF).
+  
 
 (***************************)
 (* constructions on events *)
@@ -81,17 +94,35 @@ Definition esum {I : Type} (E F : event I) : event I.
     - exact (F.(nxt) q r).
 Defined.
 
+Definition einl {I} {E F : event I} : E ⇒ₑ esum E F :=
+  fun i q => existT _ (inl q) Fib.
+Definition einr {I} {E F : event I} : F ⇒ₑ esum E F :=
+  fun i q => existT _ (inr q) Fib.
+
+
 (* null event*)
 Definition evoid {I : Type} : event I :=
   Event (fun _ => T0) (fun _ e => match e with end) (fun _ e => match e with end).
+Definition eelim0 {I} {E : event I} : evoid ⇒ₑ E :=
+  fun _ q => ex_falso q.
 
 (* unit event *)
 Definition eunit {I : Type} : event I :=
   Event (fun _ => T1) (fun _ _ => T1) (fun i _ _ => i).
 
 (* translate a event from deepspec-itree form to trivially indexed form *)
-Definition e_from_original (E : Type -> Type) : event T1 :=
+Definition eclassic (E : Type -> Type) : event T1 :=
   Event (fun _ => { X : Type & E X })
         (fun _ x => projT1 x)
         (fun _ _ _ => t1_0).
 
+Definition e_of_classic {E : Type -> Type} {X} : E X -> ⟦ eclassic E ⟧ (fun _ => X) t1_0.
+  refine (fun e => existT _ (existT E X e) _).
+  refine (fun x => x).
+Defined.
+
+Definition classic_of_e {E : Type -> Type} : e E (fun X _ => E (X t1_0)).
+  refine (fun _ a => _).
+  cbn.
+  cbn in a.
+  refine (projT2 a).
