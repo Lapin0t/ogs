@@ -1,3 +1,4 @@
+(*
 From OGS Require Import Utils EventD ITreeD.
 From Paco Require Import paco.
 Require Import Program.Tactics Logic RelationClasses .
@@ -261,3 +262,5 @@ Proof.
 Qed.
 
 End eqit_gen.
+
+*)
