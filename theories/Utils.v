@@ -10,6 +10,11 @@ From Equations Require Import Equations.
 
 #[global] Notation endo T := (T -> T).
 #[global] Notation "f ∘ g" := (Basics.compose f g) (at level 60) : function_scope. 
+Definition compose {A : Type} {B : A -> Type} {C : forall a, B a -> Type}
+           (g : forall a (b : B a), C _ b)
+           (f : forall a, B a)
+           : forall a, C _ (f a) := fun a => g _ (f a).
+#[global] Notation "f ∘' g" := (compose f g) (at level 60) : function_scope. 
 
 Definition tau {E R} (t : itree E R) : itree E R := Tau t.
 
@@ -99,13 +104,13 @@ Derive NoConfusion for fiber.
 (* These two functions actually form an isomorphism (extensionally)
       (fiber f ⇒ᵢ X) ≅ (∀ a → X (f a))
 *)
-Equations fiber_elim {A B} {f : A -> B} X (h : forall a, X (f a)) : fiber f ⇒ᵢ X :=
-  fiber_elim _ h i (Fib a) := h a.
-Equations fiber_lift {A B} {f : A -> B} X (h : fiber f ⇒ᵢ X) a : X (f a) :=
-  fiber_lift _ h a := h _ (Fib a).
+Equations fiber_into {A B} {f : A -> B} X (h : forall a, X (f a)) : fiber f ⇒ᵢ X :=
+  fiber_into _ h i (Fib a) := h a.
+Equations fiber_from {A B} {f : A -> B} X (h : fiber f ⇒ᵢ X) a : X (f a) :=
+  fiber_from _ h a := h _ (Fib a).
 
 
 Notation "X @ i" := (fiber (fun (_ : X) => i)) (at level 20) : indexed_scope.
 Definition pin {I X} (i : I) : X -> (X @ i) i := Fib.
-Definition pin_from {I X Y} {i : I} : ((X @ i) ⇒ᵢ Y) -> (X -> Y i) := fiber_lift _.
-Definition pin_into {I X Y} {i : I} : (X -> Y i) -> (X @ i ⇒ᵢ Y) := fiber_elim _.
+Definition pin_from {I X Y} {i : I} : ((X @ i) ⇒ᵢ Y) -> (X -> Y i) := fiber_from _.
+Definition pin_into {I X Y} {i : I} : (X -> Y i) -> (X @ i ⇒ᵢ Y) := fiber_into _.

@@ -73,10 +73,12 @@ Definition e_arrow0 (E : event0) (F : Type -> Type) : Type :=
   forall q : E.(qry) t1_0, F (E.(rsp) q).
 Notation "E ₑ⇒₀ F" := (e_arrow0 E F) (at level 30).
 Definition lift_fam0 (F : Type -> Type) (X : psh T1) : psh T1 := fun _ => F (X t1_0).
+(*
 Definition arrow_of_arrow0 {E F} {FF : Functor (lift_fam0 F)} (m : E ₑ⇒₀ F) : E ₑ⇒ (lift_fam0 F).
   intros [] q.
   unfold e_arrow0 in m.
   Check (@fmap T1 (lift_fam0 F) FF).
+*)
   
 
 (***************************)
@@ -120,9 +122,3 @@ Definition e_of_classic {E : Type -> Type} {X} : E X -> ⟦ eclassic E ⟧ (fun 
   refine (fun e => existT _ (existT E X e) _).
   refine (fun x => x).
 Defined.
-
-Definition classic_of_e {E : Type -> Type} : e E (fun X _ => E (X t1_0)).
-  refine (fun _ a => _).
-  cbn.
-  cbn in a.
-  refine (projT2 a).

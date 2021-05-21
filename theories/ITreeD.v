@@ -4,7 +4,7 @@ Set Primitive Projections.
 
 From Equations Require Import Equations.
 
-From OGS Require Import Utils EventD.
+From OGS Require Import CatD Utils EventD.
 
 Section itree.
 
@@ -45,8 +45,16 @@ Definition vis {i} e k : itree E R i := Vis e k.
 Definition vis' : ⟦ E ⟧ (itree E R) ⇒ᵢ itree E R := fun i x => Vis _ (projT2 x).
 End a.
 
-Definition subst {I : Type} {E : event I} {X Y : I -> Type}
-           (f : X ⇒ᵢ itree E Y) : itree E X ⇒ᵢ itree E Y :=
+Definition fmap {I} {E : event I} {X Y} (f : X ⇒ᵢ Y) : itree E X ⇒ᵢ itree E Y :=
+  cofix _fmap _ u :=
+    match (observe u) with
+    | RetF r => Ret (f _ r)
+    | TauF t => Tau (_fmap _ t)
+    | VisF e k => Vis e (fun r => _fmap _ (k r))
+    end.
+
+Definition subst {I} {E : event I} {X Y} (f : X ⇒ᵢ itree E Y)
+                 : itree E X ⇒ᵢ itree E Y :=
   cofix _subst _ u :=
     match observe u with
     | RetF r => f _ r
@@ -57,3 +65,9 @@ Definition subst {I : Type} {E : event I} {X Y : I -> Type}
 (* McBride's "daemonic" bind: [f] has to be defined at every state [i] *)
 Definition bind {I E X Y i} x f := @subst I E X Y f i x.
 Notation "x ?>= f" := (bind x f) (at level 20).
+
+Instance FunctorItree {I} (E : event I) : Functor (itree E) :=
+  Build_Functor _ (fun X Y => @fmap I E X Y).
+
+Instance MonadItree {I} (E : event I) : Monad (itree E) :=
+  Build_Monad _ (fun X => @ret I E X) (fun X Y => @subst I E X Y).
