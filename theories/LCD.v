@@ -92,7 +92,6 @@ Equations t_rename {Γ Δ} (f : forall t, Γ ∋ t -> Δ ∋ t) {t} : term Γ t 
 Definition t_shift {Γ} {x y} : term Γ x -> term (y :: Γ) x :=
   t_rename (fun _ => pop).
 
-
 Equations t_subst {Γ Δ} (f : forall t, Γ ∋ t -> term Δ t) {t} : term Γ t -> term Δ t :=
   t_subst f (Var i)        := f _ i ;
   t_subst f (App u v)      := App (t_subst f u) (t_subst f v) ;
@@ -182,13 +181,17 @@ Defined.
 Definition to_ix (Γ : ctx) (x : ty) : t_ix := existT _ Γ (existT _ x tt).
 (*Definition from_ix t_ix : t_ix := existT _ Γ (existT _ x tt).*)
 
-Equations eval_enf' {i} (t : term' i) : itree (esum (Event term' (fun i _ => e_nf' i) (fun i _ _ => i)) evoid) e_nf' i :=
+(*
+Definition eval_enf' {i} (t : term' i) : itree (ecall (sigT term') _) (e_nf' i @ t1_0) t1_0.
+
+Equations eval_enf' {i} (t : term' i) : itree (ecall (sigT term') _) e_nf' i. :=
   @eval_enf' (existT _ Γ (existT _ x tt)) t with e_split t := {
      | EVal v => Ret (n_to_n' (NVal v)) ;
      | ERed E (VVar i) v => Ret (n_to_n' (NRed E i v)) ;
      | ERed E (VLam u) v => Vis _ _
     }.
-Obligation 1. exact (inl (e_plug E (t_subst1 u (t_of_val v)))). Defined.
+Obligation 1.
+exact (e_plug E (t_subst1 u (t_of_val v))). Defined.
 Obligation 2. exact (Ret (n_to_n' r)). Defined.
 
 Definition eval_enf {i} (t : term' i) : itree evoid e_nf' i.
@@ -196,6 +199,7 @@ Definition eval_enf {i} (t : term' i) : itree evoid e_nf' i.
   intros j q.
   
   mrec eval_enf'.
+*)
 
 Lemma e_split_val {Γ x} (v : e_val Γ x) : e_split (t_of_val v) = EVal v.
   destruct v; auto.

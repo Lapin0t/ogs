@@ -9,6 +9,18 @@ Definition iter {I} {E : event I} {X Y : I -> Type} (body : X ⇒ᵢ itree E (X 
                             | inr y => Ret y
                             end.
 
+Instance ITreeMonadIter {I} (E : event I) : MonadIter (itree E) :=
+  Build_MonadIter _ (fun X Y => @iter I E X Y).
+
+Definition translate {I} {E F : event I} (f : E ⇒ₑ F) : itree E ⟹ itree F :=
+  fun X => cofix _translate _ u :=
+    match (observe u) with
+    | RetF x => Ret x
+    | TauF t => Tau (_translate _ t)
+    | VisF e k => let (e1, k1) := f _ e in
+                 Vis e1 (fun r => match k1 r with Fib a => _translate _ (k a) end)
+     end.
+
 Definition interp {I} {E : event I}
            {M : psh I -> psh I} {MF : Functor M} {MM : Monad M} {MI : MonadIter M}
            (h : E ₑ⇒ M) X
@@ -18,6 +30,7 @@ Definition interp {I} {E : event I}
             | TauF t => CatD.ret _ (inl t)
             | VisF e k => CatD.fmap (fun _ => inl) _ (e_arrow_eval h _ _ (existT _ e k))
             end).
+
 
 Definition interp_mrec {I} {E F : event I}
            (body : E ₑ⇒ itree (esum E F))
@@ -35,9 +48,16 @@ Definition mrec {I} {E F : event I} (body : E ₑ⇒ itree (esum E F)) : E ₑ�
 Definition ecall (A : Type) (B : A -> Type) : event T1 :=
   Event (fun _ => A) (fun _ => B) (fun i _ _ => i).
 
+(* WIP
 Definition rec {A B} (body : forall a, itree (ecall A B) (fun _ => B a) t1_0) : forall a, itree evoid (fun _ => B a) t1_0.
   refine (fun a => _).
   refine (@mrec T1 (ecall A B) evoid _ t1_0 _ ?>= _).
-  intros i q.
+  intros [] q.
+  cbn in *.
+  refine (translate (einl) _ _ (body a)).
   cbn in q.
+  cbn in body.
+  cbn.
+  refine (_ <$> body a).
   refine (((fun _ => inl) <$> body a)).
+*)
