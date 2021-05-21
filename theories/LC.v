@@ -1,11 +1,9 @@
-From Coq.Logic Require Import FunctionalExtensionality.
 Require Import RelationClasses.
 From ExtLib.Structures Require Import Functor Monad.
 From ExtLib.Data Require Import Nat Fin.
 From ITree Require Import
      ITree
      Events.Dependent
-     Basics.Basics
      Eq.Eq
      Interp.InterpFacts
      Interp.RecursionFacts
@@ -14,7 +12,7 @@ Import Monads.
 Import MonadNotation.
 Open Scope monad_scope.
 
-From Paco Require Import paco.
+From Paco Require paco2 paconotation.
 From Equations Require Import Equations.
 
 Set Primitive Projections.
@@ -405,10 +403,10 @@ Lemma eval_lassen_v_lem (x : term) : eval_lassen x ≈ expand_v (eval_lassen_v x
 (* LassenV trees are bisimilar and coinductively, leaves (values) applied to 
    a fresh variable have bisimilar lassen' trees. *)
 Definition eqv_lassen_v : term -> term -> Prop :=
-  paco2 (fun R x y => eutt (fun v1 v2 => R (val_app_fresh v1) (val_app_fresh v2))
+  paco2.paco2 (fun R x y => eutt (fun v1 v2 => R (val_app_fresh v1) (val_app_fresh v2))
                            (eval_lassen_v x)
                            (eval_lassen_v y))
-        bot2.
+        paconotation.bot2.
 
 Lemma eqv_lassen_v_lem (x y : term) :
   eqv_lassen_v x y <-> expand_v (eval_lassen_v x) ≈ expand_v (eval_lassen_v y).
@@ -467,6 +465,7 @@ Equations nxt_cbv i (oa : OA_cbv i) : PA_cbv -> idx_cbv :=
   nxt_cbv xs _ (PRed i) := cons KCtx (cons KVal xs).
 #[local] Transparent nxt_cbv.
 
+(*
 Definition ogsE_cbv := ogsE idx_cbv OA_cbv PA_cbv.
 Definition STRAT_cbv := STRAT _ conf_cbv OA_cbv PA_cbv nxt_cbv.
 Definition NEXT_cbv {i} oa := @NEXT _ conf_cbv OA_cbv PA_cbv nxt_cbv i oa.
@@ -500,6 +499,7 @@ Definition eval_ogs_cbv (t : term) : itree ogsE_cbv T0.
   destruct (@strat_enf nil e).
 
 bad
+*)
 End OGS_cbv.
 (* ================ *)
 
@@ -541,6 +541,8 @@ Definition unfold1 {E X} : itree E X -> itree void1 (FreeF E (itree E X) X) :=
 (* ============== *)
 (* old left-overs *)
 (* ============== *)
+
+(** comment until EOF
 
 (* Weak Head Normal Form *)
 Variant whnf : Type := W : normF term -> whnf.
@@ -651,3 +653,5 @@ Lemma boehmE_cong {C : t_ctx term} (s t : term) (p : lassen s ≈ lassen t)
     compute [lassen].
     rewrite unfold_iter,unfold_iter.
     Search ITree.iter.
+
+**)
