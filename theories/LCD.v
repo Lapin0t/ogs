@@ -3,40 +3,10 @@ From Coq Require Import Logic.
 Import EqNotations.
 From Equations Require Import Equations.
 
-From OGS Require Import EventD ITreeD Utils RecD.
+From OGS Require Import EventD CatD ITreeD Utils RecD AngelicD.
 
 Set Primitive Projections.
 Set Equations Transparent.
-
-Inductive Tele : Type :=
-| Tnil : Tele
-| Tcons (X : Type) : (X -> Tele) -> Tele
-.
-
-Equations Tfold (A : Type) : A -> (forall (X : Type), (X -> A) -> A) -> Tele -> A :=
-  Tfold A a h Tnil := a ;
-  Tfold A a h (Tcons X T) := h X (fun x => Tfold A a h (T x)) .
-
-Definition Tsg := Tfold Type unit (fun X f => {x : X & f x }).
-Definition Tpi (A : Type) := Tfold Type A (fun X f => forall (x : X), f x).
-
-Equations curry T {A} : (Tsg T -> A) -> Tpi A T :=
-  curry Tnil f := f tt ;
-  curry (Tcons X T) f := fun x => curry (T x) (fun r => f (existT _ x r)) .
-
-Equations uncurry_ T {A} : Tpi A T -> Tsg T -> A :=
-  uncurry_ Tnil x _ := x ;
-  uncurry_ (Tcons X T) f (existT _ x r) := uncurry_ (T x) (f x) r .
-
-Ltac mk_tele_ ty :=
-  match ty with
-  | ?X -> ?T => let t := mk_tele_ T in uconstr:(Tcons X (fun _ => t))
-  | forall (x : ?X), ?T => let t := mk_tele_ T in uconstr:(Tcons X (fun _ => t))
-  | ?T => uconstr:(Tnil)
-  end.
-Ltac mk_tele tm := let ty := type of tm in mk_tele_ ty.
-Notation mk_tele tm := (ltac:(let t := mk_tele tm in exact t)).
-Notation uncurry f := (uncurry_ (mk_tele f) f). 
 
 Inductive ty : Type :=
 | Base : ty
@@ -115,31 +85,31 @@ Equations t_of_val {Γ x} : e_val Γ x -> term Γ x :=
   t_of_val (VVar i) := Var i ;
   t_of_val (VLam u) := Lam u.
 
-Inductive e_ctx (Γ : ctx) (t : ty) : ctx -> ty -> Type :=
-| EHole : e_ctx Γ t Γ t
-| EApp_l {Δ a b} : term Δ (a =:> b) -> e_ctx Γ t Δ a -> e_ctx Γ t Δ b
-| EApp_r {Δ a b} : e_ctx Γ t Δ (a =:> b) -> e_val Δ a -> e_ctx Γ t Δ b
+Inductive e_ctx (Γ : ctx) (t : ty) : ty -> Type :=
+| EHole : e_ctx Γ t t
+| EApp_l {a b} : term Γ (a =:> b) -> e_ctx Γ t a -> e_ctx Γ t b
+| EApp_r {a b} : e_ctx Γ t (a =:> b) -> e_val Γ a -> e_ctx Γ t b
 .
 Arguments EHole {Γ t}.
-Arguments EApp_l {Γ t Δ a b}.
-Arguments EApp_r {Γ t Δ a b}.
+Arguments EApp_l {Γ t a b}.
+Arguments EApp_r {Γ t a b}.
 
-Equations e_plug {Γ x Δ y} (E : e_ctx Γ x Δ y) : term Γ x -> term Δ y :=
+Equations e_plug {Γ x y} (E : e_ctx Γ x y) : term Γ x -> term Γ y :=
   e_plug EHole t := t ;
   e_plug (EApp_l u E) t := App u (e_plug E t) ;
   e_plug (EApp_r E u) t := App (e_plug E t) (t_of_val u) .
 
-Equations e_fill {Γ x Δ y} : e_ctx Γ x Δ y -> term (x :: Δ) y :=
+Equations e_fill {Γ x y} : e_ctx Γ x y -> term (x :: Γ) y :=
   e_fill EHole := Var top ;
   e_fill (EApp_l u E) := App (t_shift u) (e_fill E) ;
   e_fill (EApp_r E u) := App (e_fill E) (t_shift (t_of_val u)) .
 
 Variant e_term (Γ : ctx) (x : ty) : Type :=
 | EVal : e_val Γ x -> e_term Γ x
-| ERed {Δ a b} : e_ctx Δ b Γ x -> e_val Δ (a =:> b) -> e_val Δ a -> e_term Γ x
+| ERed {a b} : e_ctx Γ b x -> e_val Γ (a =:> b) -> e_val Γ a -> e_term Γ x
 .
 Arguments EVal {Γ x}.
-Arguments ERed {Γ x Δ a b}.
+Arguments ERed {Γ x a b}.
 
 Equations t_of_e_term {Γ x} : e_term Γ x -> term Γ x :=
   t_of_e_term (EVal v) := t_of_val v ;
@@ -156,50 +126,99 @@ Equations e_split {Γ x} : term Γ x -> e_term Γ x :=
 
 Variant e_nf (Γ : ctx) (x : ty) : Type :=
 | NVal : e_val Γ x -> e_nf Γ x
-| NRed {Δ a b} : e_ctx Δ b Γ x -> Δ ∋ (a =:> b) -> e_val Δ a -> e_nf Γ x
+| NRed {a b} : e_ctx Γ b x -> Γ ∋ (a =:> b) -> e_val Γ a -> e_nf Γ x
 .
 Arguments NVal {Γ x}.
-Arguments NRed {Γ x Δ a b}.
+Arguments NRed {Γ x a b}.
 
 Equations t_of_e_nf {Γ x} : e_nf Γ x -> term Γ x :=
   t_of_e_nf (NVal v) := t_of_val v ;
   t_of_e_nf (NRed E i v) := e_plug E (App (Var i) (t_of_val v)).
 
-Definition t_ix : Type := Tsg (mk_tele term).
-Definition term' : t_ix -> Type := uncurry term.
-Definition e_nf' : t_ix -> Type := uncurry e_nf.
+Record t_env : Type := TEnv { Ctx : ctx ; Ty : ty }.
+Definition t_uncurry {A : ctx -> ty -> Type} (f : forall Γ x, A Γ x) i :=
+  f i.(Ctx) i.(Ty).
+Definition t_curry {A : ctx -> ty -> Type} (f : forall i, A i.(Ctx) i.(Ty)) Γ x :=
+  f (TEnv Γ x).
 
-Definition t_to_t' {Γ x} (t : term Γ x) : term' (existT _ Γ (existT _ x tt)) := t.
-Definition t'_to_t {i} (t : term' i) : term (projT1 i) (projT1 (projT2 i)).
-  destruct i as [ Γ [ x [] ] ]; auto.
-Defined.
-Definition n_to_n' {Γ x} (t : e_nf Γ x) : e_nf' (existT _ Γ (existT _ x tt)) := t.
-Definition n'_to_n {i} (t : e_nf' i) : e_nf (projT1 i) (projT1 (projT2 i)).
-  destruct i as [ Γ [ x [] ] ]; auto.
-Defined.
-
-Definition to_ix (Γ : ctx) (x : ty) : t_ix := existT _ Γ (existT _ x tt).
-(*Definition from_ix t_ix : t_ix := existT _ Γ (existT _ x tt).*)
+Definition term' := t_uncurry term.
+Definition e_nf' := t_uncurry e_nf.
+Definition e_val' := t_uncurry e_val.
 
 (*
-Definition eval_enf' {i} (t : term' i) : itree (ecall (sigT term') _) (e_nf' i @ t1_0) t1_0.
-
-Equations eval_enf' {i} (t : term' i) : itree (ecall (sigT term') _) e_nf' i. :=
-  @eval_enf' (existT _ Γ (existT _ x tt)) t with e_split t := {
-     | EVal v => Ret (n_to_n' (NVal v)) ;
-     | ERed E (VVar i) v => Ret (n_to_n' (NRed E i v)) ;
-     | ERed E (VLam u) v => Vis _ _
-    }.
-Obligation 1.
-exact (e_plug E (t_subst1 u (t_of_val v))). Defined.
-Obligation 2. exact (Ret (n_to_n' r)). Defined.
-
-Definition eval_enf {i} (t : term' i) : itree evoid e_nf' i.
-  refine (mrec _ _ _ ?>= _).
-  intros j q.
-  
-  mrec eval_enf'.
+Definition t_to_t' {Γ x} (t : term Γ x) : term' (TEnv Γ x) := t.
+Definition t'_to_t {i} (t : term' i) : term i.(Ctx) i.(Ty) :=  t.
+Definition n_to_n' {Γ x} (t : e_nf Γ x) : e_nf' (TEnv Γ x) := t.
+Definition n'_to_n {i} (t : e_nf' i) : e_nf i.(Ctx) (ix_ty i).
+  destruct i as [ Γ [ x [] ] ]; auto.
+Defined.
+Definition v_to_v' {Γ x} (v : e_val Γ x) : e_val' (to_ix Γ x) := v.
+Definition v'_to_v {i} (t : e_val' i) : e_val (ix_ctx i) (ix_ty i).
+  destruct i as [ Γ [ x [] ] ]; auto.
+Defined.
 *)
+
+Equations eval_enf' {Γ x} (t : e_term Γ x) : itree₀ ∅ₑ (term Γ x + e_nf Γ x) :=
+  eval_enf' (EVal v) := ret₀ (inr (NVal v)) ;
+  eval_enf' (ERed E (VVar i) v) := ret₀ (inr (NRed E i v)) ;
+  eval_enf' (ERed E (VLam u) v) := ret₀ (inl (e_plug E (t_subst1 u (t_of_val v)))).
+
+Definition eval_enf {Γ x} : term Γ x -> itree₀ ∅ₑ (e_nf Γ x) :=
+  iterₐ (eval_enf' ∘ e_split).
+
+Variant enf_qry (Γ : ctx) (x : ty) : Type :=
+| NQVal : enf_qry Γ x
+| NQRed a b : Γ ∋ (a =:> b) -> enf_qry Γ x.
+Arguments NQVal {Γ x}.
+Arguments NQRed {Γ x} a b.
+
+Definition enf_rsp Γ x : enf_qry Γ x -> Type :=
+  fun q => match q with
+        | NQVal => match x with
+                  | Base => T0    (* no opponent move on base type *)
+                  | a =:> b => T1 (* sinle opponent move: evaluation *)
+                  end
+        | NQRed _ _ _ => T2 (* continue on context or evaluate argument *)
+        end.
+
+Definition enf_nxt Γ x (q : enf_qry Γ x) : enf_rsp Γ x q -> t_env.
+  destruct q.
+  + destruct x as [|a b]; intros []. refine (TEnv (a :: Γ) b).
+  + intros []. refine (TEnv (b :: Γ) x). refine (TEnv Γ a).
+Defined.
+
+Definition enf_e : event t_env t_env :=
+  Event (t_uncurry enf_qry)
+        (t_uncurry enf_rsp)
+        (t_uncurry enf_nxt).
+
+Definition lassen_tree (X : ctx -> ty -> Type) : ctx -> ty -> Type :=
+  @t_curry (fun _ _ => Type) (itree enf_e (t_uncurry X)).
+
+
+Definition lassen_val {Γ x} (v : e_val Γ x) : lassen_tree (fun Γ x => term Γ x + T0) Γ x.
+  refine (Vis (NQVal : qry enf_e (TEnv Γ x)) _).
+  destruct x; intros [].
+  refine (Ret (inl _)).
+  refine (App (t_shift (t_of_val v)) (Var top)).
+Defined.
+
+Definition lassen_enf {Γ x} (v : e_nf Γ x) : lassen_tree (fun Γ x => term Γ x + T0) Γ x.
+  destruct v as [v | a b E i v].
+  + refine (lassen_val v).
+  + refine (Vis (NQRed a b i : qry enf_e (TEnv Γ x)) _).
+    intros [].
+    - refine (Ret (inl _)).
+      refine (e_fill E).
+    - refine (lassen_val v).
+Defined.
+
+Definition eval_lassen : forall Γ x, term Γ x -> lassen_tree (fun _ _ => T0) Γ x.
+  refine (@t_curry (fun Γ x => term Γ x -> lassen_tree (fun _ _ => T0) Γ x) _).
+  refine (iter (fun _ t => emb_comp _ _ (eval_enf t) >>= _)).
+  refine (fun _ '(Fib a) => _).
+  refine (lassen_enf a).
+Defined.
 
 Lemma e_split_val {Γ x} (v : e_val Γ x) : e_split (t_of_val v) = EVal v.
   destruct v; auto.

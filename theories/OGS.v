@@ -30,13 +30,14 @@ Section OGS_naive.
 
   (* Naive encoding of the OGS over a given strategy [Strat] *)
   Definition OGS : conf -> itree E unit :=
-    fun conf_init =>
-      rec (fun c =>
-             oa <- trigger StepO;;
-             '(pa, c') <- translate embed (Strat c oa);;
-             trigger (StepP pa);;
-             call c')
-          conf_init.
+    rec (fun c =>
+           oa <- trigger StepO;;
+           '(pa, c') <- translate embed (Strat c oa);;
+           trigger (StepP pa);;
+           call c').
 
 End OGS_naive.
 
+Section OGS_opt.
+  Variant E : Type -> Type :=
+    | OppQ : E T0.
