@@ -18,7 +18,6 @@ Definition compose {A : Type} {B : A -> Type} {C : forall a, B a -> Type}
 
 Definition tau {E R} (t : itree E R) : itree E R := Tau t.
 
-
 (***************)
 (* Finite sets *)
 
@@ -103,12 +102,19 @@ Derive NoConfusion for fiber.
 
 (* These two functions actually form an isomorphism (extensionally)
       (fiber f ⇒ᵢ X) ≅ (∀ a → X (f a))
-*)
-Equations fiber_into {A B} {f : A -> B} X (h : forall a, X (f a)) : fiber f ⇒ᵢ X :=
-  fiber_into _ h i (Fib a) := h a.
-Equations fiber_from {A B} {f : A -> B} X (h : fiber f ⇒ᵢ X) a : X (f a) :=
-  fiber_from _ h a := h _ (Fib a).
-
+ *)
+Definition fiber_ext {A B} {f : A -> B} {b : B} : fiber f b -> A :=
+  fun '(Fib a) => a.
+Definition fiber_coh {A B} {f : A -> B} {b : B} :
+    forall p : fiber f b, f (fiber_ext p) = b :=
+  fun '(Fib _) => eq_refl.
+Definition fiber_mk {A B} {f : A -> B} a : forall b (p : f a = b), fiber f b :=
+  eq_rect (f a) (fiber f) (Fib a).
+ 
+Definition fiber_into {A B} {f : A -> B} X (h : forall a, X (f a)) : fiber f ⇒ᵢ X :=
+  fun _ '(Fib a) => h a.
+Definition fiber_from {A B} {f : A -> B} X (h : fiber f ⇒ᵢ X) a : X (f a) :=
+  h _ (Fib a).
 
 Notation "X @ i" := (fiber (fun (_ : X) => i)) (at level 20) : indexed_scope.
 Definition pin {I X} (i : I) : X -> (X @ i) i := Fib.
