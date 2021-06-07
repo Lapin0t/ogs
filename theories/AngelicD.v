@@ -10,8 +10,8 @@ Definition tauₐ {X i j} (t : itreeₐ E i j X) : itreeₐ E i j X := tau t.
 Definition retₐ {X i} (x : X) : itreeₐ E i i X := ret (pin _ x).
 Definition visₐ {X i j} q (k : forall r, itreeₐ E _ j X) : itreeₐ E i j X := vis q k.
 
-Definition bindₐ {X Y i j k} (x : itreeₐ E i j X) (f : X -> itreeₐ E j k Y)
-                       : itreeₐ E i k Y :=
+Definition bindₐ {X Y i j} (x : itreeₐ E i j X) (f : X -> itree E Y j)
+                       : itree E Y i :=
  x >>= fiber_into (itree _ _) f.
 
 Notation "x !>= f" := (bindₐ x f) (at level 30).
@@ -22,6 +22,7 @@ Definition iterₐ {X Y i} (f : X -> itreeₐ E i i (X + Y)) : X -> itreeₐ E i
                                  | inr y => retₐ y
                                  end.
 End angelic.
+#[global] Notation "x !>= f" := (bindₐ x f) (at level 30).
 
 
 Definition itree₀ (E : event₀) X : Type := itreeₐ E t1_0 t1_0 X.

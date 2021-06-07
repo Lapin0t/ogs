@@ -42,8 +42,12 @@ Context {I} {E : event I I} {R : I -> Type}.
 Definition ret {i} x : itree E R i := Ret x.
 Definition tau {i} t : itree E R i := Tau t.
 Definition vis {i} e k : itree E R i := Vis e k.
-Definition vis' : ⟦ E ⟧ (itree E R) ⇒ᵢ itree E R := fun _ x => Vis _ (projT2 x).
+Definition vis'' : ⟦ E ⟧ (itree E R) ⇒ᵢ itree E R := fun _ x => Vis _ (projT2 x).
 End a.
+
+Definition vis' {I} (E : event I I) {R i} e k : itree E R i := @vis I E R i e k.
+Arguments vis' : clear implicits.
+Arguments vis' {I} E {R i} e k.
 
 Definition fmap {I} {E : event I I} {X Y} (f : X ⇒ᵢ Y) : itree E X ⇒ᵢ itree E Y :=
   cofix _fmap _ u :=
