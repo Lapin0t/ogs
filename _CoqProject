@@ -10,3 +10,4 @@ theories/RecD.v
 theories/EqD.v
 theories/LCD.v
 theories/AngelicD.v
+theories/OGSD.v
