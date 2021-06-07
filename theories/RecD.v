@@ -45,8 +45,10 @@ Definition translate_bwd {I J} {E : event I I} {F : event J J} (f0 : J -> I)
                                                         k _ (k1 r)))
     end.
 
-Definition emb_comp {I} {E : event I I} X i : itree₀ ∅ₑ X -> itree E (X @ i) i.
-  refine (fun t => translate_fwd (fun _ => i) (fun _ (i : qry (_ >ₑ ∅ₑ) _) => ex_falso i) (X @ i) t1_0 (t >>= _)).
+Definition comp (X : Type) : Type := itree₀ ∅ₑ X.
+Definition emb_comp {I} {E : event I I} X i : comp X -> itree E (X @ i) i.
+  refine (fun t => translate_fwd (fun _ => i) (fun _ (i : qry (_ >ₑ ∅ₑ) _) => ex_falso i)
+                              (X @ i) t1_0 (t >>= _)).
   refine (fun 't1_0 '(Fib a) => Ret (Fib a)).
 Defined.
 
