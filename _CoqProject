@@ -9,3 +9,4 @@ theories/CatD.v
 theories/RecD.v
 theories/EqD.v
 theories/LCD.v
+theories/AngelicD.v
