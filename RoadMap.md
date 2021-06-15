@@ -4,7 +4,7 @@
 
 On fait un type d'événements pour les arbres (la signature de l'arbre).
 
-Piste (explorée): on peut prendre la signature des lambda-termes et au lieu de
+**Piste (explorée):** on peut prendre la signature des lambda-termes et au lieu de
 construire l'algèbre initiale (les lambda-termes), on prend l'itree (les
 lambda-termes potentiellements infinis). Comme les itree sont itératifs ont a
 quand même un fold, donc on peut définir renommage/substitution sur les
@@ -12,13 +12,16 @@ lambda-termes infinis, puis enfin évaluation (toujours sur les termes infinis).
 Pour l'évaluateur CBN on tombe sur les arbres de böhm. C'est mignon mais c'est
 chiant de coder avec des récurseurs (au lieu de Fixpoint ou Equations).
 
+ref Böhm: https://lipn.univ-paris13.fr/~gmanzonetto/papers/BarbarossaM20.pdf
+(def 2.7 p5)
+
 ## Lassen
 
 En fait les arbres de Böhm sont CBN et au s'intéresse surtout à CBV
 donc arbres de Lassen et bisimulation de forme normale
 (eager-normal-form bisimulation). TODO ref.
 
-Piste (à moitié exploré): 'normalement', la bisimilarité sur les
+**Piste (à moitié exploré):** 'normalement', la bisimilarité sur les
 arbres de Lassen ne contient pas l'η-équivalence. En effet la
 question est: qu'est-ce qu'on met dans les feuilles de
 l'arbre: les valeurs, les variables ou rien du tout?
@@ -66,6 +69,8 @@ apparaitre (et contraignent) les changements de contexte:
 Autre exemple: pour les dialogues, on veut contraindre les traces à alterner
 des événements joueur et opposant.
 
+ref à voir: https://link.springer.com/chapter/10.1007/978-3-030-45231-5_22
+
 Pour cela, on va donc avoir un genre de LTS au niveau des types (à
 creuser mais dans l'idée c'est un session-type, une description de
 protocole). On va donner pour chaque événement l'index de départ
@@ -94,6 +99,8 @@ A partir de ces données, on peut calculer le foncteur associé
   F : (I → Type) → (I → Type)
   F X i := ∃ q : qry i, ∀ r : rsp i q, X (nxt i q r)
 
+todo: exemple lambda-calcul simplement typé
+
 On s'aperçoit que ce type ressemble très fortement à celui du constructeur 'VisF'
 des itree: c'est la pair d'un événement q et d'une continuation k. Pour rappel,
 dans les itree classiques, les arguments de VisF sont:
@@ -114,10 +121,14 @@ un E : Type → Type et celle utilisée pour les événements dépendants
 est la quantification existentielle sur Type. Le but étant de représenter
 l'ensemble des requêtes et pour chaque requête l'ensemble des réponses, on peut
 soit travailler avec
+
   req : Type
   rsp : req → Type
+  
 soit avec
+
   E : Type → Type
+
 où E X est l'ensemble des requêtes ayant pour réponse X, ie la fibre de rsp en X.
 
 Ainsi, si on peut voir
@@ -127,7 +138,8 @@ Ainsi, si on peut voir
   | Do {R} : E R → (R → freeer E X) → freeer E X
 
 comme une 'free-er' monad sur E, on peut également la voir comme la monade libre
-sur l'extension du conteneur représenté dans le style 'fibres' par E.
+sur l'extension du conteneur représenté dans le style 'fibres' par E, car le type
+do Do est exactement F (freeer E X) -> freeer E X (avec F défini plus haut).
 
 <<< fam vs pow
 Ce choix est lié aux 2 représentations des sous-ensemble d'un ensemble X:
@@ -139,7 +151,7 @@ Un léger avantage d'utiliser fam plutôt que pow apparait lorsque l'on quantifi
 sur les éléments du sous-ensemble:
 
   elems (Y , i : fam X) := Y
-  elems (P : pow X) := ∃ X : Type, P X
+  elems (P : pow X) := ∃ a : X, P a
 
 On s'aperçoit que elems pour pow contient une quantification sur Type,
 il s'agit donc d'un *grand* ensemble (un niveau plus haut que le
@@ -154,3 +166,30 @@ l'on connait en Coq ou Agda (à ceci prêt qu'on ne peut pas forcer
 d'unification des paramètres dans les constructeurs, on ne peut donc
 pas exprimer l'égalité inductive, ou le type inductif des fibres d'une
 fonction).
+
+
+## OGS et preuves
+
+On a jusqu'à maintenant obtenu:
+
+* le calcul de l'évaluation en eager normal form
+* le calcul d'un arbre de lassen
+* le calcul de l'OGS cbv d'un terme
+
+Le but est de prouver que l'eutt sur les abres de lassen est exactement
+l'équivalence contextuelle. Ce résultat est connu, mais non trivial car
+il mélange du raisonnement inductif (sur les termes et contextes) et
+coinductif (sur les arbres).
+
+  (∀ C, norm(C[t₁]) = norm(C[t₂])) ⇔ eutt (lassen t₁) (lassen t₂)
+
+on veut eutt_lassen <=> eutt_OGS
+
+ctx eqv <= OGS: +- simple
+ctx eqv => OGS: need définissabilité
+  
+todo:
+  rajouter letrec
+  rajouter sommes, produit
+
+  blueprint de la preuve
