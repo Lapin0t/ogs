@@ -10,20 +10,28 @@ Set Equations Transparent.
 
 Inductive ty : Type :=
 | Base : ty
+| Prod : ty -> ty -> ty
 | Arr : ty -> ty -> ty.
 Derive NoConfusion for ty.
 
-Notation "A =:> B" := (Arr A B) (at level 60).
+Declare Scope ty_scope.
+Delimit Scope ty_scope with ty.
+Bind Scope ty_scope with ty.
+Notation "A → B" := (Arr A B) (at level 40) : ty_scope .
+Notation "A × B" := (Prod A B) (at level 40) : ty_scope.
 
 Definition ctx : Type := list ty.
 Definition elt (Γ : ctx) : Type := fin (length Γ).
 
+(*Definition snoc (Γ : ctx) (x : ty) : ctx := x :: Γ.*)
+Notation "Γ ▶ x" := (x :: Γ) (at level 20).
+
 Inductive has : ctx -> ty -> Type :=
-| top {Γ x} : has (x :: Γ) x
-| pop {Γ x y} : has Γ x -> has (y :: Γ) x.
+| top {Γ x} : has (Γ ▶ x) x
+| pop {Γ x y} : has Γ x -> has (Γ ▶ y) x.
 
 Notation "Γ ∋ t" := (has Γ t) (at level 30).
-Definition pop' {Γ} : forall t, Γ ∋ t -> (t :: Γ) ∋ t := fun _ => pop.
+Definition pop' {Γ} : forall t, Γ ∋ t -> (Γ ▶ t) ∋ t := fun _ => pop.
 
 Equations has_get Γ i : Γ ∋ (Γ.[i]) :=
   has_get (x :: xs) F0 := top ;
@@ -31,109 +39,178 @@ Equations has_get Γ i : Γ ∋ (Γ.[i]) :=
 
 Inductive term : ctx -> ty -> Type :=
 | Var {Γ a} (i : Γ ∋ a) : term Γ a
-| Lam {Γ a b} (u : term (a :: Γ) b) : term Γ (a =:> b)
-| App {Γ a b} (u : term Γ (a =:> b)) (v : term Γ a) : term Γ b.
+| Lam {Γ a b} (u : term (Γ ▶ a) b) : term Γ (a → b)
+| App {Γ a b} (u : term Γ (a → b)) (v : term Γ a) : term Γ b
+| Pair {Γ a b} (u : term Γ a) (v : term Γ b) : term Γ (a × b)
+| Fst {Γ a b} (u : term Γ (a × b)) : term Γ a
+| Snd {Γ a b} (u : term Γ (a × b)) : term Γ b
+| Letrec {Γ a} (u : term (Γ ▶ a) a) : term Γ a
+.
 
-(* t_ctx Γ a Δ b := term Γ a --o term Δ b *)
-Inductive t_ctx (Γ : ctx) (t : ty) : ctx -> ty -> Type :=
-| CHole : t_ctx Γ t Γ t
-| CApp_l {Δ a b} : term Δ (a =:> b) -> t_ctx Γ t Δ a -> t_ctx Γ t Δ b
-| CApp_r {Δ a b} : t_ctx Γ t Δ (a =:> b) -> term Δ a -> t_ctx Γ t Δ b
-| CLam {Δ a b} : t_ctx Γ t (a :: Δ) b -> t_ctx Γ t Δ (a =:> b).
-Arguments CHole {Γ t}.
-Arguments CApp_l {Γ t Δ a b}.
-Arguments CApp_r {Γ t Δ a b}.
-Arguments CLam {Γ t Δ a b}.
-
-Equations plug {Γ Δ a b} : t_ctx Γ a Δ b -> term Γ a -> term Δ b :=
-  plug CHole t := t ;
-  plug (CApp_r C u) t := App (plug C t) u ;
-  plug (CApp_l u C) t := App u (plug C t);
-  plug (CLam C) t := Lam (plug C t).
 
 Equations t_rename {Γ Δ} (f : forall t, Γ ∋ t -> Δ ∋ t) {t} : term Γ t -> term Δ t :=
   t_rename f (Var i)        := Var (f _ i) ;
   t_rename f (App u v)      := App (t_rename f u) (t_rename f v) ;
   t_rename f (@Lam _ a _ u) := Lam (t_rename f' u)
-    where f' : forall t, (a :: _) ∋ t -> (a :: _) ∋ t := {
+    where f' : forall t, (_ ▶ a) ∋ t -> (_ ▶ a) ∋ t := {
           f' _ top := top ;
-          f' _ (pop i) := pop (f _ i) }.
+          f' _ (pop i) := pop (f _ i) } ;
+  t_rename f (Pair u v)     := Pair (t_rename f u) (t_rename f v) ;
+  t_rename f (Fst u)        := Fst (t_rename f u) ;
+  t_rename f (Snd u)        := Snd (t_rename f u) ;
+  t_rename f (@Letrec _ a u) := Letrec (t_rename f' u)
+    where f' : forall t, (_ ▶ a) ∋ t -> (_ ▶ a) ∋ t := {
+          f' _ top := top ;
+          f' _ (pop i) := pop (f _ i) } .
 
-Definition t_shift {Γ} {x y} : term Γ x -> term (y :: Γ) x :=
+Definition t_shift {Γ} {x y} : term Γ x -> term (Γ ▶ y) x :=
   t_rename (fun _ => pop).
 
 Equations t_subst {Γ Δ} (f : forall t, Γ ∋ t -> term Δ t) {t} : term Γ t -> term Δ t :=
   t_subst f (Var i)        := f _ i ;
   t_subst f (App u v)      := App (t_subst f u) (t_subst f v) ;
   t_subst f (@Lam _ a _ u) := Lam (t_subst f' u)
-    where f' : forall t, (a :: _) ∋ t -> term (a :: _) t := {
+    where f' : forall t, (_ ▶ a) ∋ t -> term (_ ▶ a) t := {
           f' _ top := Var top ;
-          f' _ (pop i) := t_shift (f _ i) }.
+          f' _ (pop i) := t_shift (f _ i) } ;
+  t_subst f (Pair u v)     := Pair (t_subst f u) (t_subst f v) ;
+  t_subst f (Fst u)        := Fst (t_subst f u) ;
+  t_subst f (Snd u)        := Snd (t_subst f u) ;
+  t_subst f (@Letrec _ a u) := Letrec (t_subst f' u)
+    where f' : forall t, (_ ▶ a) ∋ t -> term (_ ▶ a) t := {
+          f' _ top := Var top ;
+          f' _ (pop i) := t_shift (f _ i) } .
 
-Equations t_subst1 {Γ a b} (u : term (a :: Γ) b) (v : term Γ a) : term Γ b :=
+Equations t_subst1 {Γ a b} (u : term (Γ ▶ a) b) (v : term Γ a) : term Γ b :=
   t_subst1 u v := t_subst f u
-    where f : forall t, (a :: Γ) ∋ t -> term Γ t := {
+    where f : forall t, (Γ ▶ a) ∋ t -> term Γ t := {
           f _ top := v ;
           f _ (pop i) := Var i }.
 
-Variant e_val : ctx -> ty -> Type :=
+Inductive e_val : ctx -> ty -> Type :=
 | VVar {Γ x} : Γ ∋ x -> e_val Γ x
-| VLam {Γ a b} : term (a :: Γ) b -> e_val Γ (a =:> b)
+| VLam {Γ a b} : term (Γ ▶ a) b -> e_val Γ (a → b)
+| VRec {Γ a} : term (Γ ▶ a) a -> e_val Γ a
+| VPair {Γ a b} : e_val Γ a -> e_val Γ b -> e_val Γ (a × b)
 .
 
 Equations t_of_val {Γ x} : e_val Γ x -> term Γ x :=
   t_of_val (VVar i) := Var i ;
-  t_of_val (VLam u) := Lam u.
+  t_of_val (VLam u) := Lam u ;
+  t_of_val (VRec u) := Letrec u ;
+  t_of_val (VPair u v) := Pair (t_of_val u) (t_of_val v) .
 
 Inductive e_ctx (Γ : ctx) (t : ty) : ty -> Type :=
 | EHole : e_ctx Γ t t
-| EApp_l {a b} : term Γ (a =:> b) -> e_ctx Γ t a -> e_ctx Γ t b
-| EApp_r {a b} : e_ctx Γ t (a =:> b) -> e_val Γ a -> e_ctx Γ t b
+| EApp_l {a b} : e_ctx Γ t (a → b) -> term Γ a -> e_ctx Γ t b
+| EApp_r {a b} : e_val Γ (a → b) -> e_ctx Γ t a -> e_ctx Γ t b
+| EPair_l {a b} : e_ctx Γ t a -> term Γ b -> e_ctx Γ t (a × b)
+| EPair_r {a b} : e_val Γ a -> e_ctx Γ t b -> e_ctx Γ t (a × b)
+| EFst {a b} : e_ctx Γ t (a × b) -> e_ctx Γ t a
+| ESnd {a b} : e_ctx Γ t (a × b) -> e_ctx Γ t b
 .
 Arguments EHole {Γ t}.
 Arguments EApp_l {Γ t a b}.
 Arguments EApp_r {Γ t a b}.
+Arguments EPair_l {Γ t a b}.
+Arguments EPair_r {Γ t a b}.
+Arguments EFst {Γ t a b}.
+Arguments ESnd {Γ t a b}.
 
 Equations e_plug {Γ x y} (E : e_ctx Γ x y) : term Γ x -> term Γ y :=
   e_plug EHole t := t ;
-  e_plug (EApp_l u E) t := App u (e_plug E t) ;
-  e_plug (EApp_r E u) t := App (e_plug E t) (t_of_val u) .
+  e_plug (EApp_r u E) t := App (t_of_val u) (e_plug E t) ;
+  e_plug (EApp_l E u) t := App (e_plug E t) u ;
+  e_plug (EPair_r u E) t := Pair (t_of_val u) (e_plug E t) ;
+  e_plug (EPair_l E u) t := Pair (e_plug E t) u ;
+  e_plug (EFst E)      t := Fst (e_plug E t) ;
+  e_plug (ESnd E)      t := Snd (e_plug E t) .
 
-Equations e_fill {Γ x y} : e_ctx Γ x y -> term (x :: Γ) y :=
+Equations e_concat {Γ x y z} : e_ctx Γ x y -> e_ctx Γ y z -> e_ctx Γ x z :=
+  e_concat E0 EHole          := E0 ;
+  e_concat E0 (EApp_l E1 u)  := EApp_l (e_concat E0 E1) u ;
+  e_concat E0 (EApp_r u E1)  := EApp_r u (e_concat E0 E1) ;
+  e_concat E0 (EPair_l E1 u) := EPair_l (e_concat E0 E1) u ;
+  e_concat E0 (EPair_r u E1) := EPair_r u (e_concat E0 E1) ;
+  e_concat E0 (EFst E1)      := EFst (e_concat E0 E1) ;
+  e_concat E0 (ESnd E1)      := ESnd (e_concat E0 E1) .
+
+Equations e_fill {Γ x y} : e_ctx Γ x y -> term (Γ ▶ x) y :=
   e_fill EHole := Var top ;
-  e_fill (EApp_l u E) := App (t_shift u) (e_fill E) ;
-  e_fill (EApp_r E u) := App (e_fill E) (t_shift (t_of_val u)) .
+  e_fill (EApp_l E u) := App (e_fill E) (t_shift u) ;
+  e_fill (EApp_r u E) := App (t_shift (t_of_val u)) (e_fill E) ;
+  e_fill (EPair_l E u) := Pair (e_fill E) (t_shift u) ;
+  e_fill (EPair_r u E) := Pair (t_shift (t_of_val u)) (e_fill E) ;
+  e_fill (EFst E)      := Fst (e_fill E) ;
+  e_fill (ESnd E)      := Snd (e_fill E) .
+
+Variant e_redex (Γ : ctx) : ty -> ty -> Type :=
+| RApp {a b} : e_val Γ a -> e_redex Γ (a → b) b
+| RFst {a b} : e_redex Γ (a × b) a
+| RSnd {a b} : e_redex Γ (a × b) b
+.
+Arguments RApp {Γ a b}.
+Arguments RFst {Γ a b}.
+Arguments RSnd {Γ a b}.
+
+Equations t_of_red {Γ x y} : term Γ x -> e_redex Γ x y -> term Γ y :=
+  t_of_red e (RApp v) := App e (t_of_val v) ;
+  t_of_red e RFst := Fst e ;
+  t_of_red e RSnd := Snd e.
 
 Variant e_term (Γ : ctx) (x : ty) : Type :=
 | EVal : e_val Γ x -> e_term Γ x
-| ERed {a b} : e_ctx Γ b x -> e_val Γ (a =:> b) -> e_val Γ a -> e_term Γ x
+| ERed {a b} : e_ctx Γ b x -> e_val Γ a -> e_redex Γ a b -> e_term Γ x
 .
 Arguments EVal {Γ x}.
 Arguments ERed {Γ x a b}.
 
+(*
+Equations e_plug_val {Γ x y} : e_ctx Γ x y -> e_val Γ x -> e_term Γ y :=
+  e_plug_val EHole         v := EVal v ;
+  e_plug_val (EApp_l E u)  v := _ ;
+  e_plug_val (EApp_r u E)  v := _ ;
+  e_plug_val (EPair_l E u) v := _ ;
+  e_plug_val (EPair_r u E) v := _ ;
+  e_plug_val (EFst E)      v := _ ;
+  e_plug_val (ESnd E)      v :=  .
+*)
+
 Equations t_of_e_term {Γ x} : e_term Γ x -> term Γ x :=
   t_of_e_term (EVal v) := t_of_val v ;
-  t_of_e_term (ERed E v0 v1) := e_plug E (App (t_of_val v0) (t_of_val v1)).
+  t_of_e_term (ERed E v r) := e_plug E (t_of_red (t_of_val v) r) .
 
 Equations e_split {Γ x} : term Γ x -> e_term Γ x :=
   e_split (Var i) := EVal (VVar i) ;
   e_split (Lam u) := EVal (VLam u) ;
-  e_split (App a b) with e_split b := {
-    | EVal v0 with e_split a := {
-      | EVal u0 := ERed EHole u0 v0 ;
-      | ERed E u0 u1 := ERed (EApp_r E v0) u0 u1 } ;
-    | ERed E v0 v1 := ERed (EApp_l a E) v0 v1 }.
-
+  e_split (App a b) with e_split a := {
+    | EVal u0 with e_split b := {
+      | EVal v0 := ERed EHole u0 (RApp v0) ;
+      | ERed E v0 r := ERed (EApp_r u0 E) v0 r } ;
+    | ERed E u0 r := ERed (EApp_l E b) u0 r } ;
+  e_split (Pair a b) with e_split a := {
+    | EVal u0 with e_split b := {
+      | EVal v0 := EVal (VPair u0 v0) ;
+      | ERed E v0 r := ERed (EPair_r u0 E) v0 r } ;
+    | ERed E u0 r := ERed (EPair_l E b) u0 r } ;
+  e_split (Fst a) with e_split a := {
+    | EVal u0 := ERed EHole u0 RFst ;
+    | ERed E u0 r := ERed (EFst E) u0 r } ;
+  e_split (Snd a) with e_split a := {
+    | EVal u0 := ERed EHole u0 RSnd ;
+    | ERed E u0 r := ERed (ESnd E) u0 r } ;
+  e_split (Letrec a) := EVal (VRec a) .
+          
 Variant e_nf (Γ : ctx) (x : ty) : Type :=
 | NVal : e_val Γ x -> e_nf Γ x
-| NRed {a b} : e_ctx Γ b x -> Γ ∋ (a =:> b) -> e_val Γ a -> e_nf Γ x
+| NRed {a b} : e_ctx Γ b x -> Γ ∋ a -> e_redex Γ a b -> e_nf Γ x
 .
 Arguments NVal {Γ x}.
 Arguments NRed {Γ x a b}.
 
 Equations t_of_e_nf {Γ x} : e_nf Γ x -> term Γ x :=
   t_of_e_nf (NVal v) := t_of_val v ;
-  t_of_e_nf (NRed E i v) := e_plug E (App (Var i) (t_of_val v)).
+  t_of_e_nf (NRed E i r) := e_plug E (t_of_red (Var i) r).
 
 Record t_env : Type := TEnv { Ctx : ctx ; Ty : ty }.
 Definition t_uncurry {A : ctx -> ty -> Type} (f : forall Γ x, A Γ x) i :=
@@ -145,30 +222,22 @@ Definition term' := t_uncurry term.
 Definition e_nf' := t_uncurry e_nf.
 Definition e_val' := t_uncurry e_val.
 
-(*
-Definition t_to_t' {Γ x} (t : term Γ x) : term' (TEnv Γ x) := t.
-Definition t'_to_t {i} (t : term' i) : term i.(Ctx) i.(Ty) :=  t.
-Definition n_to_n' {Γ x} (t : e_nf Γ x) : e_nf' (TEnv Γ x) := t.
-Definition n'_to_n {i} (t : e_nf' i) : e_nf i.(Ctx) (ix_ty i).
-  destruct i as [ Γ [ x [] ] ]; auto.
-Defined.
-Definition v_to_v' {Γ x} (v : e_val Γ x) : e_val' (to_ix Γ x) := v.
-Definition v'_to_v {i} (t : e_val' i) : e_val (ix_ctx i) (ix_ty i).
-  destruct i as [ Γ [ x [] ] ]; auto.
-Defined.
-*)
-
 Equations eval_enf' {Γ x} (t : e_term Γ x) : itree₀ ∅ₑ (term Γ x + e_nf Γ x) :=
-  eval_enf' (EVal v) := ret₀ (inr (NVal v)) ;
-  eval_enf' (ERed E (VVar i) v) := ret₀ (inr (NRed E i v)) ;
-  eval_enf' (ERed E (VLam u) v) := ret₀ (inl (e_plug E (t_subst1 u (t_of_val v)))).
+  eval_enf' (EVal v)                   := ret₀ (inr (NVal v)) ;
+  eval_enf' (ERed E (VVar i) r)        := ret₀ (inr (NRed E i r)) ;
+  eval_enf' (ERed E (VRec u) r)        := _ ;
+  eval_enf' (ERed E (VLam u) (RApp v)) :=
+    ret₀ (inl (e_plug E (t_subst1 u (t_of_val v)))) ;
+  eval_enf' (ERed E (VPair u0 u1) RFst) := ret₀ (inl (e_plug E (t_of_val u0))) ;
+  eval_enf' (ERed E (VPair u0 u1) RSnd) := ret₀ (inl (e_plug E (t_of_val u1))) .
+Obligation 1.
 
 Definition eval_enf {Γ x} : term Γ x -> itree₀ ∅ₑ (e_nf Γ x) :=
   iterₐ (eval_enf' ∘ e_split).
 
 Variant enf_qry (Γ : ctx) (x : ty) : Type :=
 | NQVal : enf_qry Γ x
-| NQRed a b : Γ ∋ (a =:> b) -> enf_qry Γ x.
+| NQRed a b : Γ ∋ (a → b) -> enf_qry Γ x.
 Arguments NQVal {Γ x}.
 Arguments NQRed {Γ x} a b.
 
@@ -176,14 +245,15 @@ Definition enf_rsp Γ x : enf_qry Γ x -> Type :=
   fun q => match q with
         | NQVal => match x with
                   | Base => T0    (* no opponent move on base type *)
-                  | a =:> b => T1 (* sinle opponent move: evaluation *)
+                  | Prod a b => T0
+                  | Arr a b => T1 (* sinle opponent move: evaluation *)
                   end
         | NQRed _ _ _ => T2 (* continue on context or evaluate argument *)
         end.
 
 Definition enf_nxt Γ x (q : enf_qry Γ x) : enf_rsp Γ x q -> t_env.
   destruct q.
-  + destruct x as [|a b]; intros []. refine (TEnv (a :: Γ) b).
+  + destruct x as [|a b|a b]; intros []. refine (TEnv (a :: Γ) b).
   + intros []. refine (TEnv (b :: Γ) x). refine (TEnv Γ a).
 Defined.
 
