@@ -1,3 +1,4 @@
+Require Import Psatz.
 From ExtLib.Data Require Import Nat Fin List Unit.
 From Coq Require Import Logic.
 Import EqNotations.
@@ -23,15 +24,12 @@ Notation "A × B" := (Prod A B) (at level 40) : ty_scope.
 Definition ctx : Type := list ty.
 Definition elt (Γ : ctx) : Type := fin (length Γ).
 
-(*Definition snoc (Γ : ctx) (x : ty) : ctx := x :: Γ.*)
 Notation "Γ ▶ x" := (x :: Γ) (at level 20).
 
 Inductive has : ctx -> ty -> Type :=
 | top {Γ x} : has (Γ ▶ x) x
 | pop {Γ x y} : has Γ x -> has (Γ ▶ y) x.
-
 Notation "Γ ∋ t" := (has Γ t) (at level 30).
-Definition pop' {Γ} : forall t, Γ ∋ t -> (Γ ▶ t) ∋ t := fun _ => pop.
 
 Equations has_get Γ i : Γ ∋ (Γ.[i]) :=
   has_get (x :: xs) F0 := top ;
@@ -42,44 +40,53 @@ Inductive term : ctx -> ty -> Type :=
 | Lam {Γ a b} (u : term (Γ ▶ a) b) : term Γ (a → b)
 | App {Γ a b} (u : term Γ (a → b)) (v : term Γ a) : term Γ b
 | Pair {Γ a b} (u : term Γ a) (v : term Γ b) : term Γ (a × b)
-| Fst {Γ a b} (u : term Γ (a × b)) : term Γ a
-| Snd {Γ a b} (u : term Γ (a × b)) : term Γ b
-| Letrec {Γ a} (u : term (Γ ▶ a) a) : term Γ a
+| PMatch {Γ a b x} (u : term Γ (a × b)) (v : term (Γ ▶ a ▶ b) x) : term Γ x
+| Rec {Γ a b} (u : term (Γ ▶ (a → b)%ty ▶ a) b) : term Γ (a → b)
 .
 
+(*****************************)
+(* renaming and substitution *)
+
+(* helper for defining various shiftings of renamings and substitutions *)
+Equations has_case {Γ Δ} {F : ctx -> ty -> Type} {a}
+  : F Δ a -> (forall x, Γ ∋ x -> F Δ x) -> forall x, (Γ ▶ a) ∋ x -> F Δ x :=
+  has_case z s _ top     := z ;
+  has_case z s _ (pop i) := s _ i .
+
+Definition r_shift {Γ Δ a} (f : forall t, Γ ∋ t -> Δ ∋ t)
+  : forall t, (Γ ▶ a) ∋ t -> (Δ ▶ a) ∋ t
+  := has_case top (fun _ i => pop (f _ i)).
+
+Definition r_shift2 {Γ Δ a b} (f : forall t, Γ ∋ t -> Δ ∋ t)
+  : forall t, (Γ ▶ a ▶ b) ∋ t -> (Δ ▶ a ▶ b) ∋ t
+  := r_shift (r_shift f).
 
 Equations t_rename {Γ Δ} (f : forall t, Γ ∋ t -> Δ ∋ t) {t} : term Γ t -> term Δ t :=
   t_rename f (Var i)        := Var (f _ i) ;
   t_rename f (App u v)      := App (t_rename f u) (t_rename f v) ;
-  t_rename f (@Lam _ a _ u) := Lam (t_rename f' u)
-    where f' : forall t, (_ ▶ a) ∋ t -> (_ ▶ a) ∋ t := {
-          f' _ top := top ;
-          f' _ (pop i) := pop (f _ i) } ;
+  t_rename f (Lam u)        := Lam (t_rename (r_shift f) u) ;
   t_rename f (Pair u v)     := Pair (t_rename f u) (t_rename f v) ;
-  t_rename f (Fst u)        := Fst (t_rename f u) ;
-  t_rename f (Snd u)        := Snd (t_rename f u) ;
-  t_rename f (@Letrec _ a u) := Letrec (t_rename f' u)
-    where f' : forall t, (_ ▶ a) ∋ t -> (_ ▶ a) ∋ t := {
-          f' _ top := top ;
-          f' _ (pop i) := pop (f _ i) } .
+  t_rename f (PMatch u v)   := PMatch (t_rename f u) (t_rename (r_shift2 f) v) ;
+  t_rename f (Rec u)        := Rec (t_rename (r_shift (r_shift f)) u).
 
 Definition t_shift {Γ} {x y} : term Γ x -> term (Γ ▶ y) x :=
   t_rename (fun _ => pop).
 
+Definition s_shift {Γ Δ a} (f : forall t, Γ ∋ t -> term Δ t)
+  : forall t, (Γ ▶ a) ∋ t -> term (Δ ▶ a) t
+  := has_case (Var top) (fun _ i => t_shift (f _ i)).
+
+Definition s_shift2 {Γ Δ a b} (f : forall t, Γ ∋ t -> term Δ t)
+                    : forall t, (Γ ▶ a ▶ b) ∋ t -> term (Δ ▶ a ▶ b) t
+  := s_shift (s_shift f).
+
 Equations t_subst {Γ Δ} (f : forall t, Γ ∋ t -> term Δ t) {t} : term Γ t -> term Δ t :=
-  t_subst f (Var i)        := f _ i ;
-  t_subst f (App u v)      := App (t_subst f u) (t_subst f v) ;
-  t_subst f (@Lam _ a _ u) := Lam (t_subst f' u)
-    where f' : forall t, (_ ▶ a) ∋ t -> term (_ ▶ a) t := {
-          f' _ top := Var top ;
-          f' _ (pop i) := t_shift (f _ i) } ;
-  t_subst f (Pair u v)     := Pair (t_subst f u) (t_subst f v) ;
-  t_subst f (Fst u)        := Fst (t_subst f u) ;
-  t_subst f (Snd u)        := Snd (t_subst f u) ;
-  t_subst f (@Letrec _ a u) := Letrec (t_subst f' u)
-    where f' : forall t, (_ ▶ a) ∋ t -> term (_ ▶ a) t := {
-          f' _ top := Var top ;
-          f' _ (pop i) := t_shift (f _ i) } .
+  t_subst f (Var i)       := f _ i ;
+  t_subst f (App u v)     := App (t_subst f u) (t_subst f v) ;
+  t_subst f (Lam u)       := Lam (t_subst (s_shift f) u) ;
+  t_subst f (Pair u v)    := Pair (t_subst f u) (t_subst f v) ;
+  t_subst f (PMatch u v)  := PMatch (t_subst f u) (t_subst (s_shift2 f) v) ;
+  t_subst f (Rec u)       := Rec (t_subst (s_shift2 f) u) .
 
 Equations t_subst1 {Γ a b} (u : term (Γ ▶ a) b) (v : term Γ a) : term Γ b :=
   t_subst1 u v := t_subst f u
@@ -87,130 +94,171 @@ Equations t_subst1 {Γ a b} (u : term (Γ ▶ a) b) (v : term Γ a) : term Γ b 
           f _ top := v ;
           f _ (pop i) := Var i }.
 
+Notation "u /ₛ v" := (t_subst1 u v) (at level 50, left associativity).
+
+(**************************************************)
+(* Eager values, evaluation contexts, redexes etc *)
+
 Inductive e_val : ctx -> ty -> Type :=
 | VVar {Γ x} : Γ ∋ x -> e_val Γ x
 | VLam {Γ a b} : term (Γ ▶ a) b -> e_val Γ (a → b)
-| VRec {Γ a} : term (Γ ▶ a) a -> e_val Γ a
+| VRec {Γ a b} : term (Γ ▶ (a → b)%ty ▶ a) b -> e_val Γ (a → b)
 | VPair {Γ a b} : e_val Γ a -> e_val Γ b -> e_val Γ (a × b)
 .
 
 Equations t_of_val {Γ x} : e_val Γ x -> term Γ x :=
   t_of_val (VVar i) := Var i ;
   t_of_val (VLam u) := Lam u ;
-  t_of_val (VRec u) := Letrec u ;
+  t_of_val (VRec u) := Rec u ;
   t_of_val (VPair u v) := Pair (t_of_val u) (t_of_val v) .
 
+(* e_ctx Γ y x is an eager evaluation context with:
+    - variables in Γ,
+    - hole type x and
+    - return type y
+   They grow on the outwards, that is the operation closest to the hole will be
+   the topmost constructor. This is exactly the type of the call-stack of the
+   CBV evaluator.
+*)
 Inductive e_ctx (Γ : ctx) (t : ty) : ty -> Type :=
 | EHole : e_ctx Γ t t
-| EApp_l {a b} : e_ctx Γ t (a → b) -> term Γ a -> e_ctx Γ t b
-| EApp_r {a b} : e_val Γ (a → b) -> e_ctx Γ t a -> e_ctx Γ t b
-| EPair_l {a b} : e_ctx Γ t a -> term Γ b -> e_ctx Γ t (a × b)
-| EPair_r {a b} : e_val Γ a -> e_ctx Γ t b -> e_ctx Γ t (a × b)
-| EFst {a b} : e_ctx Γ t (a × b) -> e_ctx Γ t a
-| ESnd {a b} : e_ctx Γ t (a × b) -> e_ctx Γ t b
+| EApp_l {a b} : e_ctx Γ t b -> term Γ a -> e_ctx Γ t (a → b)
+| EApp_r {a b} : e_ctx Γ t b -> e_val Γ (a → b) -> e_ctx Γ t a
+| EPair_l {a b} : e_ctx Γ t (a × b) -> term Γ b -> e_ctx Γ t a
+| EPair_r {a b} : e_ctx Γ t (a × b) -> e_val Γ a -> e_ctx Γ t b
+| EPMatch {a b x} : e_ctx Γ t x -> term (Γ ▶ a ▶ b) x -> e_ctx Γ t (a × b)
 .
 Arguments EHole {Γ t}.
 Arguments EApp_l {Γ t a b}.
 Arguments EApp_r {Γ t a b}.
 Arguments EPair_l {Γ t a b}.
 Arguments EPair_r {Γ t a b}.
-Arguments EFst {Γ t a b}.
-Arguments ESnd {Γ t a b}.
+Arguments EPMatch {Γ t a b x}.
 
-Equations e_plug {Γ x y} (E : e_ctx Γ x y) : term Γ x -> term Γ y :=
-  e_plug EHole t := t ;
-  e_plug (EApp_r u E) t := App (t_of_val u) (e_plug E t) ;
-  e_plug (EApp_l E u) t := App (e_plug E t) u ;
-  e_plug (EPair_r u E) t := Pair (t_of_val u) (e_plug E t) ;
-  e_plug (EPair_l E u) t := Pair (e_plug E t) u ;
-  e_plug (EFst E)      t := Fst (e_plug E t) ;
-  e_plug (ESnd E)      t := Snd (e_plug E t) .
+(* useless? now that we work efficiently
+Equations e_plug {Γ x y} : e_ctx Γ y x -> term Γ x -> term Γ y :=
+  e_plug EHole         t := t ;
+  e_plug (EApp_r E u)  t := e_plug E (App (t_of_val u) t) ;
+  e_plug (EApp_l E u)  t := e_plug E (App t u) ;
+  e_plug (EPair_r E u) t := e_plug E (Pair (t_of_val u) t) ;
+  e_plug (EPair_l E u) t := e_plug E (Pair t u) ;
+  e_plug (EPMatch E u) t := e_plug E (PMatch t u) .
 
-Equations e_concat {Γ x y z} : e_ctx Γ x y -> e_ctx Γ y z -> e_ctx Γ x z :=
+Equations e_concat {Γ x y z} : e_ctx Γ z y -> e_ctx Γ y x -> e_ctx Γ z x :=
   e_concat E0 EHole          := E0 ;
   e_concat E0 (EApp_l E1 u)  := EApp_l (e_concat E0 E1) u ;
-  e_concat E0 (EApp_r u E1)  := EApp_r u (e_concat E0 E1) ;
+  e_concat E0 (EApp_r E1 u)  := EApp_r (e_concat E0 E1) u ;
   e_concat E0 (EPair_l E1 u) := EPair_l (e_concat E0 E1) u ;
-  e_concat E0 (EPair_r u E1) := EPair_r u (e_concat E0 E1) ;
-  e_concat E0 (EFst E1)      := EFst (e_concat E0 E1) ;
-  e_concat E0 (ESnd E1)      := ESnd (e_concat E0 E1) .
+  e_concat E0 (EPair_r E1 u) := EPair_r (e_concat E0 E1) u ;
+  e_concat E0 (EPMatch E1 u) := EPMatch (e_concat E0 E1) u .
+*)
 
-Equations e_fill {Γ x y} : e_ctx Γ x y -> term (Γ ▶ x) y :=
+(* todo
+Equations e_fill {Γ x y} : e_ctx Γ y x -> term (Γ ▶ x) y :=
   e_fill EHole := Var top ;
   e_fill (EApp_l E u) := App (e_fill E) (t_shift u) ;
-  e_fill (EApp_r u E) := App (t_shift (t_of_val u)) (e_fill E) ;
+  e_fill (EApp_r E u) := App (t_shift (t_of_val u)) (e_fill E) ;
   e_fill (EPair_l E u) := Pair (e_fill E) (t_shift u) ;
-  e_fill (EPair_r u E) := Pair (t_shift (t_of_val u)) (e_fill E) ;
-  e_fill (EFst E)      := Fst (e_fill E) ;
-  e_fill (ESnd E)      := Snd (e_fill E) .
+  e_fill (EPair_r E u) := Pair (t_shift (t_of_val u)) (e_fill E) ;
+  e_fill (EPMatch E u) := PMatch (t_fill E) (t_shift u) .
+*)
 
+(* 'e_redex Γ x y' represents eliminators on term Γ x returning a term Γ y *)
 Variant e_redex (Γ : ctx) : ty -> ty -> Type :=
 | RApp {a b} : e_val Γ a -> e_redex Γ (a → b) b
-| RFst {a b} : e_redex Γ (a × b) a
-| RSnd {a b} : e_redex Γ (a × b) b
+| RPMatch {a b x} : term (Γ ▶ a ▶ b) x -> e_redex Γ (a × b) x
 .
 Arguments RApp {Γ a b}.
-Arguments RFst {Γ a b}.
-Arguments RSnd {Γ a b}.
-
-Equations t_of_red {Γ x y} : term Γ x -> e_redex Γ x y -> term Γ y :=
-  t_of_red e (RApp v) := App e (t_of_val v) ;
-  t_of_red e RFst := Fst e ;
-  t_of_red e RSnd := Snd e.
+Arguments RPMatch {Γ a b x}.
 
 Variant e_term (Γ : ctx) (x : ty) : Type :=
 | EVal : e_val Γ x -> e_term Γ x
-| ERed {a b} : e_ctx Γ b x -> e_val Γ a -> e_redex Γ a b -> e_term Γ x
+| ERed {a b} : e_ctx Γ x b -> e_val Γ a -> e_redex Γ a b -> e_term Γ x
 .
 Arguments EVal {Γ x}.
 Arguments ERed {Γ x a b}.
 
-(*
-Equations e_plug_val {Γ x y} : e_ctx Γ x y -> e_val Γ x -> e_term Γ y :=
-  e_plug_val EHole         v := EVal v ;
-  e_plug_val (EApp_l E u)  v := _ ;
-  e_plug_val (EApp_r u E)  v := _ ;
-  e_plug_val (EPair_l E u) v := _ ;
-  e_plug_val (EPair_r u E) v := _ ;
-  e_plug_val (EFst E)      v := _ ;
-  e_plug_val (ESnd E)      v :=  .
+Module EFocus.
+(* Given an ongoing computation, that is a term in an evaluation context, E[t],
+   we want to find the next redex in CBV evaluation order. This is done efficiently
+   using only tail-calls, to produce an evaluator in abstract-machine style. *)
+(* The recursion pattern for these tail calls is weird so we need some helpers
+   defining a strictly decreasing measure on arguments across calls. *)
+Equations term_size {Γ x} : term Γ x -> nat :=
+  term_size (Var _) := S O ;
+  term_size (Lam _) := S O ;
+  term_size (Rec _) := S O ;
+  term_size (App a b) := S (S (term_size a + term_size b)) ;
+  term_size (PMatch a b) := S (term_size a) ;
+  term_size (Pair a b) := S (S (S (term_size a + term_size b))) .
+
+Equations ctx_size {Γ y x} : e_ctx Γ y x -> nat :=
+  ctx_size EHole := O ;
+  ctx_size (EApp_l E u) := S (ctx_size E + term_size u) ;
+  ctx_size (EApp_r E u) := O ;
+  ctx_size (EPair_l E u) := S (S (ctx_size E + term_size u)) ;
+  ctx_size (EPair_r E u) := S (ctx_size E) ;
+  ctx_size (EPMatch E b) := O .
+
+Equations aux_size {Γ x} : term Γ x + e_val Γ x -> nat :=
+  aux_size (inl t) := term_size t ;
+  aux_size (inr v) := O .
+
+(* This should actually be two mutually recursive functions:
+     e_focus : e_ctx Γ y x → term Γ x → e_term Γ y 
+     e_focus_backtrack : e_ctx Γ y x → e_val Γ x → e_term Γ y
+   But Equations doesn't allow 'by wf ..' hints in mutual blocks so we
+   have to hack the type into a sum. 
+
+   The idea is that e_focus will descend into the left-most branches,
+   recording its path as an evaluation context and stopping at values.
+   When a value is hit we have to backtrack on the evaluation context,
+   either finding a suitable redex or descending in an other branch.
 *)
+Equations e_focus' {Γ x y} (E : e_ctx Γ y x) (t : term Γ x + e_val Γ x)
+                : e_term Γ y by wf (ctx_size E + aux_size t)%nat lt :=
+  e_focus' E (inl (App a b)) := e_focus' (EApp_l E b) (inl a) ;
+  e_focus' E (inl (Pair a b)) := e_focus' (EPair_l E b) (inl a) ;
+  e_focus' E (inl (PMatch a b)) := e_focus' (EPMatch E b) (inl a) ;
+  e_focus' E (inl (Rec a)) := e_focus' E (inr (VRec a)) ;
+  e_focus' E (inl (Var i)) := e_focus' E (inr (VVar i)) ;
+  e_focus' E (inl (Lam a)) := e_focus' E (inr (VLam a)) ;
 
-Equations t_of_e_term {Γ x} : e_term Γ x -> term Γ x :=
-  t_of_e_term (EVal v) := t_of_val v ;
-  t_of_e_term (ERed E v r) := e_plug E (t_of_red (t_of_val v) r) .
+  e_focus' EHole         (inr v) := EVal v ;
+  e_focus' (EApp_l E u)  (inr v) := e_focus' (EApp_r E v) (inl u) ;
+  e_focus' (EApp_r E u)  (inr v) := ERed E u (RApp v) ;
+  e_focus' (EPair_l E u) (inr v) := e_focus' (EPair_r E v) (inl u) ;
+  e_focus' (EPair_r E u) (inr v) := e_focus' E (inr (VPair u v)) ;
+  e_focus' (EPMatch E b) (inr v) := ERed E v (RPMatch b)  .
+Obligation 1. lia. Qed.
+Obligation 2. lia. Qed.
+Obligation 3. lia. Qed.
+Obligation 4. lia. Qed.
+Obligation 5. lia. Qed.
+Obligation 6. lia. Qed.
+Obligation 7. lia. Qed.
+Obligation 8. lia. Qed.
+End EFocus.
 
-Equations e_split {Γ x} : term Γ x -> e_term Γ x :=
-  e_split (Var i) := EVal (VVar i) ;
-  e_split (Lam u) := EVal (VLam u) ;
-  e_split (App a b) with e_split a := {
-    | EVal u0 with e_split b := {
-      | EVal v0 := ERed EHole u0 (RApp v0) ;
-      | ERed E v0 r := ERed (EApp_r u0 E) v0 r } ;
-    | ERed E u0 r := ERed (EApp_l E b) u0 r } ;
-  e_split (Pair a b) with e_split a := {
-    | EVal u0 with e_split b := {
-      | EVal v0 := EVal (VPair u0 v0) ;
-      | ERed E v0 r := ERed (EPair_r u0 E) v0 r } ;
-    | ERed E u0 r := ERed (EPair_l E b) u0 r } ;
-  e_split (Fst a) with e_split a := {
-    | EVal u0 := ERed EHole u0 RFst ;
-    | ERed E u0 r := ERed (EFst E) u0 r } ;
-  e_split (Snd a) with e_split a := {
-    | EVal u0 := ERed EHole u0 RSnd ;
-    | ERed E u0 r := ERed (ESnd E) u0 r } ;
-  e_split (Letrec a) := EVal (VRec a) .
-          
+(* pack a term and an evaluation context *)
+Variant eval_arg (Γ : ctx) (x : ty) : Type :=
+| EA {y} : e_ctx Γ x y -> term Γ y -> eval_arg Γ x.
+Arguments EA {Γ x y}.
+
+(* efficiently find the first redex in E[t] *)
+Equations e_focus {Γ x} : eval_arg Γ x -> e_term Γ x :=
+  e_focus (EA E t) := EFocus.e_focus' E (inl t).
+
+
+(************************************)
+(* evaluation to eager normal forms *)
+
 Variant e_nf (Γ : ctx) (x : ty) : Type :=
 | NVal : e_val Γ x -> e_nf Γ x
-| NRed {a b} : e_ctx Γ b x -> Γ ∋ a -> e_redex Γ a b -> e_nf Γ x
+| NRed {a b} : e_ctx Γ x b -> Γ ∋ a -> e_redex Γ a b -> e_nf Γ x
 .
 Arguments NVal {Γ x}.
 Arguments NRed {Γ x a b}.
-
-Equations t_of_e_nf {Γ x} : e_nf Γ x -> term Γ x :=
-  t_of_e_nf (NVal v) := t_of_val v ;
-  t_of_e_nf (NRed E i r) := e_plug E (t_of_red (Var i) r).
 
 Record t_env : Type := TEnv { Ctx : ctx ; Ty : ty }.
 Definition t_uncurry {A : ctx -> ty -> Type} (f : forall Γ x, A Γ x) i :=
@@ -218,22 +266,35 @@ Definition t_uncurry {A : ctx -> ty -> Type} (f : forall Γ x, A Γ x) i :=
 Definition t_curry {A : ctx -> ty -> Type} (f : forall i, A i.(Ctx) i.(Ty)) Γ x :=
   f (TEnv Γ x).
 
+(*
 Definition term' := t_uncurry term.
 Definition e_nf' := t_uncurry e_nf.
 Definition e_val' := t_uncurry e_val.
+*)
 
-Equations eval_enf' {Γ x} (t : e_term Γ x) : itree₀ ∅ₑ (term Γ x + e_nf Γ x) :=
-  eval_enf' (EVal v)                   := ret₀ (inr (NVal v)) ;
-  eval_enf' (ERed E (VVar i) r)        := ret₀ (inr (NRed E i r)) ;
-  eval_enf' (ERed E (VRec u) r)        := _ ;
-  eval_enf' (ERed E (VLam u) (RApp v)) :=
-    ret₀ (inl (e_plug E (t_subst1 u (t_of_val v)))) ;
-  eval_enf' (ERed E (VPair u0 u1) RFst) := ret₀ (inl (e_plug E (t_of_val u0))) ;
-  eval_enf' (ERed E (VPair u0 u1) RSnd) := ret₀ (inl (e_plug E (t_of_val u1))) .
-Obligation 1.
+(* one evaluation step on focused terms (e_term) *)
+Equations eval_aux {Γ x} (t : e_term Γ x) : eval_arg Γ x + e_nf Γ x :=
+  eval_aux (EVal v)                   := inr (NVal v) ;
+  eval_aux (ERed E (VVar i) r)        := inr (NRed E i r) ;
+  eval_aux (ERed E (VRec u) (RApp v)) :=
+    inl (EA E (u /ₛ t_shift (t_of_val v) /ₛ Rec u)) ;
+  eval_aux (ERed E (VLam u) (RApp v)) :=
+    inl (EA E (u /ₛ t_of_val v)) ;
+  eval_aux (ERed E (VPair u0 u1) (RPMatch a)) :=
+    inl (EA E (a /ₛ t_shift (t_of_val u1) /ₛ t_of_val u0)) .
 
-Definition eval_enf {Γ x} : term Γ x -> itree₀ ∅ₑ (e_nf Γ x) :=
-  iterₐ (eval_enf' ∘ e_split).
+Definition eval_enf {Γ x} : eval_arg Γ x -> itree₀ ∅ₑ (e_nf Γ x) :=
+  iterₐ (ret₀ ∘ eval_aux ∘ e_focus).
+
+(* WIP below this point *)
+
+(*
+Variant polarity : Type := Neg | Pos.
+Equations get_polarity : ty -> polarity :=
+  get_polarity (a → b) := Neg ;
+  get_polarity Base := Pos ;
+  get_polarity (a × b) := Pos .
+*)
 
 Variant enf_qry (Γ : ctx) (x : ty) : Type :=
 | NQVal : enf_qry Γ x
@@ -289,6 +350,21 @@ Definition eval_lassen : forall Γ x, term Γ x -> lassen_tree (fun _ _ => T0) �
   refine (fun _ '(Fib a) => _).
   refine (lassen_enf a).
 Defined.
+
+(****************************************)
+(* various proofs on eager normal forms *)
+
+Equations t_of_e_term {Γ x} : e_term Γ x -> term Γ x :=
+  t_of_e_term (EVal v) := t_of_val v ;
+  t_of_e_term (ERed E v r) := e_plug E (t_of_red (t_of_val v) r) .
+
+Equations t_of_red {Γ x y} : term Γ x -> e_redex Γ x y -> term Γ y :=
+  t_of_red e (RApp v) := App e (t_of_val v) ;
+  t_of_red e (RPMatch a) := PMatch e a .
+
+Equations t_of_e_nf {Γ x} : e_nf Γ x -> term Γ x :=
+  t_of_e_nf (NVal v) := t_of_val v ;
+  t_of_e_nf (NRed E i r) := e_plug E (t_of_red (Var i) r).
 
 Lemma e_split_val {Γ x} (v : e_val Γ x) : e_split (t_of_val v) = EVal v.
   destruct v; auto.
