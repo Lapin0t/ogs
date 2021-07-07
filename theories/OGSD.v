@@ -53,8 +53,8 @@ Section OGS.
   Definition ogs : ogs_conf ⇒ᵢ itree e_ogs (fun _ => T0) :=
     iter (fun i =>
       match i as i return (ogs_conf i -> itree _ _ i) with
-      | Player i => fun c => emb_comp _ _ (spec.(play) i c)
-                         !>= fun r => stepP (projT1 r) (Ret (inl (projT2 r)))
+      | Player i => fun c => emb_comp _ _ (spec.(play) i c) !>= fun r =>
+                         stepP (projT1 r) (Ret (inl (projT2 r)))
       | Opponent i => fun c => stepO (fun oa => Ret (inl (spec.(app_o) i oa c)))
     end).
 End OGS.
@@ -66,8 +66,8 @@ Section LC_OGS.
 
 (* type of stuff in γ, eg types of continuations *)
 Variant kont_t : Type :=
-| KVal : ctx -> ty -> kont_t
-| KCtx : ctx -> ty -> ty -> kont_t
+| KVal : neg_ctx -> ty -> kont_t
+| KCtx : neg_ctx -> ty -> ty -> kont_t
 .
 
 (* actual stuff inside γ *)
@@ -78,13 +78,13 @@ Equations kont : kont_t -> Type :=
 (* stuff inside γ that opponent is allowed to query *)
 Variant has_obs : kont_t -> Type :=
 | OCtx {Γ a b} : has_obs (KCtx Γ a b)
-| OLam {Γ a b} : has_obs (KVal Γ (a =:> b))
+| OLam {Γ a b} : has_obs (KVal Γ (a → b))
 .
 
 (* wrapping kont_t to typing envs ... *)
 Equations wrap_kont_t i : has_obs i -> t_env :=
-  wrap_kont_t _ (@OLam Γ a b) := TEnv (a :: Γ) b ;
-  wrap_kont_t _ (@OCtx Γ a b) := TEnv (a :: Γ) b .
+  wrap_kont_t _ (@OLam Γ a b) := Γ ▶ a ,  b ;
+  wrap_kont_t _ (@OCtx Γ a b) := Γ ▶ a, b .
 
 (* ... and kont to corresponding terms *)
 Equations wrap_kont i (o : has_obs i) : kont i -> term' (wrap_kont_t i o) :=

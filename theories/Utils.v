@@ -28,6 +28,9 @@ Variant T3 := t3_0 | t3_1 | t3_2.
 
 Definition ex_falso {A : Type} (bot : T0) : A := match bot with end.
 
+Definition voidᵢ {I : Type} : I -> Type := fun _ => T0.
+Notation "∅ᵢ" := (voidᵢ).
+
 
 (********************************)
 (* Couple lemma on list/vec/fin *)
