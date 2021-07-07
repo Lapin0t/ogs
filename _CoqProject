@@ -1,13 +1,13 @@
 -R ./lib/InteractionTrees/theories ITree
 -Q theories OGS
 
-theories/LC.v
 theories/Utils.v
+theories/LC.v
+theories/CatD.v
 theories/EventD.v
 theories/ITreeD.v
-theories/CatD.v
+theories/AngelicD.v
 theories/RecD.v
 theories/EqD.v
 theories/LCD.v
-theories/AngelicD.v
 theories/OGSD.v

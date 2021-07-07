@@ -1,4 +1,3 @@
-(*
 From OGS Require Import Utils EventD ITreeD.
 From Paco Require Import paco.
 Require Import Program.Tactics Logic RelationClasses .
@@ -9,7 +8,7 @@ Tactic Notation "hinduction" hyp(IND) "before" hyp(H)
 
 
 Section eqit.
-  Context {I : Type} {E : event I} {R1 R2 : I -> Type} (RR : forall i, R1 i -> R2 i -> Prop).
+  Context {I : Type} {E : event I I} {R1 R2 : I -> Type} (RR : forall i, R1 i -> R2 i -> Prop).
 
   Inductive eqitF (b1 b2: bool) (vclo : endo (forall i, itree E R1 i -> itree E R2 i -> Prop) ) (sim : forall i, itree E R1 i -> itree E R2 i -> Prop) i
     : itree' E R1 i -> itree' E R2 i -> Prop :=
@@ -61,7 +60,7 @@ Section eqit.
   Hint Resolve eqit_idclo_mono : paco.
 
   Definition eutt := eqit true true.
-  Check eutt.
+
   Infix "≈" := (eutt eq) (at level 70) : type_scope.
 End eqit.
 
@@ -77,7 +76,7 @@ End eqit.
 
 
 Section eqit_trans.
-  Context {I} {E : event I} {R1 R2 : psh I} (RR : forall i, R1 i -> R2 i -> Prop).
+  Context {I} {E : event I I} {R1 R2 : psh I} (RR : forall i, R1 i -> R2 i -> Prop).
   Inductive eqit_trans_clo b1 b2 b1' b2'
                (r : forall i, itree E R1 i -> itree E R2 i -> Prop) i
            : itree E R1 i -> itree E R2 i -> Prop :=
@@ -193,7 +192,7 @@ Arguments eqit_clo_trans : clear implicits.
 
 
 Section eqit_gen.
-Context {I} {E : event I} {R: I -> Type} (RR : forall i, R i -> R i -> Prop).
+Context {I} {E : event I I} {R: I -> Type} (RR : forall i, R i -> R i -> Prop).
 
 Global Instance Reflexive_eqitF b1 b2 (sim : forall i, itree E R i -> itree E R i -> Prop)
 : (forall i, Reflexive (RR i)) -> (forall i, Reflexive (sim i)) -> (forall i, Reflexive (eqitF RR b1 b2 id sim i)).
@@ -221,6 +220,7 @@ Global Instance Symmetric_eqit_ b (sim : forall i, itree E R i -> itree E R i ->
 repeat red; symmetry; auto. Qed.
 
 (* FAILLING HERE *)
+(*
 Global Instance Reflexive_eqit_gen b1 b2 (r rg: forall i, itree E R i -> itree E R i -> Prop) :
   (forall i, Reflexive (RR i)) -> (forall i, Reflexive (gpaco3 (eqit_ RR b1 b2 id) (eqitC RR b1 b2) r rg i)).
   pcofix CIH. gstep; intros.
@@ -264,3 +264,6 @@ Qed.
 End eqit_gen.
 
 *)
+
+End eqit_gen.
+

@@ -4,14 +4,14 @@ Set Equations Transparent.
 
 
 Record ogs_spec : Type := OGS_SPEC {
-  idx_p : Type ;                         (* index at player move *)
-  idx_o : Type ;                         (* index at opponent move *)
+  idx_p : Type ;                          (* index at player move *)
+  idx_o : Type ;                          (* index at opponent move *)
   act_p : idx_p -> Type ;                 (* player actions *)
   act_o : idx_o -> Type ;                 (* opponent actions *)
   conf_p : idx_p -> Type ;                (* player states *)
   conf_o : idx_o -> Type ;                (* opponent states *)
-  nxt_p : forall i, act_p i -> idx_o ;         (* player index transition *)
-  nxt_o : forall i, act_o i -> idx_p ;         (* opponent index transition *)
+  nxt_p : forall i, act_p i -> idx_o ;    (* player index transition *)
+  nxt_o : forall i, act_o i -> idx_p ;    (* opponent index transition *)
   (* opponent state transition *)
   app_o : forall i (oa : act_o i), conf_o i -> conf_p (nxt_o i oa) ;
   (* player action computation+transition *)

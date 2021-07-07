@@ -9,7 +9,8 @@ From Equations Require Import Equations.
 (* misc notations *)
 
 #[global] Notation endo T := (T -> T).
-#[global] Notation "f ∘ g" := (Basics.compose f g) (at level 60) : function_scope. 
+  
+#[global] Notation "f ∘ g" := (Basics.compose f g) (at level 40, left associativity) : function_scope.  
 Definition compose {A : Type} {B : A -> Type} {C : forall a, B a -> Type}
            (g : forall a (b : B a), C _ b)
            (f : forall a, B a)

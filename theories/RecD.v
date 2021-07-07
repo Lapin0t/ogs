@@ -1,5 +1,4 @@
 From OGS Require Import Utils EventD ITreeD CatD AngelicD.
-Check esum.
 
 Definition iter {I} {E : event I I} {X Y : I -> Type} (body : X ⇒ᵢ itree E (X +ᵢ Y))
   : X ⇒ᵢ itree E Y :=
