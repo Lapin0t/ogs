@@ -1,6 +1,80 @@
-From OGS Require Import Utils CatD EventD ITreeD RecD AngelicD.
+From OGS Require Import Utils Ctx CatD EventD ITreeD RecD AngelicD.
+From ExtLib.Data Require Import Nat Fin List Unit.
 Set Primitive Projections.
+Set Implicit Arguments.
 Set Equations Transparent.
+
+Record uniform_event (I J : Type) : Type := UEvent {
+  u_qry : J -> Type ;
+  kon : Type ;
+  u_rsp {j} : u_qry j -> list kon ;
+  k_rsp : kon -> Type ;
+  k_nxt {k} : k_rsp k -> I
+}.
+Arguments UEvent {I J} u_qry kon u_rsp k_rsp k_nxt.
+
+(* every event is actually uniform, taking kon := {j : J & qry E j } *)
+Definition event_uniform {I J} (E : event I J) : uniform_event I J :=
+  UEvent (qry E)
+         ({ j : J & qry E j})
+         (fun j q => (j ,& q) :: nil)
+         (fun k => rsp E (projT2 k))
+         (fun k r => nxt E (projT2 k) r).
+
+(* embedding uniform events into usual events *)
+Definition e_of_u {I J} (U : uniform_event I J) : event I J :=
+  Event (u_qry U)
+        (fun _ q => { i : _ & k_rsp U (u_rsp U q .[i]) })
+        (fun _ q r => k_nxt U (projT2 r)).
+Coercion e_of_u : uniform_event >-> event.
+
+(* taking the "OGS" of an uniform event *)
+Definition ogs {I J} (U : uniform_event I J)
+           : event (I * list (kon U)) (J * list (kon U)) :=
+  Event (fun '(j , ks) => u_qry U j)
+        (fun '(j , ks) q => { i : _ & k_rsp U ((ks ++ u_rsp U q) .[i]) })
+        (fun '(j , ks) q r => (k_nxt U (projT2 r) , ks ++ u_rsp U q)).
+
+Section OGS.
+  Context {I : Type} (U : uniform_event I I).
+
+  Definition ogs_kont (X : I -> Type) : kon U -> Type :=
+    fun k => forall r : k_rsp U k, itree U X (k_nxt U r).
+
+  Definition ogs_conf (X : I -> Type) : list (kon U) -> Type := dvec (ogs_kont X).
+
+  Definition ogs_emb (X : I -> Type) : forall i ks, itree U X i -> ogs_conf X ks -> itree (ogs U) (X ∘ fst) (i , ks).
+    refine (cofix _ogs_emb i ks x c := match (observe x) with
+            | RetF x => @ret _ _ _ (i , _) x
+            | TauF t => Tau (_ogs_emb i ks t c)
+            | VisF e k => Vis (e : qry (ogs U) (i , _)) (fun r => _)
+            end).
+
+    (*
+    
+    cbn in r. cbn.
+    refine (_ogs (k_nxt U (projT2 r)) (ks ++ u_rsp U e) _ _).
+    cbn in k.
+    (*forall (i : fin (length Γ)) (p : P (Γ .[i])), Q (Γ .[i]) p
+    => dvec Γ (fun x => forall p : P x, Q x p)*)
+    unfold ogs_conf in c.
+    cbn in k.
+    destruct (concat_split _ _ (has_get (u_rsp U e +▶ ks) i)).
+      -  refine (_ogs_emb (k_nxt U r) (ks ++ u_rsp U e) _ _).
+         cbn in k.
+         destruct (get_has h) as [i' h'].
+         destruct h'.
+       
+        * 
+          Check (k (i' ,& eq_rect _ (k_rsp U) r _ (eq_sym h'))).
+      Search "concat".
+      destruct (f_split_list i).
+      cbn.
+      refine (_ogs_emb (k_nxt U r) (ks ++ u_rsp U e) _ _).
+      
+
+
+
 
 
 Record ogs_spec : Type := OGS_SPEC {
@@ -146,3 +220,4 @@ Definition lc_spec : ogs_spec :=
            lc_app_o lc_play.
 
 End LC_OGS.
+*)
