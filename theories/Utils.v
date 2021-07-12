@@ -1,7 +1,6 @@
 Set Universe Polymorphism.
 
 From ExtLib.Data Require Import Nat Fin.
-From ITree Require Import ITree Events.Dependent.
 
 From Equations Require Import Equations.
 
@@ -17,7 +16,15 @@ Definition compose {A : Type} {B : A -> Type} {C : forall a, B a -> Type}
            : forall a, C _ (f a) := fun a => g _ (f a).
 #[global] Notation "f ∘' g" := (compose f g) (at level 60) : function_scope. 
 
-Definition tau {E R} (t : itree E R) : itree E R := Tau t.
+Notation "a ,& b" := (existT _ a b) (at level 30).
+(*Notation "'ex' a" := (existT _ _ a) (at level 30).*)
+
+Definition uncurry2 {A B : Type} {C : A -> B -> Type}
+                    (f : forall a b, C a b) (i : A * B) :=
+  f (fst i) (snd i).
+Definition curry2 {A B : Type} {C : A -> B -> Type}
+                  (f : forall i, C (fst i) (snd i)) a b :=
+  f (a , b).
 
 (***************)
 (* Finite sets *)
@@ -36,11 +43,41 @@ Notation "∅ᵢ" := (voidᵢ).
 (********************************)
 (* Couple lemma on list/vec/fin *)
 
+Equations s_case {A B C : Type} (x : A + B) (f : A -> C) (g : B -> C) : C :=
+  s_case (inl a) f g := f a ;
+  s_case (inr b) f g := g b .
+
+Equations f_split {a b} (i : fin (a + b)) : (fin a + fin b) :=
+  @f_split O     _ i := inr i ;
+  @f_split (S n) _ F0 := inl F0 ;
+  @f_split (S n) _ (FS i) with f_split i := {
+     | inl i := inl (FS i) ;
+     | inr i := inr i } .
+
+Equations f_split_list {X : Type} {xs ys : list X} (i : fin (length (xs ++ ys)))
+           : fin (length xs) + fin (length ys) :=
+  @f_split_list _ nil        _ i := inr i ;
+  @f_split_list _ (cons _ _) _ F0     := inl F0 ;
+  @f_split_list _ (cons _ _) _ (FS i) with f_split_list i := {
+     | inl i := inl (FS i) ;
+     | inr i := inr i } .
+
 Equations l_get {X} (xs : list X) : fin (length xs) -> X :=
   l_get (cons x xs) F0     := x ;
   l_get (cons x xs) (FS i) := l_get xs i.
 
 Notation "xs .[ i ]" := (l_get xs i) (at level 10).
+
+(*
+Equations f_split_get {X} {xs ys : list X} i : (xs ++ ys) .[i] = s_case (f_split_list i) (l_get xs) (l_get ys) :=
+  @f_split_get _ nil        _ i := eq_refl ;
+  @f_split_get _ (cons _ _) _ F0     := eq_refl ;
+  @f_split_get _ (cons _ _) _ (FS i) with f_split_list i := {
+                                                             | inl i := _ ;
+                                                          | inr i := _  } .
+Obligation 2.
+*)
+
 
 Equations l_acc {X} (n : nat) (f : fin n -> X) : list X :=
   l_acc O     f := nil ;
@@ -50,6 +87,25 @@ Equations len_acc {X} n (f : fin n -> X) : length (l_acc n f) = n :=
   len_acc O     f := eq_refl ;
   len_acc (S n) f := f_equal S (len_acc n (f ∘ FS)).
 
+(*
+Record list' (X : Type) : Type := List' { len : nat ; val : fin len -> X }.
+Arguments len {X}.
+Arguments val {X}.
+
+Definition l_any {X : Type} (T : X -> Type) (xs : list' X) : Type :=
+  { i : fin (len xs) & T (val xs i) }.
+
+Definition l_all {X : Type} (T : X -> Type) (xs : list' X) : Type :=
+  forall i : fin (len xs), T (val xs i).
+
+Definition l_curry {X : Type} {T : X -> Type} (U : forall x, T x -> Type)
+           {xs} (h : forall e : l_any T xs, U _ (projT2 e))
+           : l_all (fun x -> forall t : T x, ) xs
+
+
+*)
+
+
 Equations dvec {X} (ty : X -> Type) (xs : list X) : Type :=
   dvec ty nil := T1 ;
   dvec ty (cons x xs) := ty x * dvec ty xs.
@@ -58,23 +114,6 @@ Transparent dvec.
 Equations d_get {X ty} (c : list X) (d : dvec ty c) (i : fin (length c)) : ty (l_get c i) :=
   d_get (cons t ts) r F0     := fst r ;
   d_get (cons t ts) r (FS i) := d_get ts (snd r) i.
-
-(********************************************************)
-(* Dependent version of stuff in ITree.Interp.Recursion *)
-
-Arguments depE : clear implicits.  (* index is usually hard to infer *)
-
-Equations dcalling' {A B} {F : Type -> Type}
-          (f : forall a, itree F (B a)) : depE A B ~> itree F :=
-dcalling' f _ (Dep a) := f a.
-
-Definition drec {E : Type -> Type} {A B}
-           (body : forall a, itree (depE A B +' E) (B a)) :
-  forall a, itree E (B a) :=
-  fun a => mrec (dcalling' body) (Dep a).
-
-Definition dcall {E A B} (a : A) : itree (depE A B +' E) (B a) :=
-  ITree.trigger (inl1 (Dep a)).
 
 Declare Scope indexed_scope.
 Open Scope indexed_scope.

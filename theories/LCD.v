@@ -6,19 +6,11 @@ Import EqNotations.
 From Equations Require Import Equations.
 
 From OGS Require Import EventD CatD ITreeD Utils RecD AngelicD.
+From OGS Require Import Ctx.
 
 Set Primitive Projections.
 Set Equations Transparent.
 
-Notation "a ,& b" := (existT _ a b) (at level 30).
-(*Notation "'ex' a" := (existT _ _ a) (at level 30).*)
-
-Definition uncurry2 {A B : Type} {C : A -> B -> Type}
-                    (f : forall a b, C a b) (i : A * B) :=
-  f (fst i) (snd i).
-Definition curry2 {A B : Type} {C : A -> B -> Type}
-                  (f : forall i, C (fst i) (snd i)) a b :=
-  f (a , b).
 
 (* Naming & Abbreviations
 
@@ -57,93 +49,20 @@ Definition neg_ty : Type := { t : ty & is_neg t }.
 Definition of_n_ty (t : neg_ty) : ty := projT1 t.
 Coercion of_n_ty : neg_ty >-> ty.
 
-(*
-Variant polarity : Type := Pos | Neg .
-Derive NoConfusion for polarity.
 
-Equations ty_pol : ty -> polarity :=
-  ty_pol (_ → _) := Neg ;
-  ty_pol (_ × _) := Pos ;
-  ty_pol (_ + _) := Pos ;
-  ty_pol Unit    := Pos .
+Definition ctx : Type := Ctx.ctx ty.
+Bind Scope ctx_scope with ctx.
 
-Definition p_ty (p : polarity) : Type := { t : ty & ty_pol_graph t p }.
-Definition of_p_ty {p} (t : p_ty p) : ty := projT1 t.
-Coercion of_p_ty : p_ty >-> ty.
-
-Definition p_ty_of_t (t : ty) : p_ty (ty_pol t) := t ,& ty_pol_graph_correct t.
-Coercion p_ty_of_t : ty >-> p_ty.
-
-Equations ty_pol_graph_coherent (t : ty) (p : polarity) : ty_pol_graph t p -> ty_pol t = p :=
-  ty_pol_graph_coherent _ _ (ty_pol_graph_equation_1) := eq_refl ;
-  ty_pol_graph_coherent _ _ (ty_pol_graph_equation_2 _ _) := eq_refl ;
-  ty_pol_graph_coherent _ _ (ty_pol_graph_equation_3 _ _) := eq_refl ;
-  ty_pol_graph_coherent _ _ (ty_pol_graph_equation_4 _ _) := eq_refl .
-
-Bind Scope ty_scope with p_ty.
-
-Definition is_pos (t : ty) : Type := ty_pol_graph t Pos.
-Definition is_neg (t : ty) : Type := ty_pol_graph t Neg.
-*)
-
-Definition ctx : Type := list ty.
-Notation "∅" := nil.
-Notation "Γ ▶ x" := (x :: Γ) (at level 20).
-Notation "Γ +▶ Δ" := (Δ ++ Γ) (at level 50, left associativity).
-
-Definition neg_ctx : Type := list neg_ty.
+Definition neg_ctx : Type := Ctx.ctx neg_ty.
+Bind Scope ctx_scope with neg_ctx.
 Definition of_n_ctx : neg_ctx -> ctx := map of_n_ty.
 Coercion of_n_ctx : neg_ctx >-> ctx.
 
-Inductive has : ctx -> ty -> Type :=
-| top {Γ x} : has (Γ ▶ x) x
-| pop {Γ x y} : has Γ x -> has (Γ ▶ y) x.
-Notation "Γ ∋ t" := (has Γ t) (at level 30).
-
-Equations neg_var {Γ : neg_ctx} {x} : Γ ∋ x -> is_neg x :=
+Equations neg_var {Γ : neg_ctx} {x : ty} : (Γ : ctx) ∋ x -> is_neg x :=
   @neg_var ∅       _ (!) ;
-  @neg_var (_ ▶ t) _ (top)   := projT2 t ;
+  @neg_var (_ ▶ t) _ (top) := projT2 t ;
   @neg_var (_ ▶ _) _ (pop i) := neg_var i .
 
-Equations has_get Γ i : Γ ∋ (Γ.[i]) :=
-  has_get (x :: xs) F0     := top ;
-  has_get (x :: xs) (FS i) := pop (has_get xs i) .
-
-(* helper for defining various shiftings *)
-Equations has_case {Γ Δ} {F : ctx -> ty -> Type} {a}
-  : F Δ a -> (forall x, Γ ∋ x -> F Δ x) -> forall x, (Γ ▶ a) ∋ x -> F Δ x :=
-  has_case z s _ top     := z ;
-  has_case z s _ (pop i) := s _ i .
-
-Definition r_shift {Γ Δ a} (f : forall t, Γ ∋ t -> Δ ∋ t)
-  : forall t, (Γ ▶ a) ∋ t -> (Δ ▶ a) ∋ t
-  := has_case top (fun _ i => pop (f _ i)).
-
-Definition r_shift2 {Γ Δ a b} (f : forall t, Γ ∋ t -> Δ ∋ t)
-  : forall t, (Γ ▶ a ▶ b) ∋ t -> (Δ ▶ a ▶ b) ∋ t
-  := r_shift (r_shift f).
-
-(* handful of lemma on concatenation *)
-Equations r_concat_l Γ Δ : forall t, Γ ∋ t -> (Γ +▶ Δ) ∋ t :=
-  r_concat_l Γ ∅       _ i := i ;
-  r_concat_l Γ (Δ ▶ x) _ i := pop (r_concat_l _ _ _ i) .
-Arguments r_concat_l {Γ Δ}.
-
-Equations r_concat_r Γ Δ : forall t, Δ ∋ t -> (Γ +▶ Δ) ∋ t :=
-  r_concat_r Γ (Δ ▶ x) _ top     := top ;
-  r_concat_r Γ (Δ ▶ x) _ (pop i) := pop (r_concat_r _ _ _ i) .
-Arguments r_concat_r {Γ Δ}.
-
-Equations r_concat3_1 Γ Δ ϒ : forall t, (Γ +▶ Δ) ∋ t -> (Γ +▶ (Δ +▶ ϒ)) ∋ t :=
-  r_concat3_1 Γ Δ ∅       _ i := i ;
-  r_concat3_1 Γ Δ (ϒ ▶ _) _ i := pop (r_concat3_1 Γ Δ ϒ _ i). 
-Arguments r_concat3_1 {Γ Δ ϒ}.
-
-Equations r_concat3_2 Γ Δ ϒ : forall t, (Γ +▶ ϒ) ∋ t -> (Γ +▶ (Δ +▶ ϒ)) ∋ t :=
-  r_concat3_2 Γ Δ ∅       _ i       := r_concat_l _ i ;
-  r_concat3_2 Γ Δ (ϒ ▶ _) _ top     := top ;
-  r_concat3_2 Γ Δ (ϒ ▶ _) _ (pop i) := pop (r_concat3_2 Γ Δ ϒ _ i) .
-Arguments r_concat3_2 {Γ Δ ϒ}.
 
 Inductive term : ctx -> ty -> Type :=
 | Var {Γ a} (i : Γ ∋ a) : term Γ a
@@ -239,25 +158,6 @@ Equations v_rename {Γ Δ} (f : forall t, Γ ∋ t -> Δ ∋ t) {t} : e_val Γ t
   v_rename f (VInl u)    := VInl (v_rename f u) ;
   v_rename f (VInr u)    := VInr (v_rename f u) .
   
-(*
-Inductive p_val : forall {p}, ctx -> p_ty p -> Type :=
-| PVar {Γ x} : Γ ∋ x -> p_val Γ x
-| PLam {Γ a b} : term (Γ ▶ a) b -> p_val Γ (a → b)
-| PRec {Γ a b} : term (Γ ▶ (a → b)%ty ▶ a) b -> p_val Γ (a → b)
-| PPair {Γ} {a b : ty} : p_val Γ a -> p_val Γ b -> p_val Γ (a × b)
-| PInl {Γ} {a b : ty} : p_val Γ a -> p_val Γ (a + b)
-| PInr {Γ} {a b : ty} : p_val Γ b -> p_val Γ (a + b)
-.
-*)
-(*
-neg_var i := { | existT _ (NArr a b) eq_refl := NVVar i } ;
-  to_nv (VLam u) := NVLam u ;
-  to_nv (VRec u) := NVRec u ;
-  to_nv (VPair u v) := NVPair (to_nv u) (to_nv v) ;
-  to_nv (VInl u) := NVInl (to_nv u) ;
-  to_nv (VInr u) := NVInr (to_nv u) .
-*)
-
 
 (* e_ctx Γ y x is an eager evaluation context with:
     - variables in Γ,
@@ -288,20 +188,6 @@ Arguments EInl {Γ t a b}.
 Arguments EInr {Γ t a b}.
 Arguments ESMatch {Γ t a b x}.
 
-(*
-Equations e_fill {Γ x y} : e_ctx Γ y x -> term (Γ ▶ x) y :=
-  e_fill EHole           := Var top ;
-  e_fill (EApp_l E u)    := _ ; (*App (e_fill E) (t_shift u) ;*)
-  e_fill (EApp_r E u)    := _ ; (*App (t_shift (t_of_val u)) (e_fill E) ;*)
-  e_fill (EPair_l E u)   := _ ; (* Pair (e_fill E) (t_shift u) ;*)
-  e_fill (EPair_r E u)   := _ ; (*Pair (t_shift (t_of_val u)) (e_fill E) ;*)
-  e_fill (EPMatch E u)   := _ ; (*PMatch (t_fill E) (t_shift u) .*)
-  e_fill (EInl E)        := _ ;
-  e_fill (EInr E)        := _ ;
-  e_fill (ESMatch E u v) := _ .
-Obligation 1.
-*)
-
 
 Equations e_rename {Γ Δ x y} (f : forall t, Γ ∋ t -> Δ ∋ t) : e_ctx Γ y x -> e_ctx Δ y x :=
   e_rename f EHole         := EHole ;
@@ -314,31 +200,6 @@ Equations e_rename {Γ Δ x y} (f : forall t, Γ ∋ t -> Δ ∋ t) : e_ctx Γ y
   e_rename f (EInr E)      := EInr (e_rename f E) ;
   e_rename f (ESMatch E u v) := ESMatch (e_rename f E) (t_rename (r_shift f) u)
                                                        (t_rename (r_shift f) v) .
-
-(* useless? now that we work efficiently
-Equations e_plug {Γ x y} : e_ctx Γ y x -> term Γ x -> term Γ y :=
-  e_plug EHole         t := t ;
-  e_plug (EApp_r E u)  t := e_plug E (App (t_of_val u) t) ;
-  e_plug (EApp_l E u)  t := e_plug E (App t u) ;
-  e_plug (EPair_r E u) t := e_plug E (Pair (t_of_val u) t) ;
-  e_plug (EPair_l E u) t := e_plug E (Pair t u) ;
-  e_plug (EPMatch E u) t := e_plug E (PMatch t u) ;
-  e_plug (EInl E)      t := e_plug E (Inl t) ;
-  e_plug (EInr E)      t := e_plug E (Inr t) ;
-  e_plug (ESMatch E u v) t := e_plug E (SMatch t u v) .
-
-Definition e_fill {Γ x y} (E : e_ctx Γ y x) : term (Γ ▶ x) y :=
-  e_plug (e_rename (fun _ => pop) E) (Var top).
-
-Equations e_concat {Γ x y z} : e_ctx Γ z y -> e_ctx Γ y x -> e_ctx Γ z x :=
-  e_concat E0 EHole          := E0 ;
-  e_concat E0 (EApp_l E1 u)  := EApp_l (e_concat E0 E1) u ;
-  e_concat E0 (EApp_r E1 u)  := EApp_r (e_concat E0 E1) u ;
-  e_concat E0 (EPair_l E1 u) := EPair_l (e_concat E0 E1) u ;
-  e_concat E0 (EPair_r E1 u) := EPair_r (e_concat E0 E1) u ;
-  e_concat E0 (EPMatch E1 u) := EPMatch (e_concat E0 E1) u .
-
-*)
 
 (* 'e_redex Γ x y' represents eliminators on term Γ x returning a term Γ y *)
 Variant e_redex (Γ : ctx) : ty -> ty -> Type :=
@@ -460,12 +321,6 @@ Definition neg_t_env : Type := neg_ctx * ty.
 Definition of_nte : neg_t_env -> t_env := fun '(Γ , x) => (of_n_ctx Γ , x).
 Coercion of_nte : neg_t_env >-> t_env.
 
-(*
-Definition term' := t_uncurry term.
-Definition e_nf' := t_uncurry e_nf.
-Definition e_val' := t_uncurry e_val.
-*)
-
 (* one evaluation step on focused terms (e_term) *)
 Equations eval_aux {Γ x} (t : e_term Γ x) : eval_arg Γ x + e_nf Γ x :=
   eval_aux (EVal v)                   := inr (NVal v) ;
@@ -527,7 +382,7 @@ Equations a_obs {Γ x} : a_val Γ x -> Type :=
   a_obs (AInr u)    := a_obs u .
 
 Equations a_cont {Γ x} (v : a_val Γ x) : a_obs v -> neg_t_env :=
-  a_cont (@AArr a b) v       := (Γ +▶ a_cext v , b) ;
+  a_cont (@AArr a b) v       := ((Γ +▶ a_cext v)%ctx , b) ;
   a_cont (APair u v) (inl o) := a_cont u o ;
   a_cont (APair u v) (inr o) := a_cont v o ;
   a_cont (AInl u)    o       := a_cont u o ;
@@ -563,7 +418,7 @@ Arguments apply_obs {Γ x}.
 
 Variant enf_qry (Γ : neg_ctx) (x : ty) : Type :=
 | LVal : a_val Γ x -> enf_qry Γ x
-| LRed a b : Γ ∋ (a → b) -> a_val Γ a -> enf_qry Γ x.
+| LRed a b : (Γ : ctx) ∋ (a → b)%ty -> a_val Γ a -> enf_qry Γ x.
 Arguments LVal {Γ x}.
 Arguments LRed {Γ x} a b.
 
@@ -576,14 +431,12 @@ Equations enf_rsp Γ x : enf_qry Γ x -> Type :=
 Equations enf_nxt Γ x (q : enf_qry Γ x) : enf_rsp Γ x q -> neg_t_env :=
   enf_nxt Γ x (LVal v)       o       := a_cont v o ;
   enf_nxt Γ x (LRed a b i v) (inl o) := a_cont v o ;
-  enf_nxt Γ x (LRed a b i v) (inr v) := (Γ +▶ a_cext v , x) .
+  enf_nxt Γ x (LRed a b i v) (inr v) := ((Γ +▶ a_cext v)%ctx , x) .
 
 Definition enf_e : event neg_t_env neg_t_env :=
   Event (uncurry2 enf_qry)
         (uncurry2 enf_rsp)
         (uncurry2 enf_nxt).
-
-Canonical enf_e.
 
 Definition lassen : endo (neg_t_env -> Type) := itree enf_e.
 
