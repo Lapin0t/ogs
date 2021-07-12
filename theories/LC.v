@@ -374,8 +374,8 @@ Definition expand_v : itree enfE_v value -> itree enfE T0 :=
                                 (tau # expand_ # eval_lassen_v # val_app_fresh).*)
 
 Equations _expand_v : itree' enfE_v value -> itree enfE T0 :=
-  _expand_v (RetF r) := tau (expand_v (eval_lassen_v (val_app_fresh r))) ;
-  _expand_v (TauF t) := tau (expand_v t) ;
+  _expand_v (RetF r) := Tau (expand_v (eval_lassen_v (val_app_fresh r))) ;
+  _expand_v (TauF t) := Tau (expand_v t) ;
   _expand_v (VisF e k) := Vis (enfE_v_inj e) (fun r => expand_v (k r)).
 
 Lemma unfold_expand_v (x : itree enfE_v value) : expand_v x ≅ _expand_v (observe x).
