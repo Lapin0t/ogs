@@ -43,6 +43,8 @@ Notation "∅ᵢ" := (voidᵢ).
 (********************************)
 (* Couple lemma on list/vec/fin *)
 
+(*
+
 Equations s_case {A B C : Type} (x : A + B) (f : A -> C) (g : B -> C) : C :=
   s_case (inl a) f g := f a ;
   s_case (inr b) f g := g b .
@@ -61,6 +63,7 @@ Equations f_split_list {X : Type} {xs ys : list X} (i : fin (length (xs ++ ys)))
   @f_split_list _ (cons _ _) _ (FS i) with f_split_list i := {
      | inl i := inl (FS i) ;
      | inr i := inr i } .
+*)
 
 Equations l_get {X} (xs : list X) : fin (length xs) -> X :=
   l_get (cons x xs) F0     := x ;
@@ -114,6 +117,11 @@ Transparent dvec.
 Equations d_get {X ty} (c : list X) (d : dvec ty c) (i : fin (length c)) : ty (l_get c i) :=
   d_get (cons t ts) r F0     := fst r ;
   d_get (cons t ts) r (FS i) := d_get ts (snd r) i.
+
+Equations d_concat {X ty} (a b : list X) (d : dvec ty a) (h : forall i : fin (length b), ty (b .[i])) : dvec ty (b ++ a) :=
+  d_concat _ nil        d h := d ;
+  d_concat _ (cons _ _) d h := (h F0 , d_concat _ _ d (fun i => h (FS i))).
+
 
 Declare Scope indexed_scope.
 Open Scope indexed_scope.

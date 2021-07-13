@@ -2,6 +2,7 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 Set Primitive Projections.
 
+From ExtLib.Data Require Import List.
 From OGS Require Import Utils CatD.
 
 Record event (I J : Type) : Type := Event {
@@ -140,3 +141,27 @@ Definition e_of_classic {E : Type -> Type} {X} : E X -> ⟦₀ eclassic E ⟧ X.
   refine (fun e => existT _ (existT E X e) _).
   refine (fun x => x).
 Defined.
+
+Record uniform_event (I J : Type) : Type := UEvent {
+  u_qry : J -> Type ;
+  kon : Type ;
+  u_rsp {j} : u_qry j -> list kon ;
+  k_rsp : kon -> Type ;
+  k_nxt {k} : k_rsp k -> I
+}.
+Arguments UEvent {I J} u_qry kon u_rsp k_rsp k_nxt.
+
+(* every event is actually uniform, taking kon := {j : J & qry E j } *)
+Definition event_uniform {I J} (E : event I J) : uniform_event I J :=
+  UEvent (qry E)
+         ({ j : J & qry E j})
+         (fun j q => (j ,& q) :: nil)
+         (fun k => rsp E (projT2 k))
+         (fun k r => nxt E (projT2 k) r).
+
+(* embedding uniform events into usual events *)
+Definition e_of_u {I J} (U : uniform_event I J) : event I J :=
+  Event (u_qry U)
+        (fun _ q => { i : _ & k_rsp U (u_rsp U q .[i]) })
+        (fun _ q r => k_nxt U (projT2 r)).
+Coercion e_of_u : uniform_event >-> event.

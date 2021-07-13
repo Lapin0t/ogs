@@ -7,6 +7,7 @@ From Equations Require Import Equations.
 
 From OGS Require Import EventD CatD ITreeD Utils RecD AngelicD.
 From OGS Require Import Ctx.
+From OGS Require Import OGSD.
 
 Set Primitive Projections.
 Set Equations Transparent.
@@ -422,48 +423,74 @@ Variant enf_qry (Γ : neg_ctx) (x : ty) : Type :=
 Arguments LVal {Γ x}.
 Arguments LRed {Γ x} a b.
 
-Equations enf_rsp Γ x : enf_qry Γ x -> Type :=
-  enf_rsp Γ x (LVal v) := a_obs v ;
-  enf_rsp Γ x (LRed a b i v) := a_obs v + a_val Γ b .
-  (* a_obs v   := continue on value
-     a_val Γ b := continue on context, giving abstract result of opponent function *)
+Variant enf_kon : Type :=
+| KVal {Γ : neg_ctx} {x : ty} : a_val Γ x -> enf_kon
+| KCtx : neg_ctx -> ty -> ty -> enf_kon
+.
+
+Equations enf_u_rsp Γ x : enf_qry Γ x -> list enf_kon :=
+  enf_u_rsp Γ x (LVal v) := KVal v :: nil ;
+  enf_u_rsp Γ x (LRed a b i v) := KVal v :: KCtx Γ x b :: nil .
+
+Equations enf_k_rsp : enf_kon -> Type :=
+  enf_k_rsp (KVal v) := a_obs v ;
+  enf_k_rsp (KCtx Γ x b) := a_val Γ b .
+
+Equations enf_k_nxt k : enf_k_rsp k -> neg_t_env :=
+  enf_k_nxt (KVal v)     o := a_cont v o ;
+  enf_k_nxt (KCtx Γ x b) v := ((Γ +▶ a_cext v)%ctx , x). 
+
+(*
 
 Equations enf_nxt Γ x (q : enf_qry Γ x) : enf_rsp Γ x q -> neg_t_env :=
   enf_nxt Γ x (LVal v)       o       := a_cont v o ;
   enf_nxt Γ x (LRed a b i v) (inl o) := a_cont v o ;
   enf_nxt Γ x (LRed a b i v) (inr v) := ((Γ +▶ a_cext v)%ctx , x) .
+*)
 
-Definition enf_e : event neg_t_env neg_t_env :=
-  Event (uncurry2 enf_qry)
-        (uncurry2 enf_rsp)
-        (uncurry2 enf_nxt).
+Definition enf_e : uniform_event neg_t_env neg_t_env :=
+  UEvent (uncurry2 enf_qry)
+         (enf_kon)
+         (uncurry2 enf_u_rsp)
+         (enf_k_rsp)
+         (enf_k_nxt).
 
 Definition lassen : endo (neg_t_env -> Type) := itree enf_e.
 
 Definition eval_arg' : neg_t_env -> Type := uncurry2 (eval_arg ∘ of_n_ctx).
 
-Definition lassen_val {Γ : neg_ctx} {x} (v : e_val Γ x)
-           : lassen (eval_arg' +ᵢ ∅ᵢ) (Γ , x) :=
-  vis (LVal (a_of_val v) : qry enf_e (Γ , x))
-      (fun o => ret (inl (EA EHole (apply_obs v o)))).
+Equations lassen_val {Γ : neg_ctx} {x} (v : e_val Γ x)
+          : lassen (eval_arg' +ᵢ ∅ᵢ) (Γ , x) :=
+  lassen_val v :=
+    Vis (LVal (a_of_val v) : qry enf_e (Γ , x))
+        (λ { | existT _ F0 o => ret (inl (EA EHole (apply_obs v o))) }).
 
 Equations lassen_enf {Γ : neg_ctx} {x} (v : e_nf Γ x)
           : lassen (eval_arg' +ᵢ ∅ᵢ) (Γ , x) :=
   lassen_enf (NVal v)     := lassen_val v ;
   lassen_enf (NRed E i r) with neg_var i := {
     lassen_enf (NRed E i (RApp v)) NArr :=
-      vis (LRed _ _ i (a_of_val v) : qry enf_e (_,_))
-          (λ { | inl o => ret (inl (EA EHole (apply_obs v o))) ;
-               | inr v    => ret (inl _) })
-                                           }.
-Obligation 1.
-  refine (EA _ _).
-  + refine (e_rename _ E); r_fixup uconstr:(r_concat_l).
-  + refine (t_of_a v).
-Qed.
+      Vis (LRed _ _ i (a_of_val v) : qry enf_e (_,_))
+          (λ { | existT _ (F0)    o => ret (inl (EA EHole (apply_obs v o))) ;
+               | existT _ (FS F0) v => ret (inl (EA (e_rename _ E) (t_of_a v)
+                                                : eval_arg' (_, _))) }) }.
+Obligation 1. r_fixup uconstr:(r_concat_l). Qed.
 
 Definition eval_lassen : eval_arg' ⇒ᵢ lassen ∅ᵢ :=
   iter (fun '(_ , _) t => emb_comp _ _ (eval_enf t) !>= lassen_enf).
+
+Definition eval_ogs {i} (a : eval_arg' i) : itree (ogs enf_e) ∅ᵢ (i , nil) :=
+  @ogs_emb _ _ _ _ nil (eval_lassen _ a) t1_0.
+
+(****************************************)
+(* lassen eutt contains eta-equivalence *)
+
+From OGS Require Import EqD.
+
+
+
+
+
 
 (****************************************)
 (* various proofs on eager normal forms *)
