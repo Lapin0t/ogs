@@ -9,7 +9,6 @@ From OGS Require Import EventD CatD ITreeD Utils RecD AngelicD.
 From OGS Require Import Ctx.
 From OGS Require Import OGSD.
 From OGS Require Import EqD.
-Check (_ ≈ _).
 
 Set Primitive Projections.
 Set Equations Transparent.
