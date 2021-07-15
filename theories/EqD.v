@@ -60,8 +60,6 @@ Section eqit.
   Hint Resolve eqit_idclo_mono : paco.
 
   Definition eutt := eqit true true.
-
-  Infix "≈" := (eutt eq) (at level 70) : type_scope.
 End eqit.
 
 #[global] Hint Constructors eqitF: core.
@@ -73,6 +71,7 @@ End eqit.
 #[global] Hint Unfold eutt: core.
 (*#[global] Hint Unfold euttge: core.*)
 #[global] Hint Unfold id: core.
+#[global] Infix "≈" := (eutt eqᵢ _) (at level 70) : type_scope.
 
 
 Section eqit_trans.

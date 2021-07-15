@@ -26,6 +26,17 @@ Definition curry2 {A B : Type} {C : A -> B -> Type}
                   (f : forall i, C (fst i) (snd i)) a b :=
   f (a , b).
 
+Definition uncurry2' {A : Type} {B : A -> Type} {C : forall a, B a -> Type}
+                    (f : forall a b, C a b) (i : sigT B) :=
+  f (projT1 i) (projT2 i).
+
+(*
+Definition curry2' {A : Type} {B : A -> Type} {C : forall a, B a -> Type}
+                  (f : forall i, C (projT1 i) (projT2 i)) a b :=
+  f (a ,& b).
+*)
+Notation curry2' := (fun f a b => f (a ,& b)).
+
 (***************)
 (* Finite sets *)
 
@@ -134,6 +145,8 @@ Variant prod1 (D E : Type -> Type) : Type -> Type :=
 
 (* (covariant) presheaves *)
 Definition psh (I : Type) : Type := I -> Type.
+
+Definition eqᵢ {I : Type} {X : psh I} i (x y : X i) : Prop := x = y.
 
 (* pointwise arrows *)
 Definition arrᵢ {I} (X Y : psh I) : Type := forall {i}, X i -> Y i.

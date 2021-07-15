@@ -8,6 +8,8 @@ From Equations Require Import Equations.
 From OGS Require Import EventD CatD ITreeD Utils RecD AngelicD.
 From OGS Require Import Ctx.
 From OGS Require Import OGSD.
+From OGS Require Import EqD.
+Check (_ ≈ _).
 
 Set Primitive Projections.
 Set Equations Transparent.
@@ -302,9 +304,14 @@ Variant eval_arg (Γ : ctx) (x : ty) : Type :=
 | EA {y} : e_ctx Γ x y -> term Γ y -> eval_arg Γ x.
 Arguments EA {Γ x y}.
 
+Definition ea_hole {Γ x} (u : term Γ x) : eval_arg Γ x := EA EHole u.
+
 (* efficiently find the first redex in E[t] *)
 Equations e_focus {Γ x} : eval_arg Γ x -> e_term Γ x :=
   e_focus (EA E t) := focus_aux.focus_aux E (inl t).
+
+Definition e_focus' {Γ x y} : e_ctx Γ x y -> term Γ y -> e_term Γ x :=
+  fun E u => e_focus (EA E u).
 
 
 (************************************)
@@ -367,13 +374,26 @@ Ltac r_fixup x :=
   eapply x;
   auto.
 
+Definition r_concat3_1' {Γ Δ ϒ : neg_ctx} : forall t, of_n_ctx (Γ +▶ Δ) ∋ t
+                                               -> of_n_ctx (Γ +▶ (Δ +▶ ϒ)) ∋ t.
+  r_fixup uconstr:(r_concat3_1).
+Defined.
+
+Definition r_concat3_2' {Γ Δ ϒ : neg_ctx} : forall t, of_n_ctx (Γ +▶ ϒ) ∋ t -> of_n_ctx (Γ +▶ (Δ +▶ ϒ)) ∋ t.
+  r_fixup uconstr:(r_concat3_2).
+Defined.
+
+Definition r_concat_l' {Γ Δ : neg_ctx} : forall t, of_n_ctx Γ ∋ t -> of_n_ctx (Γ +▶ Δ) ∋ t.
+  r_fixup uconstr:(r_concat_l).
+Defined.
+
+
 Equations t_of_a {Γ x} (u : a_val Γ x) : term (Γ +▶ a_cext u : neg_ctx) x :=
   t_of_a (AArr)      := Var top ;
-  t_of_a (APair u v) := Pair (t_rename _ (t_of_a u)) (t_rename _ (t_of_a v));
+  t_of_a (APair u v) := Pair (t_rename r_concat3_1' (t_of_a u))
+                             (t_rename r_concat3_2' (t_of_a v));
   t_of_a (AInl u)    := Inl (t_of_a u) ;
   t_of_a (AInr u)    := Inr (t_of_a u) .
-Obligation 1. r_fixup uconstr:(r_concat3_1). Qed.
-Obligation 2. r_fixup uconstr:(r_concat3_2). Qed.
 
 (* observable/queriable part of a type *)
 Equations a_obs {Γ x} : a_val Γ x -> Type :=
@@ -404,16 +424,16 @@ Arguments a_of_val {Γ x}.
 
 Equations apply_obs {Γ : neg_ctx} x (v : e_val Γ x) (o : a_obs (a_of_val v))
            : term' (a_cont (a_of_val v) o) :=
-  apply_obs (_ → _) v           o := App (t_rename _ (t_of_val v)) (t_of_a o) ;
+  apply_obs (_ → _) v           o := App (t_rename r_concat_l' (t_of_val v))
+                                         (t_of_a o) ;
   apply_obs (_ × _) (VPair u v) (inl o) := apply_obs _ u o ;
   apply_obs (_ × _) (VPair u v) (inr o) := apply_obs _ v o ;
   apply_obs (_ + _) (VInl u)    o := apply_obs _ u o ;
   apply_obs (_ + _) (VInr u)    o := apply_obs _ u o ;
 
-  apply_obs (Unit)  (VVar i)    o with neg_var i := { | (!) } ;
-  apply_obs (_ × _) (VVar i)    o with neg_var i := { | (!) } ;
-  apply_obs (_ + _) (VVar i)    o with neg_var i := { | (!) } .
-Obligation 1. r_fixup uconstr:(r_concat_l). Qed.
+  apply_obs (Unit)  (VVar i) o with neg_var i := { | (!) } ;
+  apply_obs (_ × _) (VVar i) o with neg_var i := { | (!) } ;
+  apply_obs (_ + _) (VVar i) o with neg_var i := { | (!) } .
 Arguments apply_obs {Γ x}.
 
 
@@ -440,121 +460,47 @@ Equations enf_k_nxt k : enf_k_rsp k -> neg_t_env :=
   enf_k_nxt (KVal v)     o := a_cont v o ;
   enf_k_nxt (KCtx Γ x b) v := ((Γ +▶ a_cext v)%ctx , x). 
 
-(*
-
-Equations enf_nxt Γ x (q : enf_qry Γ x) : enf_rsp Γ x q -> neg_t_env :=
-  enf_nxt Γ x (LVal v)       o       := a_cont v o ;
-  enf_nxt Γ x (LRed a b i v) (inl o) := a_cont v o ;
-  enf_nxt Γ x (LRed a b i v) (inr v) := ((Γ +▶ a_cext v)%ctx , x) .
-*)
-
 Definition enf_e : uniform_event neg_t_env neg_t_env :=
-  UEvent (uncurry2 enf_qry)
-         (enf_kon)
-         (uncurry2 enf_u_rsp)
-         (enf_k_rsp)
-         (enf_k_nxt).
+  UEvent (uncurry2 enf_qry) (enf_kon) (uncurry2 enf_u_rsp)
+         (enf_k_rsp) (enf_k_nxt).
 
 Definition lassen : endo (neg_t_env -> Type) := itree enf_e.
 
 Definition eval_arg' : neg_t_env -> Type := uncurry2 (eval_arg ∘ of_n_ctx).
+Definition ea_hole' {i} (u : term' i) : eval_arg' i := EA EHole u.
 
-Equations lassen_val {Γ : neg_ctx} {x} (v : e_val Γ x)
-          : lassen (eval_arg' +ᵢ ∅ᵢ) (Γ , x) :=
-  lassen_val v :=
-    Vis (LVal (a_of_val v) : qry enf_e (Γ , x))
-        (λ { | existT _ F0 o => ret (inl (EA EHole (apply_obs v o))) }).
+Definition lassen_val {Γ : neg_ctx} {x} (v : e_val Γ x)
+           (r : enf_k_rsp (KVal (a_of_val v)))
+           : lassen (eval_arg' +ᵢ ∅ᵢ) (enf_k_nxt _ r) :=
+  Ret (inl (EA EHole (apply_obs v r))) .
+
+Definition lassen_ctx {Γ : neg_ctx} {x b} (E : e_ctx Γ x b)
+          (r : enf_k_rsp (KCtx Γ x b))
+          : lassen (eval_arg' +ᵢ ∅ᵢ) (enf_k_nxt _ r) :=
+  Ret (inl (EA (e_rename r_concat_l' E) (t_of_a r) : eval_arg' (_ , _))) .
 
 Equations lassen_enf {Γ : neg_ctx} {x} (v : e_nf Γ x)
           : lassen (eval_arg' +ᵢ ∅ᵢ) (Γ , x) :=
-  lassen_enf (NVal v)     := lassen_val v ;
+  lassen_enf (NVal v) :=
+    Vis (LVal (a_of_val v) : qry enf_e (_, _))
+        (λ { | existT _ F0 r => lassen_val v r }) ;
   lassen_enf (NRed E i r) with neg_var i := {
     lassen_enf (NRed E i (RApp v)) NArr :=
-      Vis (LRed _ _ i (a_of_val v) : qry enf_e (_,_))
-          (λ { | existT _ (F0)    o => ret (inl (EA EHole (apply_obs v o))) ;
-               | existT _ (FS F0) v => ret (inl (EA (e_rename _ E) (t_of_a v)
-                                                : eval_arg' (_, _))) }) }.
-Obligation 1. r_fixup uconstr:(r_concat_l). Qed.
+      Vis (LRed _ _ i (a_of_val v) : qry enf_e (_, _))
+          (λ { | existT _ (F0)    r => lassen_val v r ;
+               | existT _ (FS F0) r => _ }) }.
+(* inlining breaks equations *)
+Obligation 1. exact (lassen_ctx E r). Qed.
 
-Definition eval_lassen : eval_arg' ⇒ᵢ lassen ∅ᵢ :=
+Definition eval_lassen' : eval_arg' ⇒ᵢ lassen ∅ᵢ :=
   iter (fun '(_ , _) t => emb_comp _ _ (eval_enf t) !>= lassen_enf).
 
-Definition eval_ogs {i} (a : eval_arg' i) : itree (ogs enf_e) ∅ᵢ (i , nil) :=
-  @ogs_emb _ _ _ _ nil (eval_lassen _ a) t1_0.
+Definition eval_ogs' {i} (a : eval_arg' i) : itree (ogs enf_e) ∅ᵢ (i , nil) :=
+  @ogs_emb _ _ _ _ nil t1_0 (eval_lassen' _ a).
 
-(****************************************)
-(* lassen eutt contains eta-equivalence *)
+Definition eval_lassen {Γ : neg_ctx} {x} (u : term Γ x) : lassen ∅ᵢ (Γ , x) :=
+  eval_lassen' _ (ea_hole' (u : term' (_ , _))).
 
-From OGS Require Import EqD.
-
-
-
-
-
-
-(****************************************)
-(* various proofs on eager normal forms *)
-
-(* useless for now
-Equations t_of_e_term {Γ x} : e_term Γ x -> term Γ x :=
-  t_of_e_term (EVal v) := t_of_val v ;
-  t_of_e_term (ERed E v r) := e_plug E (t_of_red (t_of_val v) r) .
-
-Equations t_of_red {Γ x y} : term Γ x -> e_redex Γ x y -> term Γ y :=
-  t_of_red e (RApp v) := App e (t_of_val v) ;
-  t_of_red e (RPMatch a) := PMatch e a .
-
-Equations t_of_e_nf {Γ x} : e_nf Γ x -> term Γ x :=
-  t_of_e_nf (NVal v) := t_of_val v ;
-  t_of_e_nf (NRed E i r) := e_plug E (t_of_red (Var i) r).
-
-Lemma e_split_val {Γ x} (v : e_val Γ x) : e_split (t_of_val v) = EVal v.
-  destruct v; auto.
-Qed.
-
-
-Lemma e_split_correct {Γ x} (t : term Γ x) : t_of_e_term (e_split t) = t.
-  funelim (e_split t); intros; cbn in *.
-  + f_equal.
-  + f_equal.
-  + rewrite Heq in Hind. rewrite Heq, <-Hind. reflexivity.
-  + rewrite Heq0; cbn; rewrite Heq.
-    rewrite Heq in Hind; rewrite Heq0 in Hind0.
-    rewrite <-Hind, <-Hind0. reflexivity.
-  + rewrite Heq0; cbn; rewrite Heq.
-    rewrite Heq in Hind; rewrite Heq0 in Hind0.
-    rewrite <-Hind, <-Hind0. reflexivity.
-Qed.
-
-Lemma e_split_coherent {Γ x} (t : e_term Γ x) : e_split (t_of_e_term t) = t.
-  funelim (t_of_e_term t).
-  + destruct e; auto.
-  + revert e1 e2; induction e0; intros; cbn.
-    - destruct (e_split (t_of_val e2)) eqn:H; cbn;
-        rewrite (e_split_val e2) in H;
-        try discriminate H;
-        injection H as ->.
-      destruct (e_split (t_of_val e1)) eqn:H; cbn;
-        rewrite (e_split_val e1) in H;
-        try discriminate H;
-        injection H as ->.
-      reflexivity.
-    - cbn in IHe0; rewrite (IHe0 e1 e2); reflexivity.
-    - destruct (e_split (t_of_val e)) eqn:H; cbn;
-        rewrite (e_split_val e) in H;
-        try discriminate H;
-        injection H as ->.
-      cbn in IHe0; rewrite (IHe0 e1 e2); reflexivity.
-Qed.
-
-Lemma e_split_unique {Γ x} {a : term Γ x} {b} : a = t_of_e_term b <-> e_split a = b.
-  econstructor; intro p.
-  rewrite<- (e_split_coherent b); f_equal; exact p.
-  rewrite<- (e_split_correct a); f_equal; exact p.
-Qed.
-
-Lemma e_split_inj {Γ a} {x y : term Γ a} (p : e_split x = e_split y) : x = y.
-  rewrite<- e_split_correct, e_split_unique.
-  exact p.
-Qed.
-*)
+Definition eval_ogs {Γ : neg_ctx} {x} (u : term Γ x)
+           : itree (ogs enf_e) ∅ᵢ ((Γ , x) , nil) :=
+  eval_ogs' (ea_hole' (u : term' (_ , _))).
