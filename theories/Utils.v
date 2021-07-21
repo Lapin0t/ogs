@@ -1,5 +1,6 @@
 Set Universe Polymorphism.
 
+Require Import RelationClasses.
 From ExtLib.Data Require Import Nat Fin.
 
 From Equations Require Import Equations.
@@ -39,6 +40,7 @@ Definition curry2' {A : Type} {B : A -> Type} {C : forall a, B a -> Type}
   f (a ,& b).
 *)
 Notation curry2' := (fun f a b => f (a ,& b)).
+
 
 (***************)
 (* Finite sets *)
@@ -149,7 +151,19 @@ Variant prod1 (D E : Type -> Type) : Type -> Type :=
 (* (covariant) presheaves *)
 Definition psh (I : Type) : Type := I -> Type.
 
-Definition eqᵢ {I : Type} {X : psh I} i (x y : X i) : Prop := x = y.
+
+Definition relᵢ {I : Type} (A B : psh I) := forall i, A i -> B i -> Prop.
+Notation Reflexiveᵢ R := (forall i, Reflexive (R i)).
+Notation Symmetricᵢ R := (forall i, Symmetric (R i)).
+Definition subrelᵢ {I : Type} {A B : psh I} (R1 R2 : relᵢ A B) : Prop :=
+  forall i a b, R1 i a b -> R2 i a b.
+
+Definition flipᵢ {I : Type} {A B : psh I} (R : relᵢ A B) : relᵢ B A :=
+  fun i x y => R i y x.
+
+
+
+Definition eqᵢ {I : Type} {X : psh I} : relᵢ X X := fun i x y => x = y.
 
 (* pointwise arrows *)
 Definition arrᵢ {I} (X Y : psh I) : Type := forall {i}, X i -> Y i.

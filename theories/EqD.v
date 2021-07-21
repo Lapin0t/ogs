@@ -1,23 +1,10 @@
-From Coq Require Import
-     Program
-     Setoid
-     Morphisms
-     RelationClasses.
+From Coq Require Import Program.
 From OGS Require Import Utils EventD ITreeD.
 From Paco Require Import paco.
-Require Import Program.Tactics Logic RelationClasses .
 Import EqNotations.
 
 Tactic Notation "hinduction" hyp(IND) "before" hyp(H)
   := move IND before H; revert_until IND; induction IND.
-
-Definition relᵢ {I : Type} (A B : psh I) := forall i, A i -> B i -> Prop.
-Notation Reflexiveᵢ R := (forall i, Reflexive (R i)).
-Notation Symmetricᵢ R := (forall i, Symmetric (R i)).
-
-Definition flipᵢ {I : Type} {A B : psh I} (R : relᵢ A B) : relᵢ B A :=
-  fun i x y => R i y x.
-
 
 
 Section eqit.
@@ -300,3 +287,4 @@ Qed.
 *)
 
 End eqit_gen.
+Global Hint Resolve Reflexive_eqit_ Reflexive_eqit Reflexive_eqit_gen : reflexivity.
