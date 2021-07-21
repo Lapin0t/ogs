@@ -12,3 +12,4 @@ theories/EqD.v
 theories/Ctx.v
 theories/LCD.v
 theories/OGSD.v
+theories/EqProps.v
