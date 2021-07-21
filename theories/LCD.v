@@ -142,6 +142,7 @@ Arguments VRec {Γ a b}.
 Arguments VPair {Γ a b}.
 Arguments VInl {Γ a b}.
 Arguments VInr {Γ a b}.
+Derive Signature for e_val.
 
 Equations t_of_val {Γ x} : e_val Γ x -> term Γ x :=
   t_of_val (VVar i) := Var i ;
@@ -209,6 +210,7 @@ Variant e_redex (Γ : ctx) : ty -> ty -> Type :=
 | RPMatch {a b x} : term (Γ ▶ a ▶ b) x -> e_redex Γ (a × b) x
 | RSMatch {a b x} : term (Γ ▶ a) x -> term (Γ ▶ b) x -> e_redex Γ (a + b) x
 .
+Derive Signature for e_redex.
 Arguments RApp {Γ a b}.
 Arguments RPMatch {Γ a b x}.
 Arguments RSMatch {Γ a b x}.

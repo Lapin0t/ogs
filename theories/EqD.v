@@ -1,3 +1,8 @@
+From Coq Require Import
+     Program
+     Setoid
+     Morphisms
+     RelationClasses.
 From OGS Require Import Utils EventD ITreeD.
 From Paco Require Import paco.
 Require Import Program.Tactics Logic RelationClasses .
@@ -6,11 +11,20 @@ Import EqNotations.
 Tactic Notation "hinduction" hyp(IND) "before" hyp(H)
   := move IND before H; revert_until IND; induction IND.
 
+Definition relᵢ {I : Type} (A B : psh I) := forall i, A i -> B i -> Prop.
+Notation Reflexiveᵢ R := (forall i, Reflexive (R i)).
+Notation Symmetricᵢ R := (forall i, Symmetric (R i)).
+
+Definition flipᵢ {I : Type} {A B : psh I} (R : relᵢ A B) : relᵢ B A :=
+  fun i x y => R i y x.
+
+
 
 Section eqit.
-  Context {I : Type} {E : event I I} {R1 R2 : I -> Type} (RR : forall i, R1 i -> R2 i -> Prop).
+  Context {I : Type} {E : event I I} {R1 R2 : I -> Type} (RR : relᵢ R1 R2).
 
-  Inductive eqitF (b1 b2: bool) (vclo : endo (forall i, itree E R1 i -> itree E R2 i -> Prop) ) (sim : forall i, itree E R1 i -> itree E R2 i -> Prop) i
+  Inductive eqitF (b1 b2: bool) (vclo : endo (relᵢ (itree E R1) (itree E R2)))
+                             (sim : relᵢ (itree E R1) (itree E R2)) i
     : itree' E R1 i -> itree' E R2 i -> Prop :=
     | EqRet r1 r2
        (REL: RR i r1 r2)
@@ -32,13 +46,12 @@ Section eqit.
 
   Hint Constructors eqitF: core.
 
-  Definition eqit_ b1 b2 vclo sim i :
-    itree E R1 i -> itree E R2 i -> Prop :=
-    fun t1 t2 => eqitF b1 b2 vclo sim i (observe t1) (observe t2).
+  Definition eqit_ b1 b2 vclo sim : relᵢ (itree E R1) (itree E R2) :=
+    fun i t1 t2 => eqitF b1 b2 vclo sim i (observe t1) (observe t2).
   Hint Unfold eqit_: core.
 
-  Definition eqit b1 b2 : forall i, itree E R1 i -> itree E R2 i -> Prop :=
-  paco3 (eqit_ b1 b2 id) bot3.
+  Definition eqit b1 b2 : relᵢ (itree E R1) (itree E R2) :=
+    paco3 (eqit_ b1 b2 id) bot3.
 
   Lemma eqitF_mono b1 b2 vclo vclo' sim sim' i x0 x1 
         (IN: eqitF b1 b2 vclo sim i x0 x1)
@@ -53,7 +66,7 @@ Section eqit.
     do 2 red. intros; eapply eqitF_mono; eauto.
   Qed.
 
-  Lemma eqit_idclo_mono : monotone3 (@id (forall i, itree E R1 i -> itree E R2 i -> Prop)).
+  Lemma eqit_idclo_mono : monotone3 (@id (relᵢ (itree E R1) (itree E R2))).
     unfold id. eauto. Qed.
 
   Hint Resolve eqit__mono : paco.
@@ -75,9 +88,9 @@ End eqit.
 
 
 Section eqit_trans.
-  Context {I} {E : event I I} {R1 R2 : psh I} (RR : forall i, R1 i -> R2 i -> Prop).
+  Context {I} {E : event I I} {R1 R2 : psh I} (RR : relᵢ R1 R2).
   Inductive eqit_trans_clo b1 b2 b1' b2'
-               (r : forall i, itree E R1 i -> itree E R2 i -> Prop) i
+               (r : relᵢ (itree E R1) (itree E R2)) i
            : itree E R1 i -> itree E R2 i -> Prop :=
   | eqit_trans_clo_intro t1 t2 t1' t2' RR1 RR2
       (EQVl: eqit RR1 b1 b1' i t1 t1')
@@ -191,10 +204,12 @@ Arguments eqit_clo_trans : clear implicits.
 
 
 Section eqit_gen.
-Context {I} {E : event I I} {R: I -> Type} (RR : forall i, R i -> R i -> Prop).
+Context {I} {E : event I I} {R: I -> Type} (RR : relᵢ R R).
 
-Global Instance Reflexive_eqitF b1 b2 (sim : forall i, itree E R i -> itree E R i -> Prop)
-: (forall i, Reflexive (RR i)) -> (forall i, Reflexive (sim i)) -> (forall i, Reflexive (eqitF RR b1 b2 id sim i)).
+Global Instance Reflexive_eqitF b1 b2 (sim : relᵢ (itree E R) (itree E R))
+  : Reflexiveᵢ RR
+    -> Reflexiveᵢ sim
+    -> Reflexiveᵢ (eqitF RR b1 b2 id sim).
 intros.
 red. destruct x; constructor; eauto.
 exact (H i r).
@@ -202,44 +217,67 @@ exact (H0 i t).
 intro v. exact (H0 _ (k v)).
 Qed.
 
-Global Instance Symmetric_eqitF b (sim : forall i, itree E R i -> itree E R i -> Prop)
-: (forall i, Symmetric (RR i)) -> (forall i, Symmetric (sim i)) -> (forall i, Symmetric (eqitF RR b b id sim i)).
+Global Instance Symmetric_eqitF b (sim : relᵢ (itree E R) (itree E R))
+  : Symmetricᵢ RR
+    -> Symmetricᵢ sim
+    -> Symmetricᵢ (eqitF RR b b id sim).
   red. induction 3; constructor; subst; eauto.
   exact (H i _ _ REL).
   exact (H0 i _ _ REL).
   intro v. exact (H0 _ _ _ (REL v)).
 Qed.
 
-Global Instance Reflexive_eqit_ b1 b2 (sim : forall i, itree E R i -> itree E R i -> Prop)
-: (forall i, Reflexive (RR i)) -> (forall i, Reflexive (sim i)) -> (forall i, Reflexive (eqit_ RR b1 b2 id sim i)).
-repeat red. intros. reflexivity. Qed.
+Global Instance Reflexive_eqit_ b1 b2 (sim : relᵢ (itree E R) (itree E R))
+  : Reflexiveᵢ RR
+    -> Reflexiveᵢ sim
+    -> Reflexiveᵢ (eqit_ RR b1 b2 id sim).
+repeat red; intros; reflexivity. Qed.
 
-Global Instance Symmetric_eqit_ b (sim : forall i, itree E R i -> itree E R i -> Prop)
-: (forall i, Symmetric (RR i)) -> (forall i, Symmetric (sim i)) -> (forall i, Symmetric (eqit_ RR b b id sim i)).
+Global Instance Symmetric_eqit_ b (sim : relᵢ (itree E R) (itree E R))
+  : Symmetricᵢ RR
+    -> Symmetricᵢ sim
+    -> Symmetricᵢ (eqit_ RR b b id sim).
 repeat red; symmetry; auto. Qed.
 
-(* FAILLING HERE *)
-(*
-Global Instance Reflexive_eqit_gen b1 b2 (r rg: forall i, itree E R i -> itree E R i -> Prop) :
-  (forall i, Reflexive (RR i)) -> (forall i, Reflexive (gpaco3 (eqit_ RR b1 b2 id) (eqitC RR b1 b2) r rg i)).
-  pcofix CIH. gstep; intros.
-  repeat red. destruct (observe x); eauto with paco.
-  reflexivity.
+Global Instance Reflexive_eqit_gen b1 b2 (r rg : relᵢ (itree E R) (itree E R))
+  : Reflexiveᵢ RR
+    -> Reflexiveᵢ (gpaco3 (eqit_ RR b1 b2 id) (eqitC RR b1 b2) r rg).
+gcofix CIH. gstep; intros.
+repeat red. destruct (observe x); eauto with paco.
+econstructor; apply H0.
 Qed.
 
-Global Instance Reflexive_eqit b1 b2 : Reflexive RR -> Reflexive (@eqit E _ _ RR b1 b2).
+Global Instance Reflexive_eqit b1 b2 : Reflexiveᵢ RR
+                                       -> Reflexiveᵢ (@eqit I E _ _ RR b1 b2).
+red; intros. ginit. apply Reflexive_eqit_gen; eauto.
+Qed.
+
+Lemma eqit_flip b1 b2 : forall i u v,
+    eqit (flipᵢ RR) b2 b1 i v u -> @eqit I E _ _ RR b1 b2 i u v.
 Proof.
-  red; intros. ginit. apply Reflexive_eqit_gen; eauto.
+  pcofix self; pstep. intros i u v euv. punfold euv.
+  red in euv |- *. induction euv; pclearbot; eauto 7 with paco.
 Qed.
 
-Global Instance Symmetric_eqit b : Symmetric RR -> Symmetric (@eqit E _ _ RR b b).
+Lemma eqit_mon (RR' : relᵢ R R) (b1 b2 b1' b2': bool)
+      (LEb1: is_true b1 -> is_true b1')
+      (LEb2: is_true b2 -> is_true b2')
+      (LERR: RR <3= RR'):
+  @eqit I E _ _ RR b1 b2 <3= @eqit I E _ _ RR' b1' b2'.
+Proof.
+  pcofix self. pstep. intros i u v euv. punfold euv.
+  red in euv |- *. induction euv; pclearbot; eauto 7 with paco.
+Qed.
+
+Global Instance Symmetric_eqit b : Symmetricᵢ RR -> Symmetricᵢ (@eqit I E _ _ RR b b).
 Proof.
   red; intros. apply eqit_flip.
   eapply eqit_mon, H0; eauto.
 Qed.
 
+(*
 Global Instance eq_sub_euttge:
-  subrelation (@eq_itree E _ _ RR) (euttge RR).
+  subrelation (@eq_itree I E _ _ RR) (euttge RR).
 Proof.
   ginit. pcofix CIH. intros.
   punfold H0. gstep. red in H0 |- *.
@@ -259,10 +297,6 @@ Global Instance eq_sub_eutt:
 Proof.
   red; intros. eapply euttge_sub_eutt. eapply eq_sub_euttge. apply H.
 Qed.
-
-End eqit_gen.
-
 *)
 
 End eqit_gen.
-

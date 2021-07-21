@@ -3,6 +3,9 @@ Set Universe Polymorphism.
 From ExtLib.Data Require Import Nat Fin.
 
 From Equations Require Import Equations.
+Set Equations Transparent.
+
+Derive Signature for fin.
 
 (******************)
 (* misc notations *)

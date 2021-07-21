@@ -19,6 +19,7 @@ Inductive has : ctx X -> X -> Type :=
 | top {Γ x} : has (Γ ▶ x) x
 | pop {Γ x y} : has Γ x -> has (Γ ▶ y) x.
 Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
+Derive Signature for has.
 
 Equations has_get (Γ : ctx X) i : Γ ∋ (Γ.[i]) :=
   has_get (x :: xs) F0     := top ;
