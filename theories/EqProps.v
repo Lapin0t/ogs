@@ -3,6 +3,7 @@ From Equations Require Import Equations.
 
 From Paco Require Import paco.
 From OGS Require Import Utils Ctx EventD CatD ITreeD EqD RecD AngelicD.
+From Coq Require Import RelationClasses.
 
 Record observing {I} {E : event I I} {X Y : psh I}
            (R : relᵢ (itree' E X) (itree' E Y))
@@ -18,9 +19,9 @@ Definition observing_sub_eqit {I} {E : event I I} {X : psh I}
            : subrelᵢ (observing eqᵢ) (@eqit I E _ _ R b0 b1).
   repeat red; intros.
   pstep. red. rewrite (observing_observe H).
-  apply Reflexive_eqitF; eauto. left. (* FAIL reflexivity.*)
-  Admitted.
-
+  apply Reflexive_eqitF; eauto. 
+  left; apply reflexivity.
+  Qed. 
 
 Definition subst_ {I} {E : event I I} {X Y : I -> Type}
            (f : X ⇒ᵢ itree E Y) : itree E X ⇒ᵢ itree E Y
