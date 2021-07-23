@@ -138,6 +138,19 @@ Equations d_concat {X ty} (a b : list X) (d : dvec ty a) (h : forall i : fin (le
   d_concat _ nil        d h := d ;
   d_concat _ (cons _ _) d h := (h F0 , d_concat _ _ d (fun i => h (FS i))).
 
+Equations d_concat_lem {X ty} (P : forall x, ty x -> ty x -> Prop)
+          (a b : list X) (d0 d1 : dvec ty a)
+          (f0 f1 : forall i : fin (length b), ty (b .[i]))
+          (Hd : forall i, P (a .[i]) (d_get _ d0 i) (d_get _ d1 i))
+          (Hf : forall i, P (b .[i]) (f0 i) (f1 i))
+          : forall i, P ((b ++ a) .[i]) (d_get _ (d_concat _ _ d0 f0) i)
+                   (d_get _ (d_concat _ _ d1 f1) i) :=
+  d_concat_lem P _ nil        d0 d1 f0 f1 Hd Hf i := Hd i ;
+  d_concat_lem P _ (cons _ _) d0 d1 f0 f1 Hd Hf (F0)   := Hf F0 ;
+  d_concat_lem P _ (cons _ _) d0 d1 f0 f1 Hd Hf (FS i) :=
+    d_concat_lem P _ _ _ _  _ _ _ (fun i => Hf (FS i)) i.
+
+
 
 Declare Scope indexed_scope.
 Open Scope indexed_scope.

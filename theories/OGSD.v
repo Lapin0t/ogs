@@ -47,7 +47,7 @@ Definition eutt_conf {I} {U : uniform_event I I} {X ks}
            : ogs_conf (itree U X) ks -> ogs_conf (itree U X) ks -> Prop :=
   fun c0 c1 => forall i (r : k_rsp U (ks .[i])), d_get ks c0 i r ≈ d_get ks c1 i r.
 
-Lemma ogs_sound0 {I} {U : uniform_event I I} {X i ks}
+Lemma ogs_complete0 {I} {U : uniform_event I I} {X i ks}
         (c0 c1 : ogs_conf (itree U X) ks) (a b : itree U X i)
         : ogs_emb c0 a ≈ ogs_emb c1 b -> a ≈ b.
   revert i ks c0 c1 a b.
@@ -89,7 +89,7 @@ Lemma ogs_sound0 {I} {U : uniform_event I I} {X i ks}
     f_equal; injection Hb as Hb; exact Hb.
 Admitted.
 
-Lemma ogs_sound1 {I} {U : uniform_event I I} {X i ks}
+Lemma ogs_complete1 {I} {U : uniform_event I I} {X i ks}
         (c0 c1 : ogs_conf (itree U X) ks) (a b : itree U X i)
         : ogs_emb c0 a ≈ ogs_emb c1 b -> eutt_conf c0 c1.
   intros H n.
@@ -106,15 +106,15 @@ Lemma ogs_sound1 {I} {U : uniform_event I I} {X i ks}
     admit. (* TODO *)
 Admitted.
 
-Theorem ogs_sound {I} {U : uniform_event I I} {X i ks}
+Theorem ogs_complete {I} {U : uniform_event I I} {X i ks}
         (c0 c1 : ogs_conf (itree U X) ks) (a b : itree U X i)
         : ogs_emb c0 a ≈ ogs_emb c1 b -> eutt_conf c0 c1 /\ a ≈ b.
   intro H; split.
-  apply (ogs_sound1 c0 c1 a b H).
-  apply (ogs_sound0 c0 c1 a b H).
+  apply (ogs_complete1 c0 c1 a b H).
+  apply (ogs_complete0 c0 c1 a b H).
 Qed.
 
-Theorem ogs_complete {I} {U : uniform_event I I} {X i ks}
+Theorem ogs_sound {I} {U : uniform_event I I} {X i ks}
         (c0 c1 : ogs_conf (itree U X) ks) (a b : itree U X i)
         : (a ≈ b) -> eutt_conf c0 c1 -> ogs_emb c0 a ≈ ogs_emb c1 b.
   revert i ks c0 c1 a b.
@@ -138,9 +138,21 @@ Theorem ogs_complete {I} {U : uniform_event I I} {X i ks}
     destruct (_observe b); try discriminate Hb.
     pose (c0' :=  (d_concat ks (u_rsp U e) c0 (fun a0 b0 => k1 (a0,& b0)))).
     pose (c1' :=  (d_concat ks (u_rsp U e) c1 (fun a0 b0 => k2 (a0,& b0)))).
-    enough (H2 : eutt_conf c0' c1') by apply (CIH _ _ c0' c1' _ _ (H2 ci cr) H2).
-    admit. (* TODO *)
-  + apply EqTauL; auto.
+    enough (Hcut : eutt_conf c0' c1')
+      by apply (CIH _ _ c0' c1' _ _ (Hcut ci cr) Hcut).
+    clear ci cr.
+    injection Ha as <- Ha.
+    injection Hb as <- Hb.
+    unfold eutt_conf.
+    enough (Hcut : _)
+      by eapply (d_concat_lem (fun _ (f0 : forall r, _) (f1 : forall r, _) => forall r, f0 r ≈ f1 r)
+                  ks (u_rsp U e) c0 c1
+                  (fun a0 b0 => k1 (a0 ,& b0)) (fun a0 b0 => k2 (a0 ,& b0))
+                  H1 Hcut).
+    intros ci cr.
+    destruct (REL (ci ,& cr)); [ auto | destruct H ].
+
+  + econstructor; auto.
     destruct (_observe a); try discriminate Ha.
     enough (Hcut : _) by apply (IHeqitF CIH ks c0 c1 t b Hcut Hb H1).
     injection Ha as ->; auto.
@@ -148,4 +160,4 @@ Theorem ogs_complete {I} {U : uniform_event I I} {X i ks}
     destruct (_observe b); try discriminate Hb.
     enough (Hcut : _) by apply (IHeqitF CIH ks c0 c1 a t Ha Hcut H1).
     injection Hb as ->; auto.
-Admitted.
+Qed.
