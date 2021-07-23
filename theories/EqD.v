@@ -62,6 +62,12 @@ Section eqit.
   Definition eutt := eqit true true.
 End eqit.
 
+Arguments EqRet {I E R1 R2 RR b1 b2 vclo sim i}.
+Arguments EqTau {I E R1 R2 RR b1 b2 vclo sim i}.
+Arguments EqVis {I E R1 R2 RR b1 b2 vclo sim i}.
+Arguments EqTauL {I E R1 R2 RR b1 b2 vclo sim i}.
+Arguments EqTauR {I E R1 R2 RR b1 b2 vclo sim i}.
+
 #[global] Hint Constructors eqitF: core.
 #[global] Hint Unfold eqit_: core.
 #[global] Hint Resolve eqit__mono : paco.
