@@ -33,7 +33,7 @@ Notation "E ₑ⇒ F" := (e_arrow E F) (at level 30).
 Notation "E ⇒ₑ F" := (E ₑ⇒ ⟦ F ⟧) (at level 30).
 
 Definition e_arrow_eval {I J} {E : event I J} {F : psh I -> psh J} {FF : Functor F}
-           : E ₑ⇒ F -> ⟦ E ⟧ ⟹ F :=
+           : E ₑ⇒ F -> ⟦ E ⟧ ⇒f F :=
   fun m _ _ x => fiber_into _ (projT2 x) <$> m _ (projT1 x).
 Arguments e_arrow_eval {I J E F FF} m X.
 Notation "⟦⇒ m ⟧ X" := (e_arrow_eval m X) (at level 30).
@@ -41,7 +41,7 @@ Notation "⟦⇒ m ⟧ X" := (e_arrow_eval m X) (at level 30).
 (** inverse of e_arrow_eval, meaning that the functor ⟦-⟧ : event I → endo (psh I)
     is fully-faithfull (i think the proof requires function extensionality
     and parametricity) *)
-Definition e_arrow_mk {I J} {E : event I J} {F} : ⟦ E ⟧ ⟹ F -> E ₑ⇒ F :=
+Definition e_arrow_mk {I J} {E : event I J} {F} : ⟦ E ⟧ ⇒f F -> E ₑ⇒ F :=
   fun m i q => m (fiber (nxt E q)) _ (existT _ q Fib).
 
 

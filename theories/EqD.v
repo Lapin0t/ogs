@@ -1,4 +1,4 @@
-From Coq Require Import Program.
+From Coq Require Import Program Morphisms.
 From OGS Require Import Utils EventD ITreeD.
 From Paco Require Import paco.
 Import EqNotations.
@@ -60,6 +60,8 @@ Section eqit.
   Hint Resolve eqit_idclo_mono : paco.
 
   Definition eutt := eqit true true.
+  Definition eq_itree := eqit false false.
+  Definition euttge := eqit true false.
 End eqit.
 
 Arguments EqRet {I E R1 R2 RR b1 b2 vclo sim i}.
@@ -82,21 +84,21 @@ Arguments EqTauR {I E R1 R2 RR b1 b2 vclo sim i}.
 
 Section eqit_trans.
   Context {I} {E : event I I} {R1 R2 : psh I} (RR : relᵢ R1 R2).
-  Inductive eqit_trans_clo b1 b2 b1' b2'
+  Inductive eqit_trans_clo b1 b2
                (r : relᵢ (itree E R1) (itree E R2)) i
            : itree E R1 i -> itree E R2 i -> Prop :=
   | eqit_trans_clo_intro t1 t2 t1' t2' RR1 RR2
-      (EQVl: eqit RR1 b1 b1' i t1 t1')
-      (EQVr: eqit RR2 b2 b2' i t2 t2')
+      (EQVl: eqit RR1 b1 false i t1 t1')
+      (EQVr: eqit RR2 b2 false i t2 t2')
       (REL: r i t1' t2')
       (LERR1: forall i x x' y, RR1 i x x' -> RR i x' y -> RR i x y)
       (LERR2: forall i x y y', RR2 i y y' -> RR i x y' -> RR i x y)
-  : eqit_trans_clo b1 b2 b1' b2' r i t1 t2
-.
-Hint Constructors eqit_trans_clo: core.
+  : eqit_trans_clo b1 b2 r i t1 t2
+  .
+  Hint Constructors eqit_trans_clo: core.
 
-Definition eqitC b1 b2 := eqit_trans_clo b1 b2 false false.
-Hint Unfold eqitC: core.
+  Definition eqitC := eqit_trans_clo.
+  Hint Unfold eqitC: core.
 
 Lemma eqitC_mon b1 b2 r1 r2 i t1 t2
       (IN: eqitC b1 b2 r1 i t1 t2)
@@ -182,9 +184,10 @@ Hint Resolve eqitC_dist : paco.
 Lemma eqit_clo_trans b1 b2 vclo
       (MON: monotone3 vclo)
       (CMP: compose (eqitC b1 b2) vclo <4= compose vclo (eqitC b1 b2)):
-  eqit_trans_clo b1 b2 false false <4= gupaco3 (eqit_ RR b1 b2 vclo) (eqitC b1 b2).
+  eqitC b1 b2 <4= gupaco3 (eqit_ RR b1 b2 vclo) (eqitC b1 b2).
   intros. destruct PR. gclo. econstructor; eauto with paco.
 Qed.
+
 
 End eqit_trans.
 #[global] Hint Unfold eqitC: core.
@@ -194,7 +197,6 @@ End eqit_trans.
 #[global] Hint Resolve eqitC_dist : paco.
 Arguments eqit_clo_trans : clear implicits.
 #[global] Hint Constructors eqit_trans_clo: core.
-
 
 Section eqit_gen.
 Context {I} {E : event I I} {R: I -> Type} (RR : relᵢ R R).
@@ -294,3 +296,90 @@ Qed.
 
 End eqit_gen.
 Global Hint Resolve Reflexive_eqit_ Reflexive_eqit Reflexive_eqit_gen : reflexivity.
+
+Instance geuttgen_cong_eqit {I E R1 R2}
+         {RR1 : relᵢ R1 R1} {RR2 : relᵢ R2 R2} {RS : relᵢ R1 R2}
+         b1 b2 r rg
+         (LERR1 : forall i x x' y, RR1 i x x' -> RS i x' y -> RS i x y)
+         (LERR2 : forall i x y y', RR2 i y y' -> RS i x y' -> RS i x y) i:
+  Proper (eq_itree RR1 i ==> eq_itree RR2 i ==> flip impl)
+         (gpaco3 (@eqit_ I E R1 R2 RS b1 b2 id) (eqitC RS b1 b2) r rg i).
+  repeat intro. guclo eqit_clo_trans. econstructor; cycle -3; eauto.
+  - eapply eqit_mon, H; eauto; discriminate.
+  - eapply eqit_mon, H0; eauto; discriminate.
+Qed.
+
+Global Instance geuttgen_cong_eqit_eq {I E R1 R2 RS} b1 b2 r rg i :
+  Proper (eq_itree eqᵢ i ==> eq_itree eqᵢ i ==> flip impl)
+         (gpaco3 (@eqit_ I E R1 R2 RS b1 b2 id) (eqitC RS b1 b2) r rg i).
+Proof.
+  eapply geuttgen_cong_eqit; intros; cbv in H; subst; eauto.
+Qed.
+
+Global Instance geuttge_cong_euttge {I E R1 R2}
+         {RR1 : relᵢ R1 R1} {RR2 : relᵢ R2 R2} {RS : relᵢ R1 R2} r rg
+       (LERR1: forall i x x' y, RR1 i x x' -> RS i x' y -> RS i x y)
+       (LERR2: forall i x y y', RR2 i y y' -> RS i x y' -> RS i x y) i :
+  Proper (euttge RR1 i ==> eq_itree RR2 i ==> flip impl)
+         (gpaco3 (@eqit_ I E R1 R2 RS true false id) (eqitC RS true false) r rg i).
+Proof.
+  repeat intro. guclo eqit_clo_trans.
+Qed.
+
+Global Instance geuttge_cong_euttge_eq {I E R1 R2 RS} r rg i:
+  Proper (euttge eqᵢ i ==> eq_itree eqᵢ i ==> flip impl)
+         (gpaco3 (@eqit_ I E R1 R2 RS true false id) (eqitC RS true false) r rg i).
+Proof.
+  eapply geuttge_cong_euttge; intros; cbv in H; subst; eauto.
+Qed.
+
+Global Instance geutt_cong_euttge {I E R1 R2}
+         {RR1 : relᵢ R1 R1} {RR2 : relᵢ R2 R2} {RS : relᵢ R1 R2} r rg
+       (LERR1: forall i x x' y, RR1 i x x' -> RS i x' y -> RS i x y)
+       (LERR2: forall i x y y', RR2 i y y' -> RS i x y' -> RS i x y) i:
+  Proper (euttge RR1 i ==> euttge RR2 i ==> flip impl)
+         (gpaco3 (@eqit_ I E R1 R2 RS true true id) (eqitC RS true true) r rg i).
+Proof.
+  repeat intro. guclo eqit_clo_trans.
+Qed.
+
+Global Instance geutt_cong_euttge_eq {I E R1 R2 RS} r rg i :
+  Proper (euttge eqᵢ i ==> euttge eqᵢ i ==> flip impl)
+         (gpaco3 (@eqit_ I E R1 R2 RS true true id) (eqitC RS true true) r rg i).
+Proof.
+  eapply geutt_cong_euttge; intros; cbv in H; subst; eauto.
+Qed.
+
+Global Instance eqitgen_cong_eqit {I E R1 R2}
+         {RR1 : relᵢ R1 R1} {RR2 : relᵢ R2 R2} {RS : relᵢ R1 R2} b1 b2 i
+       (LERR1: forall i x x' y, RR1 i x x' -> RS i x' y -> RS i x y)
+       (LERR2: forall i x y y', RR2 i y y' -> RS i x y' -> RS i x y):
+  Proper (eq_itree RR1 i ==> eq_itree RR2 i ==> flip impl)
+         (@eqit I E R1 R2 RS b1 b2 i).
+Proof.
+  ginit. intros. eapply geuttgen_cong_eqit; eauto. gfinal. eauto.
+Qed.
+
+Global Instance eqitgen_cong_eqit_eq {I E R1 R2 RS} b1 b2 i:
+  Proper (eq_itree eqᵢ i ==> eq_itree eqᵢ i ==> flip impl)
+         (@eqit I E R1 R2 RS b1 b2 i).
+Proof.
+  ginit. intros. rewrite H1, H0. gfinal. eauto.
+Qed.
+
+(* would need to write/port transitivity properties (eqit_trans)
+Global Instance euttge_cong_euttge {I E R RS}
+       (TRANS: Transitiveᵢ RS) i :
+  Proper (euttge RS i ==> flip (euttge RS i) ==> flip impl)
+         (@eqit I E R R RS true false i).
+Proof.
+  repeat intro. do 2 (eapply eqit_mon, eqit_trans; eauto using (trans_rcompose RS)).
+Qed.
+
+Global Instance euttge_cong_euttge_eq {E R}:
+  Proper (euttge eq ==> flip (euttge eq) ==> flip impl)
+         (@eqit E R R eq true false).
+Proof.
+  eapply euttge_cong_euttge; eauto using eq_trans.
+Qed.
+*)

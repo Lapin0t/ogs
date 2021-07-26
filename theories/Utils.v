@@ -168,6 +168,7 @@ Definition psh (I : Type) : Type := I -> Type.
 Definition relᵢ {I : Type} (A B : psh I) := forall i, A i -> B i -> Prop.
 Notation Reflexiveᵢ R := (forall i, Reflexive (R i)).
 Notation Symmetricᵢ R := (forall i, Symmetric (R i)).
+Notation Transitiveᵢ R := (forall i, Transitive (R i)).
 Definition subrelᵢ {I : Type} {A B : psh I} (R1 R2 : relᵢ A B) : Prop :=
   forall i a b, R1 i a b -> R2 i a b.
 
@@ -177,6 +178,7 @@ Definition flipᵢ {I : Type} {A B : psh I} (R : relᵢ A B) : relᵢ B A :=
 
 
 Definition eqᵢ {I : Type} {X : psh I} : relᵢ X X := fun i x y => x = y.
+Arguments eqᵢ _ _ _ /.
 
 (* pointwise arrows *)
 Definition arrᵢ {I} (X Y : psh I) : Type := forall {i}, X i -> Y i.
@@ -187,7 +189,7 @@ Definition sumᵢ {I} (X Y : psh I) : psh I := fun i => (X i + Y i)%type.
 Infix "+ᵢ" := (sumᵢ) (at level 20) : indexed_scope.
 
 (* pointwise arrows between F G : endo (psh I) *)
-Notation "F ⟹ G" := (forall X : psh _, F X ⇒ᵢ G X) (at level 30).
+Notation "F ⇒f G" := (forall X : psh _, F X ⇒ᵢ G X) (at level 30).
 
 
 Inductive fiber {A B} (f : A -> B) : B -> Type := Fib a : fiber f (f a).
