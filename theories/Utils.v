@@ -1,5 +1,6 @@
 Set Universe Polymorphism.
 
+From Coq Require Import JMeq Program.Equality EqdepFacts.
 Require Import RelationClasses.
 From ExtLib.Data Require Import Nat Fin.
 
@@ -130,9 +131,20 @@ Equations dvec {X} (ty : X -> Type) (xs : list X) : Type :=
   dvec ty (cons x xs) := ty x * dvec ty xs.
 Transparent dvec.
 
+Equations d_collect {X} {ty : X -> Type} (xs : list X) (f : forall i, ty (xs .[i])) : dvec ty xs :=
+  d_collect nil f := t1_0 ;
+  d_collect (cons x xs) f := (f F0 , d_collect xs (fun i => f (FS i))).
+Arguments d_collect {X ty xs}.
+
 Equations d_get {X ty} (c : list X) (d : dvec ty c) (i : fin (length c)) : ty (l_get c i) :=
   d_get (cons t ts) r F0     := fst r ;
   d_get (cons t ts) r (FS i) := d_get ts (snd r) i.
+
+
+(*
+Equations d_collect_lem {X} {ty : X -> Type} (xs : list X) (f : forall i, ty (xs .[i]))
+          : forall i, d_get 
+*)
 
 Equations d_concat {X ty} (a b : list X) (d : dvec ty a) (h : forall i : fin (length b), ty (b .[i])) : dvec ty (b ++ a) :=
   d_concat _ nil        d h := d ;
@@ -149,6 +161,35 @@ Equations d_concat_lem {X ty} (P : forall x, ty x -> ty x -> Prop)
   d_concat_lem P _ (cons _ _) d0 d1 f0 f1 Hd Hf (F0)   := Hf F0 ;
   d_concat_lem P _ (cons _ _) d0 d1 f0 f1 Hd Hf (FS i) :=
     d_concat_lem P _ _ _ _  _ _ _ (fun i => Hf (FS i)) i.
+
+Equations fin_inj' {X} {a b : list X} : fin (length a) -> fin (length (a ++ b)) :=
+  @fin_inj' _ (cons _ _) _ (F0)   := F0 ;
+  @fin_inj' _ (cons _ _) _ (FS i) := FS (fin_inj' i) .
+
+
+Equations fin_inj_get {X} {a b : list X} (i : fin (length a)) : a .[i] = (a ++ b) .[fin_inj' i] :=
+  @fin_inj_get _ (cons _ _) _ (F0) := _ ;
+  @fin_inj_get _ (cons _ _) _ (FS i) := fin_inj_get i .
+
+Equations fin_inj_dget {X} {a b : list X} {ty} (d : dvec ty b)
+           (h : forall i : fin (length a), ty (a .[i]))
+           (i : fin (length a))
+           : d_get _ (d_concat b a d h) (fin_inj' i) = eq_rect _ ty (h i) _ (fin_inj_get i) :=
+  @fin_inj_dget _ (cons _ _) _ _ _ _ (F0) := _ ;
+  @fin_inj_dget _ (cons _ _) _ _ _ _ (FS i) := fin_inj_dget _ _ i .
+
+Definition pi_lem_eq
+    {A : Type} {x y : A} (H0 : y = x)
+    {B : A -> Type} {C : forall a, B a -> Type}
+    (f : forall b : B x, C x b)
+    (g : forall b : B y, C y b)
+
+    (H1 : f = eq_rect _ (fun a => forall b : B a, C a b) g _ H0)
+
+    (b : B y) : eq_dep (sigT B) (fun a => C (projT1 a) (projT2 a)) (_ ,& _) (f (eq_rect _ B b _ H0)) (_ ,& _) (g b).
+  dependent induction H1; auto.
+Defined.
+                 
 
 
 

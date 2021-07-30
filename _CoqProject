@@ -2,7 +2,6 @@
 -Q theories OGS
 
 theories/Utils.v
-theories/LC.v
 theories/CatD.v
 theories/EventD.v
 theories/ITreeD.v

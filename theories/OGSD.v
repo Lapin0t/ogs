@@ -1,20 +1,49 @@
+(*|
+==========================
+Operational Game Semantics
+==========================
+
+.. coq:: none
+|*)
+From Coq Require Import JMeq Program.Equality EqdepFacts.
 From OGS Require Import Utils Ctx CatD EventD ITreeD RecD AngelicD EqD.
 From ExtLib.Data Require Import Nat Fin List Unit.
+From Paco Require Import paco.
 Set Primitive Projections.
 Set Implicit Arguments.
 Set Equations Transparent.
 
-(* taking the "OGS" of an uniform event *)
+(*|
+An uniform event is one where the set of answers for a given query is
+of the form ``list kon`` for some type ``kon``. We argue that the gist
+of an OGS is the ability for the opponent to remember all the
+continuations that have been offered, and continue not only on the continuations
+that have been offered at the last event, but also on all the previous ones.
+
+Hence the OGS of an uniform event will be indexed by an additional
+``ks : list kon`` representing the list of currently available continuations
+and the set of responses will be the choice of a continuation in the concatenation
+of the new continuations available and the ones present in the context.
+|*)
 Definition ogs {I J} (U : uniform_event I J)
            : event (I * list (kon U)) (J * list (kon U)) :=
   Event (fun '(j , ks) => u_qry U j)
         (fun '(j , ks) q => { i : _ & k_rsp U ((u_rsp U q ++ ks) .[i]) })
         (fun '(j , ks) q r => (k_nxt U (projT2 r) , u_rsp U q ++ ks)).
 
+(*|
+An OGS configuration ``c : ogs_conf X ks`` is a heterogeneous list
+of ``X``'s for each continuation of the list.
+|*)
 Definition ogs_conf {I} {U : uniform_event I I}
              (X : I -> Type) (ks : list (kon U)) : Type :=
   dvec (fun k => forall r : k_rsp U k, X (k_nxt U r)) ks.
 
+(*|
+Given an OGS configuration containing itrees (eg a forest of itrees
+explaining how to continue for every continuation in scope), and an
+itree over ``U``, we can generate an itree over ``ogs U``.
+|*)
 Definition ogs_emb {I} {U : uniform_event I I} {X : I -> Type}
            : forall {i ks},
              ogs_conf (itree U X) ks
@@ -25,58 +54,32 @@ Definition ogs_emb {I} {U : uniform_event I I} {X : I -> Type}
     | TauF t => Tau (_ogs_emb i ks c t)
     | VisF e k => Vis (e : qry (ogs U) (i , ks)) (fun r =>
                    let c' := d_concat _ _ c (curry2' k) in
-                   _ogs_emb _ _ c' (d_get _ c' _ _))
+                   _ogs_emb _ _ c' (uncurry2' (d_get _ c') r))
     end.
 
-Equations fin_inj' {X} {a b : ctx X} : fin (length a) -> fin (length (b +▶ a)%ctx) :=
-  @fin_inj' _ (cons _ _) _ (F0)   := F0 ;
-  @fin_inj' _ (cons _ _) _ (FS i) := FS (fin_inj' i) .
-
-
-Equations fin_inj_get {X} {a b : ctx X} (i : fin (length a)) : a .[i] = (b +▶ a)%ctx .[fin_inj' i] :=
-  @fin_inj_get _ (cons _ _) _ (F0) := _ ;
-  @fin_inj_get _ (cons _ _) _ (FS i) := fin_inj_get i .
-
-Equations fin_inj_dget {X} {a b : ctx X} {ty} (d : dvec ty b)
-           (h : forall i : fin (length a), ty (a .[i]))
-           (i : fin (length a))
-           : d_get _ (d_concat b a d h) (fin_inj' i)
-             = eq_rect _ ty (h i) _ (fin_inj_get i) :=
-  @fin_inj_dget _ (cons _ _) _ _ _ _ (F0) := _ ;
-  @fin_inj_dget _ (cons _ _) _ _ _ _ (FS i) := fin_inj_dget _ _ i .
-
-
-Equations fin_inj_lem {X A} {a b : ctx X} {ty} (P : forall x, ty x -> A)
-          (i : fin (length a)) (x : ty (a .[i]))
-          : P _ (eq_rect (a .[ i ]) ty x _ (@fin_inj_get X a b i)) = P _ x :=
- @fin_inj_lem _ _ (cons _ _) _ _ P (F0) x := _ ;  
- @fin_inj_lem _ _ (cons _ _) _ _ P (FS i) x := fin_inj_lem P i x .
-  
-
+(*|
+Here is a short lemma injecting a query for ``U`` into a query for ``ogs U``.
+|*)
 Definition ogs_inj_rsp {I} {U : uniform_event I I} {i ks} {q : qry U i}
           (r : rsp U q) : rsp (ogs U) (q : qry (ogs U) (i , ks)) :=
   fin_inj' _ ,& eq_rect _ (k_rsp U) (projT2 r) _ (fin_inj_get (projT1 r)).
 
-
-Lemma sigT_eq_lem {A : Type} {B : A -> Type} {C : forall a, B a -> Type}
-      {a : A} {k0 k1 : forall b, C a b}
-      : (a ,& k0 : sigT (fun a => forall b, C a b)) = (a ,& k1)
-        -> forall b, k0 b = k1 b.
-  intros e b.
-  pose (h1 := projT2_eq e); cbn in h1; rewrite<- h1.
-  apply (@f_equal (forall b, C a b) (C a b) (fun k => k b)).
-  exact (Eqdep.Eq_rect_eq.eq_rect_eq _ a (fun a => forall b, C a b) k0 (projT1_eq e)).
-Qed.
-    
-                 
-
-From OGS Require Import EqD.
-From Paco Require Import paco.
-
+(*|
+Next is a definition of eutt lifted to our type of forests: two forests are eutt
+if they are pointwise eutt.
+|*)
 Definition eutt_conf {I} {U : uniform_event I I} {X ks}
            : ogs_conf (itree U X) ks -> ogs_conf (itree U X) ks -> Prop :=
   fun c0 c1 => forall i (r : k_rsp U (ks .[i])), d_get ks c0 i r ≈ d_get ks c1 i r.
 
+(*|
+The soundness theorem: if the OGS embedding of two itrees are eutt, then the
+trees are themselves eutt. The proof is very direct: by coinduction we pattern
+match on the proof, destructing and discriminating everything to expose the forced
+constructors (like the kind of clause-based dependent induction that coq-equation
+does). The case for Vis is currently not finished, there are still some dependent
+equality rewriting shenanigans.
+|*)
 Theorem ogs_sound {I} {U : uniform_event I I} {X i ks}
         {c0 c1 : ogs_conf (itree U X) ks} {a b : itree U X i}
         (H : ogs_emb c0 a ≈ ogs_emb c1 b) : a ≈ b.
@@ -111,12 +114,11 @@ Theorem ogs_sound {I} {U : uniform_event I I} {X i ks}
     econstructor; intros v; right.
     apply (CIH _ _ (d_concat ks _ c0 (fun a b => k (a ,& b)))
                (d_concat ks _ c1 (fun a b => k0 (a ,& b)))).
-    pose (k1v := k1 (ogs_inj_rsp v)).
-    pose (XX := sigT_eq_lem (Ha) (ogs_inj_rsp v)).
-    cbn in XX.
-    rewrite fin_inj_dget in XX.
+    dependent induction Ha.
+    dependent induction Hb.
+    apply (fun f => f (ogs_inj_rsp v)) in REL.
+    cbn [projT1 projT2 ogs_inj_rsp] in REL.
     admit.
-    
   + destruct (_observe a); try discriminate Ha.
     econstructor; auto.
     enough (Hcut : _) by apply (IHeqitF CIH c0 c1 t b Hcut Hb).
@@ -128,6 +130,11 @@ Theorem ogs_sound {I} {U : uniform_event I I} {X i ks}
 Admitted.
 
 
+(*|
+The completeness result: given two eutt trees and two pointwise eutt forests,
+the OGS embedding are eutt. Again this is a direct proof by coinduction and
+pattern matching on the proofs.
+|*)
 Theorem ogs_complete {I} {U : uniform_event I I} {X i ks}
         (c0 c1 : ogs_conf (itree U X) ks) (a b : itree U X i)
         : (a ≈ b) -> eutt_conf c0 c1 -> ogs_emb c0 a ≈ ogs_emb c1 b.

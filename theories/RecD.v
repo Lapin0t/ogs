@@ -11,7 +11,7 @@ Definition iter {I} {E : event I I} {X Y : I -> Type} (body : X ⇒ᵢ itree E (
 Instance ITreeMonadIter {I} (E : event I I) : MonadIter (itree E) :=
   Build_MonadIter _ (fun X Y => @iter I E X Y).
 
-Definition translate {I} {E F : event I I} (f : E ⇒ₑ F) : itree E ⟹ itree F :=
+Definition translate {I} {E F : event I I} (f : E ⇒ₑ F) : itree E ⇒f itree F :=
   fun _ => cofix _translate _ u :=
     match (observe u) with
     | RetF x => Ret x
@@ -54,7 +54,7 @@ Defined.
 Definition interp {I} {E : event I I}
            {M : psh I -> psh I} {MF : Functor M} {MM : Monad M} {MI : MonadIter M}
            (h : E ₑ⇒ M)
-           : itree E ⟹ M :=
+           : itree E ⇒f M :=
   fun _ => CatD.iter (fun i x => match (observe x) with
             | RetF x => CatD.ret _ (inr x)
             | TauF t => CatD.ret _ (inl t)
@@ -64,7 +64,7 @@ Definition interp {I} {E : event I I}
 
 Definition interp_mrec {I} {E F : event I I}
            (body : E ₑ⇒ itree (esum E F))
-           : itree (esum E F) ⟹ itree F :=
+           : itree (esum E F) ⇒f itree F :=
   fun _ => iter (fun _ (t : itree (esum E F) _ _) => match (observe t) with
               | RetF r => Ret (inr r)
               | TauF t => Ret (inl t)
