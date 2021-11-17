@@ -1,14 +1,16 @@
--R ./lib/InteractionTrees/theories ITree
 -Q theories OGS
 
-theories/Utils.v
-theories/CatD.v
-theories/EventD.v
-theories/ITreeD.v
-theories/AngelicD.v
-theories/RecD.v
-theories/EqD.v
-theories/Ctx.v
-theories/LCD.v
-theories/OGSD.v
-theories/EqProps.v
+theories/Utils/Prelude.v
+theories/Utils/FFun.v
+theories/Utils/Psh.v
+theories/ITree/Cat.v
+theories/ITree/Event.v
+theories/ITree/ITree.v
+theories/ITree/Eq.v
+theories/ITree/EqProps.v
+theories/ITree/Angelic.v
+theories/ITree/Rec.v
+theories/STLC/Ctx.v
+theories/STLC/Syntax.v
+theories/STLC/Props.v
+theories/STLC/OGS.v

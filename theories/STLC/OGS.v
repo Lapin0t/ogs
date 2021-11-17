@@ -32,12 +32,12 @@ Definition ogs {I J} (U : uniform_event I J)
         (fun '(j , ks) q r => (k_nxt U (projT2 r) , u_rsp U q ++ ks)).
 
 (*|
-An OGS configuration ``c : ogs_conf X ks`` is a heterogeneous list
-of ``X``'s for each continuation of the list.
+An OGS configuration ``c : ogs_conf X ks`` is a forest of ``itree U
+X``, that has a tree for each ``ks``.
 |*)
 Definition ogs_conf {I} {U : uniform_event I I}
              (X : I -> Type) (ks : list (kon U)) : Type :=
-  dvec (fun k => forall r : k_rsp U k, X (k_nxt U r)) ks.
+  ffun (fun k => forall r : k_rsp U k, itree U X (k_nxt U r)) ks.
 
 (*|
 Given an OGS configuration containing itrees (eg a forest of itrees
@@ -46,15 +46,15 @@ itree over ``U``, we can generate an itree over ``ogs U``.
 |*)
 Definition ogs_emb {I} {U : uniform_event I I} {X : I -> Type}
            : forall {i ks},
-             ogs_conf (itree U X) ks
+             ogs_conf X ks
            -> itree U X i
            -> itree (ogs U) (X ∘ fst) (i , ks) :=
   cofix _ogs_emb i ks c x := match (observe x) with
     | RetF x => Ret (x : X (fst (i , ks)))
     | TauF t => Tau (_ogs_emb i ks c t)
     | VisF e k => Vis (e : qry (ogs U) (i , ks)) (fun r =>
-                   let c' := d_concat _ _ c (curry2' k) in
-                   _ogs_emb _ _ c' (uncurry2' (d_get _ c') r))
+                   let c' := ffconcat_pi _ _ c k in
+                   _ogs_emb _ _ c' (ffun_pi_get c' r))
     end.
 
 (*|
@@ -62,15 +62,15 @@ Here is a short lemma injecting a query for ``U`` into a query for ``ogs U``.
 |*)
 Definition ogs_inj_rsp {I} {U : uniform_event I I} {i ks} {q : qry U i}
           (r : rsp U q) : rsp (ogs U) (q : qry (ogs U) (i , ks)) :=
-  fin_inj' _ ,& eq_rect _ (k_rsp U) (projT2 r) _ (fin_inj_get (projT1 r)).
+  finj _ ,& eq_rect _ (k_rsp U) (projT2 r) _ (finj_get (projT1 r)).
 
 (*|
 Next is a definition of eutt lifted to our type of forests: two forests are eutt
 if they are pointwise eutt.
 |*)
 Definition eutt_conf {I} {U : uniform_event I I} {X ks}
-           : ogs_conf (itree U X) ks -> ogs_conf (itree U X) ks -> Prop :=
-  fun c0 c1 => forall i (r : k_rsp U (ks .[i])), d_get ks c0 i r ≈ d_get ks c1 i r.
+           : ogs_conf X ks -> ogs_conf X ks -> Prop :=
+  fun c0 c1 => forall i (r : k_rsp U (ks .[i])), ffapp c0 i r ≈ ffapp c1 i r.
 
 (*|
 The soundness theorem: if the OGS embedding of two itrees are eutt, then the
@@ -81,7 +81,7 @@ does). The case for Vis is currently not finished, there are still some dependen
 equality rewriting shenanigans.
 |*)
 Theorem ogs_sound {I} {U : uniform_event I I} {X i ks}
-        {c0 c1 : ogs_conf (itree U X) ks} {a b : itree U X i}
+        {c0 c1 : ogs_conf X ks} {a b : itree U X i}
         (H : ogs_emb c0 a ≈ ogs_emb c1 b) : a ≈ b.
   revert i ks c0 c1 a b H.
   pcofix CIH.
@@ -112,12 +112,17 @@ Theorem ogs_sound {I} {U : uniform_event I I} {X i ks}
     cbn [_observe] in Ha, Hb.
     injection Ha as <- Ha; injection Hb as <- Hb.
     econstructor; intros v; right.
-    apply (CIH _ _ (d_concat ks _ c0 (fun a b => k (a ,& b)))
-               (d_concat ks _ c1 (fun a b => k0 (a ,& b)))).
+    apply (CIH _ _ (ffconcat_pi ks _ c0 k)
+                   (ffconcat_pi ks _ c1 k0)); clear CIH.
     dependent induction Ha.
     dependent induction Hb.
-    apply (fun f => f (ogs_inj_rsp v)) in REL.
-    cbn [projT1 projT2 ogs_inj_rsp] in REL.
+    specialize (REL (ogs_inj_rsp v)).
+    cbn in REL.
+    unfold eutt, eqit.
+    (*
+    cbn [projT1 projT2 ogs_inj_rsp uncurry2'] in REL.
+    cbn [uncurry2'] in REL.
+    *)
     admit.
   + destruct (_observe a); try discriminate Ha.
     econstructor; auto.
@@ -136,7 +141,7 @@ the OGS embedding are eutt. Again this is a direct proof by coinduction and
 pattern matching on the proofs.
 |*)
 Theorem ogs_complete {I} {U : uniform_event I I} {X i ks}
-        (c0 c1 : ogs_conf (itree U X) ks) (a b : itree U X i)
+        (c0 c1 : ogs_conf X ks) (a b : itree U X i)
         : (a ≈ b) -> eutt_conf c0 c1 -> ogs_emb c0 a ≈ ogs_emb c1 b.
   revert i ks c0 c1 a b.
   pcofix CIH.
@@ -157,8 +162,8 @@ Theorem ogs_complete {I} {U : uniform_event I I} {X i ks}
   + econstructor; intros [ci cr]; right.
     destruct (_observe a); try discriminate Ha.
     destruct (_observe b); try discriminate Hb.
-    pose (c0' :=  (d_concat ks (u_rsp U e) c0 (fun a0 b0 => k1 (a0,& b0)))).
-    pose (c1' :=  (d_concat ks (u_rsp U e) c1 (fun a0 b0 => k2 (a0,& b0)))).
+    pose (c0' :=  (ffconcat ks (u_rsp U e) c0 (fun a0 b0 => k1 (a0,& b0)))).
+    pose (c1' :=  (ffconcat ks (u_rsp U e) c1 (fun a0 b0 => k2 (a0,& b0)))).
     enough (Hcut : eutt_conf c0' c1')
       by apply (CIH _ _ c0' c1' _ _ (Hcut ci cr) Hcut).
     clear ci cr.

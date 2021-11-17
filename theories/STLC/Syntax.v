@@ -829,3 +829,103 @@ Definition eval_lassen {Γ : neg_ctx} {x} (u : term Γ x) : lassen ∅ᵢ (Γ , 
 Definition eval_ogs {Γ : neg_ctx} {x} (u : term Γ x)
            : itree (ogs enf_e) ∅ᵢ ((Γ , x) , nil) :=
   eval_ogs' (ea_start' (u : term' (_ , _))).
+
+(******* WIP **************
+Equations e_compose {Γ x y z} : e_ctx Γ z y -> e_ctx Γ y x -> e_ctx Γ z x :=
+ e_compose F EHole           := F ;
+ e_compose F (EApp_l E u)    := EApp_l (e_compose F E) u ;
+ e_compose F (EApp_r E u)    := EApp_r (e_compose F E) u ;
+ e_compose F (EPair_l E u)   := EPair_l (e_compose F E) u ;
+ e_compose F (EPair_r E u)   := EPair_r (e_compose F E) u ;
+ e_compose F (EPMatch E b)   := EPMatch (e_compose F E) b ;
+ e_compose F (EInl E)        := EInl (e_compose F E) ;
+ e_compose F (EInr E)        := EInr (e_compose F E) ;
+ e_compose F (ESMatch E a b) := ESMatch (e_compose F E) a b .
+
+(*
+Lemma e_focus_compose_aux {Γ x y} (E : e_ctx Γ y x) (u : term Γ x)
+  : focus_aux.focus_aux E (inl u)
+    = match focus_aux.focus_aux EHole (inl u) with
+      | EVal v => focus_aux.focus_aux E (inr v)
+      | ERed F v e => ERed (e_compose E F) v e
+      end
+  .
+  funelim (focus_aux.focus_aux E (inl u)); clear Heqcall.
+  + 
+    rewrite focus_aux.focus_aux_equation_10.
+    rewrite <- focus_aux.focus_aux_equation_1.
+    reflexivity.
+  + rewrite 2 focus_aux.focus_aux_equation_2.
+    rewrite focus_aux.focus_aux_equation_10.
+    rewrite <- focus_aux.focus_aux_equation_2.
+    reflexivity.
+  + rewrite 2 focus_aux.focus_aux_equation_3.
+    rewrite focus_aux.focus_aux_equation_10.
+    rewrite <- focus_aux.focus_aux_equation_3.
+    reflexivity.
+  + rewrite 2 focus_aux.focus_aux_equation_4.
+    clear Heqcall.
+    rewrite H.
+
+
+    destruct t1.
+    rewrite Heqcall.
+  + rewrite 2 
+    rewrite focus_
+  funelim (e_focus (EA E u)).
+Variant e_term (Γ : ctx) (x : ty) : Type :=
+| EVal : e_val Γ x -> e_term Γ x
+| ERed {a b} : e_ctx Γ x b -> e_val Γ a -> e_elim Γ a b -> e_term Γ x
+.
+
+*)
+From Paco Require Import paco.
+Lemma lassen_ogs_sound {Γ : neg_ctx} {x} {a b : term Γ x}
+      (H : forall y (E : e_ctx Γ y x), eval_enf (EA E a) ≈ eval_enf (EA E b))
+      : eval_ogs a ≈ eval_ogs b.
+  revert Γ x a b H.
+  pcofix CIH.
+  intros Γ x a b H.
+  pstep.
+  unfold eqit_, observe.
+  unfold eval_ogs, eval_ogs', ea_start', ogs_emb.
+  cbn [_observe].
+  change (_ (Γ, x) ∅%ctx t1_0 ?t)
+    with (@ogs_emb _ _ _ (Γ , x) ∅%ctx t1_0 t).
+  (*
+  change (Vis ?e (fun r0 : rsp (ogs enf_e) ?e => _ (k_nxt enf_e _) ?c (d_concat ∅%ctx (u_rsp enf_e ?e) t1_0 ?f) ?b))
+    with (Vis e (fun r0 => ogs_emb i c (d_concat ∅%ctx (u_rsp enf_e e) t1_0 f) b)).
+  *)
+  unfold eval_lassen', iter, bind, subst, observe.
+  cbn [_observe fst snd].
+  unfold emb_comp, translate_fwd, compose.
+  cbv [_observe].
+  unfold bind.
+  
+  cbn [_observe fst snd].
+  unfold compose.
+  cbn.
+  cbn [ compose ].
+      
+  change (_ (k_nxt enf_e (projT2 ?r)) (∅ +▶ u_rsp enf_e ?e)%ctx (d_concat ∅%ctx (u_rsp enf_e ?e) t1_0 ?f) (uncurry2' (d_get ?g))
+    with (@ogs_emb _ _ _ (k_nxt enf_e (projT2 r)) (∅ +▶ u_rsp enf_e e)%ctx (d_concat _ _ t1_0 f) (uncurry2' g)).
+  cbv cofix.
+  cbn iota.
+  change (_ogs_emb ?a ?b ?c ?d) with (ogs_emb ?a ?b ?c ?d).
+  cbn [_observe].
+  unfold eval_enf, compose, iterₐ in H.
+(* TODO:
+   in goal:
+   - unfold one step of iter
+   - unfold eval_enf
+   - 
+   in H:
+   - unfold one step of iter
+*)
+  
+
+Lemma lassen_ogs_complete {Γ : neg_ctx} {x} {a b : term Γ x}
+        (H : eval_ogs a ≈ eval_ogs b) {y} (E : e_ctx Γ y x)
+        : eval_enf (EA E a) ≈ eval_enf (EA E b).
+Admitted.
+*********************)
