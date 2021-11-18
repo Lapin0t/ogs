@@ -1,9 +1,11 @@
 Set Primitive Projections.
+
+From Coq Require Import RelationClasses.
+From Paco Require Import paco.
 From Equations Require Import Equations.
 
-From Paco Require Import paco.
-From OGS Require Import Utils Ctx EventD CatD ITreeD EqD RecD AngelicD.
-From Coq Require Import RelationClasses.
+From OGS Require Import Utils.
+From OGS.ITree Require Import Cat Event ITree Eq Rec Angelic.
 
 Record observing {I} {E : event I I} {X Y : psh I}
            (R : relᵢ (itree' E X) (itree' E Y))

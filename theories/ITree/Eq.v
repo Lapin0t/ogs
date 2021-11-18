@@ -1,7 +1,9 @@
 From Coq Require Import Program Morphisms.
-From OGS Require Import Utils EventD ITreeD.
 From Paco Require Import paco.
 Import EqNotations.
+
+From OGS Require Import Utils.
+From OGS.ITree Require Import Event ITree.
 
 Tactic Notation "hinduction" hyp(IND) "before" hyp(H)
   := move IND before H; revert_until IND; induction IND.
@@ -249,7 +251,6 @@ Qed.
 
 Lemma eqit_flip b1 b2 : forall i u v,
     eqit (flipᵢ RR) b2 b1 i v u -> @eqit I E _ _ RR b1 b2 i u v.
-Proof.
   pcofix self; pstep. intros i u v euv. punfold euv.
   red in euv |- *. induction euv; pclearbot; eauto 7 with paco.
 Qed.
@@ -259,13 +260,11 @@ Lemma eqit_mon (RR' : relᵢ R R) (b1 b2 b1' b2': bool)
       (LEb2: is_true b2 -> is_true b2')
       (LERR: RR <3= RR'):
   @eqit I E _ _ RR b1 b2 <3= @eqit I E _ _ RR' b1' b2'.
-Proof.
   pcofix self. pstep. intros i u v euv. punfold euv.
   red in euv |- *. induction euv; pclearbot; eauto 7 with paco.
 Qed.
 
 Global Instance Symmetric_eqit b : Symmetricᵢ RR -> Symmetricᵢ (@eqit I E _ _ RR b b).
-Proof.
   red; intros. apply eqit_flip.
   eapply eqit_mon, H0; eauto.
 Qed.
@@ -312,7 +311,6 @@ Qed.
 Global Instance geuttgen_cong_eqit_eq {I E R1 R2 RS} b1 b2 r rg i :
   Proper (eq_itree eqᵢ i ==> eq_itree eqᵢ i ==> flip impl)
          (gpaco3 (@eqit_ I E R1 R2 RS b1 b2 id) (eqitC RS b1 b2) r rg i).
-Proof.
   eapply geuttgen_cong_eqit; intros; cbv in H; subst; eauto.
 Qed.
 
@@ -322,14 +320,12 @@ Global Instance geuttge_cong_euttge {I E R1 R2}
        (LERR2: forall i x y y', RR2 i y y' -> RS i x y' -> RS i x y) i :
   Proper (euttge RR1 i ==> eq_itree RR2 i ==> flip impl)
          (gpaco3 (@eqit_ I E R1 R2 RS true false id) (eqitC RS true false) r rg i).
-Proof.
   repeat intro. guclo eqit_clo_trans.
 Qed.
 
 Global Instance geuttge_cong_euttge_eq {I E R1 R2 RS} r rg i:
   Proper (euttge eqᵢ i ==> eq_itree eqᵢ i ==> flip impl)
          (gpaco3 (@eqit_ I E R1 R2 RS true false id) (eqitC RS true false) r rg i).
-Proof.
   eapply geuttge_cong_euttge; intros; cbv in H; subst; eauto.
 Qed.
 
@@ -339,14 +335,12 @@ Global Instance geutt_cong_euttge {I E R1 R2}
        (LERR2: forall i x y y', RR2 i y y' -> RS i x y' -> RS i x y) i:
   Proper (euttge RR1 i ==> euttge RR2 i ==> flip impl)
          (gpaco3 (@eqit_ I E R1 R2 RS true true id) (eqitC RS true true) r rg i).
-Proof.
   repeat intro. guclo eqit_clo_trans.
 Qed.
 
 Global Instance geutt_cong_euttge_eq {I E R1 R2 RS} r rg i :
   Proper (euttge eqᵢ i ==> euttge eqᵢ i ==> flip impl)
          (gpaco3 (@eqit_ I E R1 R2 RS true true id) (eqitC RS true true) r rg i).
-Proof.
   eapply geutt_cong_euttge; intros; cbv in H; subst; eauto.
 Qed.
 
@@ -356,14 +350,12 @@ Global Instance eqitgen_cong_eqit {I E R1 R2}
        (LERR2: forall i x y y', RR2 i y y' -> RS i x y' -> RS i x y):
   Proper (eq_itree RR1 i ==> eq_itree RR2 i ==> flip impl)
          (@eqit I E R1 R2 RS b1 b2 i).
-Proof.
   ginit. intros. eapply geuttgen_cong_eqit; eauto. gfinal. eauto.
 Qed.
 
 Global Instance eqitgen_cong_eqit_eq {I E R1 R2 RS} b1 b2 i:
   Proper (eq_itree eqᵢ i ==> eq_itree eqᵢ i ==> flip impl)
          (@eqit I E R1 R2 RS b1 b2 i).
-Proof.
   ginit. intros. rewrite H1, H0. gfinal. eauto.
 Qed.
 
