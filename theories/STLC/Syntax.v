@@ -7,19 +7,25 @@ Simply-typed lambda-calculus
 
 .. coq:: none
 |*)
-Require Import Psatz.
-From ExtLib.Data Require Import Nat Fin List Unit.
+Set Primitive Projections.
+
 From Coq Require Import Logic.
 Import EqNotations.
-From Equations Require Import Equations.
+Require Import Psatz.
 
-From OGS Require Import EventD CatD ITreeD Utils RecD AngelicD.
-From OGS Require Import Ctx.
+From ExtLib.Data Require Import List.
+
+From OGS Require Import Utils.
+From OGS.ITree Require Import Cat Event ITree Rec Angelic Eq.
+From OGS.STLC Require Import Ctx.
+
+From Equations Require Import Equations.
+Set Equations Transparent.
+
+(*
 From OGS Require Import OGSD.
 From OGS Require Import EqD.
-
-Set Primitive Projections.
-Set Equations Transparent.
+*)
 
 (*|
 Syntax
@@ -515,8 +521,8 @@ we constrain contexts to contain only negative types as we would like to work wi
 *focused* terms that do not contain spurious stuck redexes.
 |*)
 Definition neg_t_env : Type := neg_ctx * ty.
-Definition eval_arg' : neg_t_env -> Type := uncurry2 (eval_arg ∘ of_n_ctx).
-Definition term' : neg_t_env -> Type := uncurry2 (term ∘ of_n_ctx).
+Definition eval_arg' : neg_t_env -> Type := uncurry (eval_arg ∘ of_n_ctx).
+Definition term' : neg_t_env -> Type := uncurry (term ∘ of_n_ctx).
 Definition ea_start' {i} (u : term' i) : eval_arg' i := EA EHole u.
 
 (*|
@@ -544,8 +550,8 @@ Equations eval_step {Γ x} (t : e_term Γ x) : eval_arg Γ x + e_nf Γ x :=
 And now the evaluator is complete: our iterₐ combinator encoding tail-recursion
 ties the knot, repeatedly finding the next redex and reducing it.
 |*)
-Definition eval_enf {Γ x} : eval_arg Γ x -> itree₀ ∅ₑ (e_nf Γ x) :=
-  iterₐ (ret₀ ∘ eval_step ∘ e_focus).
+Definition eval_enf {Γ x} : eval_arg Γ x -> comp (e_nf Γ x) :=
+  iterₐ (NonDep.ret ∘ eval_step ∘ e_focus).
 
 (*|
 Lassen trees
@@ -622,7 +628,7 @@ turns an abstract value into a term, extending the context with a fresh variable
 for everything that has been hiden.
 |*)
 Equations a_cext {Γ x} : a_val Γ x -> neg_ctx :=
-  a_cext (@AArr a b)   := nil ▶ ((a → b)%ty ,& NArr) ;
+  a_cext (@AArr a b)   := nil ▶ ((a → b)%ty ,' NArr) ;
   a_cext (APair u v)   := a_cext u +▶ a_cext v ;
   a_cext (AInl u)      := a_cext u ;
   a_cext (AInr u)      := a_cext u .
@@ -771,8 +777,8 @@ Packing everything together. We get ``lassen X`` which is the set
 of lassen trees with leaves of type ``X``. "Real" lassen trees will not
 have any leaves.
 |*)
-Definition enf_e : uniform_event neg_t_env neg_t_env :=
-  UEvent (uncurry2 enf_qry) (enf_kon) (uncurry2 enf_u_rsp)
+Definition enf_e : uniformₑ neg_t_env neg_t_env :=
+  UEvent (uncurry enf_qry) (enf_kon) (uncurry enf_u_rsp)
          (enf_k_rsp) (enf_k_nxt).
 
 Definition lassen : endo (neg_t_env -> Type) := itree enf_e.
@@ -793,6 +799,7 @@ Definition lassen_ctx {Γ : neg_ctx} {x b} (E : e_ctx Γ x b)
 (*|
 Then how to inject eager normal forms into lassen trees.
 |*)
+(* equations issue
 Equations lassen_enf {Γ : neg_ctx} {x} (v : e_nf Γ x)
           : lassen (eval_arg' +ᵢ ∅ᵢ) (Γ , x) :=
   lassen_enf (NVal v) :=
@@ -802,9 +809,25 @@ Equations lassen_enf {Γ : neg_ctx} {x} (v : e_nf Γ x)
     lassen_enf (NRed E i (RApp v)) NArr :=
       Vis (LRed _ _ i (a_of_val v) : qry enf_e (_, _))
           (λ { | existT _ (F0)    r => lassen_val v r ;
-               | existT _ (FS F0) r => _ }) }.
-(*| Inlining this breaks equations! |*)
-Obligation 1. exact (lassen_ctx E r). Qed.
+               | existT _ (FS F0) r => lassen_ctx E r }) }.
+*)
+Equations lassen_enf {Γ : neg_ctx} {x} (v : e_nf Γ x)
+          : lassen (eval_arg' +ᵢ ∅ᵢ) (Γ , x) :=
+  lassen_enf (NVal v) :=
+    Vis (LVal (a_of_val v) : qry enf_e (_, _)) _ ;
+  lassen_enf (NRed E i r) with neg_var i := {
+    lassen_enf (NRed E i (RApp v)) NArr :=
+      Vis (LRed _ _ i (a_of_val v) : qry enf_e (_, _)) _ } .
+Obligation 1.
+dependent elimination r. refine (lassen_val v X). (* case F0 *)
+dependent elimination f. (* absurd *)
+Defined.
+Obligation 2.
+dependent elimination r. refine (lassen_val v X). (* case F0 *)
+dependent elimination f. refine (lassen_ctx E X). (* case FS F0 *)
+dependent elimination f. (* absurd *)
+Defined.
+   
 
 (*|
 And finally we tie the knot and iterate a sequence of evaluation to
@@ -814,118 +837,7 @@ Definition eval_lassen' : eval_arg' ⇒ᵢ lassen ∅ᵢ :=
   iter (fun '(_ , _) t => emb_comp _ _ (eval_enf t) !>= lassen_enf).
 
 (*|
-Using our generic formulation of OGS based on history, we simply call
-``ogs_emb`` on our lassen tree to translate it to an OGS version.
-|*)
-Definition eval_ogs' {i} (a : eval_arg' i) : itree (ogs enf_e) ∅ᵢ (i , nil) :=
-  @ogs_emb _ _ _ _ nil t1_0 (eval_lassen' _ a).
-
-(*|
-And to wrap up, two cleaner interfaces, starting with an empty evaluation context.
+And to wrap up, a cleaner interface starting with an empty evaluation context.
 |*)
 Definition eval_lassen {Γ : neg_ctx} {x} (u : term Γ x) : lassen ∅ᵢ (Γ , x) :=
   eval_lassen' _ (ea_start' (u : term' (_ , _))).
-
-Definition eval_ogs {Γ : neg_ctx} {x} (u : term Γ x)
-           : itree (ogs enf_e) ∅ᵢ ((Γ , x) , nil) :=
-  eval_ogs' (ea_start' (u : term' (_ , _))).
-
-(******* WIP **************
-Equations e_compose {Γ x y z} : e_ctx Γ z y -> e_ctx Γ y x -> e_ctx Γ z x :=
- e_compose F EHole           := F ;
- e_compose F (EApp_l E u)    := EApp_l (e_compose F E) u ;
- e_compose F (EApp_r E u)    := EApp_r (e_compose F E) u ;
- e_compose F (EPair_l E u)   := EPair_l (e_compose F E) u ;
- e_compose F (EPair_r E u)   := EPair_r (e_compose F E) u ;
- e_compose F (EPMatch E b)   := EPMatch (e_compose F E) b ;
- e_compose F (EInl E)        := EInl (e_compose F E) ;
- e_compose F (EInr E)        := EInr (e_compose F E) ;
- e_compose F (ESMatch E a b) := ESMatch (e_compose F E) a b .
-
-(*
-Lemma e_focus_compose_aux {Γ x y} (E : e_ctx Γ y x) (u : term Γ x)
-  : focus_aux.focus_aux E (inl u)
-    = match focus_aux.focus_aux EHole (inl u) with
-      | EVal v => focus_aux.focus_aux E (inr v)
-      | ERed F v e => ERed (e_compose E F) v e
-      end
-  .
-  funelim (focus_aux.focus_aux E (inl u)); clear Heqcall.
-  + 
-    rewrite focus_aux.focus_aux_equation_10.
-    rewrite <- focus_aux.focus_aux_equation_1.
-    reflexivity.
-  + rewrite 2 focus_aux.focus_aux_equation_2.
-    rewrite focus_aux.focus_aux_equation_10.
-    rewrite <- focus_aux.focus_aux_equation_2.
-    reflexivity.
-  + rewrite 2 focus_aux.focus_aux_equation_3.
-    rewrite focus_aux.focus_aux_equation_10.
-    rewrite <- focus_aux.focus_aux_equation_3.
-    reflexivity.
-  + rewrite 2 focus_aux.focus_aux_equation_4.
-    clear Heqcall.
-    rewrite H.
-
-
-    destruct t1.
-    rewrite Heqcall.
-  + rewrite 2 
-    rewrite focus_
-  funelim (e_focus (EA E u)).
-Variant e_term (Γ : ctx) (x : ty) : Type :=
-| EVal : e_val Γ x -> e_term Γ x
-| ERed {a b} : e_ctx Γ x b -> e_val Γ a -> e_elim Γ a b -> e_term Γ x
-.
-
-*)
-From Paco Require Import paco.
-Lemma lassen_ogs_sound {Γ : neg_ctx} {x} {a b : term Γ x}
-      (H : forall y (E : e_ctx Γ y x), eval_enf (EA E a) ≈ eval_enf (EA E b))
-      : eval_ogs a ≈ eval_ogs b.
-  revert Γ x a b H.
-  pcofix CIH.
-  intros Γ x a b H.
-  pstep.
-  unfold eqit_, observe.
-  unfold eval_ogs, eval_ogs', ea_start', ogs_emb.
-  cbn [_observe].
-  change (_ (Γ, x) ∅%ctx t1_0 ?t)
-    with (@ogs_emb _ _ _ (Γ , x) ∅%ctx t1_0 t).
-  (*
-  change (Vis ?e (fun r0 : rsp (ogs enf_e) ?e => _ (k_nxt enf_e _) ?c (d_concat ∅%ctx (u_rsp enf_e ?e) t1_0 ?f) ?b))
-    with (Vis e (fun r0 => ogs_emb i c (d_concat ∅%ctx (u_rsp enf_e e) t1_0 f) b)).
-  *)
-  unfold eval_lassen', iter, bind, subst, observe.
-  cbn [_observe fst snd].
-  unfold emb_comp, translate_fwd, compose.
-  cbv [_observe].
-  unfold bind.
-  
-  cbn [_observe fst snd].
-  unfold compose.
-  cbn.
-  cbn [ compose ].
-      
-  change (_ (k_nxt enf_e (projT2 ?r)) (∅ +▶ u_rsp enf_e ?e)%ctx (d_concat ∅%ctx (u_rsp enf_e ?e) t1_0 ?f) (uncurry2' (d_get ?g))
-    with (@ogs_emb _ _ _ (k_nxt enf_e (projT2 r)) (∅ +▶ u_rsp enf_e e)%ctx (d_concat _ _ t1_0 f) (uncurry2' g)).
-  cbv cofix.
-  cbn iota.
-  change (_ogs_emb ?a ?b ?c ?d) with (ogs_emb ?a ?b ?c ?d).
-  cbn [_observe].
-  unfold eval_enf, compose, iterₐ in H.
-(* TODO:
-   in goal:
-   - unfold one step of iter
-   - unfold eval_enf
-   - 
-   in H:
-   - unfold one step of iter
-*)
-  
-
-Lemma lassen_ogs_complete {Γ : neg_ctx} {x} {a b : term Γ x}
-        (H : eval_ogs a ≈ eval_ogs b) {y} (E : e_ctx Γ y x)
-        : eval_enf (EA E a) ≈ eval_enf (EA E b).
-Admitted.
-*********************)

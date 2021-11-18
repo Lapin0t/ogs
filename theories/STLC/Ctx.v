@@ -10,7 +10,7 @@ Definition ctx (X : Type) : Type := list X.
 
 #[global] Notation "∅" := nil : ctx_scope.
 #[global] Notation "Γ ▶ x" := (x :: Γ%ctx) (at level 40, left associativity) : ctx_scope.
-#[global] Notation "Γ +▶ Δ" := (Δ%ctx ++ Γ%ctx) (at level 50, left associativity) : ctx_scope.
+#[global] Notation "Γ +▶ Δ" := (app Δ%ctx Γ%ctx) (at level 50, left associativity) : ctx_scope.
 
 Section lemma.
 Context {X : Type}.
@@ -73,5 +73,4 @@ Equations r_concat3_2 (Γ Δ ϒ : ctx X) : forall t, (Γ +▶ ϒ) ∋ t -> (Γ +
 Arguments r_concat3_2 {Γ Δ ϒ}.
 
 End lemma.
-
 #[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
