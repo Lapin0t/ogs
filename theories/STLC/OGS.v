@@ -5,13 +5,14 @@ Operational Game Semantics
 
 .. coq:: none
 |*)
-From Coq Require Import JMeq Program.Equality EqdepFacts.
-From OGS Require Import Utils Ctx CatD EventD ITreeD RecD AngelicD EqD.
-From ExtLib.Data Require Import Nat Fin List Unit.
-From Paco Require Import paco.
 Set Primitive Projections.
 Set Implicit Arguments.
-Set Equations Transparent.
+From Coq Require Import JMeq Program.Equality EqdepFacts.
+From Paco Require Import paco.
+From ExtLib.Data Require Import List.
+
+From OGS Require Import Utils.
+From OGS.ITree Require Import Event ITree Eq.
 
 (*|
 An uniform event is one where the set of answers for a given query is
@@ -25,17 +26,17 @@ Hence the OGS of an uniform event will be indexed by an additional
 and the set of responses will be the choice of a continuation in the concatenation
 of the new continuations available and the ones present in the context.
 |*)
-Definition ogs {I J} (U : uniform_event I J)
+Definition ogs {I J} (U : uniformₑ I J)
            : event (I * list (kon U)) (J * list (kon U)) :=
   Event (fun '(j , ks) => u_qry U j)
-        (fun '(j , ks) q => { i : _ & k_rsp U ((u_rsp U q ++ ks) .[i]) })
-        (fun '(j , ks) q r => (k_nxt U (projT2 r) , u_rsp U q ++ ks)).
+        (fun '(j , ks) q => { i : _ & k_rsp U ((List.app (u_rsp U q) ks) .[i]) })
+        (fun '(j , ks) q r => (k_nxt U (projT2 r) , List.app (u_rsp U q) ks)).
 
 (*|
 An OGS configuration ``c : ogs_conf X ks`` is a forest of ``itree U
 X``, that has a tree for each ``ks``.
 |*)
-Definition ogs_conf {I} {U : uniform_event I I}
+Definition ogs_conf {I} {U : uniformₑ I I}
              (X : I -> Type) (ks : list (kon U)) : Type :=
   ffun (fun k => forall r : k_rsp U k, itree U X (k_nxt U r)) ks.
 

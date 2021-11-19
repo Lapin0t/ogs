@@ -550,7 +550,7 @@ Equations eval_step {Γ x} (t : e_term Γ x) : eval_arg Γ x + e_nf Γ x :=
 And now the evaluator is complete: our iterₐ combinator encoding tail-recursion
 ties the knot, repeatedly finding the next redex and reducing it.
 |*)
-Definition eval_enf {Γ x} : eval_arg Γ x -> comp (e_nf Γ x) :=
+Definition eval_enf {Γ x} : eval_arg Γ x -> computation (e_nf Γ x) :=
   iterₐ (NonDep.ret ∘ eval_step ∘ e_focus).
 
 (*|

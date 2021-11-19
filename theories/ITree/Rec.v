@@ -47,10 +47,10 @@ Definition translate_bwd {I J} {E : event I I} {F : event J J} (f0 : J -> I)
     end.
 
 (** Possibly non-terminating computation, ie an itree null event. *)
-Definition comp (X : Type) : Type := NonDep.itree ∅ₑ X.
+Definition computation (X : Type) : Type := NonDep.itree ∅ₑ X.
 
 (** Embedding a computation into any index-preserving itree. *)
-Definition emb_comp {I} {E : event I I} X i : comp X -> itree E (X @ i) i.
+Definition emb_comp {I} {E : event I I} X i : computation X -> itree E (X @ i) i.
   refine (fun t => translate_fwd (fun _ => i) (fun _ (i : qry (_ >ₑ ∅ₑ) _) => ex_falso i)
                               (X @ i) T1_0 (t >>= _)).
   refine (fun 't1_0 '(Fib a) => Ret (Fib a)).
