@@ -26,6 +26,9 @@ Infix "+ᵢ" := (sumᵢ) (at level 20) : indexed_scope.
     "ₙ" is for natural transformation *)
 Notation "F ⇒ₙ G" := (forall X : psh _, F X ⇒ᵢ G X) (at level 30).
 
+Definition joinᵢ {I J} (X : psh I) (Y : psh J) : psh (I * J) :=
+  fun '(i , j) => (X i + Y j)%type.
+
 
 (** indexed relations *)
 
