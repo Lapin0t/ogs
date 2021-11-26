@@ -79,16 +79,15 @@ Notation "A -o B" := (lollipop A B) (at level 30).
 
 Definition compose_lolli {I J K L M N}
            (A : game' I J) (B : game' K L) (C : game' M N)
-           {P Q R S j l m}
-  : itree (B -o C) (joinᵢ P Q) (l , m)
-  -> iforest (A -o B) (joinᵢ R S) (inr (j , l))
-  -> itree (A -o C) (fun '(j, m) => (R j + Q m + sigT P + sigT S)%type) (j , m).
-revert l m j.
+           {X Y Z} (f : forall j l m, X (l , m) -> Z (j , m))
+           (g : forall j l m, Y (j , l) -> Z (j , m))
+  : forall {j l m}, itree (B -o C) X (l , m)
+  -> iforest (A -o B) Y (inr (j , l))
+  -> itree (A -o C) Z (j , m).
 cofix _aux.
-intros l m j a b.
+intros j l m a b.
 destruct (_observe a).
-- destruct r; refine (ret _). refine (inl (inr (l ,' p))).
-  refine (inl (inl (inr q))).
+- refine (ret (f _ _ _ r)).
 - refine (tau (_aux _ _ _ t b)).
 - destruct e.
   + specialize (b s).
@@ -96,7 +95,7 @@ destruct (_observe a).
     cofix _aux2.
     intros j b.
     destruct (_observe b).
-    * destruct r; refine (ret _). refine (inl (inl (inl r))). refine (inr (_ ,' s0)).
+    * refine (ret (g _ _ _ r)).
     * refine (tau (_aux2 _ t)).
     * destruct e.
       unshelve refine (vis _ _). refine (inl s0). refine (fun r => _aux2 _ (k0 r)).
