@@ -123,7 +123,48 @@ cofix _aux _ _ x :=
 From OGS.ITree Require Import Eq.
 From Paco Require Import paco.
 
-(* WIP
+Definition assoc_arg {I J K L M N O P}
+           (A : game' I J) (B : game' K L) (C : game' M N) (D : game' O P)
+           X Y Z j o : Type :=
+  ({ l : _ & ( comp_arg B C D X Y l o
+           * iforest (A ⊸ B) Z (inr (j , l)))%type }
+  +{ k : _ & ( iforest (C ⊸ D) X (inl (k , o))
+           * comp_arg A B C Y Z j  k)%type }).
+
+Definition assoc_left {I J K L M N O P}
+           {A : game' I J} {B : game' K L} {C : game' M N} {D : game' O P}
+           {X Y Z U W}
+           (f0 : forall l n o, X (n , o) -> U (l , o))
+           (g0 : forall l m o, Y (l , m) -> U (l , o))
+           (f1 : forall j l o, U (l, o) -> W (j, o))
+           (g1 : forall j k o, Z (j, k) -> W (j, o))
+           {j o} (x : assoc_arg A B C D X Y Z j o) : itree (A ⊸ D) W (j , o) :=
+match x with
+| inl (l,' (arg, c)) =>
+    comp f1 g1 (inl (l,' (comp f0 g0 arg               , c)))
+| inr (m,' (a, inl (l,' (b, c)))) =>
+    comp f1 g1 (inl (l,' (comp f0 g0 (inr (m,' (a, b))), c)))
+| inr (m,' (a, inr (k,' (b, c)))) =>
+    comp f1 g1 (inr (k ,' (fun r => comp f0 g0 (inr (m,' (a, b r))), c)))
+end.
+
+Definition assoc_right {I J K L M N O P}
+           {A : game' I J} {B : game' K L} {C : game' M N} {D : game' O P}
+           {X Y Z V W}
+           (f0 : forall j l m, Y (l, m) -> V (j, m))
+           (g0 : forall j k m, Z (j, k) -> V (j, m))
+           (f1 : forall j n o, X (n, o) -> W (j, o))
+           (g1 : forall j m o, V (j, m) -> W (j, o))
+           {j o} (x : assoc_arg A B C D X Y Z j o) : itree (A ⊸ D) W (j , o) :=
+match x with
+| inl (l,' (inl (_ ,' (a , b)) , c)) =>
+  comp f1 g1 (inl (_ ,' (a , (fun r => comp f0 g0 (inl (_ ,' (b r , c)))))))
+| inl (l,' (inr (_ ,' (a , b)) , c)) =>
+  comp f1 g1 (inr (_ ,' (a , comp f0 g0 (inl (_ ,' (b , c))))))
+| inr (m,' (a, arg)) =>
+  comp f1 g1 (inr (_ ,' (a , comp f0 g0 arg)))
+end.
+
 Definition comp_assoc {I J K L M N O P}
            {A : game' I J} {B : game' K L} {C : game' M N} {D : game' O P}
            {X Y Z U V W}
@@ -138,31 +179,48 @@ Definition comp_assoc {I J K L M N O P}
            (eq0 : forall j l n o x, f1 j l o (f0 l n o x) = f1' j n o x)
            (eq1 : forall j l m o y, f1 j l o (g0 l m o y) = g1' j m o (f0' j l m y))
            (eq2 : forall j k m o z, g1 j k o z = g1' j m o (g0' j k m z))
-  : forall {j o}
-    ({ n : _ & ( comp_arg B C D X Y (l , o)
-                 * iforest (A ⊸ B) Z (inr (j , l)))%type }
-    +{ k : _ & ( iforest (C ⊸ D) X (inl (k , o))
-               * comp_arg A B C Y Z (j , k))%type })
-
-    comp f1 g1   (inl (_ ,' (comp f0 g0 (inl (_ ,' (a,  b))) , c))
-  ≊ comp f1' g1' (_ ,' (a (fun q => comp f0' g0' (b q) c)).
-  pcofix CIH.
-  intros j l n o a b c.
-  pstep.
-  cbv [eqit_ observe _observe]; cbn [comp].
-  cbv [observe]; cbn [_observe comp].
-  cbv [observe].
-  destruct (_observe a); cbn.
-  + econstructor; apply eq0.
-  + econstructor; right; apply CIH.
-  + destruct e.
-    - cbn [_observe comp]. cbv [observe].
-      destruct (_observe (b c0)); cbn.
-      * econstructor; apply eq1.
-      * econstructor.
-        cbn.
-      Printing all.
-    - econstructor; right; apply CIH.
-  cbv [eqit_].
-  cbv [ observe _observe comp].
-*)
+  : forall {j o} (arg : assoc_arg A B C D X Y Z j o),
+      assoc_left f0 g0 f1 g1 arg
+    ≊
+      assoc_right f0' g0' f1' g1' arg.
+pcofix CIH. pstep.
+intros j o [[l [[[n [a b]]|[k [a b]]] c]]| [k [a [[l [b c]]|[? [b c]]]]]];
+  cbn; cbv [eqit_ observe _observe]; cbn [comp]; cbv [observe];
+    cbn [_observe comp]; cbv [observe].
++ destruct (_observe a); cbn.
+  - econstructor. apply eq0.
+  - econstructor. right. refine (CIH _ _ (inl (_ ,' (inl (_ ,' _) , _)))).
+  - destruct e.
+    * econstructor. right.
+      refine (CIH _ _ (inr (_ ,' (_ , inl (_ ,' (_ , _)))))).
+    * econstructor. intro v. right.
+      refine (CIH _ _ (inl (_ ,' (inl (_ ,' (_ , _)), _)))).
++ destruct (_observe b); cbn.
+  - econstructor. apply eq1.
+  - econstructor. right. refine (CIH _ _ (inr (_ ,' (_ , inl (_ ,' (_ , _)))))).
+  - destruct e.
+    * econstructor. right.
+      refine (CIH _ _ (inr (_ ,' (_ , inr (_ ,' (_ , _)))))).
+    * cbn.
+      econstructor.
+      right.
+      refine (CIH _ _ (inl (_ ,' (inl (_ ,' _) , _)))).
++ destruct (_observe b); cbn.
+  - econstructor. apply eq1.
+  - econstructor; right.
+    refine (CIH _ _ (inr (_ ,' (_ , inl (_ ,' (_ , _)))))).
+  - destruct e.
+    * econstructor. right.
+      refine (CIH _ _ (inr (_ ,' (_ , inr (_ ,' (_ , _)))))).
+    * econstructor; right.
+      refine (CIH _ _ (inl (_ ,' (inl (_ ,' _) , _)))).
++ destruct (_observe c); cbn.
+  - econstructor. apply eq2.
+  - econstructor; right.
+    refine (CIH _ _ (inr (_ ,' (_ , inr (_ ,' (_ , _)))))).
+  - destruct e.
+    * econstructor; right.
+      refine (CIH _ _ (inr (_ ,' (_ , inr (_ ,' (_ , _)))))).
+    * econstructor; right.
+      refine (CIH _ _ (inr (_ ,' (_ , inl (_ ,' (_ , _)))))).
+Qed.
