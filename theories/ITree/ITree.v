@@ -47,7 +47,8 @@ Section short. Context {I} {E : event I I} {R : I -> Type}.
 
 End short.
 
-Notation "vis[ E ] e k" := (@vis _ E _ _ e k) (at level 30).
+Definition vis' {I} (E : event I I) {R i} e k : itree E R i := @vis _ E _ _ e k.
+Arguments vis' {I} E {R i} e k.
 
 Section structure. Context {I : Type} {E : event I I} {X Y : psh I}.
 

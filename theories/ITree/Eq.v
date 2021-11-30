@@ -82,6 +82,7 @@ Arguments EqTauR {I E R1 R2 RR b1 b2 vclo sim i}.
 (*#[global] Hint Unfold euttge: core.*)
 #[global] Hint Unfold id: core.
 #[global] Infix "≈" := (eutt eqᵢ _) (at level 70) : type_scope.
+#[global] Infix "≊" := (eq_itree eqᵢ _) (at level 70) : type_scope.
 
 
 Section eqit_trans.
