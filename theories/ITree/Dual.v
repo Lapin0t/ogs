@@ -84,38 +84,41 @@ Notation "A ⊗ B" := (tensor A B) (at level 30).
 Definition lollipop {I J K L} (A : game' I J) (B : game' K L) := dual A ⊗ B.
 Notation "A ⊸ B" := (lollipop A B) (at level 30).
 
-Definition comp_arg {I J K L M N}
-           (A : game' I J) (B : game' K L) (C : game' M N) X Y j m : Type :=
-    ({ l : _ & ( itree (B ⊸ C) X (l , m)
-               * iforest (A ⊸ B) Y (inr (j , l)))%type }
-    +{ k : _ & ( iforest (B ⊸ C) X (inl (k , m))
-               * itree (A ⊸ B) Y (j , k))%type }).
+Variant comp_arg {I J K L M N}
+        (A : game' I J) (B : game' K L) (C : game' M N) X Y j m : Type :=
+| C_ap {l} : itree (B ⊸ C) X (l , m)
+             -> iforest (A ⊸ B) Y (inr (j , l))
+             -> comp_arg A B C X Y j m
+| C_pa {k} : iforest (B ⊸ C) X (inl (k , m))
+             -> itree (A ⊸ B) Y (j , k)
+             -> comp_arg A B C X Y j m
+.
 
 Definition comp {I J K L M N} {A : game' I J} {B : game' K L} {C : game' M N}
   {X Y Z} (f : forall j l m, X (l , m) -> Z (j , m)) (g : forall j l m, Y (j , l) -> Z (j , m))
   : forall {j m}, comp_arg A B C X Y j m -> itree (A ⊸ C) Z (j , m) :=
 cofix _aux _ _ x :=
   match x with
-  | inl (_ ,' (a , b)) =>
+  | C_ap a b =>
     match (observe a) with
     | RetF r => Ret (f _ _ _ r)
-    | TauF t => Tau (_aux _ _ (inl (_ ,' (t, b))))
+    | TauF t => Tau (_aux _ _ (C_ap t b))
     | VisF e k =>
       match e as s return (forall r, itree (B ⊸ C) X (nxt (B ⊸ C) s r)) -> _ with
-      | inl c => fun k => Tau (_aux _ _ (inr (_ ,' (k , b c))))
+      | inl c => fun k => Tau (_aux _ _ (C_pa k (b c)))
       | inr c => fun k => Vis (inr c : qry (A ⊸ C) (_ , _))
-                          (fun r => _aux _ _ (inl (_ ,' (k r , b))))
+                          (fun r => _aux _ _ (C_ap (k r) b))
       end k
     end
-  | inr (_ ,' (a , b)) =>
+  | C_pa a b =>
     match (observe b) with
     | RetF r => Ret (g _ _ _ r)
-    | TauF t => Tau (_aux _ _ (inr (_ ,' (a, t))))
+    | TauF t => Tau (_aux _ _ (C_pa a t))
     | VisF e k =>
       match e as s return (forall r, itree (A ⊸ B) Y (nxt (A ⊸ B) s r)) -> _ with
       | inl c => fun k => Vis (inl c : qry (A ⊸ C) (_ , _))
-                          (fun r => _aux _ _ (inr (_ ,' (a , k r))))
-      | inr c => fun k => Tau (_aux _ _ (inl (_ ,' (a c , k))))
+                          (fun r => _aux _ _ (C_pa a (k r)))
+      | inr c => fun k => Tau (_aux _ _ (C_ap (a c) k))
       end k
     end
   end.
@@ -123,13 +126,22 @@ cofix _aux _ _ x :=
 From OGS.ITree Require Import Eq.
 From Paco Require Import paco.
 
-Definition assoc_arg {I J K L M N O P}
+Variant assoc_arg {I J K L M N O P}
            (A : game' I J) (B : game' K L) (C : game' M N) (D : game' O P)
            X Y Z j o : Type :=
-  ({ l : _ & ( comp_arg B C D X Y l o
-           * iforest (A ⊸ B) Z (inr (j , l)))%type }
-  +{ k : _ & ( iforest (C ⊸ D) X (inl (k , o))
-           * comp_arg A B C Y Z j  k)%type }).
+| C_app {l n} : itree (C ⊸ D) X (n , o)
+                -> iforest (B ⊸ C) Y (inr (l , n))
+                -> iforest (A ⊸ B) Z (inr (j , l))
+                -> assoc_arg A B C D X Y Z j o
+| C_pap {l m} : iforest (C ⊸ D) X (inl (m , o))
+                -> itree (B ⊸ C) Y (l , m)
+                -> iforest (A ⊸ B) Z (inr (j , l))
+                -> assoc_arg A B C D X Y Z j o
+| C_ppa {k m} : iforest (C ⊸ D) X (inl (m , o))
+                -> iforest (B ⊸ C) Y (inl (k , m))
+                -> itree (A ⊸ B) Z (j , k)
+                -> assoc_arg A B C D X Y Z j o
+.
 
 Definition assoc_left {I J K L M N O P}
            {A : game' I J} {B : game' K L} {C : game' M N} {D : game' O P}
@@ -140,12 +152,9 @@ Definition assoc_left {I J K L M N O P}
            (g1 : forall j k o, Z (j, k) -> W (j, o))
            {j o} (x : assoc_arg A B C D X Y Z j o) : itree (A ⊸ D) W (j , o) :=
 match x with
-| inl (l,' (arg, c)) =>
-    comp f1 g1 (inl (l,' (comp f0 g0 arg               , c)))
-| inr (m,' (a, inl (l,' (b, c)))) =>
-    comp f1 g1 (inl (l,' (comp f0 g0 (inr (m,' (a, b))), c)))
-| inr (m,' (a, inr (k,' (b, c)))) =>
-    comp f1 g1 (inr (k ,' (fun r => comp f0 g0 (inr (m,' (a, b r))), c)))
+| C_app a b c => comp f1 g1 (C_ap (comp f0 g0 (C_ap a b)) c)
+| C_pap a b c => comp f1 g1 (C_ap (comp f0 g0 (C_pa a b)) c)
+| C_ppa a b c => comp f1 g1 (C_pa (fun r => comp f0 g0 (C_pa a (b _))) c) 
 end.
 
 Definition assoc_right {I J K L M N O P}
@@ -157,12 +166,9 @@ Definition assoc_right {I J K L M N O P}
            (g1 : forall j m o, V (j, m) -> W (j, o))
            {j o} (x : assoc_arg A B C D X Y Z j o) : itree (A ⊸ D) W (j , o) :=
 match x with
-| inl (l,' (inl (_ ,' (a , b)) , c)) =>
-  comp f1 g1 (inl (_ ,' (a , (fun r => comp f0 g0 (inl (_ ,' (b r , c)))))))
-| inl (l,' (inr (_ ,' (a , b)) , c)) =>
-  comp f1 g1 (inr (_ ,' (a , comp f0 g0 (inl (_ ,' (b , c))))))
-| inr (m,' (a, arg)) =>
-  comp f1 g1 (inr (_ ,' (a , comp f0 g0 arg)))
+| C_app a b c => comp f1 g1 (C_ap a (fun r => comp f0 g0 (C_ap (b _) c)))
+| C_pap a b c => comp f1 g1 (C_pa a (comp f0 g0 (C_ap b c)))
+| C_ppa a b c => comp f1 g1 (C_pa a (comp f0 g0 (C_pa b c))) 
 end.
 
 Definition comp_assoc {I J K L M N O P}
@@ -180,47 +186,27 @@ Definition comp_assoc {I J K L M N O P}
            (eq1 : forall j l m o y, f1 j l o (g0 l m o y) = g1' j m o (f0' j l m y))
            (eq2 : forall j k m o z, g1 j k o z = g1' j m o (g0' j k m z))
   : forall {j o} (arg : assoc_arg A B C D X Y Z j o),
-      assoc_left f0 g0 f1 g1 arg
-    ≊
-      assoc_right f0' g0' f1' g1' arg.
+    assoc_left f0 g0 f1 g1 arg ≊ assoc_right f0' g0' f1' g1' arg.
 pcofix CIH. pstep.
-intros j o [[l [[[n [a b]]|[k [a b]]] c]]| [k [a [[l [b c]]|[? [b c]]]]]];
+intros j o [? ? a b c|? ? a b c|? ? a b c];
   cbn; cbv [eqit_ observe _observe]; cbn [comp]; cbv [observe];
     cbn [_observe comp]; cbv [observe].
 + destruct (_observe a); cbn.
-  - econstructor. apply eq0.
-  - econstructor. right. refine (CIH _ _ (inl (_ ,' (inl (_ ,' _) , _)))).
+  - econstructor; apply eq0.
+  - econstructor; right. refine (CIH _ _ (C_app _ _ _)).
   - destruct e.
-    * econstructor. right.
-      refine (CIH _ _ (inr (_ ,' (_ , inl (_ ,' (_ , _)))))).
-    * econstructor. intro v. right.
-      refine (CIH _ _ (inl (_ ,' (inl (_ ,' (_ , _)), _)))).
+    * econstructor; right. refine (CIH _ _ (C_pap _ _ _)).
+    * econstructor; intro v; right. refine (CIH _ _ (C_app _ _ _)).
 + destruct (_observe b); cbn.
-  - econstructor. apply eq1.
-  - econstructor. right. refine (CIH _ _ (inr (_ ,' (_ , inl (_ ,' (_ , _)))))).
+  - econstructor; apply eq1.
+  - econstructor; right. refine (CIH _ _ (C_pap _ _ _)).
   - destruct e.
-    * econstructor. right.
-      refine (CIH _ _ (inr (_ ,' (_ , inr (_ ,' (_ , _)))))).
-    * cbn.
-      econstructor.
-      right.
-      refine (CIH _ _ (inl (_ ,' (inl (_ ,' _) , _)))).
-+ destruct (_observe b); cbn.
-  - econstructor. apply eq1.
-  - econstructor; right.
-    refine (CIH _ _ (inr (_ ,' (_ , inl (_ ,' (_ , _)))))).
-  - destruct e.
-    * econstructor. right.
-      refine (CIH _ _ (inr (_ ,' (_ , inr (_ ,' (_ , _)))))).
-    * econstructor; right.
-      refine (CIH _ _ (inl (_ ,' (inl (_ ,' _) , _)))).
+    * econstructor; right. refine (CIH _ _ (C_ppa _ _ _)).
+    * econstructor; right. refine (CIH _ _ (C_app _ _ _)).
 + destruct (_observe c); cbn.
-  - econstructor. apply eq2.
-  - econstructor; right.
-    refine (CIH _ _ (inr (_ ,' (_ , inr (_ ,' (_ , _)))))).
+  - econstructor; apply eq2.
+  - econstructor; right. refine (CIH _ _ (C_ppa _ _ _)).
   - destruct e.
-    * econstructor; right.
-      refine (CIH _ _ (inr (_ ,' (_ , inr (_ ,' (_ , _)))))).
-    * econstructor; right.
-      refine (CIH _ _ (inr (_ ,' (_ , inl (_ ,' (_ , _)))))).
+    * econstructor; right. refine (CIH _ _ (C_ppa _ _ _)).
+    * econstructor; right. refine (CIH _ _ (C_pap _ _ _)).
 Qed.
