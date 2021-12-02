@@ -126,67 +126,55 @@ cofix _aux _ _ x :=
 From OGS.ITree Require Import Eq.
 From Paco Require Import paco.
 
-Variant assoc_arg {I J K L M N O P}
-           (A : game' I J) (B : game' K L) (C : game' M N) (D : game' O P)
-           X Y Z j o : Type :=
+Section assoc.
+  Context {I J K L M N O P : Type}.
+  Context {A : game' I J} {B : game' K L} {C : game' M N} {D : game' O P}.
+  Context {X : N * O -> Type} {Y : L * M -> Type} {Z : J * K -> Type}.
+  Context {U : L * O -> Type} {V : J * M -> Type} {W : J * O -> Type}.
+  Context (f0 : forall l n o, X (n, o) -> U (l, o))
+          (g0 : forall l m o, Y (l, m) -> U (l, o))
+          (f1 : forall j l o, U (l, o) -> W (j, o))
+          (g1 : forall j k o, Z (j, k) -> W (j, o))
+          (f0' : forall j l m, Y (l, m) -> V (j, m))
+          (g0' : forall j k m, Z (j, k) -> V (j, m))
+          (f1' : forall j n o, X (n, o) -> W (j, o))
+          (g1' : forall j m o, V (j, m) -> W (j, o)).
+  Context (eq0 : forall j l n o x, @f1 j l o (@f0 l n o x) = @f1' j n o x)
+          (eq1 : forall j l m o y, @f1 j l o (@g0 l m o y) = @g1' j m o (@f0' j l m y))
+          (eq2 : forall j k m o z, @g1 j k o z = @g1' j m o (@g0' j k m z)).
+
+
+Variant assoc_arg (j : J) (o : O) : Type :=
 | C_app {l n} : itree (C ⊸ D) X (n , o)
                 -> iforest (B ⊸ C) Y (inr (l , n))
                 -> iforest (A ⊸ B) Z (inr (j , l))
-                -> assoc_arg A B C D X Y Z j o
+                -> assoc_arg j o
 | C_pap {l m} : iforest (C ⊸ D) X (inl (m , o))
                 -> itree (B ⊸ C) Y (l , m)
                 -> iforest (A ⊸ B) Z (inr (j , l))
-                -> assoc_arg A B C D X Y Z j o
+                -> assoc_arg j o
 | C_ppa {k m} : iforest (C ⊸ D) X (inl (m , o))
                 -> iforest (B ⊸ C) Y (inl (k , m))
                 -> itree (A ⊸ B) Z (j , k)
-                -> assoc_arg A B C D X Y Z j o
+                -> assoc_arg j o
 .
 
-Definition assoc_left {I J K L M N O P}
-           {A : game' I J} {B : game' K L} {C : game' M N} {D : game' O P}
-           {X Y Z U W}
-           (f0 : forall l n o, X (n , o) -> U (l , o))
-           (g0 : forall l m o, Y (l , m) -> U (l , o))
-           (f1 : forall j l o, U (l, o) -> W (j, o))
-           (g1 : forall j k o, Z (j, k) -> W (j, o))
-           {j o} (x : assoc_arg A B C D X Y Z j o) : itree (A ⊸ D) W (j , o) :=
+Definition assoc_left {j o} (x : assoc_arg j o) : itree (A ⊸ D) W (j , o) :=
 match x with
 | C_app a b c => comp f1 g1 (C_ap (comp f0 g0 (C_ap a b)) c)
 | C_pap a b c => comp f1 g1 (C_ap (comp f0 g0 (C_pa a b)) c)
 | C_ppa a b c => comp f1 g1 (C_pa (fun r => comp f0 g0 (C_pa a (b _))) c) 
 end.
 
-Definition assoc_right {I J K L M N O P}
-           {A : game' I J} {B : game' K L} {C : game' M N} {D : game' O P}
-           {X Y Z V W}
-           (f0 : forall j l m, Y (l, m) -> V (j, m))
-           (g0 : forall j k m, Z (j, k) -> V (j, m))
-           (f1 : forall j n o, X (n, o) -> W (j, o))
-           (g1 : forall j m o, V (j, m) -> W (j, o))
-           {j o} (x : assoc_arg A B C D X Y Z j o) : itree (A ⊸ D) W (j , o) :=
+Definition assoc_right {j o} (x : assoc_arg j o) : itree (A ⊸ D) W (j , o) :=
 match x with
-| C_app a b c => comp f1 g1 (C_ap a (fun r => comp f0 g0 (C_ap (b _) c)))
-| C_pap a b c => comp f1 g1 (C_pa a (comp f0 g0 (C_ap b c)))
-| C_ppa a b c => comp f1 g1 (C_pa a (comp f0 g0 (C_pa b c))) 
+| C_app a b c => comp f1' g1' (C_ap a (fun r => comp f0' g0' (C_ap (b _) c)))
+| C_pap a b c => comp f1' g1' (C_pa a (comp f0' g0' (C_ap b c)))
+| C_ppa a b c => comp f1' g1' (C_pa a (comp f0' g0' (C_pa b c))) 
 end.
 
-Definition comp_assoc {I J K L M N O P}
-           {A : game' I J} {B : game' K L} {C : game' M N} {D : game' O P}
-           {X Y Z U V W}
-           (f0 : forall l n o, X (n , o) -> U (l , o))
-           (g0 : forall l m o, Y (l , m) -> U (l , o))
-           (f1 : forall j l o, U (l, o) -> W (j, o))
-           (g1 : forall j k o, Z (j, k) -> W (j, o))
-           (f0' : forall j l m, Y (l, m) -> V (j, m))
-           (g0' : forall j k m, Z (j, k) -> V (j, m))
-           (f1' : forall j n o, X (n, o) -> W (j, o))
-           (g1' : forall j m o, V (j, m) -> W (j, o))
-           (eq0 : forall j l n o x, f1 j l o (f0 l n o x) = f1' j n o x)
-           (eq1 : forall j l m o y, f1 j l o (g0 l m o y) = g1' j m o (f0' j l m y))
-           (eq2 : forall j k m o z, g1 j k o z = g1' j m o (g0' j k m z))
-  : forall {j o} (arg : assoc_arg A B C D X Y Z j o),
-    assoc_left f0 g0 f1 g1 arg ≊ assoc_right f0' g0' f1' g1' arg.
+Definition comp_assoc : forall {j o} (arg : assoc_arg j o),
+    assoc_left arg ≊ assoc_right arg.
 pcofix CIH. pstep.
 intros j o [? ? a b c|? ? a b c|? ? a b c];
   cbn; cbv [eqit_ observe _observe]; cbn [comp]; cbv [observe];
@@ -210,3 +198,5 @@ intros j o [? ? a b c|? ? a b c|? ? a b c];
     * econstructor; right. refine (CIH _ _ (C_ppa _ _ _)).
     * econstructor; right. refine (CIH _ _ (C_pap _ _ _)).
 Qed.
+End assoc.
+Arguments assoc_arg {I J K L M N O P} A B C D X Y Z.
