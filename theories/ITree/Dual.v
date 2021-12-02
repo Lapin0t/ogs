@@ -84,24 +84,24 @@ Notation "A ⊗ B" := (tensor A B) (at level 30).
 Definition lollipop {I J K L} (A : game' I J) (B : game' K L) := dual A ⊗ B.
 Notation "A ⊸ B" := (lollipop A B) (at level 30).
 
-Variant comp_arg {I J K L M N}
-        (A : game' I J) (B : game' K L) (C : game' M N) X Y j m : Type :=
-| C_ap {l} : itree (B ⊸ C) X (l , m)
-             -> iforest (A ⊸ B) Y (inr (j , l))
-             -> comp_arg A B C X Y j m
-| C_pa {k} : iforest (B ⊸ C) X (inl (k , m))
-             -> itree (A ⊸ B) Y (j , k)
-             -> comp_arg A B C X Y j m
+Section comp.
+  Context {I J K L M N : Type}.
+  Context {A : game' I J} {B : game' K L} {C : game' M N}.
+  Context {X : L * M -> Type} {Y : J * K -> Type} {Z : J * M -> Type}.
+  Context (f : forall j l m, X (l , m) -> Z (j , m))
+          (g : forall j k m, Y (j , k) -> Z (j , m)).
+
+Variant comp_arg (j : J) (m : M) : Type :=
+| C_ap {l} : itree (B ⊸ C) X (l , m) -> iforest (A ⊸ B) Y (inr (j , l)) -> comp_arg j m
+| C_pa {k} : iforest (B ⊸ C) X (inl (k , m)) -> itree (A ⊸ B) Y (j , k) -> comp_arg j m
 .
 
-Definition comp {I J K L M N} {A : game' I J} {B : game' K L} {C : game' M N}
-  {X Y Z} (f : forall j l m, X (l , m) -> Z (j , m)) (g : forall j l m, Y (j , l) -> Z (j , m))
-  : forall {j m}, comp_arg A B C X Y j m -> itree (A ⊸ C) Z (j , m) :=
+Definition comp : forall {j m}, comp_arg j m -> itree (A ⊸ C) Z (j , m) :=
 cofix _aux _ _ x :=
   match x with
   | C_ap a b =>
     match (observe a) with
-    | RetF r => Ret (f _ _ _ r)
+    | RetF r => Ret (f r)
     | TauF t => Tau (_aux _ _ (C_ap t b))
     | VisF e k =>
       match e as s return (forall r, itree (B ⊸ C) X (nxt (B ⊸ C) s r)) -> _ with
@@ -112,7 +112,7 @@ cofix _aux _ _ x :=
     end
   | C_pa a b =>
     match (observe b) with
-    | RetF r => Ret (g _ _ _ r)
+    | RetF r => Ret (g r)
     | TauF t => Tau (_aux _ _ (C_pa a t))
     | VisF e k =>
       match e as s return (forall r, itree (A ⊸ B) Y (nxt (A ⊸ B) s r)) -> _ with
@@ -122,6 +122,7 @@ cofix _aux _ _ x :=
       end k
     end
   end.
+End comp.
 
 From OGS.ITree Require Import Eq.
 From Paco Require Import paco.
@@ -129,8 +130,8 @@ From Paco Require Import paco.
 Section assoc.
   Context {I J K L M N O P : Type}.
   Context {A : game' I J} {B : game' K L} {C : game' M N} {D : game' O P}.
-  Context {X : N * O -> Type} {Y : L * M -> Type} {Z : J * K -> Type}.
-  Context {U : L * O -> Type} {V : J * M -> Type} {W : J * O -> Type}.
+  Context {X : N * O -> Type} {Y : L * M -> Type} {Z : J * K -> Type}
+          {U : L * O -> Type} {V : J * M -> Type} {W : J * O -> Type}.
   Context (f0 : forall l n o, X (n, o) -> U (l, o))
           (g0 : forall l m o, Y (l, m) -> U (l, o))
           (f1 : forall j l o, U (l, o) -> W (j, o))
@@ -146,17 +147,17 @@ Section assoc.
 
 Variant assoc_arg (j : J) (o : O) : Type :=
 | C_app {l n} : itree (C ⊸ D) X (n , o)
-                -> iforest (B ⊸ C) Y (inr (l , n))
-                -> iforest (A ⊸ B) Z (inr (j , l))
-                -> assoc_arg j o
+              -> iforest (B ⊸ C) Y (inr (l , n))
+              -> iforest (A ⊸ B) Z (inr (j , l))
+              -> assoc_arg j o
 | C_pap {l m} : iforest (C ⊸ D) X (inl (m , o))
-                -> itree (B ⊸ C) Y (l , m)
-                -> iforest (A ⊸ B) Z (inr (j , l))
-                -> assoc_arg j o
+              -> itree (B ⊸ C) Y (l , m)
+              -> iforest (A ⊸ B) Z (inr (j , l))
+              -> assoc_arg j o
 | C_ppa {k m} : iforest (C ⊸ D) X (inl (m , o))
-                -> iforest (B ⊸ C) Y (inl (k , m))
-                -> itree (A ⊸ B) Z (j , k)
-                -> assoc_arg j o
+              -> iforest (B ⊸ C) Y (inl (k , m))
+              -> itree (A ⊸ B) Z (j , k)
+              -> assoc_arg j o
 .
 
 Definition assoc_left {j o} (x : assoc_arg j o) : itree (A ⊸ D) W (j , o) :=
@@ -173,30 +174,24 @@ match x with
 | C_ppa a b c => comp f1' g1' (C_pa a (comp f0' g0' (C_pa b c))) 
 end.
 
-Definition comp_assoc : forall {j o} (arg : assoc_arg j o),
-    assoc_left arg ≊ assoc_right arg.
-pcofix CIH. pstep.
-intros j o [? ? a b c|? ? a b c|? ? a b c];
-  cbn; cbv [eqit_ observe _observe]; cbn [comp]; cbv [observe];
-    cbn [_observe comp]; cbv [observe].
-+ destruct (_observe a); cbn.
-  - econstructor; apply eq0.
-  - econstructor; right. refine (CIH _ _ (C_app _ _ _)).
-  - destruct e.
-    * econstructor; right. refine (CIH _ _ (C_pap _ _ _)).
-    * econstructor; intro v; right. refine (CIH _ _ (C_app _ _ _)).
-+ destruct (_observe b); cbn.
-  - econstructor; apply eq1.
-  - econstructor; right. refine (CIH _ _ (C_pap _ _ _)).
-  - destruct e.
-    * econstructor; right. refine (CIH _ _ (C_ppa _ _ _)).
-    * econstructor; right. refine (CIH _ _ (C_app _ _ _)).
-+ destruct (_observe c); cbn.
-  - econstructor; apply eq2.
-  - econstructor; right. refine (CIH _ _ (C_ppa _ _ _)).
-  - destruct e.
-    * econstructor; right. refine (CIH _ _ (C_ppa _ _ _)).
-    * econstructor; right. refine (CIH _ _ (C_pap _ _ _)).
+Definition comp_assoc {j o} (x : assoc_arg j o) : assoc_left x ≊ assoc_right x.
+revert j o x; pcofix CIH; pstep.
+intros ? ? [? ? a ? ?|? ? ? a ?|? ? ? ? a].
+all:
+  cbn; cbv [eqit_ observe _observe];
+  cbn [comp]; cbv [observe];
+  cbn [_observe comp]; cbv [observe];
+  destruct (_observe a); cbn.
+3,6,9: destruct e. (* case split on event in 'VisF' goals *)
+all:
+  econstructor;
+  try apply eq0;
+  try apply eq1;
+  try apply eq2;
+  right;
+  try (exact (CIH _ _ (C_app _ _ _)));
+  try (exact (CIH _ _ (C_pap _ _ _)));
+  try (exact (CIH _ _ (C_ppa _ _ _))).
 Qed.
 End assoc.
 Arguments assoc_arg {I J K L M N O P} A B C D X Y Z.
