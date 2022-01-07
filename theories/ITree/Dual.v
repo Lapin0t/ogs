@@ -8,6 +8,8 @@ where roles (questioning and answering) are reversed.
 Set Implicit Arguments.
 Set Contextual Implicit.
 Set Primitive Projections.
+From Equations Require Import Equations.
+Set Equations Transparent.
 
 (*From ExtLib.Data Require Import Nat Fin List Unit.*)
 
@@ -59,7 +61,7 @@ Definition iforest {I J} (G : game' I J) (X : I -> Type) (j : J) : Type :=
 Definition dual {I J} (G : game' I J) : game' J I :=
   Game (server G) (client G).
 
-Definition tensor {I J K L} (A : game' I J) (B : game' K L)
+Definition parallel {I J K L} (A : game' I J) (B : game' K L)
   : game' (I * K) (J * K + I * L) :=
 {| client := {|
      move := fun ix => (c_move A (fst ix) + c_move B (snd ix))%type;
@@ -79,10 +81,9 @@ Definition tensor {I J K L} (A : game' I J) (B : game' K L)
                     | inr p => fun m => (fst p , s_next B (snd p) m)
                     end |} |}.
 
-Notation "A ⊗ B" := (tensor A B) (at level 30).
-
-Definition lollipop {I J K L} (A : game' I J) (B : game' K L) := dual A ⊗ B.
-Notation "A ⊸ B" := (lollipop A B) (at level 30).
+Notation "A ⅋ B" := (parallel A B) (at level 30).
+Notation "A ⊸ B" := (dual A ⅋ B) (at level 30).
+Notation "A ⊗ B" := (dual (dual A ⅋ dual B)) (at level 30).
 
 Section comp.
   Context {I J K L M N : Type}.
@@ -195,3 +196,131 @@ all:
 Qed.
 End assoc.
 Arguments assoc_arg {I J K L M N O P} A B C D X Y Z.
+
+Definition copycat {I J} (A : game' I J) X : forall u : I + J,
+    iforest (A ⊸ A) X (match u with | inl i => inl (i , i)
+                                    | inr j => inr (j , j) end) :=
+cofix _copycat u := match u with
+| inl i => fun r => Vis (inr r : qry (A ⊸ A) (_ , _)) (_copycat (inr _))
+| inr i => fun r => Vis (inl r : qry (A ⊸ A) (_ , _)) (_copycat (inl _))
+end.
+Arguments copycat {I J} A X u.
+
+(* Proofs that copycat ∘ f ≈ f and f ∘ copycat ≈ f *)
+Section comp_id.
+  Context {I J K L : Type}.
+  Context {A : game' I J} {B : game' K L}.
+  Context {X : J * K -> Type}.
+
+  Variant comp_id_right_arg k :=
+  | C_ai {j} : itree (A ⊸ B) X (j , k) -> comp_id_right_arg k
+  | C_pi {i} : iforest (A ⊸ B) X (inl (i , k)) -> c_move A i -> comp_id_right_arg k
+  .
+
+  Equations comp_id_right_j {k} : comp_id_right_arg k -> J :=
+    comp_id_right_j (@C_ai _ j a) := j ;
+    comp_id_right_j (@C_pi _ i a v) := c_next A i v .
+
+  Context {Y : J * I -> Type}.
+  Context {f0 : forall j0 j1 k, X (j1, k) -> X (j0, k)}
+          {g0 : forall j i k, Y (j, i) -> X (j, k)}.
+  Context (eq0 : forall j k r, @f0 j j k r = r).
+
+  Equations comp_id_right_left {k} (x : comp_id_right_arg k) : itree (A ⊸ B) X (comp_id_right_j x , k) :=
+    comp_id_right_left (C_ai a) := comp f0 g0 (C_ap a (copycat A Y (inr _))) ;
+    comp_id_right_left (C_pi a v) := comp f0 g0 (C_pa a (copycat A Y (inl _) v)) .
+
+  Equations comp_id_right_right {k} (x : comp_id_right_arg k) : itree (A ⊸ B) X (comp_id_right_j x , k) :=
+    comp_id_right_right (C_ai a) := a ;
+    comp_id_right_right (C_pi a v) := a v .
+
+  Definition comp_id_right {k} (x : comp_id_right_arg k)
+             : comp_id_right_left x ≈ comp_id_right_right x.
+    revert k x.
+    pcofix CIH. intros k x.
+    pstep. cbv [eqit_ observe].
+    destruct x as [j a | i a v]; cbv [comp_id_right_right comp_id_right_left].
+    - cbn; cbv [observe].
+      destruct (_observe a).
+      + econstructor. apply eq0.
+      + econstructor. right. apply (CIH _ (C_ai _)).
+      + destruct e.
+        * econstructor. auto.
+          cbn. econstructor.
+          intro v.
+          right. apply (CIH _ (C_pi _ _)).
+        *  econstructor.
+           intro v.
+           right. apply (CIH _ (C_ai _)).
+    - cbn. econstructor. auto.
+      cbv [observe]; cbn. cbv [observe].
+      destruct (_observe (a v)).
+      +  econstructor. apply eq0.
+      + econstructor. right. apply (CIH _ (C_ai _)).
+      + destruct e.
+        *  econstructor. auto.
+           cbn. econstructor.
+           intro v1. right. apply (CIH _ (C_pi _ _)).
+        * econstructor. intro v1. right. apply (CIH _ (C_ai _)).
+Qed.
+
+  Context {Z : L * K -> Type}.
+  Context {f1 : forall j l k, Z (l, k) -> X (j, k)}
+          {g1 : forall j k0 k1, X (j, k0) -> X (j, k1)}.
+  Context (eq1 : forall j k r, @g1 j k k r = r).
+
+  Variant comp_id_left_arg j :=
+  | C_ia {k} : itree (A ⊸ B) X (j , k) -> comp_id_left_arg j
+  | C_ip {l} : iforest (A ⊸ B) X (inr (j , l)) -> s_move B l -> comp_id_left_arg j
+  .
+
+  Equations comp_id_left_k {j} : comp_id_left_arg j -> K :=
+    comp_id_left_k (@C_ia _ k a) := k ;
+    comp_id_left_k (@C_ip _ l a v) := s_next B l v .
+
+  Equations comp_id_left_left {j} (x : comp_id_left_arg j) : itree (A ⊸ B) X (j, comp_id_left_k x) :=
+    comp_id_left_left (C_ia a) := comp f1 g1 (C_pa (copycat B Z (inl _)) a) ;
+    comp_id_left_left (C_ip a v) := comp f1 g1 (C_ap (copycat B Z (inr _) v) a) .
+
+  Equations comp_id_left_right {j} (x : comp_id_left_arg j) : itree (A ⊸ B) X (j, comp_id_left_k x) :=
+    comp_id_left_right (C_ia a) := a ;
+    comp_id_left_right (C_ip a v) := a v .
+
+  Definition comp_id_left {j} (x : comp_id_left_arg j)
+             : comp_id_left_left x ≈ comp_id_left_right x.
+    revert j x.
+    pcofix CIH. intros j x.
+    pstep. cbv [eqit_ observe].
+    destruct x as [k a | l a v ].
+    - cbn. cbv [observe].
+      destruct (_observe a).
+      + econstructor. apply eq1.
+      + econstructor. right. apply (CIH _ (C_ia _)).
+      + destruct e.
+        * econstructor. intro v. right. apply (CIH _ (C_ia _)).
+        * econstructor. auto.
+          cbn. econstructor.
+          intro v. right. apply (CIH _ (C_ip _ _)).
+    -  cbn. econstructor. auto.
+      cbv [observe]; cbn. cbv [observe].
+      destruct (_observe (a v)).
+      + econstructor. apply eq1.
+      + econstructor. right. apply (CIH _ (C_ia _)).
+      + destruct e.
+        * econstructor. intro v1. right. apply (CIH _ (C_ia _)).
+        * econstructor. auto.
+          cbn. econstructor. intro v1. right. apply (CIH _ (C_ip _ _)).
+  Qed.
+End comp_id.
+
+
+
+
+Definition bang {I J} (A : game' I J)
+  : game' (I * list J) (list J) :=
+{| client :=
+   {| move := fun ix => c_move A (fst ix) ;
+      next := fun ix m => c_next A (fst ix) m :: snd ix |} ;
+   server :=
+   {| move := fun js => { n : fin (length js) & s_move A (js .[ n ]) } ;
+      next := fun js m => (s_next A (js .[ projT1 m]) (projT2 m), js) |} |}.

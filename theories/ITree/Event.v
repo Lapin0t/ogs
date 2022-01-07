@@ -18,6 +18,25 @@ Record event (I J : Type) : Type := Event {
   nxt {j} (q : qry j) : rsp q -> I
 }.
 
+CoInductive game : Type :=
+  { move : Type ;
+    play : move -> game
+    }.
+
+Definition e_to_g {I : Type} (E : event I I) : I -> game :=
+  cofix _aux (i : I) : game := {|
+    move := qry E i;
+    play q := {| move := rsp E q ;
+                 play r := _aux (nxt E q r) |} |}.
+
+Definition game_e : event game game := {|
+  qry g := move g ;
+  rsp g q := move (play g q) ;
+  nxt g q r := play (play g q) r
+|}.
+  
+  
+
 (** Interpretation of events as functors. *)
 Definition evalₑ {I J} (E : event I J) : psh I -> psh J :=
   fun X i => { q : qry E i & forall r : rsp E q, X (nxt E q r) }.

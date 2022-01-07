@@ -14,6 +14,41 @@ From ExtLib.Data Require Import List.
 From OGS Require Import Utils.
 From OGS.ITree Require Import Event ITree Eq.
 
+(* I-joueur := {i : I & history i }
+   I-opposant := { i : I & history i }
+*)
+(* history x := *)
+Inductive partial_play {I} (E : event I I) (i : I) : Type :=
+| PLeaf (q : qry E i) : free E X i
+| PNode (q : qry E i) (k : forall r : rsp E q, free E X (nxt E q r)) : free E X i
+.
+
+Inductive history {I} (E : event I I) : I -> Type :=
+| bottom : forall {i}, history E i
+| frame : forall {i} (parent : history E i)
+            {n} (xs : vec (free E (qry E) i) n) (a : fin n),
+            history E (xs '[x])
+
+(*
+
+moves_client (i , hist) := move i
+next (i , hist) q  := frame hist q
+       ^^^^     ^          ^^
+     indice j   move j    indice opp
+
+moves_opp hist := 
+
+*)
+
+
+
+
+(*
+    forall (q : qry E i) {n} (rs : vec (rsp E q) n),
+          ffun (history E ∘ nxt E q) n rs
+          -> history E i .
+*)
+
 (*|
 An uniform event is one where the set of answers for a given query is
 of the form ``list kon`` for some type ``kon``. We argue that the gist
@@ -26,8 +61,9 @@ Hence the OGS of an uniform event will be indexed by an additional
 and the set of responses will be the choice of a continuation in the concatenation
 of the new continuations available and the ones present in the context.
 |*)
-Definition ogs {I J} (U : uniformₑ I J)
-           : event (I * list (kon U)) (J * list (kon U)) :=
+
+Definition ogs {I J} (E : event I J)
+           : game (I * list (kon U)) (J * list (kon U)) :=
   Event (fun '(j , ks) => u_qry U j)
         (fun '(j , ks) q => { i : _ & k_rsp U ((List.app (u_rsp U q) ks) .[i]) })
         (fun '(j , ks) q r => (k_nxt U (projT2 r) , List.app (u_rsp U q) ks)).
