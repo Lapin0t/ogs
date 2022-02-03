@@ -440,7 +440,7 @@ context. When hitting a value we have to backtrack on the evaluation
 context, either finding a suitable redex or descending in another
 branch.
 |*)
-Equations focus_aux {Γ x y} (E : e_ctx Γ y x) (t : term Γ x + e_val Γ x)
+Equations? focus_aux {Γ x y} (E : e_ctx Γ y x) (t : term Γ x + e_val Γ x)
           : e_term Γ y by wf (ctx_size E + aux_size t)%nat lt :=
   focus_aux E (inl (Var i))      := focus_aux E (inr (VVar i)) ;
   focus_aux E (inl (Lam a))      := focus_aux E (inr (VLam a)) ;
@@ -461,43 +461,30 @@ Equations focus_aux {Γ x y} (E : e_ctx Γ y x) (t : term Γ x + e_val Γ x)
   focus_aux (EInl E)      (inr v) := focus_aux E (inr (VInl v)) ;
   focus_aux (EInr E)      (inr v) := focus_aux E (inr (VInr v)) ;
   focus_aux (ESMatch E a b) (inr v) := ERed E v (RSMatch a b) .
-(*|
-.. coq:: none
-|*)
-Obligation 1. lia. Qed.
-Obligation 2. lia. Qed.
-Obligation 3. lia. Qed.
-Obligation 4. lia. Qed.
-Obligation 5. lia. Qed.
-Obligation 6. lia. Qed.
-Obligation 7. lia. Qed.
-Obligation 8. lia. Qed.
-Obligation 9. lia. Qed.
-Obligation 10. lia. Qed.
-Obligation 11. lia. Qed.
-(*||*)
+all: lia.
+Defined.
 End focus_aux.
  
 (*|
 From now on, a lot of functions which would usually be presented as taking a term
 as input, will take an ongoing evaluation instead, that is a term ``a`` decomposed
-as ``E[b]``. We call such a package an "evaluation argument".
+as ``E[b]``. We call such a package a "focused term".
 |*)
 Variant eval_arg (Γ : ctx) (x : ty) : Type :=
-| EA {y} : e_ctx Γ x y -> term Γ y -> eval_arg Γ x.
+| EArg {y} : e_ctx Γ x y -> term Γ y -> eval_arg Γ x.
 (*|
 .. coq:: none
 |*)
-Arguments EA {Γ x y}.
+Arguments EArg {Γ x y}.
 
 (*||*)
-Definition ea_start {Γ x} (u : term Γ x) : eval_arg Γ x := EA EHole u.
+Definition earg_start {Γ x} (u : term Γ x) : eval_arg Γ x := EArg EHole u.
 
 (*|
 Efficiently find the first redex in ``E[t]``
 |*)
 Equations e_focus {Γ x} : eval_arg Γ x -> e_term Γ x :=
-  e_focus (EA E t) := focus_aux.focus_aux E (inl t).
+  e_focus (EArg E t) := focus_aux.focus_aux E (inl t).
 
 (*|
 Eager normal forms
@@ -518,22 +505,6 @@ Arguments NVal {Γ x}.
 Arguments NRed {Γ x a b}.
 
 (*|
-For encoding reasons, our dependent-itree machinerie works on indexed
-sets ``I → Type`` yet all our types (terms, values, variables, etc) are all of the
-form ``ctx → ty → Type``. Here we define some uncurried versions. Additionnaly
-we constrain contexts to contain only negative types as we would like to work with
-*focused* terms that do not contain spurious stuck redexes.
-|*)
-Definition neg_t_env : Type := neg_ctx * ty.
-Definition eval_arg' : neg_t_env -> Type := uncurry (eval_arg ∘ of_n_ctx).
-Definition term' : neg_t_env -> Type := uncurry (term ∘ of_n_ctx).
-Definition ea_start' {i} (u : term' i) : eval_arg' i := EA EHole u.
-Definition e_ctx' : ty -> neg_t_env -> Type := fun t e => e_ctx (fst e) (snd e) t.
-Check EA.
-Definition ea' {t e} : e_ctx' t e -> term (fst e) t -> eval_arg' e := EA.
-(*Definition ea' {i} (E : e_ctx) (u : term' i) : eval_arg' i := EA EHole u.*)
-
-(*|
 The evaluator
 ^^^^^^^^^^^^^
 This next function is the core of our evaluator implementing a single
@@ -544,15 +515,15 @@ Equations eval_step {Γ x} (t : e_term Γ x) : eval_arg Γ x + e_nf Γ x :=
   eval_step (EVal v)                   := inr (NVal v) ;
   eval_step (ERed E (VVar i) r)        := inr (NRed E i r) ;
   eval_step (ERed E (VRec u) (RApp v)) :=
-    inl (EA E (u /ₛ t_shift (t_of_val v) /ₛ Rec u)) ;
+    inl (EArg E (u /ₛ t_shift (t_of_val v) /ₛ Rec u)) ;
   eval_step (ERed E (VLam u) (RApp v)) :=
-    inl (EA E (u /ₛ t_of_val v)) ;
+    inl (EArg E (u /ₛ t_of_val v)) ;
   eval_step (ERed E (VPair u0 u1) (RPMatch a)) :=
-    inl (EA E (a /ₛ t_shift (t_of_val u1) /ₛ t_of_val u0)) ;
+    inl (EArg E (a /ₛ t_shift (t_of_val u1) /ₛ t_of_val u0)) ;
   eval_step (ERed E (VInl u) (RSMatch a b)) :=
-    inl (EA E (a /ₛ t_of_val u)) ;
+    inl (EArg E (a /ₛ t_of_val u)) ;
   eval_step (ERed E (VInr u) (RSMatch a b)) :=
-    inl (EA E (b /ₛ t_of_val u)) .
+    inl (EArg E (b /ₛ t_of_val u)) .
 
 (*|
 And now the evaluator is complete: our iterₐ combinator encoding tail-recursion
@@ -644,18 +615,16 @@ Equations a_cext {x} : a_val x -> neg_ctx :=
 (*|
 .. coq:: none
 |*)
-Ltac r_fixup x :=
+Ltac r_fixup :=
   cbn; unfold of_n_ctx in *;
-  repeat rewrite map_app in *;
-  eapply x;
-  auto.
+  repeat rewrite map_app in *.
 
 Definition r_concat_l' {Γ Δ : neg_ctx} : forall t, of_n_ctx Γ ∋ t -> of_n_ctx (Γ +▶ Δ) ∋ t.
-  r_fixup uconstr:(r_concat_l).
+  r_fixup; eapply r_concat_l.
 Defined.
 
 Definition r_concat_r' {Γ Δ : neg_ctx} : forall t, of_n_ctx Δ ∋ t -> of_n_ctx (Γ +▶ Δ) ∋ t.
-  r_fixup uconstr:(r_concat_r).
+  r_fixup; eapply r_concat_r.
 Defined.
 
 (*||*)
@@ -673,38 +642,28 @@ on a given negative type.
 Equations t_obs : neg_ty -> Type :=
   t_obs (_ ,' @NArr a b) := a_val a .
 
-Equations lift_env : neg_ctx -> neg_t_env -> neg_t_env :=
-  lift_env Γ e := ((Γ +▶ fst e)%ctx , snd e).
 (*|
 And how the typing context and goal type change at a given observation.
 |*)
-Equations t_obs_nxt {x} : t_obs x -> neg_t_env :=
-  @t_obs_nxt (_ ,' @NArr a b) o := (a_cext o , b).
+Equations t_obs_args (x : neg_ty) : t_obs x -> neg_ctx :=
+  @t_obs_args (_ ,' @NArr a b) o := a_cext o.
 
+Equations t_obs_goal (x : neg_ty) : t_obs x -> ty :=
+  @t_obs_goal (_ ,' @NArr a b) o := b.
+
+(*|
+.. coq:: none
+|*)
+Arguments t_obs_args {x} o.
+Arguments t_obs_goal {x} o.
+
+(*|
+|*)
 Equations t_obs_apply {Γ : neg_ctx} {x : neg_ty} (o : t_obs x)
-          : term Γ x -> term' (lift_env Γ (t_obs_nxt o)) :=
+          : term Γ x -> term ((Γ +▶ t_obs_args o) : neg_ctx) (t_obs_goal o) :=
   @t_obs_apply Γ (_ ,' @NArr a b) o t :=
     App (t_rename r_concat_l' t)
         (t_rename r_concat_r' (t_of_a o)).
-
-(*|
-The set of queries (or observations) that can be made on an abstract value
-is any observation on
-|*)
-(*
-Equations a_obs {x} : a_val x -> Type :=
-  a_obs (@AArr a b) := a_val a ;
-  a_obs (APair u v) := a_obs u + a_obs v ;
-  a_obs (AInl u)    := a_obs u ;
-  a_obs (AInr u)    := a_obs u .
-
-Equations a_cont {x} (v : a_val x) : a_obs v -> neg_ctx -> neg_t_env :=
-  a_cont (@AArr a b) v       Γ := ((Γ +▶ a_cext v)%ctx , b) ;
-  a_cont (APair u v) (inl o) Γ := a_cont u o Γ ;
-  a_cont (APair u v) (inr o) Γ := a_cont v o Γ ;
-  a_cont (AInl u)    o       Γ := a_cont u o Γ ;
-  a_cont (AInr u)    o       Γ := a_cont u o Γ .
-*)
 
 (*|
 Now we explain how to turn a value into an abstract value. It is crucial that the
@@ -724,7 +683,8 @@ Equations a_of_val {Γ : neg_ctx} x (v : e_val Γ x) : a_val x :=
 |*)
 Arguments a_of_val {Γ x}.
 
-Equations? cext_get {Γ : neg_ctx} x (v : e_val Γ x) (y : neg_ty) (i : (a_cext (a_of_val v) : ctx) ∋ (y : ty)) : e_val Γ y :=
+Equations? cext_get {Γ : neg_ctx} x (v : e_val Γ x) (y : neg_ty)
+         : (a_cext (a_of_val v) : ctx) ∋ (y : ty) -> e_val Γ y :=
   cext_get (_ → _) v           (_ ,' _) top := v ;
   cext_get (_ × _) (VPair u v) (_ ,' _) i := _ ;
   cext_get (_ + _) (VInl u)    (_ ,' _) i := cext_get _ u _ i ;
@@ -733,188 +693,28 @@ Equations? cext_get {Γ : neg_ctx} x (v : e_val Γ x) (y : neg_ty) (i : (a_cext 
   cext_get (_ × _) (VVar i) _ _ with neg_var i := { | (!) } ;
   cext_get (_ + _) (VVar i) _ _ with neg_var i := { | (!) } .
 
-unfold of_n_ctx in i; rewrite map_app in i.
-destruct (concat_split _ _ i); refine (cext_get _ _ _ (_ ,' _) h); auto.
+r_fixup.
+destruct (concat_split _ _ i) as [j|j].
+all: refine (cext_get _ _ _ (_ ,' _) j); auto.
 Defined.
-
-(*
-Equations val_a_get {Γ : neg_ctx} x (v : e_val Γ x) (a_of_val x v)
-*)
-
-(*
-(*|
-And how to apply that observation to get a new term to continue on.
-|*)
-Equations apply_obs {Γ : neg_ctx} x (v : e_val Γ x) (o : a_obs (a_of_val v))
-           : term' (a_cont (a_of_val v) o Γ) :=
-  apply_obs (_ → _) v           o := App (t_rename r_concat_l' (t_of_val v))
-                                         (t_rename r_concat_r' (t_of_a o)) ;
-  apply_obs (_ × _) (VPair u v) (inl o) := apply_obs _ u o ;
-  apply_obs (_ × _) (VPair u v) (inr o) := apply_obs _ v o ;
-  apply_obs (_ + _) (VInl u)    o := apply_obs _ u o ;
-  apply_obs (_ + _) (VInr u)    o := apply_obs _ u o ;
-
-  apply_obs (Unit)  (VVar i) o with neg_var i := { | (!) } ;
-  apply_obs (_ × _) (VVar i) o with neg_var i := { | (!) } ;
-  apply_obs (_ + _) (VVar i) o with neg_var i := { | (!) } .
-*)
 (*|
 .. coq:: none
 |*)
-(*Arguments apply_obs {Γ x}.*)
+Arguments cext_get {Γ} x v {y} i.
 
 (*|
-Lassen tree structure
-^^^^^^^^^^^^^^^^^^^^^
-
-We now give the structure of Lassen trees using our itree library. Our
-trees will be intrinsically typed and hence indexed by a negative
-context ``Γ`` and a type ``x``.
-
-Node shapes are as follows:
+For encoding reasons, our dependent-itree machinerie works on indexed
+sets ``I → Type`` yet all our types (terms, values, variables, etc) are all of the
+form ``ctx → ty → Type``. Here we define some uncurried versions. Additionnaly
+we constrain contexts to contain only negative types as we would like to work with
+*focused* terms that do not contain spurious stuck redexes.
 |*)
+Definition frame : Type := neg_ctx * ty.
+Definition eval_arg' : frame -> Type := uncurry (eval_arg ∘ of_n_ctx).
+Definition term' : frame -> Type := uncurry (term ∘ of_n_ctx).
+Definition earg_start' {i} (u : term' i) : eval_arg' i := EArg EHole u.
+Definition e_ctx' : ty -> frame -> Type := fun t e => e_ctx (fst e) (snd e) t.
+Definition earg' {t e} : e_ctx' t e -> term (fst e) t -> eval_arg' e := EArg.
 
-(*
-stack:
-
-ret: X
-opp vals: Γ
---- P call Γ ∋ A -> B, a : a_val A
-ret: B
-ply vals: Δ = c_ext a
--- O call Δ ∋ C -> D, c : a_val C
-ret: D
-opp vals: E = Γ + c_ext c
-
-
-*)
-
-(*|
-A "frame" will be what our lassen trees will be indexed over: it is the state
-of our game. It is called frame in evocation of *stack-frames*.
-- `f_env` are our free variables, that is what opponent has shared with us.
-- `f_ret` is a description of the last stack frame: if it is `None`
-  that means there is no previous stack frame: we can only call new
-  things and not return (only opponent should ever be in this
-  position). If it is `Some (Δ , x)` it means that we can return an x
-  to opponent and restore his `f_env` to `Δ` (ie what we have shared
-  to him).
-
-Note that lassen trees are indexed of *frames* and not *stacks of
-frames*: after a call we are forgetting where we were coming from. It might seem
-weird but that in concordance with the fact that the opponent to a lassen tree
-can only every query what was given last.
-|*)
-(*
-Record enf_frame : Type := Frame {
-  f_env : neg_ctx ;
-  f_ret : option neg_t_env
-}.
-
-(*|
-Moves in the game of Lassen are of two kinds:
-- `LRet`, return an abstract value in response to a call (only allowed
-  if we have just been called)
-- `LCal`, call (observe) an opponent name (free variable)
-
-Note that these are both queries and responses since the Lassen game is symmetric.
-More on that later.
-|*)
-Variant enf_move : enf_frame -> Type :=
-| LRet {Γ Δ x} : a_val x -> enf_move (Frame Γ (Some (Δ , x)))
-| LCal {Γ x y} : Γ ∋ y -> t_obs y -> enf_move (Frame Γ x)
-.
-(*|
-.. coq:: none
-|*)
-Arguments LRet {Γ Δ x}.
-Arguments LCal {Γ x y}.
-
-(*|
-After a move we switch to a new frame:
-- after a return we would intuitively like to pop a frame but we don't maintain
-  a stack so we just say we're at a bottom frame (None); still we have switched
-  our opponent's env Δ into primary position and extended it with 
-- 
-|*)
-Equations enf_next f : enf_move f -> enf_frame :=
-  enf_next _ (@LRet Γ Δ x v)   := Frame (Δ +▶ a_cext v) None ;
-  enf_next _ (@LCal Γ x y i v) :=
-    let Δ := match x with Some (Δ , _) => Δ | None => ∅%ctx end in
-    let (Δ', x') := t_obs_nxt v Δ
-    in Frame Δ' (Some (Γ , x')) .
-*)
-
-Definition frame : Type := neg_ctx * option ty.
-
-Definition frame_of_ntenv (e : neg_t_env) : frame := (fst e , Some (snd e)).
-Coercion frame_of_ntenv : neg_t_env >-> frame.
-
-Variant lassen_move (Γ : neg_ctx) : option ty -> Type :=
-| LRet {x} : a_val x -> lassen_move Γ (Some x)
-| LCall {x} {y : neg_ty} : (Γ : ctx) ∋ (y : ty) -> t_obs y -> lassen_move Γ x
-.
-Derive Signature NoConfusion for lassen_move.
-(*|
-.. coq:: none
-|*)
-Arguments LRet {Γ x} v.
-Arguments LCall {Γ x y} i o.
-
-Definition lassen_move' := uncurry lassen_move.
-Hint Transparent lassen_move'.
-Hint Transparent uncurry.
-(*|
-After a move we switch to a new frame:
-- after a return we would intuitively like to pop a frame but we don't maintain
-  a stack so we just say we're at a bottom frame (None); still we have switched
-  our opponent's env Δ into primary position and extended it with 
-- after a call we do what the observation says (`t_obs_nxt`)
-|*)
-Equations lassen_next Γ x : lassen_move Γ x -> frame :=
-  lassen_next _ _ (LRet v)    := (a_cext v, None) ;
-  lassen_next _ _ (LCall i v) := t_obs_nxt v .
-
-Equations lassen_next' Γ x : lassen_move Γ x -> neg_t_env -> neg_t_env :=
-  lassen_next' _ _ (LRet v)    e := ((fst e +▶ a_cext v)%ctx , snd e) ;
-  lassen_next' _ _ (LCall i v) e := lift_env (fst e) (t_obs_nxt v) .
-
-Definition lassen_g : game' neg_t_env (neg_t_env * frame) :=
-  Game (HGame (lassen_move' ∘ frame_of_ntenv)
-              (fun f => pair f ∘ uncurry lassen_next (frame_of_ntenv f)))
-       (HGame (lassen_move' ∘ snd)
-              (fun f m => uncurry lassen_next' (snd f) m (fst f))).
-
-Definition lassen : endo (neg_t_env -> Type) := itree lassen_g.
-
-Equations lassen_enf {Γ : neg_ctx} {x} (v : e_nf Γ x)
-          : lassen (eval_arg' +ᵢ ∅ᵢ) (Γ , x) :=
-  lassen_enf (NVal v) :=
-    Vis (LRet (a_of_val v) : qry lassen_g (_ , _))
-        (λ { | LCall i a :=
-                 Ret (inl (ea_start' (t_obs_apply a (cext_get _ v _ i)))) });
-  lassen_enf (NRed E i r) with neg_var i := {
-    lassen_enf (NRed E i (RApp v)) NArr :=
-      Vis (@LCall _ _ (_ ,' NArr) i (a_of_val v) : qry lassen_g (_, _))
-          (λ { | LRet a := _ ; | LCall i a := _ })
-    }.
-Obligation 1.
-refine (Ret (inl _)).
-refine (@ea' _ (_ , _) (e_rename r_concat_l' E) (t_rename r_concat_r' (t_of_a a))).
-Defined.
-Obligation 2.
-refine (Ret (inl (ea_start' (t_obs_apply a (cext_get _ v _ i))))).
-Defined.
-
-(*|
-And finally we tie the knot and iterate a sequence of evaluation to
-eager normal form and injection into lassen trees.
-|*)
-Definition eval_lassen' : eval_arg' ⇒ᵢ lassen ∅ᵢ :=
-  iter (fun '(_ , _) t => emb_comp _ _ (eval_enf t) !>= lassen_enf).
-
-(*|
-And to wrap up, a cleaner interface starting with an empty evaluation context.
-|*)
-Definition eval_lassen {Γ : neg_ctx} {x} (u : term Γ x) : lassen ∅ᵢ (Γ , x) :=
-  eval_lassen' _ (ea_start' (u : term' (_ , _))).
+Equations lift_frame : neg_ctx -> frame -> frame :=
+  lift_frame Γ e := ((Γ +▶ fst e)%ctx , snd e).

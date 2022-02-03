@@ -314,8 +314,6 @@ Qed.
 End comp_id.
 
 
-
-
 Definition bang {I J} (A : game' I J)
   : game' (I * list J) (list J) :=
 {| client :=

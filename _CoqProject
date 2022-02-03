@@ -12,5 +12,7 @@ theories/ITree/Angelic.v
 theories/ITree/Rec.v
 theories/STLC/Ctx.v
 theories/STLC/Syntax.v
+theories/STLC/Direct.v
+theories/STLC/Layered.v
 theories/STLC/Props.v
 theories/STLC/OGS.v
