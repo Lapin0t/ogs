@@ -12,7 +12,45 @@ From Paco Require Import paco.
 From ExtLib.Data Require Import List.
 
 From OGS Require Import Utils.
-From OGS.ITree Require Import Event ITree Eq.
+From OGS.ITree Require Import Event ITree Eq Dual.
+From OGS.STLC Require Import Syntax.
+
+Inductive p_stack : Type :=
+| PNil : neg_ctx -> ty -> p_stack
+| PCon : o_stack -> neg_ctx -> ty -> p_stack
+with o_stack : Type :=
+| ONil : neg_ctx -> o_stack
+| OCon : p_stack -> neg_ctx -> ty -> o_stack
+.
+
+Equations p_stack_ntenv : p_stack -> neg_t_env :=
+  p_stack_ntenv (PNil Γ x) := (Γ , x) ;
+  p_stack_ntenv (PCon s Γ x) := (Γ , x) .
+
+Equations o_stack_frame : o_stack -> frame :=
+  o_stack_frame (ONil Γ) := (Γ , None) ;
+  o_stack_frame (OCon s Γ x) := (Γ , Some x) .
+
+Equations ogs_next_p (s : p_stack) : lassen_move' (frame_of_ntenv (p_stack_ntenv s)) -> o_stack :=
+  ogs_next_p (PNil Γ x) (LRet a) := ONil (a_cext a) ;
+  ogs_next_p (PCon s Γ x) (LRet a) := _ ;
+  ogs_next_p s (LCall i o) := _ .
+Obligation 1.
+Check (a_cext a).
+
+Definition ogs_g : game' p_stack o_stack :=
+  {| client :=
+       {| move s := let (Γ , x) := p_stack_ntenv s in lassen_move Γ (Some x) ;
+          next s m := _ |} ;
+     server :=
+       {| move := _ ;
+          next := _ |} |}.
+
+Equations ogs_next_p (s : p_stack) : lassen_move' (frame_of_ntenv (p_stack_ntenv s)) -> o_stack :=
+  ogs_next_p s := _ .
+
+Equations ogs_next_p Γ x : lassen_move Γ x -> frame :=
+
 
 (* I-joueur := {i : I & history i }
    I-opposant := { i : I & history i }

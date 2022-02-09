@@ -4,7 +4,7 @@ From Coq Require Import Logic.
 Import EqNotations.
 Require Import Psatz.
 
-From ExtLib.Data Require Import List Fin.
+From ExtLib.Data Require Import List Fin Bool.
 
 From OGS Require Import Utils.
 From OGS.ITree Require Import Cat Event Dual ITree Rec Angelic Eq.
@@ -15,6 +15,26 @@ Set Equations Transparent.
 
 
 Definition frame : Type := neg_ctx * ty.
+
+(* CPS procrastination
+Variant enf_kont : Type :=
+| KCtx : neg_ctx -> ty -> ty -> enf_kont
+| KVal : neg_ctx -> neg_ctx -> enf_kont
+.
+
+Variant enf_k_move : enf_kont -> Type :=
+| RET {Γ s t} : a_val s -> enf_k_move (KCtx Γ s t)
+| CALL {Γ Δ : neg_ctx} {s : neg_ty} : (Δ : ctx) ∋ (s : ty)
+                                    -> t_obs s -> enf_k_move (KVal Γ Δ)
+.
+
+Equations enf_k_nxt {k} : enf_k_move k -> list enf_kont :=
+  enf_k_nxt (@RET Γ s t v) := KVal _ (Γ +▶ a_cext v) ;
+  enf_k_nxt (@CALL Γ Δ s i o) := _ .
+
+  enf_k_move (KVal Γ Δ)   := 
+*)
+
 
 Variant enf_play (Γ : neg_ctx) : option ty -> Type :=
 | RET {x} : a_val x -> enf_play Γ (Some x)
@@ -28,56 +48,164 @@ Equations is_some {A} : option A -> bool :=
   is_some (Some _) := true .
 
 Variant stack_action : bool -> Type :=
-| Push {b} : ty -> stack_action b
-| Pop : stack_action true .
+| Push {b} : neg_ctx -> ty -> stack_action b
+| Pop : neg_ctx -> stack_action true .
 
-Equations enf_next {Γ x} : enf_play Γ x -> neg_ctx * stack_action (is_some x) :=
-  enf_next (RET v)    := (a_cext v , Pop) ;
-  enf_next (CALL i v) := (t_obs_args v , Push (t_obs_goal v)) .
+Equations enf_next {Γ x} : enf_play Γ x -> stack_action (is_some x) :=
+  enf_next (RET v)    := Pop (a_cext v) ;
+  enf_next (CALL i v) := Push (t_obs_args v) (t_obs_goal v) .
 
 Module OGS.
 
-  Inductive passive_stack : Type :=
-  | PNil : passive_stack
-  | PCon : ty -> active_stack -> passive_stack
-  with active_stack : Type :=
-  | ACon : ty -> passive_stack -> active_stack
+  Inductive stack : bool -> Type :=
+  | SNil : stack true
+  | SCon {b} : ty -> neg_ctx * stack (negb b) -> stack b
   .
+  Arguments SCon {b}.
+  Definition index b := neg_ctx * stack b.
 
-  Equations passive_head : passive_stack -> option ty :=
-    passive_head (PNil)     := None ;
-    passive_head (PCon t _) := Some t .
+  Equations stack_ctx {b} : stack b -> neg_ctx :=
+    @stack_ctx true  (SNil)                        := ∅ ;
+    @stack_ctx false (SCon _ (_ , SNil))           := ∅ ;
+    @stack_ctx b     (SCon _ (_ , SCon _ (Δ , s))) := stack_ctx s +▶ Δ .
 
-  Equations is_con : passive_stack -> bool :=
-    is_con (PNil)     := false ;
-    is_con (PCon _ _) := true .
+  Definition index_ctx {b} (i : index b) : neg_ctx := stack_ctx (snd i) +▶ fst i.    
 
-  Equations active_head : active_stack -> option ty :=
-    active_head (ACon t _) := Some t .
+  (*
+  Equations stack_ctx_aux : neg_ctx -> stack -> neg_ctx :=
+    stack_ctx_aux Γ (SNil) := Γ ;
+    stack_ctx_aux Γ (SCon _ (_ , SNil)) := Γ ;
+    stack_ctx_aux Γ (SCon _ (_ , SCon _ s)) := (stack_ctx_aux (fst s) (snd s) +▶ Γ) .
+*)
 
-  Equations apply_active {b} : active_stack -> stack_action b -> passive_stack :=
-    apply_active (ACon x s) (Push y) := PCon y (ACon x s) ;
-    apply_active (ACon x s) (Pop)    := s .
+  Equations stack_ty {b} : index b -> option ty :=
+    stack_ty (_ , SNil)   := None ;
+    stack_ty (_ , SCon t _) := Some t .
 
-  Equations apply_passive (s : passive_stack) : stack_action (is_some (passive_head s)) -> active_stack :=
-    apply_passive (PCon x s) (Pop)    := s ;
-    apply_passive p          (Push x) := ACon x p .
+  Equations ext_head {b} : index b -> neg_ctx -> index b :=
+    ext_head i Δ := ((fst i +▶ Δ)%ctx , snd i) .
+
+  Equations? stack_apply {b} (i : index b) : stack_action (is_some (stack_ty i)) -> index (negb b) :=
+    @stack_apply b (Γ , SCon x s) (Pop Δ)    := ext_head s Δ ;
+    @stack_apply b (Γ , SNil)     (Push Δ y) := (Δ , SCon y (Γ , _)) ;
+    @stack_apply b (Γ , SCon x s) (Push Δ y) := (Δ , SCon y (Γ , SCon x _)) .
+  + refine SNil.
+  + rewrite Bool.negb_involutive. refine (n , s).
+  Defined.
+
+  Definition half_g b : half_game (index b) (index (negb b)) :=
+    {| move := fun e => enf_play (index_ctx e) (stack_ty e) ;
+       next := fun e m => stack_apply e (enf_next m) |} .
+
+  Definition game_desc : game' (index false) (index true) :=
+    {| client := half_g false ; server := half_g true |}.
+
+  Definition ogs := itree game_desc ∅ᵢ.
+  Definition ogs_opp := itree (dual game_desc) ∅ᵢ.
+
+  (*
+  Definition 
+    a_s       =  T1 ;  T2 -> T3 ; []
+    a_s + b_s = 'T1'-> T2 ;  T3 -> T4 ; T5 -> T6 ; []
+  *)
+
+  Equations stack_cat {b} : stack b -> stack false -> stack (negb b) :=
+    stack_cat (SNil)     t := t ;
+    stack_cat (SCon x s) t := SCon x (fst s , stack_cat (snd s) t) .
+
+  Definition index_cat {b} (e : index b) (s : stack false) : index (negb b) :=
+    (fst e , stack_cat (snd e) s) .
+
+  Variant comp_arg (s : stack false) : Type :=
+  | CompAP {e : index false} : ogs e
+      -> (forall r : c_move game_desc e, ogs (index_cat (c_next game_desc e r) s))
+      -> comp_arg s
+  | CompPA {e : index true} :
+      (forall r : s_move game_desc e, ogs (s_next game_desc e r))
+      -> ogs (index_cat e s)
+      -> comp_arg s
+  .
+  Arguments CompAP {s e} ply opp.
+  Arguments CompPA {s e} ply opp.
   
-  Definition game_desc : game' (neg_ctx * neg_ctx * active_stack)
-                               (neg_ctx * neg_ctx * passive_stack) :=
-    {| client :=
-         {| move e := enf_play (fst (fst e)) (active_head (snd e)) ;
-            next e m := let x := enf_next m in
-                        (fst (fst e), (snd (fst e) +▶ fst x)%ctx,
-                         apply_active (snd e) (snd x)) |} ;
-       server :=
-         {| move e := enf_play (snd (fst e)) (passive_head (snd e)) ;
-            next e m := let x := enf_next m in
-                        ((fst (fst e) +▶ fst x)%ctx, snd (fst e),
-                         apply_passive (snd e) (snd x)) |} |} .
+  Equations split_var {s : index true} {t x} : index_ctx (index_cat s t) ∋ x -> index_ctx s ∋ x + index_ctx (∅%ctx, t) ∋ x :=
+    @split_var (Γ , SNil)     t x i with concat_split _ _ i :=
+      { | inl i := inr i ;
+        | inr i := inl _ } ;
+    @split_var (Γ , SCon _ (_ , SCon _ (Δ , s))) t x i with concat_split _ _ i :=
+      { | inl i := @split_var (Δ , s) t x i ;
+        | inr i := _ } .
+  + cbn; rewrite app_nil_r; exact i.
+  +  cbn in *.
+  cbn in i.
+
+  Equations? split_move {e : index true} {s} : c_move game_desc (index_cat e s) -> s_move game_desc e + c_move game_desc (∅%ctx , s) :=
+    @split_move (_ , SNil)     (SCon _ _) (RET v) := inr (RET v) ;
+    @split_move (_ , SCon _ _) _          (RET v) := inl (RET v) ;
+    @split_move s              t          (CALL i v) := _ .
+  + cbn in *; r_fixup. destruct (concat_split _ _ i) as [j|j].
+    - refine (inr (CALL j v)).
+    - rewrite app_nil_r; refine (inl (CALL j v)).
+  + cbv [index_cat index_ctx] in i. cbn [fst snd] in i.
+    refine (inr (CALL _ v)).
+    
+  shelve.
+  cbv [index_ctx index_cat] in i. cbn[fst snd] in i.
+  r_fixup.
+  destruct (concat_split _ _ i).
+  - shelve.
+    - 
+
+
+  Definition compo {e s} : comp_arg e s -> ogs (∅%ctx , s).
+    revert e s.
+    cofix CIH.
+    intros e s [ply opp|ply opp].
+    - destruct (observe ply).
+      + destruct r.
+      + exact (Tau (CIH _ _ (CompAP t opp))).
+      + refine (Tau (CIH _ _ (CompPA k (opp e0)))).
+    - destruct (observe opp).
+      + destruct r.
+      + exact (Tau (CIH _ _ (CompPA ply t))).
+      + cbn in e0. dependent elimination e0.
+        cbv
+    
+          Equations? split_move {e s} : c_move game_desc (index_cat e s) -> c_move game_desc e + c_move game_desc (∅%ctx , s) :=
+          split
+    inj_move (SCon x s) (RET v)    := RET v ;
+    inj_move s          (CALL i v) := CALL _ v .
+  refine (stack_ctx_top (Γ , t) i).
+  cbn in i.
+  refine (stack_ctx_top (Γ , t) i).
+
+  r_fixup. cbn in i. cbv[stack_ctx_aux]. exact (r_concat_r _ _ _ i).
+
+        cbv[rsp nxt event_of_game] in k.
+        fold (event_of_game game_desc) in k.
+        cbv [event_of_game game_desc half_g s_next extend] in opp. cbn in opp.
+Check (opp e).
+        pose (u := opp e).
+        cbn in u.
+        pose (u := s_next game_desc (Γ , Δ , SCon x (concat s1 s2)) e).
+        fold (event_of_game game_desc) in k.
+        Check (CompPA )
+        fold (passive game_desc ∅ᵢ (c_next game_desc _ e)) in k.
+        
+        change (passive game_desc ∅ᵢ (c_next game_desc _ e)) in k.
+        cbn in u.
+        Check (CIH (Δ +▶ fst (enf_next e))%ctx Γ _ (stack_apply (SCon x (concat s1 s2)) (snd (enf_next e))) _ (opp e) k).
+        cbn in k.
+        destruct s1.
+        - cbn in opp. cbn in e.
+           
+        dependent elimination e.
+        - 
+        
+
+End OGS.
 
 Module lassen.
-
   Variant request (Γ : neg_ctx) (x : ty) : Type :=
   | LRet : a_val x -> request Γ x
   | LCall : ctx_obs Γ -> request Γ x
@@ -91,8 +219,9 @@ Module lassen.
     trans (LRet v)           (CObs i o) := ((Γ +▶ )%ctx , _) ;
     trans (LCall (CObs _ _)) (inl a) := _ ;
     trans (LCall (CObs _ _)) (inr (CObs i o)) := _ .
-  
-  Definition opp_i : Type := (neg_ctx * neg_ctx) * option (ty * ty).
+
+  (*Definition lassen_e : Event _ _ := { request answer trans }.*)
+
 
 (*********************************)
 (* OLD THINGS / SCRATCHPAD BELOW *)
@@ -117,6 +246,11 @@ s_mv : J -> Type                    # ty_obs
 s_nxt {j} : s_mv j -> I             # ty_obs_goal
 s_ext {j} : s_mv j -> list J        # ty_obs_args
 
+c_mv : I -> Type                    # a_val
+c_nxt {i} : c_mv i -> list J        # a_cext
+s_mv : J -> Type                    # ty_obs
+s_nxt {j} : s_mv j -> I             # ty_obs_goal
+s_ext {j} : s_mv j -> list J        # ty_obs_args
 ##
 
 c_mv : list a_val' * ty -> Type

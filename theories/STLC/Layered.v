@@ -13,8 +13,52 @@ From OGS.STLC Require Import Ctx Syntax.
 From Equations Require Import Equations.
 Set Equations Transparent.
 
+Variant ctx_any {X} (P : X -> Type) (Γ : Ctx.ctx X) : Type :=
+| CAny {x} : Γ ∋ x -> P x -> ctx_any P Γ
+.
+
+Definition enf_answer : half_game ty neg_ctx :=
+  {| move := a_val ;
+     next := @a_cext |} .
+
+Definition enf_question : half_game neg_ty (neg_ctx * ty) :=
+  {| move := t_obs ;
+     next := @t_obs_nxt |} .
+
+
 (*
 
+I = ty
+J = neg_ty
+
+TANS : I => list J
+TREQ : J => list J * I
+
+!TREQ ⊸ TANS
+
+par : I => J -> list I => J
+
+(t1 ⊗ t2 ⊗ t3) ⊸ t
+
+par TREQ : list J => list J * I
+
+AA := par TREQ + TANS : list J * I => list J * I + list J
+
+par TREQ + TANS || join (par TREQ + TANS , par TREQ) 
+
+BASE := TANS | par TREQ : I => list J => list J * I
+
+
+ 
+
+
+
+the type game:
+c_mv : I -> Type                    # a_val: type answer
+c_nxt {i} : c_mv i -> list J        # a_cext: spawn *several* continuations
+s_mv : J -> Type                    # ty_obs: server move on 1 given continuation
+s_nxt {j} : s_mv j -> I             # ty_obs_goal: server transition to new goal
+s_ext {j} : s_mv j -> list J        # ty_obs_args: spawning new continuations
 
 
 *)

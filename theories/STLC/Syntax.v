@@ -616,7 +616,7 @@ Equations a_cext {x} : a_val x -> neg_ctx :=
 .. coq:: none
 |*)
 Ltac r_fixup :=
-  cbn; unfold of_n_ctx in *;
+  unfold of_n_ctx in *;
   repeat rewrite map_app in *.
 
 Definition r_concat_l' {Γ Δ : neg_ctx} : forall t, of_n_ctx Γ ∋ t -> of_n_ctx (Γ +▶ Δ) ∋ t.
@@ -651,11 +651,15 @@ Equations t_obs_args (x : neg_ty) : t_obs x -> neg_ctx :=
 Equations t_obs_goal (x : neg_ty) : t_obs x -> ty :=
   @t_obs_goal (_ ,' @NArr a b) o := b.
 
+Definition t_obs_nxt (x : neg_ty) (o : t_obs x) : neg_ctx * ty :=
+  (t_obs_args x o , t_obs_goal x o).
+
 (*|
 .. coq:: none
 |*)
 Arguments t_obs_args {x} o.
 Arguments t_obs_goal {x} o.
+Arguments t_obs_nxt {x} o.
 
 (*|
 |*)
