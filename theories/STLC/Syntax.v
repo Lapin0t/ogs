@@ -690,16 +690,15 @@ Arguments a_of_val {Γ x}.
 Equations? cext_get {Γ : neg_ctx} x (v : e_val Γ x) (y : neg_ty)
          : (a_cext (a_of_val v) : ctx) ∋ (y : ty) -> e_val Γ y :=
   cext_get (_ → _) v           (_ ,' _) top := v ;
-  cext_get (_ × _) (VPair u v) (_ ,' _) i := _ ;
-  cext_get (_ + _) (VInl u)    (_ ,' _) i := cext_get _ u _ i ;
-  cext_get (_ + _) (VInr v)    (_ ,' _) i := cext_get _ v _ i ;
+  cext_get (_ × _) (VPair u v) (_ ,' _) j := _ ;
+  cext_get (_ + _) (VInl u)    (_ ,' _) j := cext_get _ u _ j ;
+  cext_get (_ + _) (VInr v)    (_ ,' _) j := cext_get _ v _ j ;
   cext_get Unit    (VVar i) _ _ with neg_var i := { | (!) } ;
   cext_get (_ × _) (VVar i) _ _ with neg_var i := { | (!) } ;
   cext_get (_ + _) (VVar i) _ _ with neg_var i := { | (!) } .
 
-r_fixup.
-destruct (concat_split _ _ i) as [j|j].
-all: refine (cext_get _ _ _ (_ ,' _) j); auto.
+r_fixup; destruct (concat_split _ _ j) as [k|k].
+all: refine (cext_get _ _ _ (_ ,' _) k); auto.
 Defined.
 (*|
 .. coq:: none
