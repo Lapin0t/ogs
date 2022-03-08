@@ -14,28 +14,6 @@ From Equations Require Import Equations.
 Set Equations Transparent.
 
 
-Definition frame : Type := neg_ctx * ty.
-
-(* CPS procrastination
-Variant enf_kont : Type :=
-| KCtx : neg_ctx -> ty -> ty -> enf_kont
-| KVal : neg_ctx -> neg_ctx -> enf_kont
-.
-
-Variant enf_k_move : enf_kont -> Type :=
-| RET {Γ s t} : a_val s -> enf_k_move (KCtx Γ s t)
-| CALL {Γ Δ : neg_ctx} {s : neg_ty} : (Δ : ctx) ∋ (s : ty)
-                                    -> t_obs s -> enf_k_move (KVal Γ Δ)
-.
-
-Equations enf_k_nxt {k} : enf_k_move k -> list enf_kont :=
-  enf_k_nxt (@RET Γ s t v) := KVal _ (Γ +▶ a_cext v) ;
-  enf_k_nxt (@CALL Γ Δ s i o) := _ .
-
-  enf_k_move (KVal Γ Δ)   := 
-*)
-
-
 Variant enf_play (Γ : neg_ctx) : option ty -> Type :=
 | RET {x} : a_val x -> enf_play Γ (Some x)
 | CALL {x y} : Γ ∋ y -> t_obs y -> enf_play Γ x
@@ -56,281 +34,310 @@ Equations enf_next {Γ x} : enf_play Γ x -> stack_action (is_some x) :=
   enf_next (CALL i v) := Push (t_obs_args v) (t_obs_goal v) .
 
 Module OGS.
-  Notation Act := (false).
-  Notation Pass := (true).
+  Notation Act := (true).
+  Notation Pass := (false).
   Notation switch := (negb).
 
   Inductive stack : bool -> Type :=
-  | SNil : stack Pass
-  | SCon {role} : ty -> neg_ctx * stack (switch role) -> stack role
+  | SNil : neg_ctx -> stack Pass
+  | SCon {role} : neg_ctx -> ty -> stack (switch role) -> stack role
   .
   Arguments SCon {role}.
-  Definition index b := neg_ctx * stack b.
 
   (*
-  (Γ0 , SCon x0 (Δ0 , SCon y0 (Γ1 , SCon x1 (Δ1 , SNil))))
+  (Γ0 , SCon x0 (Δ0 , SNIL +++ SCon y0 (Γ1 , SCon x1 (Δ1 , SNil))))
+
+NOUS  Γ0 ⊢ x0                ++          Γ1 ⊢ x1
+EUX                Δ0 ⊢ ⊥   ++ Δ0' ⊢ y0            Δ1 ⊢ ⊥
+      ^^^^^^^^^^^^^^^^^       ^^^^^^^^^^^^^^^^^^^^^^^^
+        b = haut                a = bas
+r = Pass = true
+me = Act ; res = Pass
+me = Pass ; res = Act
+
+cas simple
+      ^^^^^^^^^^^^^^^^
+      ask Γ0 : push ...
+   ou ret x0 : pop Γ0 ⊢ x0
+               ^^^^^
+               on applique sur le haut + concaténer avec bas
+             == appliquer sur tout
+
+cas compliqué
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+                            ask Γ1 : push ..
+                            ret x1 impossible
+
+                                 vvvv
+                  appli +  concaténer avec le haut 
+              !=   appliquer push sur tout
+
+               Γ0 ⊢ x0            ++          Γ1 ⊢ x1
+Δ00 ⊢ x00               Δ0 ⊢ ⊥   ++ ∅ ⊢ y0            Δ1 ⊢ ⊥
+                  
+           
+
+  
+
+  
+
+  
+  
+
+
+
   Γ1 + Γ0 ⊢ x0
   Δ1 + Δ0 ⊢ y0
   Γ1 ⊢ x1
   Δ1
   *)
 
-  Equations s_flat_ctx {r} : stack r -> list neg_ctx :=
-    s_flat_ctx (SNil)           := ∅%ctx ;
-    s_flat_ctx (SCon _ (Γ , s)) := (s_flat_ctx s ▶ Γ)%ctx .
+  (* r : parité de la stack (SNil = pair = false)
+     autre: Act = je commence ; Pass = iel commence *)
+  Equations stack_ctx {r} : bool -> stack r -> neg_ctx :=
+    stack_ctx Act  (SNil Γ)     := Γ ;
+    stack_ctx Pass (SNil Γ)     := ∅%ctx ;
+    stack_ctx Act  (SCon Γ x s) := stack_ctx Pass s +▶ Γ ;
+    stack_ctx Pass (SCon Γ x s) := stack_ctx Act s .
 
-  Definition i_flat_ctx {r} (a : index r) : list neg_ctx :=
-    (s_flat_ctx (snd a) ▶ fst a)%ctx .
+  Equations stack_ty {r} : stack r -> option ty :=
+    stack_ty (SNil _)     := None ;
+    stack_ty (SCon _ t _) := Some t .
 
-  Equations deinterlace : bool -> list neg_ctx -> list neg_ctx :=
-    
+  Equations ext_head {r} : stack r -> neg_ctx -> stack r :=
+    ext_head (SNil Γ)     Δ := SNil (Γ +▶ Δ) ;
+    ext_head (SCon Γ x s) Δ := SCon (Γ +▶ Δ) x s .
 
-  (** Get the list of context extensions for either player or opponent. *)
-  Equations s_ctx {a} (r : bool) (Γ : neg_ctx) (s : stack a) : list neg_ctx by struct s :=
-    s_ctx Act  Γ s := (s_ctx_aux Pass s ▶ Γ)%ctx ;
-    s_ctx Pass Γ s := s_ctx_aux Act s
-  with s_ctx_aux {a} (r : bool) (s : stack a) : list neg_ctx by struct s :=
-    s_ctx_aux r (SNil)     := ∅%ctx ;
-    s_ctx_aux r (SCon _ i) := s_ctx r (fst i) (snd i) .
+  Equations stack_apply {r} (s : stack r) : stack_action (is_some (stack_ty s)) -> stack (switch r) :=
+    @stack_apply Pass (SCon Γ x s)  (Pop Δ)    := ext_head s Δ ;
+    @stack_apply Act  (SCon Γ x s)  (Pop Δ)    := ext_head s Δ ;
+    @stack_apply Pass s             (Push Δ y) := @SCon Act Δ y s ;
+    @stack_apply Act  s             (Push Δ y) := @SCon Pass Δ y s .
 
-  Equations i_ctx {b} (i : index b) (r : bool) : list neg_ctx :=
-    i_ctx i Act := cons (fst i) (s_ctx (snd i) Act) ;
-    i_ctx i Pass := s_ctx (snd i) Pass .
-  Definition stack_ctx {b} (s : stack b) : neg_ctx := join (s_ctx s Act).
-  Definition index_ctx {b} (s : index b) : neg_ctx := join (i_ctx s Act).
-
-  (*
-  Equations s_ctx : neg_ctx -> stack -> neg_ctx :=
-    s_ctx Γ (SNil) := Γ ;
-    s_ctx Γ (SCon _ (_ , SNil)) := Γ ;
-    s_ctx Γ (SCon _ (_ , SCon _ s)) := (s_ctx (fst s) (snd s) +▶ Γ) .
-*)
-
-  Equations stack_ty {b} : index b -> option ty :=
-    stack_ty (_ , SNil)   := None ;
-    stack_ty (_ , SCon t _) := Some t .
-
-  Equations ext_head {b} : index b -> neg_ctx -> index b :=
-    ext_head i Δ := ((fst i +▶ Δ)%ctx , snd i) .
-
-  Equations stack_apply {b} (i : index b) : stack_action (is_some (stack_ty i)) -> index (switch b) :=
-    @stack_apply Pass (Γ , SCon x s)  (Pop Δ) := ext_head s Δ ;
-    @stack_apply Act  (Γ , SCon x s)  (Pop Δ) := ext_head s Δ ;
-    @stack_apply Pass (Γ , s)         (Push Δ y) := (Δ , @SCon Act y (Γ , s)) ;
-    @stack_apply Act  (Γ , s)         (Push Δ y) := (Δ , @SCon Pass y (Γ , s)) .
-
-  Definition half_g b : half_game (index b) (index (switch b)) :=
-    {| move := fun e => enf_play (index_ctx e) (stack_ty e) ;
+  Definition half_g r : half_game (stack r) (stack (switch r)) :=
+    {| move := fun e => enf_play (stack_ctx Act e) (stack_ty e) ;
        next := fun e m => stack_apply e (enf_next m) |} .
 
-  Definition game_desc : game' (index false) (index true) :=
+  Definition game_desc : game' (stack Act) (stack Pass) :=
     {| client := half_g Act ; server := half_g Pass |}.
 
   Definition ogs := itree game_desc ∅ᵢ.
   Definition ogs_opp := itree (dual game_desc) ∅ᵢ.
 
-  (*
-  Definition 
-    a_s       =  T1 ;  T2 -> T3 ; []
-    a_s + b_s =  T1 -> T2 ;  T3 -> T4 ; []
+  Equations stack_cat {r s} : stack r -> stack s -> stack (xorb r s) :=
+    @stack_cat Act  Pass a (SNil Γ)     := ext_head a Γ ;
+    @stack_cat Pass Pass a (SNil Γ)     := ext_head a Γ ;
+    @stack_cat Act  Act  a (SCon Γ x b) := @SCon Pass Γ x (stack_cat a b) ;
+    @stack_cat Act  Pass a (SCon Γ x b) := @SCon Act  Γ x (stack_cat a b) ;
+    @stack_cat Pass Act  a (SCon Γ x b) := @SCon Act  Γ x (stack_cat a b) ;
+    @stack_cat Pass Pass a (SCon Γ x b) := @SCon Pass Γ x (stack_cat a b) .
 
-    comp =                         T4 ; []
-  *)
+  Infix "s▶" := (stack_cat) (at level 40).
 
-  Equations aux_cat {r} : index Act -> neg_ctx -> stack r -> index (switch r) :=
-    aux_cat t Γ (SNil)     := ext_head t Γ ;
-    aux_cat t Γ (SCon x s) := (Γ , SCon x (aux_cat t (fst s) (snd s))) .
+  Variant implyb : bool -> bool -> Type :=
+    | ImpTT : implyb true true
+    | ImpFA {b} : implyb false b
+  .
+  Notation "a =b> b" := (implyb a b) (at level 30).  
 
-  Definition index_cat {r} (a : index Act) (b : index r) :=
-    aux_cat a (fst b) (snd b) .
+  Equations fix_action {a b} : a =b> b -> stack_action a -> stack_action b :=
+    fix_action (ImpTT) (Pop Δ)    := Pop Δ ;
+    fix_action _       (Push Δ x) := Push Δ x .
 
-  (*Infix "s▶" := (stack_cat) (at level 40).*)
-  Infix "i▶" := (index_cat) (at level 40).
-
-  Definition stack_cat_join {r} s (a : index r) (b : index Act)
-    :   join (i_ctx (b i▶ a) s)
-        = join (i_ctx b (xorb (negb s) r) +▶ i_ctx a s)%ctx.
-    cbv [index_cat i_ctx]. cbn.
-    funelim (aux_cat b (fst a) (snd a)).
-    + rewrite <- e. cbn.
-      destruct s.
-      - reflexivity.
-      - cbn. exact (app_assoc_reverse _ _ _).
-    + rewrite <- e. cbn.
-      destruct s.
-      - cbn.
-
-  Equations stack_cat_join {r} s (a : index r) (b : index Act)
-    :   join (i_ctx (b i▶ a) s)
-        = join (i_ctx b (xorb (negb s) r) +▶ i_ctx a s)%ctx
-               by struct a
-    :=
-    stack_cat_join true  (_ , SNil)                  t := eq_refl ;
-    stack_cat_join false (_ , SNil)                  t := app_assoc_reverse _ _ _ ;
-    stack_cat_join true  (_ , @SCon true  _ (Δ , SCon _ (_ , s))) t
-      := _ ;
-    stack_cat_join false (_ , @SCon true  _ (Δ , s)) t := _ ;
-    stack_cat_join true  (_ , @SCon false _ (Δ , s)) t := _ ;
-    stack_cat_join false (_ , @SCon false _ (Δ , s)) t := _ .
-  Obligation 1.
-  dependent elimination s.
-  + reflexivity.
-  + destruct p. cbn. refine (f_equal (fun x => x +▶ Δ)%ctx _).
-    dependent elimination s. cbn.
-
-     + cbn.
-  refine (stack_cat_join _ Pass (Δ , s) t).
-
-  dependent elimination s. destruct p.
-  cbn [aux_cat]. cbn [fst snd join].
-  dependent elimination s. destruct p.
-  dependent elimination s.
-  cbn. shelve.
-  cbn.
-  destruct 
-  cbv beta.
-
-  cbv [i_ctx]. cbn. 
-  refine (app_assoc_reverse _ _ _).
-  Search (_ +▶ (_ +▶ _)%ctx)%ctx.
- 
-  Search join.
-  cbv [i_ctx join]
-
-
-    stack_cat_join true  (_ , SNil)                  t := eq_refl ;
-    stack_cat_join false (_ , SNil)                  t := eq_refl ;
-    stack_cat_join true  (_ , @SCon true  _ (Δ , s)) t := f_equal (cons Δ) (stack_cat_join _ s t) ;
-    stack_cat_join false (_ , @SCon true  _ (Δ , s)) t := stack_cat_join _ s t ;
-    stack_cat_join true  (_ , @SCon false _ (Δ , s)) t := f_equal (cons Δ) (stack_cat_join _ s t) ;
-    stack_cat_join false (_ , @SCon false _ (Δ , s)) t := stack_cat_join _ s t .
-
-  Definition stack_cat_inj_l {a b} (t : stack Act) (s : stack a) {x}
-    (i : join (s_ctx s b) ∋ x) : join (s_ctx (t s▶ s) b) ∋ x.
-    rewrite stack_cat_join.
-    rewrite (@join_cat _ (s_ctx t _) (s_ctx s b)).
-    refine (r_concat_r _ _ _ i).
+  Definition cat_head {r s} (a : stack r) (b : stack s)
+    : is_some (stack_ty a) =b> is_some (stack_ty (a s▶ b)).
+    dependent elimination a; [exact (ImpFA)|].
+    dependent elimination b; [destruct role|destruct role,role0]; exact (ImpTT).
   Defined.
 
-  Definition index_cat_join {b} (e : index b) (t : stack Act)
-    : i_ctx (t i▶ e) = (s_ctx t _ +▶ i_ctx e)%ctx
-    := f_equal (cons _) (stack_cat_join _ (snd e) t).
+  Definition stack_cat_join {r s} me (a : stack r) (b : stack s) 
+    : stack_ctx me (a s▶ b)
+      = (stack_ctx (xorb s me) a +▶ stack_ctx me b)%ctx.
+    funelim (a s▶ b); destruct me.
+    all: cbn; try (rewrite app_assoc_reverse; f_equal); try apply H.
+    all: dependent elimination a; try reflexivity; apply app_assoc_reverse.
+  Defined.
 
-  Equations stack_cat_apply {Γ x t} (e : index Act) a
-    : stack_apply (t i▶ (Γ , @SCon Pass x e)) a
-      = t i▶ (stack_apply (Γ , @SCon Pass x e) a) :=
-    stack_cat_apply (_ , SCon _ _) (Pop _)    := eq_refl ;
-    stack_cat_apply (_ , SCon _ _) (Push _ _) := eq_refl .
+  Definition stack_cat_inj_l {r s me} (a : stack r) (b : stack s) {x}
+    : stack_ctx me b ∋ x -> stack_ctx me (a s▶ b) ∋ x :=
+    rew <- [fun n => _ -> n ∋ _ ] stack_cat_join _ _ _
+    in r_concat_r _ _ _.
+
+  (*
+  Equations stack_cat_apply_top {Γ x a} (b : stack Act) (m : stack_action true)
+    : stack_apply (a s▶ @SCon Pass Γ x b) m
+    = a s▶ (stack_apply (@SCon Pass Γ x b) m)
+    :=
+    stack_cat_apply_top (SCon _ _ _) (Pop _)    := eq_refl ;
+    stack_cat_apply_top (SCon _ _ _) (Push _ _) := eq_refl .
+  *)
+
+  (*
+  Equations stack_cat_apply_bot {Γ x a} (b : stack Act) (mv : stack_action false)
+    : stack_apply (a s▶ @SCon Pass Γ x b) mv
+    = stack_apply (@SCon Pass Γ x a) mv s▶ b
+    :=
+    stack_cat_apply (SCon _ _ _) (Pop _)    := eq_refl ;
+    stack_cat_apply (SCon _ _ _) (Push _ _) := eq_refl .
+  Check stack_cat_apply.
+*)
 
   Variant comp_arg (s : stack Act) : Type :=
   | CompAP {e} :
         ogs e
-      -> (forall r : c_move game_desc e, ogs (s i▶ c_next game_desc e r))
+      -> (forall r : c_move game_desc e, ogs (s s▶ c_next game_desc e r))
       -> comp_arg s
   | CompPA {e} :
       (forall r : s_move game_desc e, ogs (s_next game_desc e r))
-      -> ogs (s i▶ e)
+      -> ogs (s s▶ e)
       -> comp_arg s
   .
   Arguments CompAP {s e} ply opp.
   Arguments CompPA {s e} ply opp.
 
-  Definition split_var (e : index true) {t x} (i : index_ctx (t i▶ e) ∋ x)
-             : index_ctx (∅%ctx , t) ∋ x + index_ctx e ∋ x
-        := concat_split _ _
-              (rew [fun x => x ∋ _] (join_cat _ _)
-               in rew [fun x => join x ∋ _ ] index_cat_join e t
-               in i).
-
-  Equations split_move {e : index true} {s} : c_move game_desc (s i▶ e) -> c_move game_desc (∅%ctx , s) + s_move game_desc e :=
-    @split_move (_ , SNil)     (SCon _ _) (RET v) := inl (RET v) ;
-    @split_move (_ , SCon _ _) _          (RET v) := inr (RET v) ;
-    @split_move (Γ , s)        t          (CALL i v) with split_var (Γ , s) i :=
-      { | inl i := inl (CALL i v) ;
-        | inr i := inr (CALL i v) } .
-
-
-  Definition split_resp {e : index true} {s} (c : c_move game_desc (s i▶ e)) : Type := match split_move c with
-      | inl m => s_move game_desc (c_next game_desc (∅%ctx , s) m)
-      | inr m => c_move game_desc (s_next game_desc e m)
+  Definition split_var (a : stack Act) {r} (b : stack r) {x}
+             (i : stack_ctx Act (a s▶ b) ∋ x)
+             : stack_ctx (switch r) a ∋ x + stack_ctx Act b ∋ x.
+    refine (concat_split _ _ _).
+    destruct r; exact (rew [fun t => t ∋ _ ] stack_cat_join _ _ _ in i).
+  Defined.
+    
+  Equations split_move (a : stack Act) (b : stack Pass)
+    : c_move game_desc (a s▶ b)
+      -> c_move game_desc a + s_move game_desc b :=
+    split_move (SCon _ _ _) (SNil _)     (RET v) := inl (RET v) ;
+    split_move (SCon _ _ _) (SCon _ _ _) (RET v) := inr (RET v) ;
+    split_move a            b            (CALL i v) :=
+      match (split_var a b i) with
+      | inl j => inl (CALL j v)
+      | inr j => inr (CALL j v)
       end.
-  (*Arguments split_resp /.*)
 
-  Definition split_resp_next {e : index true} {s} (c : c_move game_desc (s i▶ e)) : split_resp c -> index Act.
-    intros w. unfold split_resp in w.
-    destruct (split_move c).
-    - Check (s_next game_desc _ w).
-    - exact (s i▶ c_next game_desc _ w).
+  Definition split_resp {a : stack Act} {b : stack Pass}
+     (m : c_move game_desc a + s_move game_desc b) : Type
+    := match m with
+      | inl m => s_move game_desc (c_next game_desc _ m)
+      | inr m => c_move game_desc (s_next game_desc _ m)
+      end.
+
+  Axiom todo : forall A : Type, A.
+
+  Equations split_resp_next (a : stack Act) (b : stack Pass)
+            (m : c_move game_desc (a s▶ b))
+            : split_resp (split_move a b m) -> stack Act :=
+    split_resp_next a b m r with split_move a b m :=
+      { | inl m' := (*todo _ *) stack_apply (_ s▶ b) (fix_action (cat_head _ b) (enf_next r)) ;
+        | inr m' => a s▶ (c_next game_desc _ r) } .
+
+  (*
+  Definition split_resp_next (a : stack Act) (b : stack Pass)
+             (m : c_move game_desc (a s▶ b)) : split_resp m -> stack Act :=
+    match split_move a b m
+      as s0 return (match s0 with
+                    | inl m' => s_move game_desc (c_next game_desc a m')
+                    | inr m' => c_move game_desc (s_next game_desc b m')
+                    end -> stack Act)
+    with
+    | inl m' => fun r0 => stack_apply (_ s▶ b) (imply_stack_action (cat_ty_some _ b)
+                                                               (enf_next r0))
+    | inr m' => fun r0 => a s▶ (c_next game_desc _ r0)
+    end.
+    
+    cbv [split_resp] in r.
+    destruct (split_move a b m).
+    - exact (stack_apply (stack_apply a (enf_next c) s▶ b)
+                         (imply_stack_action (cat_ty_some _ _) (enf_next r))).
+    - exact (a s▶ c_next game_desc (stack_apply b (enf_next s)) r).
+  Defined.
+  Print split_resp_next.
+*)
+
+  (*
+  Equations? inj_split_resp (a : stack Act) (b : stack Pass)
+             (c : c_move game_desc (a s▶ b)) (w : split_resp (split_move a b c))
+             : s_move game_desc (c_next game_desc (a s▶ b) c) :=
+    inj_split_resp (SCon _ _ _) (SNil _)                (RET v) m := m ;
+    inj_split_resp (SCon _ _ s) (SCon _ _ (SCon _ _ _)) (RET v) (RET w) :=
+      RET w ;
+    inj_split_resp (SCon _ _ s) (SCon _ _ (SCon _ _ _)) (RET v) (CALL i w) :=
+      CALL (rew <- [fun x => (x +▶ _)%ctx ∋ _] (stack_cat_join _ _ _)
+            in rew [fun x => x ∋ _] app_assoc_reverse _ _ _
+            in r_concat_r _ _ _ i)
+           w ;
+    inj_split_resp a b (CALL i v) w with split_var a b i :=
+      { | inl j := _ ;
+        | inr j := _ } .
+  cbn in w.
+  1,2: cbn.
+  1,2: cbv [split_resp] in w; cbn in w.
+  1,2: destruct (split_var _ _ i).
+
+  Obligation 
+  Obligation 2.
+*)
+
+  Definition inj_split_resp (a : stack Act) (b : stack Pass)
+             (c : c_move game_desc (a s▶ b)) (w : split_resp (split_move a b c))
+             : fiber (s_next game_desc (c_next game_desc (a s▶ b) c))
+                     (split_resp_next _ _ _ w).
+    cbv [split_resp_next].
+    funelim (split_move a b c); cbn in w. all: swap 3 2.
+    - apply (fib_constr w).
+      dependent elimination s; dependent elimination w; cbn.
+
+      cbn. admit. admit. admit.
+    - dependent elimination s0; dependent elimination w.
+      + apply (fib_constr (RET a)).
+        dependent elimination s0; [cbn; rewrite app_assoc|]; reflexivity.
+      + unshelve eapply (fib_constr (CALL _ t1)).
+        exact (rew <- [fun x => (x +▶ _)%ctx ∋ _] (stack_cat_join _ _ _)
+               in rew [fun x => x ∋ _] app_assoc_reverse _ _ _
+               in r_concat_r _ _ _ h).
+        reflexivity.
+    - cbn. cbn in w; destruct (split_var (SCon n0 t s) (SNil n) i); cbn in w.
+      + apply (fib_constr w).
+        dependent elimination w.
+        * cbn.
+        admit.
+      + dependent elimination w.
+        * apply (fib_constr (RET a)). cbn. f_equal. apply app_assoc.
+        * unshelve eapply (fib_constr (CALL (r_concat_r _ _ _ _) t0)).
+          destruct (concat_split _ _ h0); [dependent elimination h1|exact h1].
+          cbn. reflexivity.
+    - cbn in w. cbn.
+      destruct (split_var (SCon n0 t s) (SCon n1 t0 s0) i); cbn in w.
+      all: dependent elimination w.
+      1,3: apply (fib_constr (RET a)); admit.
+      all: unshelve eapply (fib_constr (CALL _ t1)); cbn.
+      1,2: refine (rew <- [fun x => (x +▶ _)%ctx ∋ _] (stack_cat_join _ _ _) in _).
+      1,2: destruct (concat_split _ _ h0); cbn.
+      2,4: exact (r_concat_r _ _ _ h1).
+      exact (r_concat_l _ _ _ (r_concat_l _ _ _ h1)).
+      exact (r_concat_l _ _ _ (r_concat_r _ _ _ h1)).
+      admit.
+      reflexivity.
+  Defined.
   Defined.
 
+  Definition inj_split_resp_coh {a : stack Act} {b : stack Pass}
+             (c : c_move game_desc (a s▶ b)) (w : split_resp (split_move a b c))
+             : s_next game_desc _ (inj_split_resp _ _ c w) = split_resp_next _ _ _ w.
+    cbv [split_resp] in w. cbv [split_resp_next].
+    cbv [inj_split_resp]. cbn.
+    funelim (split_move a b c); cbn in w.
+    - cbn; dependent elimination s; cbn.
+      + dependent elimination w; cbn. shelve.
+      + dependent elimination w.
+        * reflexivity.
+        * shelve.
+    - cbn.
+      destruct (split_var (SCon n0 t s) (SNil n) i); cbn in w |-.
+      + cbn. dependent elimination w. cbn.
+      
+      shelve.
+      cbn. shelve.
 
-  Equations inj_split_resp {e : index true} {s} (c : c_move game_desc (s i▶ e))
-    (w : split_resp c) : s_move game_desc (c_next game_desc (s i▶ e) c) :=
-    @inj_split_resp (_ , SNil)                        (SCon _ _) (RET v) m := m ;
-    @inj_split_resp (_ , SCon _ (_ , SCon _ _))                _ (RET v) (RET w) := RET w ;
-    @inj_split_resp (_ , SCon _ (_ , (SCon _ (_ , SNil))))     _ (RET v) (CALL i w) := CALL (r_concat_r _ _ _ _) w ;
-    @inj_split_resp (_ , SCon _ (_ , (SCon _ (_ , SCon _ _)))) _ (RET v) (CALL i w) := CALL _ w ;
-    @inj_split_resp (Γ , SNil)               t                   (CALL i v) m := _ ;
-    @inj_split_resp (Γ , SCon _ (_ , _))     t                   (CALL i v) m := _ .
-  Obligation 2. cbn in i; rewrite app_nil_r in i; exact i. Defined.
-  Obligation 3.
-  cbn in *.
-  destruct (concat_split _ _ i) as [j|j].
-  - destruct (concat_split _ _ j) as [k|k].
-    + refine (r_concat_l _ _ _ (r_concat_l _ _ _ _)).
-      refine (stack_cat_inj_l _ _ k).
-    + refine (r_concat_l _ _ _ (r_concat_r _ _ _ k)).
-  - refine (r_concat_r _ _ _ j).
-  Defined.
-  Obligation 1.
-  cbv [split_resp] in m; cbn in m. cbv [split_move_clause_3] in m. cbn in m.
-  destruct (split_var (Γ , SNil) i); cbn in m.
-  - dependent elimination m.
-    + refine (RET a).
-    + refine (CALL h0 t).
-  - dependent elimination m.
-    + refine (RET a).
-    + refine (CALL (r_concat_r _ _ _ (rew [fun x => x ∋ y] (app_nil_r _) in h0)) t).
-  Defined.
-  Obligation 4.
-  cbv [split_resp split_move_clause_3_1] in m; cbn in m.
-  dependent elimination t.
-  destruct (split_var (Γ , @SCon Pass e0 (e1 , @SCon Act t0 (n , s))) i); cbn in m.
-  - dependent elimination m.
-    + refine (RET a).
-    + refine (CALL _ t1).
-      destruct p; cbn.
-      destruct (concat_split _ _ h0).
-      refine (r_concat_l _ _ _ (r_concat_l _ _ _ _)).
-      cbn in h1.
-      destruct (concat_split _ _ h1).
-      refine (rew <- [fun x => join x ∋ y] (stack_cat_join Pass s (SCon t (n0 , s0))) in _).
-      cbn. refine (rew <- [fun x => x ∋ y] (join_cat _ _) in _).
-      refine (r_concat_l _ _ _ _).
-      cbn. refine (r_concat_l _ _ _ h2).
-      refine (rew <- [fun x => join x ∋ y] (stack_cat_join Pass s (SCon t (n0 , s0))) in _).
-      cbn. refine (rew <- [fun x => x ∋ y] (join_cat _ _) in _).
-      refine (r_concat_l _ _ _ _).
-      refine (r_concat_r _ _ _ h2).
-      refine (r_concat_r _ _ _ h1).
-  - dependent elimination m.
-    + refine (RET a).
-    + refine (CALL _ t1).
-      cbn in *.
-      destruct (concat_split _ _ h0).
-      * refine (r_concat_l _ _ _ _).
-      destruct (concat_split _ _ h1).
-      refine (r_concat_l _ _ _ _).
-      destruct p.
-      refine (rew <- [fun x => join x ∋ y] (stack_cat_join Pass s (SCon t _)) in _).
-      cbn. refine (rew <- [fun x => x ∋ y] (join_cat _ _) in _).
-      refine (r_concat_r _ _ _ h2).
-      refine (r_concat_r _ _ _ h2).
-      * refine (r_concat_r _ _ _ h1).
- Defined.
-
-  Definition inj_split_resp_coh {e : index true} {s} (c : c_move game_desc (s i▶ e))
-    (w : split_resp c) : s_next game_desc _ (inj_split_resp c w) = split_resp_next _ w.
+    - cbn in w. cbv [split_resp_next].
     funelim (inj_split_resp c w); auto.
     - 
       destruct p.
@@ -456,6 +463,30 @@ Admitted.
             : fiber (s_next game_desc (c_next game_desc (s i▶ e) c))
                                       (split_resp_next _ w) :=
   fib_constr _ _ (inj_split_resp_coh c w).
+
+
+  (*  DEF CIO(≈) : (conf act -> conf pass) ** 2 -> Prop
+
+      a ≈ a'
+  ---------------    tau-left
+  a || b ≈CIO a ' || b
+
+      b ≈ b'
+  ---------------    tau-right
+  a || b ≈CIO a || b'
+
+      
+  -----------------------------------
+  Vis e ka || Vis (dual e) kb ≈CIO ka || kb
+
+     
+
+  operateur sur la relation bisim
+  ==> chap 7 sangiorgi barb
+
+
+
+  *)
 
 
   Definition compo : forall s, comp_arg s -> ogs (∅%ctx , s) :=
