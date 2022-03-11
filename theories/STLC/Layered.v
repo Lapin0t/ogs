@@ -13,69 +13,179 @@ From OGS.STLC Require Import Ctx Syntax.
 From Equations Require Import Equations.
 Set Equations Transparent.
 
-Variant ctx_any {X} (P : X -> Type) (Γ : Ctx.ctx X) : Type :=
-| CAny {x} : Γ ∋ x -> P x -> ctx_any P Γ
+
+From OGS.ITree Require Import Eq.
+From Paco Require Import paco.
+Require Import Coq.Program.Equality.
+
+Variant kont : Type :=
+| KCtx : ty -> kont
+| KVar : neg_ty -> kont
 .
 
-Definition enf_answer : half_game ty neg_ctx :=
-  {| move := a_val ;
-     next := @a_cext |} .
+Equations k_move : kont -> Type :=
+  k_move (KCtx x) := a_val x ;
+  k_move (KVar x) := t_obs x .
 
-Definition enf_question : half_game neg_ty (neg_ctx * ty) :=
-  {| move := t_obs ;
-     next := @t_obs_nxt |} .
-
+Equations k_next (k : kont) : k_move k -> list kont :=
+  k_next (KCtx x) a := map KVar (a_cext a) ;
+  k_next (KVar x) o := cons (KCtx (t_obs_goal o)) (map KVar (t_obs_args o)) .
 
 (*
+Definition base : half_game (list kont) (list kont) :=
+  {| move := any k_move ;
+     next := any_elim k_next |} .
 
-I = ty
-J = neg_ty
-
-TANS : I => list J
-TREQ : J => list J * I
-
-!TREQ ⊸ TANS
-
-par : I => J -> list I => J
-
-(t1 ⊗ t2 ⊗ t3) ⊸ t
-
-par TREQ : list J => list J * I
-
-AA := par TREQ + TANS : list J * I => list J * I + list J
-
-par TREQ + TANS || join (par TREQ + TANS , par TREQ) 
-
-BASE := TANS | par TREQ : I => list J => list J * I
-
-
- 
-
-
-
-the type game:
-c_mv : I -> Type                    # a_val: type answer
-c_nxt {i} : c_mv i -> list J        # a_cext: spawn *several* continuations
-s_mv : J -> Type                    # ty_obs: server move on 1 given continuation
-s_nxt {j} : s_mv j -> I             # ty_obs_goal: server transition to new goal
-s_ext {j} : s_mv j -> list J        # ty_obs_args: spawning new continuations
-
-
+Definition g_lassen : game' (list kont) (list kont * list kont) :=
+  {| client := {| move := fun xs => any k_move xs ;
+                  next := fun xs m => (any_elim k_next xs m , xs) |} ;
+     server := {| move := fun ys => any k_move (fst ys) ;
+                  next := fun ys m => app (any_elim k_next (fst ys) m) (snd ys) |} |} .
 *)
 
-Definition frame : Type := neg_ctx * ty.
+Definition half_ogs : half_game (list kont * list kont) (list kont * list kont) :=
+  {| move := fun xs => any k_move (fst xs) ;
+     next := fun xs m => (app (any_elim k_next _ m) (snd xs) , fst xs) |} .
 
-Variant enf_play (Γ : neg_ctx) : option ty -> Type :=
-| RET {x} : a_val x -> enf_play Γ (Some x)
-| CALL {x} {y : neg_ty} : (Γ : ctx) ∋ (y : ty) -> t_obs y -> enf_play Γ x
-.
-Arguments RET {Γ x} v.
-Arguments CALL {Γ x y} i o.
+Definition g_ogs : game' (list kont * list kont) (list kont * list kont) :=
+  {| client := half_ogs ; server := half_ogs |}.
 
-Record v_kont : Type := VKont { vk_ctx : neg_ctx ;
-                                vk_ty : ty }.
-Record c_kont : Type := CKont { ck_ctx : neg_ctx ;
-                                ck_in : ty ;
-                                ck_out : ty }.
+Definition ogs := itree g_ogs ∅ᵢ.
 
-Equations v_play : v_kont -> Type := 
+Section composition.
+  
+Variant _compo_arg (showₚ showₒ hideₚ hideₒ fullₚ fullₒ : list kont) : Type :=
+| _c_ap  : ogs (fullₚ , fullₒ)
+         -> iforest g_ogs ∅ᵢ (hideₚ , hideₒ)
+         -> _compo_arg showₚ showₒ hideₚ hideₒ fullₚ fullₒ
+| _c_pa : iforest g_ogs ∅ᵢ (fullₒ , fullₚ)
+        -> ogs (hideₒ , hideₚ)
+        -> _compo_arg showₚ showₒ hideₚ hideₒ fullₚ fullₒ
+  .
+Arguments _c_pa {showₚ showₒ hideₚ hideₒ fullₚ fullₒ} a b.
+Arguments _c_ap {showₚ showₒ hideₚ hideₒ fullₚ fullₒ} a b.
+
+Definition _compo : forall showₚ showₒ hideₚ hideₒ fullₚ fullₒ
+                    , showₚ ⊎ hideₚ ≡ fullₚ
+                    -> showₒ ⊎ hideₒ ≡ fullₒ
+                    -> _compo_arg showₚ showₒ hideₚ hideₒ fullₚ fullₒ
+                    -> ogs (showₚ , showₒ).
+  cofix CIH.
+  intros ? ? ? ? ? ? cₚ cₒ [a b|a b].
+  - destruct (observe a).
+    + destruct r.
+    + exact (Tau (CIH _ _ _ _ _ _ cₚ cₒ (_c_ap t b))).
+    + destruct e as [x i m].
+      destruct (cover_split cₚ i) as [j|j].
+      * refine (Vis (Any _ _ j m : qry g_ogs (_,_)) (fun r => _)).
+        refine (CIH _ _ _ _ _ _ _ (ext_cover_l _ cₒ)
+                    (_c_ap (k (r_any (r_cover_l (ext_cover_l _ cₒ)) r)) b)).
+        refine (@cat_cover _ _ _ _ ∅ _ _ cₚ _); destruct r; refine (cover_nil_r).
+      * exact (Tau (CIH _ _ _ _ _ _ cₚ (ext_cover_r _ cₒ)
+                        (_c_pa k (b (Any _ _ j m))))).
+  - destruct (observe b).
+    + destruct r.
+    + exact (Tau (CIH _ _ _ _ _ _ cₚ cₒ (_c_pa a t))).
+    + destruct e as [x i m].
+      exact (Tau (CIH _ _ _ _ _ _ (ext_cover_r _ cₚ) cₒ
+                      (_c_ap (a (Any _ _ (r_cover_r cₒ i) m)) k))).      
+Defined.
+Arguments _compo {_ _ _ _ _ _}.
+
+Definition compo_ap {showₚ showₒ hideₚ hideₒ fullₚ fullₒ}
+      (cₚ : showₚ ⊎ hideₚ ≡ fullₚ) (cₒ : showₒ ⊎ hideₒ ≡ fullₒ)
+      (a : ogs (fullₚ , fullₒ)) (b : iforest g_ogs ∅ᵢ (hideₚ , hideₒ))
+      : ogs (showₚ , showₒ)
+  := _compo cₚ cₒ (_c_ap a b).
+
+Definition compo_pa {showₚ showₒ hideₚ hideₒ fullₚ fullₒ}
+      (cₚ : showₚ ⊎ hideₚ ≡ fullₚ) (cₒ : showₒ ⊎ hideₒ ≡ fullₒ)
+      (a : iforest g_ogs ∅ᵢ (fullₒ , fullₚ)) (b : ogs (hideₒ , hideₚ))
+      : ogs (showₚ , showₒ)
+  := _compo cₚ cₒ (_c_pa a b).
+
+(**********)
+(* PROOFS *)
+(**********)
+
+
+Variant _compo_arg_eq (showₚ showₒ hideₚ hideₒ fullₚ fullₒ : list kont) : Type :=
+| _c_pa2 (a0 a1 : iforest g_ogs ∅ᵢ (fullₒ , fullₚ)) (b0 b1 : ogs (hideₒ , hideₚ))
+  : (forall r, a0 r ≈ a1 r) -> b0 ≈ b1 -> _compo_arg_eq showₚ showₒ hideₚ hideₒ fullₚ fullₒ 
+| _c_ap2 (a0 a1 : ogs (fullₚ , fullₒ)) (b0 b1 : iforest g_ogs ∅ᵢ (hideₚ , hideₒ))
+  : a0 ≈ a1 -> (forall r, b0 r ≈ b1 r) -> _compo_arg_eq showₚ showₒ hideₚ hideₒ fullₚ fullₒ 
+  .
+Arguments _c_pa2 {showₚ showₒ hideₚ hideₒ fullₚ fullₒ} a0 a1 b0 b1 ea eb.
+Arguments _c_ap2 {showₚ showₒ hideₚ hideₒ fullₚ fullₒ} a0 a1 b0 b1 ea eb.
+
+Equations _c_arg_eq_l {sₚ sₒ hₚ hₒ fₚ fₒ}
+  : _compo_arg_eq sₚ sₒ hₚ hₒ fₚ fₒ -> _compo_arg sₚ sₒ hₚ hₒ fₚ fₒ :=
+  _c_arg_eq_l (_c_pa2 a0 a1 b0 b1 ea eb) := _c_pa a0 b0 ;
+  _c_arg_eq_l (_c_ap2 a0 a1 b0 b1 ea eb) := _c_ap a0 b0 .
+    
+Equations _c_arg_eq_r {sₚ sₒ hₚ hₒ fₚ fₒ}
+  : _compo_arg_eq sₚ sₒ hₚ hₒ fₚ fₒ -> _compo_arg sₚ sₒ hₚ hₒ fₚ fₒ :=
+  _c_arg_eq_r (_c_pa2 a0 a1 b0 b1 ea eb) := _c_pa a1 b1 ;
+  _c_arg_eq_r (_c_ap2 a0 a1 b0 b1 ea eb) := _c_ap a1 b1 .
+    
+
+(* bisimilarity of composition of pairwise bisimilar arguments *)
+Lemma _compo_cong {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ fₚ) (cₒ : sₒ ⊎ hₒ ≡ fₒ)
+      (a : _compo_arg_eq sₚ sₒ hₚ hₒ fₚ fₒ)
+      : _compo cₚ cₒ (_c_arg_eq_l a) ≈ _compo cₚ cₒ (_c_arg_eq_r a).
+  revert sₚ sₒ hₚ hₒ fₚ fₒ cₚ cₒ a.
+  pcofix CIH; pstep.
+  intros ? ? ? ? ? ? ? ? [ a0 a1 b0 b1 ea eb | a0 a1 b0 b1 ea eb ].
+  - cbv [eqit_ observe]; cbn; cbv [observe].
+    punfold eb; cbv [eqit_ observe _observe] in eb; cbn in eb.
+    dependent induction eb; cbv [_observe]; try rewrite <- x0; try rewrite <- x.
+    + destruct r1.
+    + econstructor; right.
+      refine (CIH _ _ _ _ _ _ _ _ (_c_pa2 _ _ _ _ ea _)).
+      destruct REL; [exact H|destruct H].
+    + destruct e.
+      econstructor; right.
+      refine (CIH _ _ _ _ _ _ _ _ (_c_ap2 _ _ _ _ (ea (Any k_move _ _ _)) _)).
+      intro r0; destruct (REL r0); [exact H|destruct H].
+    + econstructor; auto.
+      cbv [observe]; cbn; cbv [observe].
+      exact (IHeb CIH _ _ _ _ _ _ ea eq_refl eq_refl).
+    + econstructor; auto.
+      cbv [observe]; cbn; cbv [observe].
+      exact (IHeb CIH _ _ _ _ _ _ ea eq_refl eq_refl).
+  - cbv [eqit_ observe]; cbn; cbv [observe].
+    punfold ea; cbv [eqit_ observe _observe] in ea; cbn in ea.
+    dependent induction ea; cbv [_observe]; try rewrite <- x0; try rewrite <- x.
+    + destruct r1.
+    + econstructor; right.
+      refine (CIH _ _ _ _ _ _ _ _ (_c_ap2 _ _ _ _ _ eb)).
+      destruct (REL); [exact H|destruct H].
+    + destruct e; destruct (cover_split cₚ h).
+      * econstructor; right.
+        refine (CIH _ _ _ _ _ _ _ _ (_c_ap2 _ _ _ _ _ eb)).
+        destruct (REL (r_any (r_cover_l (ext_cover_l _ cₒ)) v));
+          [exact H|destruct H].
+      * econstructor; right.
+        refine (CIH _ _ _ _ _ _ _ _ (_c_pa2 _ _ _ _ _ (eb (Any _ _ _ _)))).
+        intro r0; destruct (REL r0); [exact H|destruct H].
+    + econstructor; auto.
+      cbv [observe]; cbn; cbv [observe].
+      refine (IHea CIH _ _ _ _ _ _ eq_refl eq_refl eb).
+    + econstructor; auto.
+      cbv [observe]; cbn; cbv [observe].
+      refine (IHea CIH _ _ _ _ _ _ eq_refl eq_refl eb).
+Qed.
+Check _compo_cong.
+
+(***
+lem1 : norm a ≈ norm b -> inj_ogs a ≈ inj_ogs b
+lem2 : inj_ogs a ≈ inj_ogs b -> norm a ≈ norm b
+
+a ≈obs b := forall E, norm (E[a]) ≈ norm (E[b]) 
+
+lem2 : inj_ogs (E[t]) = _compo (inj_ogs_ctx E, inj_ogs t)
+
+
+THM1: inj_ogs a ≈ inj_ogs b -> a ≈obs b
+THM2: a ≈obs b -> inj_ogs a ≈ inj_ogs b
+***)
