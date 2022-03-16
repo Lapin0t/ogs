@@ -59,10 +59,11 @@ Notation "A × B" := (Prod A B) (at level 40) : ty_scope.
 Notation "A + B" := (Sum A B) : ty_scope.
 
 (*|
-Our contexts (stacks of types) will be called ``ctx``. They are defined generically
+Our contexts (stacks of types) will be called ``t_ctx``. They are defined generically
 in ``Ctx.v``.
 |*)
-Definition ctx : Type := Ctx.ctx ty.
+Definition t_ctx : Type := Ctx.ctx ty.
+Bind Scope ctx_scope with t_ctx.
 
 (*|
 Negative and positive types
@@ -98,8 +99,8 @@ Coercion of_n_ty : neg_ty >-> ty.
 
 Bind Scope ctx_scope with neg_ctx.
 Bind Scope ctx_scope with ctx.
-Definition of_n_ctx : neg_ctx -> ctx := map of_n_ty.
-Coercion of_n_ctx : neg_ctx >-> ctx.
+Definition of_n_ctx : neg_ctx -> t_ctx := map of_n_ty.
+Coercion of_n_ctx : neg_ctx >-> t_ctx.
 
 Equations of_n_var {Γ x} (i : Γ ∋ x) : (of_n_ctx Γ) ∋ of_n_ty x :=
   of_n_var top     := top ;
@@ -109,7 +110,7 @@ Equations of_n_var {Γ x} (i : Γ ∋ x) : (of_n_ctx Γ) ∋ of_n_ty x :=
 Our first non-trivial lemma: if a variable in negative context has
 type ``x`` then ``x`` is negative.
 |*)
-Equations neg_var {Γ : neg_ctx} {x : ty} : (Γ : ctx) ∋ x -> is_neg x :=
+Equations neg_var {Γ : neg_ctx} {x : ty} : (Γ : t_ctx) ∋ x -> is_neg x :=
   @neg_var ∅       _ (!) ;
   @neg_var (_ ▶ t) _ (top)   := projT2 t ;
   @neg_var (_ ▶ _) _ (pop i) := neg_var i .
@@ -136,7 +137,7 @@ will really be proofs with computational content, which may make them
 slightly more complicated, but which can help by restricting what can
 be done (no more blind de-bruijn indices manipulation).
 |*)
-Inductive term : ctx -> ty -> Type :=
+Inductive term : t_ctx -> ty -> Type :=
 | Var {Γ a} : Γ ∋ a -> term Γ a
 | Lam {Γ a b} : term (Γ ▶ a) b -> term Γ (a → b)
 | Rec {Γ a b} : term (Γ ▶ (a → b)%ty ▶ a) b -> term Γ (a → b)
@@ -235,7 +236,7 @@ Eager values
 Eager values are lambda-terms that do not contain any eager-redex. One can note
 the general pattern: ``val := pos-intro(val) | neg-intro(term)``.
 |*)
-Inductive e_val (Γ : ctx) : ty -> Type :=
+Inductive e_val (Γ : t_ctx) : ty -> Type :=
 | VVar {x} : Γ ∋ x -> e_val Γ x
 | VLam {a b} : term (Γ ▶ a) b -> e_val Γ (a → b)
 | VRec {a b} : term (Γ ▶ (a → b)%ty ▶ a) b -> e_val Γ (a → b)
@@ -303,7 +304,7 @@ of type ``y`` (and context ``Γ`` too, since it can't cross binders).
 
 This is exactely the type of the call-stack of the CBV evaluator.
 |*)
-Inductive e_ctx (Γ : ctx) (t : ty) : ty -> Type :=
+Inductive e_ctx (Γ : t_ctx) (t : ty) : ty -> Type :=
 | EHole : e_ctx Γ t t
 | EApp_l {a b} : e_ctx Γ t b -> term Γ a -> e_ctx Γ t (a → b)
 | EApp_r {a b} : e_ctx Γ t b -> e_val Γ (a → b) -> e_ctx Γ t a
@@ -353,7 +354,7 @@ Having case constructs for sum and product types, we have 3 kinds of
 beta-redexes. ``e_elim Γ x y`` represents eliminators taking a
 ``term Γ x`` to a ``term Γ y``.
 |*)
-Variant e_elim (Γ : ctx) : ty -> ty -> Type :=
+Variant e_elim (Γ : t_ctx) : ty -> ty -> Type :=
 | RApp {a b} : e_val Γ a -> e_elim Γ (a → b) b
 | RPMatch {a b x} : term (Γ ▶ a ▶ b) x -> e_elim Γ (a × b) x
 | RSMatch {a b x} : term (Γ ▶ a) x -> term (Γ ▶ b) x -> e_elim Γ (a + b) x
@@ -373,7 +374,7 @@ are terms where the next eager-redex to evaluate is explicited. In particular,
 either there is no such redex and the term is a value, or it can be decomposed as
 ``E[v r]`` with ``E`` an evaluation context, ``v`` a value and ``r`` an eliminator.
 |*)
-Variant e_term (Γ : ctx) (x : ty) : Type :=
+Variant e_term (Γ : t_ctx) (x : ty) : Type :=
 | EVal : e_val Γ x -> e_term Γ x
 | ERed {a b} : e_ctx Γ x b -> e_val Γ a -> e_elim Γ a b -> e_term Γ x
 .
@@ -470,7 +471,7 @@ From now on, a lot of functions which would usually be presented as taking a ter
 as input, will take an ongoing evaluation instead, that is a term ``a`` decomposed
 as ``E[b]``. We call such a package a "focused term".
 |*)
-Variant eval_arg (Γ : ctx) (x : ty) : Type :=
+Variant eval_arg (Γ : t_ctx) (x : ty) : Type :=
 | EArg {y} : e_ctx Γ x y -> term Γ y -> eval_arg Γ x.
 (*|
 .. coq:: none
@@ -494,7 +495,7 @@ Repeatedly applying the redex-finding function and then reducing it, we will eit
 end-up with a value or, as we evaluate open terms, get stuck on a redex whose premise
 is a variable. That's exactly what eager-normal-forms are.
 |*)
-Variant e_nf (Γ : ctx) (x : ty) : Type :=
+Variant e_nf (Γ : t_ctx) (x : ty) : Type :=
 | NVal : e_val Γ x -> e_nf Γ x
 | NRed {a b} : e_ctx Γ x b -> Γ ∋ a -> e_elim Γ a b -> e_nf Γ x
 .
@@ -531,6 +532,24 @@ ties the knot, repeatedly finding the next redex and reducing it.
 |*)
 Definition eval_enf {Γ x} : eval_arg Γ x -> computation (e_nf Γ x) :=
   iterₐ (NonDep.ret ∘ eval_step ∘ e_focus).
+
+(*|
+For encoding reasons, our dependent-itree machinerie works on indexed
+sets ``I → Type`` yet all our types (terms, values, variables, etc) are all of the
+form ``t_ctx → ty → Type``. Here we define some uncurried versions. Additionnaly
+we constrain contexts to contain only negative types as we would like to work with
+*focused* terms that do not contain spurious stuck redexes.
+|*)
+Definition frame : Type := neg_ctx * ty.
+Definition eval_arg' : frame -> Type := uncurry (eval_arg ∘ of_n_ctx).
+Definition term' : frame -> Type := uncurry (term ∘ of_n_ctx).
+Definition e_nf' : frame -> Type := uncurry (e_nf ∘ of_n_ctx).
+Definition earg_start' {i} (u : term' i) : eval_arg' i := EArg EHole u.
+Definition e_ctx' : ty -> frame -> Type := fun t e => e_ctx (fst e) (snd e) t.
+Definition earg' {t e} : e_ctx' t e -> term (fst e) t -> eval_arg' e := EArg.
+
+Equations lift_frame : neg_ctx -> frame -> frame :=
+  lift_frame Γ e := ((Γ +▶ fst e)%ctx , snd e).
 
 (*|
 Lassen trees
@@ -651,7 +670,7 @@ Equations t_obs_args (x : neg_ty) : t_obs x -> neg_ctx :=
 Equations t_obs_goal (x : neg_ty) : t_obs x -> ty :=
   @t_obs_goal (_ ,' @NArr a b) o := b.
 
-Definition t_obs_nxt (x : neg_ty) (o : t_obs x) : neg_ctx * ty :=
+Definition t_obs_nxt (x : neg_ty) (o : t_obs x) : frame :=
   (t_obs_args x o , t_obs_goal x o).
 
 (*|
@@ -688,7 +707,7 @@ Equations a_of_val {Γ : neg_ctx} x (v : e_val Γ x) : a_val x :=
 Arguments a_of_val {Γ x}.
 
 Equations? cext_get {Γ : neg_ctx} x (v : e_val Γ x) (y : neg_ty)
-         : (a_cext (a_of_val v) : ctx) ∋ (y : ty) -> e_val Γ y :=
+         : a_cext (a_of_val v) ∋ y -> e_val Γ y :=
   cext_get (_ → _) v           (_ ,' _) top := v ;
   cext_get (_ × _) (VPair u v) (_ ,' _) j := _ ;
   cext_get (_ + _) (VInl u)    (_ ,' _) j := cext_get _ u _ j ;
@@ -705,19 +724,3 @@ Defined.
 |*)
 Arguments cext_get {Γ} x v {y} i.
 
-(*|
-For encoding reasons, our dependent-itree machinerie works on indexed
-sets ``I → Type`` yet all our types (terms, values, variables, etc) are all of the
-form ``ctx → ty → Type``. Here we define some uncurried versions. Additionnaly
-we constrain contexts to contain only negative types as we would like to work with
-*focused* terms that do not contain spurious stuck redexes.
-|*)
-Definition frame : Type := neg_ctx * ty.
-Definition eval_arg' : frame -> Type := uncurry (eval_arg ∘ of_n_ctx).
-Definition term' : frame -> Type := uncurry (term ∘ of_n_ctx).
-Definition earg_start' {i} (u : term' i) : eval_arg' i := EArg EHole u.
-Definition e_ctx' : ty -> frame -> Type := fun t e => e_ctx (fst e) (snd e) t.
-Definition earg' {t e} : e_ctx' t e -> term (fst e) t -> eval_arg' e := EArg.
-
-Equations lift_frame : neg_ctx -> frame -> frame :=
-  lift_frame Γ e := ((Γ +▶ fst e)%ctx , snd e).

@@ -13,6 +13,51 @@ From OGS.STLC Require Import Ctx Syntax.
 From Equations Require Import Equations.
 Set Equations Transparent.
 
+Notation Act := (true).
+Notation Pass := (false).
+Notation switch := (negb).
+
+Inductive stack : bool -> Type :=
+| SNil : neg_ctx -> stack Pass
+| SCon {role} : neg_ctx -> ty -> stack (switch role) -> stack role
+.
+Arguments SCon {role}.
+
+
+
+(* r : parité de la stack (SNil = pair = false)
+   autre: Act = je commence ; Pass = iel commence *)
+Equations stack_ctx {r} : bool -> stack r -> neg_ctx :=
+  stack_ctx Act  (SNil Γ)     := Γ ;
+  stack_ctx Pass (SNil Γ)     := ∅%ctx ;
+  stack_ctx Act  (SCon Γ x s) := stack_ctx Pass s +▶ Γ ;
+  stack_ctx Pass (SCon Γ x s) := stack_ctx Act s .
+
+Equations stack_ty {r} : stack r -> option ty :=
+  stack_ty (SNil _)     := None ;
+  stack_ty (SCon _ t _) := Some t .
+
+Equations ext_head {r} : stack r -> neg_ctx -> stack r :=
+  ext_head (SNil Γ)     Δ := SNil (Γ +▶ Δ) ;
+  ext_head (SCon Γ x s) Δ := SCon (Γ +▶ Δ) x s .
+
+Variant move_alt : Type :=
+| RET' {x} : a_val x -> move_alt
+| CALL' {x} : t_obs x -> move_alt
+.
+  
+Variant justify {r} : stack r -> move_alt -> Type :=
+| JR {Γ x s} {a : a_val x} : justify (SCon Γ x s) (RET' a)
+| JC {s x} {o : t_obs x} : stack_ctx Act s ∋ x -> justify s (CALL' o)
+.
+Arguments JR {r Γ x s a}.
+Arguments JC {r s x o} i.
+
+Equations stack_apply {r} {s : stack r} {m : move_alt}
+  : justify s m -> stack (switch r) :=
+  stack_apply (@JR _ _ _ s a) := ext_head s (a_cext a) ;
+  stack_apply (@JC r s _ o _) := @SCon (switch r) (t_obs_args o) (t_obs_goal o)
+                                       ltac:(destruct r; exact s).
 
 Variant enf_play (Γ : neg_ctx) : option ty -> Type :=
 | RET {x} : a_val x -> enf_play Γ (Some x)
@@ -34,16 +79,6 @@ Equations enf_next {Γ x} : enf_play Γ x -> stack_action (is_some x) :=
   enf_next (CALL i v) := Push (t_obs_args v) (t_obs_goal v) .
 
 Module OGS.
-  Notation Act := (true).
-  Notation Pass := (false).
-  Notation switch := (negb).
-
-  Inductive stack : bool -> Type :=
-  | SNil : neg_ctx -> stack Pass
-  | SCon {role} : neg_ctx -> ty -> stack (switch role) -> stack role
-  .
-  Arguments SCon {role}.
-
   (*
   (Γ0 , SCon x0 (Δ0 , SNIL +++ SCon y0 (Γ1 , SCon x1 (Δ1 , SNil))))
 
@@ -92,27 +127,6 @@ cas compliqué
   Δ1
   *)
 
-  (* r : parité de la stack (SNil = pair = false)
-     autre: Act = je commence ; Pass = iel commence *)
-  Equations stack_ctx {r} : bool -> stack r -> neg_ctx :=
-    stack_ctx Act  (SNil Γ)     := Γ ;
-    stack_ctx Pass (SNil Γ)     := ∅%ctx ;
-    stack_ctx Act  (SCon Γ x s) := stack_ctx Pass s +▶ Γ ;
-    stack_ctx Pass (SCon Γ x s) := stack_ctx Act s .
-
-  Equations stack_ty {r} : stack r -> option ty :=
-    stack_ty (SNil _)     := None ;
-    stack_ty (SCon _ t _) := Some t .
-
-  Equations ext_head {r} : stack r -> neg_ctx -> stack r :=
-    ext_head (SNil Γ)     Δ := SNil (Γ +▶ Δ) ;
-    ext_head (SCon Γ x s) Δ := SCon (Γ +▶ Δ) x s .
-
-  Equations stack_apply {r} (s : stack r) : stack_action (is_some (stack_ty s)) -> stack (switch r) :=
-    @stack_apply Pass (SCon Γ x s)  (Pop Δ)    := ext_head s Δ ;
-    @stack_apply Act  (SCon Γ x s)  (Pop Δ)    := ext_head s Δ ;
-    @stack_apply Pass s             (Push Δ y) := @SCon Act Δ y s ;
-    @stack_apply Act  s             (Push Δ y) := @SCon Pass Δ y s .
 
   Definition half_g r : half_game (stack r) (stack (switch r)) :=
     {| move := fun e => enf_play (stack_ctx Act e) (stack_ty e) ;
@@ -233,14 +247,12 @@ cas compliqué
                                 (fix_action _ (enf_next r))
         | inr m' => a s▶ (c_next game_desc _ r) } .
   Obligation 1.
-  dependent elimination a; cbn.
-  dependent elimination m'; cbn.
-  - dependent elimination s; cbn.
+  dependent elimination a.
+  dependent elimination m'.
+  - dependent elimination s.
     + exact (ImpFA).
-    + dependent elimination b; cbn.
-      * exact imply_refl.
-      * dependent induction s0; exact imply_refl.
-  - dependent elimination b; cbn; exact (imply_refl).
+    + dependent elimination b; [|dependent induction s0]; exact imply_refl.
+  - dependent elimination b; exact (imply_refl).
   Defined.
 
   Definition inj_split_resp (a : stack Act) (b : stack Pass)

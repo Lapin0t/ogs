@@ -193,3 +193,20 @@ Equations any_c_split_coh2 {P xs ys zs} (c : xs ⊎ ys ≡ zs) (a : any P zs) :
 End lemma.
 #[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
 #[global] Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30).
+
+
+Equations has_map0 {X Y} (f : X -> Y) (Γ : ctx X) {y} : map f Γ ∋ y -> X :=
+  has_map0 f (Γ ▶ x) top     := x ;
+  has_map0 f (Γ ▶ x) (pop i) := has_map0 f Γ i .
+
+Equations has_map1 {X Y} (f : X -> Y) (Γ : ctx X) {y} (i : map f Γ ∋ y) : Γ ∋ has_map0 f Γ i :=
+  has_map1 f (Γ ▶ x) top     := top ;
+  has_map1 f (Γ ▶ x) (pop i) := pop (has_map1 f Γ i) .
+
+Equations has_map2 {X Y} (f : X -> Y) (Γ : ctx X) {y} (i : map f Γ ∋ y) : f (has_map0 f Γ i) = y :=
+  has_map2 f (Γ ▶ x) top     := eq_refl ;
+  has_map2 f (Γ ▶ x) (pop i) := has_map2 f Γ i .
+
+Equations map_has {X Y} (f : X -> Y) (Γ : ctx X) {x} : Γ ∋ x -> map f Γ ∋ f x :=
+  map_has f (Γ ▶ _) top     := top ;
+  map_has f (Γ ▶ _) (pop i) := pop (map_has f Γ i) .
