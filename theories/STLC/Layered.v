@@ -18,15 +18,15 @@ From OGS.ITree Require Import Eq.
 From Paco Require Import paco.
 Require Import Coq.Program.Equality.
 
-Variant kont : Type :=
-| KCtx : ty -> kont
-| KVar : neg_ty -> kont
+Variant k_move_typ : Type :=
+| KCtx : ty -> k_move_typ
+| KVar : neg_ty -> k_move_typ
 .
 
-Definition k_ctx : Type := Ctx.ctx kont.
+Definition k_ctx : Type := Ctx.ctx k_move_typ.
 Bind Scope ctx_scope with k_ctx.
 
-Equations k_move : kont -> Type :=
+Equations k_move : k_move_typ -> Type :=
   k_move (KCtx x) := a_val x ;
   k_move (KVar x) := t_obs x .
 
@@ -59,13 +59,12 @@ Definition g_lassen : game' lassen_c_ix lassen_s_ix :=
      server := {| move := lassen_s_move ;
                   next := lassen_s_next |} |} .
 
-(*
 Definition kctx_of_nctx (Γ : neg_ctx) : k_ctx := map KVar Γ .
 Definition kctx_of_frame (s : frame) : k_ctx := kctx_of_nctx (fst s) ▶ KCtx (snd s).
 
 Variant k_ext : Type :=
 | KPush : frame -> k_ext
-| KPop : neg_ctx -> k_ext
+| KPop  : neg_ctx -> k_ext
 .
 
 Equations kctx_of_kext : k_ext -> k_ctx :=
@@ -79,10 +78,11 @@ Equations ext_frame : frame -> k_ext -> frame :=
   ext_frame u (KPush v) := ((fst u +▶ fst v)%ctx , snd v) ;
   ext_frame u (KPop Γ)  := ((fst u +▶ Γ)%ctx , snd u) .
 
-Equations k_next (k : kont) : k_move k -> k_ext :=
+Equations k_next (k : k_move_typ) : k_move k -> k_ext :=
   k_next (KCtx x) a := KPop (a_cext a) ;
   k_next (KVar x) o := KPush (t_obs_nxt o) .
 
+(*
 Definition g_lassen : game' frame (k_ctx * frame) :=
   {| client := {| move := fun i => any k_move (kctx_of_frame i) ;
                   next := fun i m => (kctx_of_kext (any_elim k_next _ m) , i) |} ;
@@ -115,14 +115,28 @@ Equations inj_ogs_enf {s} : e_nf' s -> itree g_lassen (eval_arg' +ᵢ ∅ᵢ) s 
 
 *)
 
-Definition half_ogs : half_game (k_ctx * k_ctx) (k_ctx * k_ctx) :=
-  {| move := fun i => any k_move (fst i) ;
-     next := fun i m => (ext_kctx (snd i) (any_elim k_next _ m) , fst i) |} .
+Record pos_ogs : Type :=
+  { pctx : k_ctx;
+    octx : k_ctx
+  }.
 
-Definition g_ogs : game' (k_ctx * k_ctx) (k_ctx * k_ctx) :=
+Definition half_ogs : half_game pos_ogs pos_ogs :=
+  {| move := fun i   => any k_move i.(pctx) ;
+     next := fun i m =>
+              {| pctx := ext_kctx i.(octx) (any_elim k_next _ m);
+                 octx := i.(pctx) |}
+  |} .
+
+Definition g_ogs : game' pos_ogs pos_ogs :=
   {| client := half_ogs ; server := half_ogs |}.
 
+(* ogs: ensemble des stratégies sur l'OGS (a.k.a. LTS de typage ?) *)
 Definition ogs := itree g_ogs ∅ᵢ.
+
+Definition inj_ogs {Γ: neg_ctx} {τ} (t : term Γ τ) :
+  ogs {| pctx := map KVar Γ ▶ KCtx τ;
+         octx := ∅ |}.
+Admitted.
 
 Section composition.
 
@@ -158,7 +172,7 @@ Definition _compo : forall showₚ showₒ hideₚ hideₒ fullₚ fullₒ
     + exact (Tau (CIH _ _ _ _ _ _ cₚ cₒ (_c_pa a t))).
     + destruct e as [x i m].
       exact (Tau (CIH _ _ _ _ _ _ (ext_cover_r _ cₚ) cₒ
-                      (_c_ap (a (Any _ _ (r_cover_r cₒ i) m)) k))).      
+                      (_c_ap (a (Any _ _ (r_cover_r cₒ i) m)) k))).
 Defined.
 Arguments _compo {_ _ _ _ _ _}.
 
@@ -176,9 +190,9 @@ Check compo_ap.
 
 Variant _compo_arg_eq (hideₚ hideₒ fullₚ fullₒ : list kont) : Type :=
 | _c_pa2 (a0 a1 : iforest g_ogs ∅ᵢ (fullₒ , fullₚ)) (b0 b1 : ogs (hideₒ , hideₚ))
-  : (forall r, a0 r ≈ a1 r) -> b0 ≈ b1 -> _compo_arg_eq hideₚ hideₒ fullₚ fullₒ 
+  : (forall r, a0 r ≈ a1 r) -> b0 ≈ b1 -> _compo_arg_eq hideₚ hideₒ fullₚ fullₒ
 | _c_ap2 (a0 a1 : ogs (fullₚ , fullₒ)) (b0 b1 : iforest g_ogs ∅ᵢ (hideₚ , hideₒ))
-  : a0 ≈ a1 -> (forall r, b0 r ≈ b1 r) -> _compo_arg_eq hideₚ hideₒ fullₚ fullₒ 
+  : a0 ≈ a1 -> (forall r, b0 r ≈ b1 r) -> _compo_arg_eq hideₚ hideₒ fullₚ fullₒ
   .
 Arguments _c_pa2 {hideₚ hideₒ fullₚ fullₒ} a0 a1 b0 b1 ea eb.
 Arguments _c_ap2 {hideₚ hideₒ fullₚ fullₒ} a0 a1 b0 b1 ea eb.
@@ -187,12 +201,12 @@ Equations _c_arg_eq_l {hₚ hₒ fₚ fₒ} : _compo_arg_eq hₚ hₒ fₚ fₒ
                                     -> _compo_arg hₚ hₒ fₚ fₒ :=
   _c_arg_eq_l (_c_pa2 a0 a1 b0 b1 ea eb) := _c_pa a0 b0 ;
   _c_arg_eq_l (_c_ap2 a0 a1 b0 b1 ea eb) := _c_ap a0 b0 .
-    
+
 Equations _c_arg_eq_r {hₚ hₒ fₚ fₒ} : _compo_arg_eq hₚ hₒ fₚ fₒ
                                     -> _compo_arg hₚ hₒ fₚ fₒ :=
   _c_arg_eq_r (_c_pa2 a0 a1 b0 b1 ea eb) := _c_pa a1 b1 ;
   _c_arg_eq_r (_c_ap2 a0 a1 b0 b1 ea eb) := _c_ap a1 b1 .
-    
+
 
 (* bisimilarity of composition of pairwise bisimilar arguments *)
 Lemma _compo_cong {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ fₚ) (cₒ : sₒ ⊎ hₒ ≡ fₒ)
@@ -245,11 +259,44 @@ Check _compo_cong.
 (***
 lem1 : norm a ≈ norm b -> inj_ogs a ≈ inj_ogs b
 
-a ≈obs b := forall E, norm (E[a]) ≈ norm (E[b]) 
+a ≈obs b := forall E, norm (E[a]) ≈ norm (E[b])
 
-lem2 : inj_ogs (E[t]) = _compo (inj_ogs_ctx E, inj_ogs t)
+lem_joker: t diverges iff inj_ogs(t) diverges?
+t≈ spin <-> inj_ogs(t) ≈ spin
+inf_ogs(t) ≈ norm(t);;?k
+
+(* Pain-point :( *)
+lem2 : inj_ogs (E[t]) ≈ _compo (inj_ogs_ctx E, inj_ogs t)
+Preuve par coinduction.
+- inj_ogs (E[t]) calcule donc E[t] calcule donc t calcul et on case split
+
+Attaque: quid si
+t = E'[f v]
+inj_ogs(t) ≈ _compo (inj_ogs_ctx E', inj_ogs (f v))
+inj_ogs_ctx E ∘ inj_ogs t ≈
+inj_ogs_ctx E ∘ (inj_ogs_ctx E' ∘ inj_ogs (f v))
+≈
+(inj_ogs_ctx E ∘ inj_ogs_ctx E') ∘ inj_ogs (f v)
+≈ (?)
+(inj_ogs_ctx (E ∘ E')) ∘ inj_ogs (f v)
+
+Défense: E[E'[f v]] == E↺E'[f v]
 
 
-THM1: inj_ogs a ≈ inj_ogs b -> a ≈obs b
-THM2: a ≈obs b -> inj_ogs a ≈ inj_ogs b
+
+≈ ::= eutt eq (bisimilarité faible entre itree)
+
+THM1 (soundness):
+forall {Γ : neg_ctx} {τ} (a b : term Γ τ)
+ (BIS : inj_ogs a ≈ inj_ogs b),
+ a ≈obs b
+Proof.
+
+
+
+THM2 (full abstraction):
+forall {Γ : neg_ctx} {τ} (a b : term Γ τ),
+ a ≈obs b ->
+ inj_ogs a ≈ inj_ogs b
+
 ***)
