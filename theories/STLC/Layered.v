@@ -18,58 +18,69 @@ From OGS.ITree Require Import Eq.
 From Paco Require Import paco.
 Require Import Coq.Program.Equality.
 
-Variant k_move_typ : Type :=
-| KCtx : ty -> k_move_typ
-| KVar : neg_ty -> k_move_typ
+(*|
+``move_t`` can be seen as an extension of negative types, ``KVar``
+being an injection and ``KCtx x`` encoding something like ``¬ x``, or ``x → ⊥``.
+|*)
+Variant move_t : Type :=
+| KCtx : ty -> move_t
+| KVar : neg_ty -> move_t
 .
+Derive NoConfusion for move_t.
 
-Definition k_ctx : Type := Ctx.ctx k_move_typ.
-Bind Scope ctx_scope with k_ctx.
-
-Equations k_move : k_move_typ -> Type :=
+Equations k_move : move_t -> Type :=
   k_move (KCtx x) := a_val x ;
   k_move (KVar x) := t_obs x .
 
-Definition lassen_c_ix : Type := frame .
-Definition lassen_s_ix : Type := (frame + neg_ctx) * frame .
+Definition k_ctx : Type := Ctx.ctx move_t.
+Bind Scope ctx_scope with k_ctx.
 
-Equations lassen_c_move : lassen_c_ix -> Type :=
-  lassen_c_move c_i := any t_obs (fst c_i) + a_val (snd c_i) .
+Definition KVars (Γ : neg_ctx) : k_ctx := map KVar Γ .
+Definition k_has_vars (ks : k_ctx) (Γ : neg_ctx) := KVars Γ ⊆ ks.
+Definition k_has_ty (ks : k_ctx) (x : ty) := ks ∋ KCtx x.
+Definition k_has_frame (ks : k_ctx) (f : frame) :=
+  k_has_vars ks (fst f) * k_has_ty ks (snd f) .
 
-Equations lassen_c_next c_i : lassen_c_move c_i -> lassen_s_ix :=
-  lassen_c_next c_i (inl a) := (inl (any_elim (@t_obs_nxt) _ a) , c_i) ;
-  lassen_c_next c_i (inr a) := (inr (a_cext a) , c_i) .
+Variant move_ext : move_t -> Type :=
+| KECtx {x} : frame -> move_ext (KCtx x)
+| KEVar {x} : neg_ctx -> move_ext (KVar x)
+.
+Derive NoConfusion for move_ext.
 
-Equations lassen_s_move : lassen_s_ix -> Type :=
-  lassen_s_move (inl s_i , _) := any t_obs (fst s_i) + a_val (snd s_i) ;
-  lassen_s_move (inr s_i , _) := any t_obs s_i .
+Equations move_ext_valid (ks : k_ctx) (k : move_t) : move_ext k -> Type :=
+  move_ext_valid ks (KCtx x) (KECtx f) := k_has_frame ks f ;
+  move_ext_valid ks (KVar x) (KEVar Γ) := k_has_vars ks Γ.
 
-Equations lassen_s_next s_i : lassen_s_move s_i -> lassen_c_ix :=
-  lassen_s_next (inl s_i , c_i) (inl a) :=
-    ((fst c_i +▶ any_elim (@t_obs_args) _ a)%ctx ,
-     any_elim (@t_obs_goal) _ a) ;
-  lassen_s_next (inl s_i , c_i) (inr a) := ((fst c_i +▶ a_cext a)%ctx , snd c_i) ;
-  lassen_s_next (inr s_i , c_i) a :=
-    ((fst c_i +▶ any_elim (@t_obs_args) _ a)%ctx ,
-     any_elim (@t_obs_goal) _ a) .
+Equations move_ext_valid_lift {ks ks'} (k : move_t) (e : move_ext k)
+  : move_ext_valid ks k e -> move_ext_valid (ks +▶ ks') k e :=
+  move_ext_valid_lift (KCtx x) (KECtx s) v :=
+    (fun _ i => r_concat_l _ _ _ (fst v _ i) ,
+     r_concat_l _ _ _ (snd v)) ;
+  move_ext_valid_lift (KVar x) (KEVar s) v := fun _ i => r_concat_l _ _ _ (v _ i) .
 
-Definition g_lassen : game' lassen_c_ix lassen_s_ix :=
-  {| client := {| move := lassen_c_move ;
-                  next := lassen_c_next |} ;
-     server := {| move := lassen_s_move ;
-                  next := lassen_s_next |} |} .
+Definition move_ext' : Type := { k : move_t & move_ext k }.
 
-Definition kctx_of_nctx (Γ : neg_ctx) : k_ctx := map KVar Γ .
-Definition kctx_of_frame (s : frame) : k_ctx := kctx_of_nctx (fst s) ▶ KCtx (snd s).
+(*|
+Consequently, ``k_move`` extends the set of observations (or "moves" or "queries")
+on extended negative types.
+|*)
+Equations k_val (k : move_t) : move_ext k -> Type :=
+  k_val (KCtx x) (KECtx f) := e_ctx (fst f) (snd f) x ;
+  k_val (KVar x) (KEVar Γ) := e_val Γ x .
+Definition k_val' (k : move_ext') : Type := k_val (projT1 k) (projT2 k).
 
 Variant k_ext : Type :=
 | KPush : frame -> k_ext
 | KPop  : neg_ctx -> k_ext
 .
 
+Equations k_next (k : move_t) : k_move k -> k_ext :=
+  k_next (KCtx x) a := KPop (a_cext a) ;
+  k_next (KVar x) o := KPush (t_obs_nxt o) .
+
 Equations kctx_of_kext : k_ext -> k_ctx :=
-  kctx_of_kext (KPush s) := kctx_of_frame s ;
-  kctx_of_kext (KPop Δ)  := kctx_of_nctx Δ .
+  kctx_of_kext (KPush s) := KVars (fst s) ▶ KCtx (snd s)  ;
+  kctx_of_kext (KPop Δ)  := KVars Δ .
 
 Definition ext_kctx (ks : k_ctx) (e : k_ext) : k_ctx
   := ks +▶ kctx_of_kext e.
@@ -78,54 +89,13 @@ Equations ext_frame : frame -> k_ext -> frame :=
   ext_frame u (KPush v) := ((fst u +▶ fst v)%ctx , snd v) ;
   ext_frame u (KPop Γ)  := ((fst u +▶ Γ)%ctx , snd u) .
 
-Equations k_next (k : k_move_typ) : k_move k -> k_ext :=
-  k_next (KCtx x) a := KPop (a_cext a) ;
-  k_next (KVar x) o := KPush (t_obs_nxt o) .
-
-(*
-Definition g_lassen : game' frame (k_ctx * frame) :=
-  {| client := {| move := fun i => any k_move (kctx_of_frame i) ;
-                  next := fun i m => (kctx_of_kext (any_elim k_next _ m) , i) |} ;
-     server := {| move := fun i => any k_move (fst i) ;
-                  next := fun i m => ext_frame (snd i) (any_elim k_next _ m) |} |} .
-
-Equations inj_ogs_enf {s} : e_nf' s -> itree g_lassen (eval_arg' +ᵢ ∅ᵢ) s :=
-  inj_ogs_enf (NVal v) := Vis (Any _ _ top (a_of_val v) : qry g_lassen _) _ ;
-  inj_ogs_enf (NRed E i v) := _ .
-
-  destruct s as [Γ x]; intros [ v | ? ? E i e ]; cbn in *.
-  + unshelve refine (Vis (Any _ _ top _ : qry g_lassen _) _).
-    refine (a_of_val v).
-    intros [k i m]; cbn in i |- *.
-    revert m.
-    rewrite <- (has_map2 _ _ i).
-    intros m. cbn in m. cbn.
-    refine (Ret (inl _)).
-    refine (earg_start (t_obs_apply m (cext_get _ v (has_map1 _ _ i)))).
-  + unshelve refine (Vis _ _).
-    destruct (neg_var i).
-    refine (Any _ _ (pop _) _). refine (map_has KVar _ (has_map1 _ _ i)).
-    cbn. Check (has_map2 of_n_ty Γ i).
-    cbn.
-    cbn. Check (t)
-    cbn. Check (cext_get).
-    destruct r.
-    dependent elimination x0.
-    - shelve.
-
-*)
-
-Record pos_ogs : Type :=
-  { pctx : k_ctx;
-    octx : k_ctx
-  }.
+Record pos_ogs : Type := POgs { p_ctx : k_ctx ; o_ctx : k_ctx }.
+Definition p_swap (p : pos_ogs) := POgs p.(o_ctx) p.(p_ctx).
 
 Definition half_ogs : half_game pos_ogs pos_ogs :=
-  {| move := fun i   => any k_move i.(pctx) ;
-     next := fun i m =>
-              {| pctx := ext_kctx i.(octx) (any_elim k_next _ m);
-                 octx := i.(pctx) |}
-  |} .
+  {| move := fun i   => any k_move i.(p_ctx) ;
+     next := fun i m => {| p_ctx := ext_kctx i.(o_ctx) (any_elim k_next _ m) ;
+                        o_ctx := i.(p_ctx) |} |} .
 
 Definition g_ogs : game' pos_ogs pos_ogs :=
   {| client := half_ogs ; server := half_ogs |}.
@@ -133,17 +103,129 @@ Definition g_ogs : game' pos_ogs pos_ogs :=
 (* ogs: ensemble des stratégies sur l'OGS (a.k.a. LTS de typage ?) *)
 Definition ogs := itree g_ogs ∅ᵢ.
 
-Definition inj_ogs {Γ: neg_ctx} {τ} (t : term Γ τ) :
-  ogs {| pctx := map KVar Γ ▶ KCtx τ;
-         octx := ∅ |}.
-Admitted.
+Record conf_p (p : pos_ogs) : Type := ConfP {
+    (* extended continuation typing of *opponent* k_ctx *)
+    C_moves_t : forall k, p.(p_ctx) ∋ k -> move_ext k ;
+    (* compatibility of extended typing with *player* k_ctx *)
+    C_moves_v : forall k i, move_ext_valid p.(o_ctx) k (C_moves_t k i) ;
+    (* actual content: continuation data at extended typing *)
+    C_moves : forall k i, k_val k (C_moves_t k i)
+}.
+Arguments ConfP {p}.
+Arguments C_moves_t {p}.
+Arguments C_moves_v {p}.
+Arguments C_moves {p}.
+
+Record conf_a (ks : k_ctx) : Type := ConfA {
+    C_focus_t : frame ;
+    C_focus_v : k_has_frame ks C_focus_t ;
+    C_focus : eval_arg' C_focus_t ;
+}.
+Arguments ConfA {ks}.
+Arguments C_focus_t {ks}.
+Arguments C_focus_v {ks}.
+Arguments C_focus {ks}.
+
+Definition conf (p : pos_ogs) : Type := conf_a p.(p_ctx) * conf_p (p_swap p) .
+
+Equations? conf_p_lift (p : pos_ogs) {ks}
+  : conf_p p -> conf_p (POgs p.(p_ctx) (p.(o_ctx) +▶ ks)%ctx) :=
+  conf_p_lift p c := ConfP _ _ _ .
++ refine (c.(C_moves_t) k X).
++ refine (move_ext_valid_lift k _ (c.(C_moves_v) k i)).
++ refine (c.(C_moves) k i).
+Defined.
+
+Equations? conf_p_cat (p : pos_ogs) {ks}
+  : conf_p p -> conf_p (POgs ks p.(o_ctx)) -> conf_p (POgs (p.(p_ctx) +▶ ks)%ctx p.(o_ctx)) :=
+  conf_p_cat _ c d := ConfP _ _ _ .
+- destruct (concat_split _ _ X).
+  + refine (c.(C_moves_t) k h).
+  + refine (d.(C_moves_t) k h).
+- destruct (concat_split _ _ i).
+  + refine (c.(C_moves_v) k h).
+  + refine (d.(C_moves_v) k h).
+- destruct (concat_split _ _ i).
+  + refine (c.(C_moves) k h).
+  + refine (d.(C_moves) k h).
+Defined.
+
+Equations? k_move_apply {ks} (k : move_t) (m : k_move k)
+          (e : move_ext k) (v : move_ext_valid ks k e)
+          (val : k_val k e) : conf_a (ext_kctx ks (k_next k m)) :=
+  k_move_apply (KCtx x) m (KECtx f) verif val :=
+    ConfA ((fst f +▶ a_cext m)%ctx , snd f)
+          (_ , r_concat_l _ _ _ (snd verif))
+          (EArg (e_rename r_concat_l' val)
+                (t_rename r_concat_r' (t_of_a m))
+            : eval_arg' (_ , _)) ;
+  k_move_apply (KVar x) m (KEVar Γ) verif val :=
+    ConfA ((Γ +▶ t_obs_args m)%ctx , t_obs_goal m)
+          (_ , top)
+          (EArg EHole (t_obs_apply m val) : eval_arg' (_ , _)) .
+- cbv [KVars] in X; r_fixup.
+  destruct (concat_split _ _ X).
+  + refine (r_concat_l _ _ _ (fst verif _ h)).
+  + refine (r_concat_r _ _ _ h).
+- cbv [KVars] in X; r_fixup.
+  destruct (concat_split _ _ X).
+  + refine (pop (r_concat_l _ _ _ (verif _ h))).
+  + refine (pop (r_concat_r _ _ _ h)).
+Defined.
+
+Equations conf_p_select {p} (c : conf_p p) : iforest g_ogs (conf +ᵢ ∅ᵢ) p :=
+  conf_p_select c (@Any _ _ _ k i m) :=
+    Ret (inl (k_move_apply k m _ (c.(C_moves_v) k i) (c.(C_moves) k i) ,
+              conf_p_lift p c) : conf (POgs _ _) + _) .
+
+
+
+Definition inj_ogs_aux p (c : conf p) : itree g_ogs (conf +ᵢ ∅ᵢ) p.
+  refine (emb_comp _ _ (eval_enf (fst c).(C_focus)) !>= _).
+  intros [].
+  - refine (Vis (Any _ _ (snd (fst c).(C_focus_v)) (a_of_val e) : qry g_ogs _) _).
+    refine (conf_p_select (conf_p_cat _ (snd c) _)).
+    unshelve econstructor.
+    + intros k i. cbn in i.
+      rewrite <- (has_map2 _ _ i).
+      refine (KEVar (fst (C_focus_t (fst c)))).
+    + intros k i. cbn in i. cbn.
+      rewrite <- (has_map2 _ _ i); cbn.
+      refine (fst (fst c).(C_focus_v)).
+    + intros k i. cbn in *.
+      rewrite <- (has_map2 _ _ i); cbn.
+      refine (cext_get _ e (has_map1 _ _ i)).
+  - pose (ni := neg_var h); dependent elimination ni.
+    dependent elimination e0.
+    refine (Vis (Any _ _ (fst (fst c).(C_focus_v) _ (map_has KVar _ (neg_upgrade h NArr)))
+                         (a_of_val e0) : qry g_ogs _) _).
+    refine (conf_p_select (conf_p_cat _ (snd c) _)).
+    unshelve econstructor.
+    + intros k i.
+      dependent elimination i.
+      * refine (KECtx (fst c).(C_focus_t)).
+      * rewrite <- (has_map2 _ _ h0).
+        refine (KEVar (fst (fst c).(C_focus_t))).
+    + intros k i.
+      dependent elimination i.
+      * refine ((fst c).(C_focus_v)).
+      * cbv [KVars] in h0; cbn in *. rewrite <- (has_map2 _ _ h0).
+        refine (fst (fst c).(C_focus_v)).
+    + intros k i.
+      dependent elimination i.
+      * refine e.
+      * cbv [KVars] in h0; cbn in *. rewrite <- (has_map2 _ _ h0).
+        refine (cext_get _ e0 (has_map1 _ _ h0)).
+Defined.
+
+Definition inj_ogs : forall p, conf p -> itree g_ogs ∅ᵢ p := iter inj_ogs_aux.
 
 Section composition.
 
 Variant _compo_arg (hideₚ hideₒ fullₚ fullₒ : k_ctx) : Type :=
-| _c_ap  : ogs (fullₚ , fullₒ) -> iforest g_ogs ∅ᵢ (hideₚ , hideₒ)
+| _c_ap  : ogs (POgs fullₚ fullₒ) -> iforest g_ogs ∅ᵢ (POgs hideₚ hideₒ)
          -> _compo_arg hideₚ hideₒ fullₚ fullₒ
-| _c_pa : iforest g_ogs ∅ᵢ (fullₒ , fullₚ) -> ogs (hideₒ , hideₚ)
+| _c_pa : iforest g_ogs ∅ᵢ (POgs fullₒ fullₚ) -> ogs (POgs hideₒ hideₚ)
         -> _compo_arg hideₚ hideₒ fullₚ fullₒ
   .
 Arguments _c_pa {hideₚ hideₒ fullₚ fullₒ} a b.
@@ -153,7 +235,7 @@ Definition _compo : forall showₚ showₒ hideₚ hideₒ fullₚ fullₒ
                     , showₚ ⊎ hideₚ ≡ fullₚ
                     -> showₒ ⊎ hideₒ ≡ fullₒ
                     -> _compo_arg hideₚ hideₒ fullₚ fullₒ
-                    -> ogs (showₚ , showₒ).
+                    -> ogs (POgs showₚ showₒ).
   cofix CIH.
   intros ? ? ? ? ? ? cₚ cₒ [a b|a b].
   - destruct (observe a).
@@ -161,7 +243,7 @@ Definition _compo : forall showₚ showₒ hideₚ hideₒ fullₚ fullₒ
     + exact (Tau (CIH _ _ _ _ _ _ cₚ cₒ (_c_ap t b))).
     + destruct e as [x i m].
       destruct (cover_split cₚ i) as [j|j].
-      * refine (Vis (Any _ _ j m : qry g_ogs (_,_)) (fun r => _)).
+      * refine (Vis (Any _ _ j m : qry g_ogs (POgs _ _)) (fun r => _)).
         refine (CIH _ _ _ _ _ _ _ (ext_cover_l _ cₒ)
                     (_c_ap (k (r_any (r_cover_l (ext_cover_l _ cₒ)) r)) b)).
         refine (@cat_cover _ _ _ _ ∅ _ _ cₚ _); destruct r; refine (cover_nil_r).
@@ -172,7 +254,7 @@ Definition _compo : forall showₚ showₒ hideₚ hideₒ fullₚ fullₒ
     + exact (Tau (CIH _ _ _ _ _ _ cₚ cₒ (_c_pa a t))).
     + destruct e as [x i m].
       exact (Tau (CIH _ _ _ _ _ _ (ext_cover_r _ cₚ) cₒ
-                      (_c_ap (a (Any _ _ (r_cover_r cₒ i) m)) k))).
+                      (_c_ap (a (Any _ _ (r_cover_r cₒ x i) m)) k))).
 Defined.
 Arguments _compo {_ _ _ _ _ _}.
 
@@ -188,10 +270,10 @@ Check compo_ap.
 (**********)
 
 
-Variant _compo_arg_eq (hideₚ hideₒ fullₚ fullₒ : list kont) : Type :=
-| _c_pa2 (a0 a1 : iforest g_ogs ∅ᵢ (fullₒ , fullₚ)) (b0 b1 : ogs (hideₒ , hideₚ))
+Variant _compo_arg_eq (hideₚ hideₒ fullₚ fullₒ : k_ctx) : Type :=
+| _c_pa2 (a0 a1 : iforest g_ogs ∅ᵢ (POgs fullₒ fullₚ)) (b0 b1 : ogs (POgs hideₒ hideₚ))
   : (forall r, a0 r ≈ a1 r) -> b0 ≈ b1 -> _compo_arg_eq hideₚ hideₒ fullₚ fullₒ
-| _c_ap2 (a0 a1 : ogs (fullₚ , fullₒ)) (b0 b1 : iforest g_ogs ∅ᵢ (hideₚ , hideₒ))
+| _c_ap2 (a0 a1 : ogs (POgs fullₚ fullₒ)) (b0 b1 : iforest g_ogs ∅ᵢ (POgs hideₚ hideₒ))
   : a0 ≈ a1 -> (forall r, b0 r ≈ b1 r) -> _compo_arg_eq hideₚ hideₒ fullₚ fullₒ
   .
 Arguments _c_pa2 {hideₚ hideₒ fullₚ fullₒ} a0 a1 b0 b1 ea eb.
@@ -257,35 +339,53 @@ Qed.
 Check _compo_cong.
 
 (***
-lem1 : norm a ≈ norm b -> inj_ogs a ≈ inj_ogs b
+
+DEFS
+norm : term -> triv-strategy (normal-form)
+inj_ogs : term -> ogs-strategy
 
 a ≈obs b := forall E, norm (E[a]) ≈ norm (E[b])
+s_a ≈cio s_b := forall s_x, (s_x ∘ s_a) ≈ (s_x ∘ s_b) 
+
+### CHEMIN 1 (peio, ≈obs est la plus grand rel compatible&adequate)
+
+lem1 : norm a ≈ norm b -> inj_ogs a ≈ inj_ogs b
 
 lem_joker: t diverges iff inj_ogs(t) diverges?
-t≈ spin <-> inj_ogs(t) ≈ spin
+t ≈ spin <-> inj_ogs(t) ≈ spin
 inf_ogs(t) ≈ norm(t);;?k
 
-(* Pain-point :( *)
-lem2 : inj_ogs (E[t]) ≈ _compo (inj_ogs_ctx E, inj_ogs t)
-Preuve par coinduction.
-- inj_ogs (E[t]) calcule donc E[t] calcule donc t calcul et on case split
+COEUR DE LA PREUVE:
+lem2 : inj_ogs (E[t]) ≈ (inj_ogs_ctx E) ∘ (inj_ogs t)
 
-Attaque: quid si
-t = E'[f v]
-inj_ogs(t) ≈ _compo (inj_ogs_ctx E', inj_ogs (f v))
-inj_ogs_ctx E ∘ inj_ogs t ≈
-inj_ogs_ctx E ∘ (inj_ogs_ctx E' ∘ inj_ogs (f v))
-≈
-(inj_ogs_ctx E ∘ inj_ogs_ctx E') ∘ inj_ogs (f v)
-≈ (?)
-(inj_ogs_ctx (E ∘ E')) ∘ inj_ogs (f v)
+  Preuve par coinduction.
+  - inj_ogs (E[t]) calcule donc E[t] calcule donc t calcul et on case split
 
-Défense: E[E'[f v]] == E↺E'[f v]
+  Attaque: quid si
+  t = E'[f v]
+  inj_ogs(t) ≈ _compo (inj_ogs_ctx E', inj_ogs (f v))
+  inj_ogs_ctx E ∘ inj_ogs t ≈
+  inj_ogs_ctx E ∘ (inj_ogs_ctx E' ∘ inj_ogs (f v))
+  ≈
+  (inj_ogs_ctx E ∘ inj_ogs_ctx E') ∘ inj_ogs (f v)
+  ≈ (?)
+  (inj_ogs_ctx (E ∘ E')) ∘ inj_ogs (f v)
+
+  Défense: E[E'[f v]] == E↺E'[f v]
+
+### CHEMIN 2 (guilhem, rel CIO)
 
 
 
-≈ ::= eutt eq (bisimilarité faible entre itree)
 
+
+
+
+
+
+
+
+-----------
 THM1 (soundness):
 forall {Γ : neg_ctx} {τ} (a b : term Γ τ)
  (BIS : inj_ogs a ≈ inj_ogs b),

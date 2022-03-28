@@ -33,6 +33,9 @@ Inductive has : ctx X -> X -> Type :=
 Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
 Derive Signature for has.
 
+Definition renaming (Γ Δ : ctx X) : Type := forall x, Γ ∋ x -> Δ ∋ x.
+Notation "Γ ⊆ Δ" := (renaming Γ%ctx Δ%ctx) (at level 30).
+
 Equations has_get (Γ : ctx X) i : Γ ∋ (Γ.[i]) :=
   has_get (x :: xs) F0     := top ;
   has_get (x :: xs) (FS i) := pop (has_get xs i) .
@@ -51,12 +54,10 @@ Equations has_case {Γ Δ : ctx X} {F : ctx X -> X -> Type} {a}
   has_case z s _ top     := z ;
   has_case z s _ (pop i) := s _ i .
 
-Definition r_shift {Γ Δ : ctx X} {a} (f : forall t, Γ ∋ t -> Δ ∋ t)
-  : forall t, (Γ ▶ a) ∋ t -> (Δ ▶ a) ∋ t
+Definition r_shift {Γ Δ : ctx X} {a} (f : Γ ⊆ Δ) : (Γ ▶ a) ⊆ (Δ ▶ a)
   := has_case top (fun _ i => pop (f _ i)).
 
-Definition r_shift2 {Γ Δ : ctx X} {a b} (f : forall t, Γ ∋ t -> Δ ∋ t)
-  : forall t, (Γ ▶ a ▶ b) ∋ t -> (Δ ▶ a ▶ b) ∋ t
+Definition r_shift2 {Γ Δ : ctx X} {a b} (f : Γ ⊆ Δ) : (Γ ▶ a ▶ b) ⊆ (Δ ▶ a ▶ b)
   := r_shift (r_shift f).
 
 Equations concat_split (Γ Δ : ctx X) {s} : (Γ +▶ Δ) ∋ s -> (Γ ∋ s) + (Δ ∋ s) :=
@@ -67,22 +68,22 @@ Equations concat_split (Γ Δ : ctx X) {s} : (Γ +▶ Δ) ∋ s -> (Γ ∋ s) + 
     | inr j := inr (pop j) } .
 
 (* handful of lemma on concatenation *)
-Equations r_concat_l (Γ Δ : ctx X) : forall t, Γ ∋ t -> (Γ +▶ Δ) ∋ t :=
+Equations r_concat_l (Γ Δ : ctx X) : Γ ⊆ (Γ +▶ Δ) :=
   r_concat_l Γ ∅       _ i := i ;
   r_concat_l Γ (Δ ▶ x) _ i := pop (r_concat_l _ _ _ i) .
 Arguments r_concat_l {Γ Δ}.
 
-Equations r_concat_r (Γ Δ : ctx X) : forall t, Δ ∋ t -> (Γ +▶ Δ) ∋ t :=
+Equations r_concat_r (Γ Δ : ctx X) : Δ ⊆ (Γ +▶ Δ) :=
   r_concat_r Γ (Δ ▶ x) _ top     := top ;
   r_concat_r Γ (Δ ▶ x) _ (pop i) := pop (r_concat_r _ _ _ i) .
 Arguments r_concat_r {Γ Δ}.
 
-Equations r_concat3_1 (Γ Δ ϒ : ctx X) : forall t, (Γ +▶ Δ) ∋ t -> (Γ +▶ (Δ +▶ ϒ)) ∋ t :=
+Equations r_concat3_1 (Γ Δ ϒ : ctx X) : (Γ +▶ Δ) ⊆ (Γ +▶ (Δ +▶ ϒ)) :=
   r_concat3_1 Γ Δ ∅       _ i := i ;
   r_concat3_1 Γ Δ (ϒ ▶ _) _ i := pop (r_concat3_1 Γ Δ ϒ _ i). 
 Arguments r_concat3_1 {Γ Δ ϒ}.
 
-Equations r_concat3_2 (Γ Δ ϒ : ctx X) : forall t, (Γ +▶ ϒ) ∋ t -> (Γ +▶ (Δ +▶ ϒ)) ∋ t :=
+Equations r_concat3_2 (Γ Δ ϒ : ctx X) : (Γ +▶ ϒ) ⊆ (Γ +▶ (Δ +▶ ϒ)) :=
   r_concat3_2 Γ Δ ∅       _ i       := r_concat_l _ i ;
   r_concat3_2 Γ Δ (ϒ ▶ _) _ top     := top ;
   r_concat3_2 Γ Δ (ϒ ▶ _) _ (pop i) := pop (r_concat3_2 Γ Δ ϒ _ i) .
@@ -142,15 +143,15 @@ Equations ext_cover_r {xs ys zs} (u : ctx X) : xs ⊎ ys ≡ zs -> xs ⊎ (ys +�
   ext_cover_r ∅ c := c ; 
   ext_cover_r (uu ▶ _) c := CRight (ext_cover_r uu c) .
 
-Equations r_cover_l {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] : xs ∋ x -> zs ∋ x :=
-  r_cover_l (CLeft c)  top     := top ;
-  r_cover_l (CLeft c)  (pop i) := pop (r_cover_l c i) ;
-  r_cover_l (CRight c) i       := pop (r_cover_l c i) .
+Equations r_cover_l {xs ys zs} (p : xs ⊎ ys ≡ zs) : xs ⊆ zs :=
+  r_cover_l (CLeft c)  _ top     := top ;
+  r_cover_l (CLeft c)  _ (pop i) := pop (r_cover_l c _ i) ;
+  r_cover_l (CRight c) _ i       := pop (r_cover_l c _ i) .
 
-Equations r_cover_r {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] : ys ∋ x -> zs ∋ x :=
-  r_cover_r (CLeft c)  i       := pop (r_cover_r c i) ;
-  r_cover_r (CRight c) top     := top ;
-  r_cover_r (CRight c) (pop i) := pop (r_cover_r c i) .
+Equations r_cover_r {xs ys zs} (p : xs ⊎ ys ≡ zs) : ys ⊆ zs :=
+  r_cover_r (CLeft c)  _ i       := pop (r_cover_r c _ i) ;
+  r_cover_r (CRight c) _ top     := top ;
+  r_cover_r (CRight c) _ (pop i) := pop (r_cover_r c _ i) .
 
 Equations cover_split {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] : zs ∋ x -> xs ∋ x + ys ∋ x:=
   cover_split (CLeft c)  top     := inl top ;
@@ -167,7 +168,7 @@ Equations any_c_split {P xs ys zs} : xs ⊎ ys ≡ zs -> any P zs -> any P xs + 
     { | inl j := inl (Any j p) ;
       | inr j := inr (Any j p) } .
 
-Equations r_any {P xs ys} (ρ : forall x, xs ∋ x -> ys ∋ x) : any P xs -> any P ys :=
+Equations r_any {P xs ys} (ρ : xs ⊆ ys) : any P xs -> any P ys :=
   r_any ρ (Any i p) := Any (ρ _ i) p .
 
 (*
@@ -191,8 +192,9 @@ Equations any_c_split_coh2 {P xs ys zs} (c : xs ⊎ ys ≡ zs) (a : any P zs) :
 *)
 
 End lemma.
-#[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
-#[global] Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30).
+#[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30) : type_scope.
+#[global] Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30) : type_scope.
+#[global] Notation "Γ ⊆ Δ" := (renaming Γ%ctx Δ%ctx) (at level 30) : type_scope.
 
 
 Equations has_map0 {X Y} (f : X -> Y) (Γ : ctx X) {y} : map f Γ ∋ y -> X :=

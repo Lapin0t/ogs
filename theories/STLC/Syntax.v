@@ -115,6 +115,10 @@ Equations neg_var {Γ : neg_ctx} {x : ty} : (Γ : t_ctx) ∋ x -> is_neg x :=
   @neg_var (_ ▶ t) _ (top)   := projT2 t ;
   @neg_var (_ ▶ _) _ (pop i) := neg_var i .
 
+Equations neg_upgrade {Γ : neg_ctx} {x : ty} (i : (Γ : t_ctx) ∋ x) (p : is_neg x) :
+  Γ ∋ (x ,' p) :=
+  @neg_upgrade (_ ▶ (_ ,' NArr)) _ (top)   NArr := top ;
+  @neg_upgrade (_ ▶ _)           _ (pop i) p    := pop (neg_upgrade i p) .
 
 (*|
 Syntax of terms
