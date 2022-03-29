@@ -92,7 +92,7 @@ Arguments r_concat3_2 {Γ Δ ϒ}.
 Variant any (P : X -> Type) (xs : list X) : Type :=
 | Any {x} : xs ∋ x -> P x -> any P xs
 .
-Arguments Any {P xs x} i p.
+#[global] Arguments Any {P xs x} i p.
 
 Equations any_el {P xs} : any P xs -> X :=
   any_el (@Any _ _ x _ _) := x .

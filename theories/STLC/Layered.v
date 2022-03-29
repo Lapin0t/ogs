@@ -41,22 +41,20 @@ Definition k_has_ty (ks : k_ctx) (x : ty) := ks ∋ KCtx x.
 Definition k_has_frame (ks : k_ctx) (f : frame) :=
   k_has_vars ks (fst f) * k_has_ty ks (snd f) .
 
-Variant move_ext : move_t -> Type :=
-| KECtx {x} : frame -> move_ext (KCtx x)
-| KEVar {x} : neg_ctx -> move_ext (KVar x)
-.
-Derive NoConfusion for move_ext.
+Equations move_ext : move_t -> Type :=
+  move_ext (KCtx x) := frame ;
+  move_ext (KVar x) := neg_ctx .
 
 Equations move_ext_valid (ks : k_ctx) (k : move_t) : move_ext k -> Type :=
-  move_ext_valid ks (KCtx x) (KECtx f) := k_has_frame ks f ;
-  move_ext_valid ks (KVar x) (KEVar Γ) := k_has_vars ks Γ.
+  move_ext_valid ks (KCtx x) f := k_has_frame ks f ;
+  move_ext_valid ks (KVar x) Γ := k_has_vars ks Γ.
 
 Equations move_ext_valid_lift {ks ks'} (k : move_t) (e : move_ext k)
   : move_ext_valid ks k e -> move_ext_valid (ks +▶ ks') k e :=
-  move_ext_valid_lift (KCtx x) (KECtx s) v :=
+  move_ext_valid_lift (KCtx x) s v :=
     (fun _ i => r_concat_l _ _ _ (fst v _ i) ,
      r_concat_l _ _ _ (snd v)) ;
-  move_ext_valid_lift (KVar x) (KEVar s) v := fun _ i => r_concat_l _ _ _ (v _ i) .
+  move_ext_valid_lift (KVar x) s v := fun _ i => r_concat_l _ _ _ (v _ i) .
 
 Definition move_ext' : Type := { k : move_t & move_ext k }.
 
@@ -65,8 +63,8 @@ Consequently, ``k_move`` extends the set of observations (or "moves" or "queries
 on extended negative types.
 |*)
 Equations k_val (k : move_t) : move_ext k -> Type :=
-  k_val (KCtx x) (KECtx f) := e_ctx (fst f) (snd f) x ;
-  k_val (KVar x) (KEVar Γ) := e_val Γ x .
+  k_val (KCtx x) f := e_ctx (fst f) (snd f) x ;
+  k_val (KVar x) Γ := e_val (Γ : neg_ctx) x .
 Definition k_val' (k : move_ext') : Type := k_val (projT1 k) (projT2 k).
 
 Variant k_ext : Type :=
@@ -103,23 +101,29 @@ Definition g_ogs : game' pos_ogs pos_ogs :=
 (* ogs: ensemble des stratégies sur l'OGS (a.k.a. LTS de typage ?) *)
 Definition ogs := itree g_ogs ∅ᵢ.
 
-Record conf_p (p : pos_ogs) : Type := ConfP {
-    (* extended continuation typing of *opponent* k_ctx *)
-    C_moves_t : forall k, p.(p_ctx) ∋ k -> move_ext k ;
-    (* compatibility of extended typing with *player* k_ctx *)
-    C_moves_v : forall k i, move_ext_valid p.(o_ctx) k (C_moves_t k i) ;
-    (* actual content: continuation data at extended typing *)
-    C_moves : forall k i, k_val k (C_moves_t k i)
-}.
-Arguments ConfP {p}.
-Arguments C_moves_t {p}.
-Arguments C_moves_v {p}.
-Arguments C_moves {p}.
+(* configuration passive permettant de réponde à 1 unique move_t donné
+à l'opposant *)
+Record conf_p1 (ks : k_ctx) (k : move_t) : Type := ConfP1 {
+  (* typage supplémentaire pour savoir comment continuer après *)
+  C_move_t : move_ext k ;
+  (* preuve que l'on peut effectivement continuer comme on veut *)
+  C_move_v : move_ext_valid ks k C_move_t ;
+  (* soit un e_ctx soit une e_val, donnant notre stratégie *)
+  C_move : k_val k C_move_t ;
+} .
+Arguments ConfP1 {ks k}.
+Arguments C_move_t {ks k}.
+Arguments C_move_v {ks k}.
+Arguments C_move {ks k}.
+
+(* configuration passive: pour chaque move_t donné à l'opposant on doit avoir
+   une conf_p1 *)
+Definition conf_p (p : pos_ogs) : Type := forall k, p.(p_ctx) ∋ k -> conf_p1 p.(o_ctx) k .
 
 Record conf_a (ks : k_ctx) : Type := ConfA {
-    C_focus_t : frame ;
-    C_focus_v : k_has_frame ks C_focus_t ;
-    C_focus : eval_arg' C_focus_t ;
+  C_focus_t : frame ;
+  C_focus_v : k_has_frame ks C_focus_t ;
+  C_focus : eval_arg' C_focus_t ;
 }.
 Arguments ConfA {ks}.
 Arguments C_focus_t {ks}.
@@ -128,97 +132,98 @@ Arguments C_focus {ks}.
 
 Definition conf (p : pos_ogs) : Type := conf_a p.(p_ctx) * conf_p (p_swap p) .
 
-Equations? conf_p_lift (p : pos_ogs) {ks}
-  : conf_p p -> conf_p (POgs p.(p_ctx) (p.(o_ctx) +▶ ks)%ctx) :=
-  conf_p_lift p c := ConfP _ _ _ .
-+ refine (c.(C_moves_t) k X).
-+ refine (move_ext_valid_lift k _ (c.(C_moves_v) k i)).
-+ refine (c.(C_moves) k i).
-Defined.
+(* weakening the inclusion proofs for a singleton passive configuration *)
+Definition conf_p1_lift {ks ks' k} (c : conf_p1 ks k) : conf_p1 (ks +▶ ks') k :=
+  {| C_move_t := c.(C_move_t) ;
+     C_move_v := move_ext_valid_lift k _ c.(C_move_v) ;
+     C_move   := c.(C_move) |} .
 
-Equations? conf_p_cat (p : pos_ogs) {ks}
-  : conf_p p -> conf_p (POgs ks p.(o_ctx)) -> conf_p (POgs (p.(p_ctx) +▶ ks)%ctx p.(o_ctx)) :=
-  conf_p_cat _ c d := ConfP _ _ _ .
-- destruct (concat_split _ _ X).
-  + refine (c.(C_moves_t) k h).
-  + refine (d.(C_moves_t) k h).
-- destruct (concat_split _ _ i).
-  + refine (c.(C_moves_v) k h).
-  + refine (d.(C_moves_v) k h).
-- destruct (concat_split _ _ i).
-  + refine (c.(C_moves) k h).
-  + refine (d.(C_moves) k h).
-Defined.
+(* append a singleton passive configuration to a passive configuration *)
+Equations conf_p_app {ps k os} (c : conf_p (POgs ps os)) (d : conf_p1 os k)
+           : conf_p (POgs (ps ▶ k)%ctx os) :=  
+  conf_p_app c d _ top := d ;
+  conf_p_app c d _ (pop i) := c _ i .
 
-Equations? k_move_apply {ks} (k : move_t) (m : k_move k)
-          (e : move_ext k) (v : move_ext_valid ks k e)
-          (val : k_val k e) : conf_a (ext_kctx ks (k_next k m)) :=
-  k_move_apply (KCtx x) m (KECtx f) verif val :=
-    ConfA ((fst f +▶ a_cext m)%ctx , snd f)
-          (_ , r_concat_l _ _ _ (snd verif))
-          (EArg (e_rename r_concat_l' val)
-                (t_rename r_concat_r' (t_of_a m))
-            : eval_arg' (_ , _)) ;
-  k_move_apply (KVar x) m (KEVar Γ) verif val :=
-    ConfA ((Γ +▶ t_obs_args m)%ctx , t_obs_goal m)
+(* concatenating passive configurations (could be defined by iterating conf_p_app) *)
+Definition conf_p_cat {ps ps' os}
+           (c : conf_p (POgs ps os))
+           (d : conf_p (POgs ps' os))
+           : conf_p (POgs (ps +▶ ps')%ctx os) :=  
+ fun k i => match concat_split ps ps' i with
+         | inl j => c k j
+         | inr j => d k j
+         end.
+
+Notation "c ▶p d" := (conf_p_app c d) (at level 40).
+Notation "c +▶p d" := (conf_p_cat c d) (at level 40).
+
+
+(* create an active configuration given a passive configuration and a move on it *)
+Equations? conf_p_apply {ks} (k : move_t) (c : conf_p1 ks k) (m : k_move k)
+          : conf_a (ext_kctx ks (k_next k m)) :=
+  conf_p_apply (KCtx x) c m :=
+    ConfA ((fst c.(C_move_t) +▶ a_cext m)%ctx , snd c.(C_move_t))
+          (_ , r_concat_l _ _ _ (snd c.(C_move_v)))
+          (EArg (e_rename r_concat_l' c.(C_move))
+                (t_rename r_concat_r' (t_of_a m))) ;
+  conf_p_apply (KVar x) c m :=
+    ConfA ((c.(C_move_t) +▶ t_obs_args m)%ctx , t_obs_goal m)
           (_ , top)
-          (EArg EHole (t_obs_apply m val) : eval_arg' (_ , _)) .
-- cbv [KVars] in X; r_fixup.
-  destruct (concat_split _ _ X).
-  + refine (r_concat_l _ _ _ (fst verif _ h)).
-  + refine (r_concat_r _ _ _ h).
-- cbv [KVars] in X; r_fixup.
-  destruct (concat_split _ _ X).
-  + refine (pop (r_concat_l _ _ _ (verif _ h))).
-  + refine (pop (r_concat_r _ _ _ h)).
+          (EArg EHole (t_obs_apply m c.(C_move))) .
+all: cbv [KVars] in X; r_fixup.
+all: destruct (concat_split _ _ X).
+refine (r_concat_l _ _ _ (fst c.(C_move_v) _ h)).
+refine (r_concat_r _ _ _ h).
+refine (pop (r_concat_l _ _ _ (c.(C_move_v) _ h))).
+refine (pop (r_concat_r _ _ _ h)).
 Defined.
 
-Equations conf_p_select {p} (c : conf_p p) : iforest g_ogs (conf +ᵢ ∅ᵢ) p :=
-  conf_p_select c (@Any _ _ _ k i m) :=
-    Ret (inl (k_move_apply k m _ (c.(C_moves_v) k i) (c.(C_moves) k i) ,
-              conf_p_lift p c) : conf (POgs _ _) + _) .
+(* inject passive configurations into passive opponent strategies *)
+Equations inj_ogs_p_aux {p} (c : conf_p p) : iforest g_ogs (conf +ᵢ ∅ᵢ) p :=
+  inj_ogs_p_aux c (@Any _ _ _ k i m) :=
+    Ret (inl (conf_p_apply k (c k i) m ,
+             (fun k i => conf_p1_lift (c k i))) : conf (POgs _ _) + _).
 
+Definition e_val' : frame -> Type := uncurry (e_val ∘ of_n_ctx).
 
+(* create a passive configuration from a set of variables *)
+Equations conf_p_vars {ks} (c : conf_a ks)
+          {Γ : neg_ctx} (f : forall x, Γ ∋ x -> e_val (fst c.(C_focus_t)) x)
+          : conf_p {| p_ctx := KVars Γ ; o_ctx := ks |} :=
+  conf_p_vars c f k i :=
+    rew has_map2 KVar _ i
+    in {| C_move_t := fst c.(C_focus_t) : move_ext (KVar _) ;
+          C_move_v := fst c.(C_focus_v) ;
+          C_move := f _ (has_map1 _ _ i) |}.
 
-Definition inj_ogs_aux p (c : conf p) : itree g_ogs (conf +ᵢ ∅ᵢ) p.
-  refine (emb_comp _ _ (eval_enf (fst c).(C_focus)) !>= _).
-  intros [].
-  - refine (Vis (Any _ _ (snd (fst c).(C_focus_v)) (a_of_val e) : qry g_ogs _) _).
-    refine (conf_p_select (conf_p_cat _ (snd c) _)).
-    unshelve econstructor.
-    + intros k i. cbn in i.
-      rewrite <- (has_map2 _ _ i).
-      refine (KEVar (fst (C_focus_t (fst c)))).
-    + intros k i. cbn in i. cbn.
-      rewrite <- (has_map2 _ _ i); cbn.
-      refine (fst (fst c).(C_focus_v)).
-    + intros k i. cbn in *.
-      rewrite <- (has_map2 _ _ i); cbn.
-      refine (cext_get _ e (has_map1 _ _ i)).
-  - pose (ni := neg_var h); dependent elimination ni.
-    dependent elimination e0.
-    refine (Vis (Any _ _ (fst (fst c).(C_focus_v) _ (map_has KVar _ (neg_upgrade h NArr)))
-                         (a_of_val e0) : qry g_ogs _) _).
-    refine (conf_p_select (conf_p_cat _ (snd c) _)).
-    unshelve econstructor.
-    + intros k i.
-      dependent elimination i.
-      * refine (KECtx (fst c).(C_focus_t)).
-      * rewrite <- (has_map2 _ _ h0).
-        refine (KEVar (fst (fst c).(C_focus_t))).
-    + intros k i.
-      dependent elimination i.
-      * refine ((fst c).(C_focus_v)).
-      * cbv [KVars] in h0; cbn in *. rewrite <- (has_map2 _ _ h0).
-        refine (fst (fst c).(C_focus_v)).
-    + intros k i.
-      dependent elimination i.
-      * refine e.
-      * cbv [KVars] in h0; cbn in *. rewrite <- (has_map2 _ _ h0).
-        refine (cext_get _ e0 (has_map1 _ _ h0)).
-Defined.
+(* create a passive configuration from an evaluation context *)
+Equations conf_p1_ctx {ks b} (c : conf_a ks)
+          : e_ctx (fst c.(C_focus_t)) (snd c.(C_focus_t)) b
+            -> conf_p1 ks (KCtx b) :=
+  conf_p1_ctx c e :=
+    {| C_move_t := c.(C_focus_t) : move_ext (KCtx _);
+       C_move_v := c.(C_focus_v) ;
+       C_move := e |} .
 
-Definition inj_ogs : forall p, conf p -> itree g_ogs ∅ᵢ p := iter inj_ogs_aux.
+(* inject normal forms into active player strategies *)
+Equations inj_ogs_enf_aux {p} (c : conf p) : e_nf' (fst c).(C_focus_t)
+                                           -> itree g_ogs (conf +ᵢ ∅ᵢ) p :=
+  inj_ogs_enf_aux c (NVal v) :=
+    Vis (Any (snd (fst c).(C_focus_v))
+             (a_of_val v) : qry g_ogs _)
+        (inj_ogs_p_aux (snd c +▶p conf_p_vars _ (fun _ i => cext_get _ v i))) ;
+
+  inj_ogs_enf_aux c (NRed E i v) :=
+    Vis (Any (fst (fst c).(C_focus_v) _ (map_has KVar _ (neg_upgrade i)))
+             (o_of_elim i v) : qry g_ogs _)
+        (inj_ogs_p_aux
+           (snd c +▶p conf_p_vars _ (fun _ i => o_args_get _ v i)
+            ▶p conf_p1_ctx _ (rew <- [fun t => e_ctx _ _ t] o_of_elim_eq i v in E))) .
+
+(* inject an (active) configuration into strategies *)
+Definition inj_ogs : forall p, conf p -> itree g_ogs ∅ᵢ p :=
+  iter (fun _ c => emb_comp _ _ (eval_enf (fst c).(C_focus))
+                !>= inj_ogs_enf_aux c).
 
 Section composition.
 
@@ -243,18 +248,18 @@ Definition _compo : forall showₚ showₒ hideₚ hideₒ fullₚ fullₒ
     + exact (Tau (CIH _ _ _ _ _ _ cₚ cₒ (_c_ap t b))).
     + destruct e as [x i m].
       destruct (cover_split cₚ i) as [j|j].
-      * refine (Vis (Any _ _ j m : qry g_ogs (POgs _ _)) (fun r => _)).
+      * refine (Vis (Any j m : qry g_ogs (POgs _ _)) (fun r => _)).
         refine (CIH _ _ _ _ _ _ _ (ext_cover_l _ cₒ)
                     (_c_ap (k (r_any (r_cover_l (ext_cover_l _ cₒ)) r)) b)).
         refine (@cat_cover _ _ _ _ ∅ _ _ cₚ _); destruct r; refine (cover_nil_r).
       * exact (Tau (CIH _ _ _ _ _ _ cₚ (ext_cover_r _ cₒ)
-                        (_c_pa k (b (Any _ _ j m))))).
+                        (_c_pa k (b (Any j m))))).
   - destruct (observe b).
     + destruct r.
     + exact (Tau (CIH _ _ _ _ _ _ cₚ cₒ (_c_pa a t))).
     + destruct e as [x i m].
       exact (Tau (CIH _ _ _ _ _ _ (ext_cover_r _ cₚ) cₒ
-                      (_c_ap (a (Any _ _ (r_cover_r cₒ x i) m)) k))).
+                      (_c_ap (a (Any (r_cover_r cₒ x i) m)) k))).
 Defined.
 Arguments _compo {_ _ _ _ _ _}.
 
@@ -306,7 +311,7 @@ Lemma _compo_cong {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ fₚ
       destruct REL; [exact H|destruct H].
     + destruct e.
       econstructor; right.
-      refine (CIH _ _ _ _ _ _ _ _ (_c_ap2 _ _ _ _ (ea (Any k_move _ _ _)) _)).
+      refine (CIH _ _ _ _ _ _ _ _ (_c_ap2 _ _ _ _ (ea (Any _ _)) _)).
       intro r0; destruct (REL r0); [exact H|destruct H].
     + econstructor; auto.
       cbv [observe]; cbn; cbv [observe].
@@ -327,7 +332,7 @@ Lemma _compo_cong {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ fₚ
         destruct (REL (r_any (r_cover_l (ext_cover_l _ cₒ)) v));
           [exact H|destruct H].
       * econstructor; right.
-        refine (CIH _ _ _ _ _ _ _ _ (_c_pa2 _ _ _ _ _ (eb (Any _ _ _ _)))).
+        refine (CIH _ _ _ _ _ _ _ _ (_c_pa2 _ _ _ _ _ (eb (Any _ _)))).
         intro r0; destruct (REL r0); [exact H|destruct H].
     + econstructor; auto.
       cbv [observe]; cbn; cbv [observe].

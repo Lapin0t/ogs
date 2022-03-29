@@ -115,10 +115,10 @@ Equations neg_var {Γ : neg_ctx} {x : ty} : (Γ : t_ctx) ∋ x -> is_neg x :=
   @neg_var (_ ▶ t) _ (top)   := projT2 t ;
   @neg_var (_ ▶ _) _ (pop i) := neg_var i .
 
-Equations neg_upgrade {Γ : neg_ctx} {x : ty} (i : (Γ : t_ctx) ∋ x) (p : is_neg x) :
-  Γ ∋ (x ,' p) :=
-  @neg_upgrade (_ ▶ (_ ,' NArr)) _ (top)   NArr := top ;
-  @neg_upgrade (_ ▶ _)           _ (pop i) p    := pop (neg_upgrade i p) .
+Equations neg_upgrade {Γ : neg_ctx} {x : ty} (i : (Γ : t_ctx) ∋ x) :
+  Γ ∋ (x ,' neg_var i) :=
+  @neg_upgrade (_ ▶ (_ ,' _)) _ (top)   := top ;
+  @neg_upgrade (_ ▶ _)        _ (pop i) := pop (neg_upgrade i) .
 
 (*|
 Syntax of terms
@@ -728,3 +728,21 @@ Defined.
 |*)
 Arguments cext_get {Γ} x v {y} i.
 
+Equations o_of_elim {Γ : neg_ctx} {x y} (i : (Γ : t_ctx) ∋ x)
+  : e_elim Γ x y -> t_obs (x ,' neg_var i) :=
+  o_of_elim i e with neg_var i := { o_of_elim i (RApp v) NArr := _ } .
+Obligation 1. exact (a_of_val v). Defined.
+
+Definition o_of_elim_eq {Γ : neg_ctx} {x y} (i : (Γ : t_ctx) ∋ x)
+          (e : e_elim Γ x y) : t_obs_goal (o_of_elim i e) = y.
+cbv [o_of_elim]; pose (u := neg_var i); fold u.
+dependent elimination u; dependent elimination e; reflexivity.
+Defined.
+
+Definition o_args_get {Γ : neg_ctx} {x y z} (i : (Γ : t_ctx) ∋ x)
+          (e : e_elim Γ x y) : t_obs_args (o_of_elim i e) ∋ z -> e_val Γ z.
+  intro j.
+  cbv [o_of_elim] in j; pose (u := neg_var i); fold u in j.
+  dependent elimination u; dependent elimination e; cbv -[a_cext a_of_val] in j.
+  refine (cext_get _ e j).
+Defined.
