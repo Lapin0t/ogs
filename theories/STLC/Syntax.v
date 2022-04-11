@@ -154,72 +154,67 @@ Inductive term : t_ctx -> ty -> Type :=
 | PMatch {Γ a b x} : term Γ (a × b) -> term (Γ ▶ a ▶ b) x -> term Γ x
 | Inl {Γ a b} : term Γ a -> term Γ (a + b)
 | Inr {Γ a b} : term Γ b -> term Γ (a + b)
-| SMatch {Γ a b x} : term Γ (a + b) -> term (Γ ▶ a) x -> term (Γ ▶ b) x
-                                                      -> term Γ x
+| SMatch {Γ a b x} : term Γ (a + b) -> term (Γ ▶ a) x -> term (Γ ▶ b) x -> term Γ x
 .
 
 (*|
 Simultaneous renaming. This is functoriality of term (as presheaves on contexts).
+First using an auxiliary that does fused shifting for efficiency.
 |*)
-Equations t_rename {Γ Δ} (f : forall t, Γ ∋ t -> Δ ∋ t) {t}
-          : term Γ t -> term Δ t :=
-  t_rename f (Var i)        := Var (f _ i) ;
-  t_rename f (Lam u)        := Lam (t_rename (r_shift f) u) ;
-  t_rename f (Rec u)        := Rec (t_rename (r_shift (r_shift f)) u) ;
-  t_rename f (App u v)      := App (t_rename f u) (t_rename f v) ;
-  t_rename f (Pair u v)     := Pair (t_rename f u) (t_rename f v) ;
-  t_rename f (PMatch u v)   := PMatch (t_rename f u)
-                                      (t_rename (r_shift2 f) v) ;
-  t_rename f (Inl u)        := Inl (t_rename f u) ; 
-  t_rename f (Inr u)        := Inr (t_rename f u) ; 
-  t_rename f (SMatch u v w) := SMatch (t_rename f u)
-                                      (t_rename (r_shift f) v)
-                                      (t_rename (r_shift f) w).
-(*|
-Weakening by one new variable in context.
-|*)
-Definition t_shift {Γ} {x y} : term Γ x -> term (Γ ▶ y) x :=
-  t_rename (fun _ => pop).
+Equations t_rename_aux {Γ Δ} (ts : t_ctx) (f : Γ ⊆ Δ) [t]
+          : term (Γ +▶ ts) t -> term (Δ +▶ ts) t :=
+  t_rename_aux ts f (Var i)        := Var (r_shift_n ts f _ i) ;
+  t_rename_aux ts f (Lam u)        := Lam (t_rename_aux (ts ▶ _) f u) ;
+  t_rename_aux ts f (Rec u)        := Rec (t_rename_aux (ts ▶ _ ▶ _) f u) ;
+  t_rename_aux ts f (App u v)      := App (t_rename_aux ts f u)
+                                          (t_rename_aux ts f v) ;
+  t_rename_aux ts f (Pair u v)     := Pair (t_rename_aux ts f u)
+                                           (t_rename_aux ts f v) ;
+  t_rename_aux ts f (PMatch u v)   := PMatch (t_rename_aux ts f u)
+                                             (t_rename_aux (ts ▶ _ ▶ _) f v) ;
+  t_rename_aux ts f (Inl u)        := Inl (t_rename_aux ts f u) ;
+  t_rename_aux ts f (Inr u)        := Inr (t_rename_aux ts f u) ;
+  t_rename_aux ts f (SMatch u v w) := SMatch (t_rename_aux ts f u)
+                                             (t_rename_aux (ts ▶ _) f v)
+                                             (t_rename_aux (ts ▶ _) f w) .
 
-(*|
-Weakening in a substitution: if we have a substitution ``Γ ⇒ₛ Δ`` then we have
-a substitution ``(Γ ▶ a) ⇒ₛ (Δ ▶ a)``.
-|*)
-Definition s_shift {Γ Δ a} (f : forall t, Γ ∋ t -> term Δ t)
-           : forall t, (Γ ▶ a) ∋ t -> term (Δ ▶ a) t
-  := has_case (Var top) (fun _ i => t_shift (f _ i)).
+Definition t_rename {Γ Δ} (f : Γ ⊆ Δ) [t] := @t_rename_aux Γ Δ ∅ f t.
 
-Definition s_shift2 {Γ Δ a b} (f : forall t, Γ ∋ t -> term Δ t)
-           : forall t, (Γ ▶ a ▶ b) ∋ t -> term (Δ ▶ a ▶ b) t
-  := s_shift (s_shift f).
+Definition t_shift {Γ} [y x] : term Γ x -> term (Γ ▶ y) x :=
+  @t_rename _ _ (fun _ => pop) _.
+
+Equations s_shift_n {Γ Δ} (ts : t_ctx) (f : Γ =[ term ]> Δ)
+          : (Γ +▶ ts) =[ term ]> (Δ +▶ ts) :=
+  s_shift_n ts f _ i with concat_split _ _ i :=
+    { | inl j := t_rename (r_concat_l _ _) (f _ j) ;
+      | inr j := Var (r_concat_r _ _ _ j) } .
 
 (*|
 Simultaneous substitution. This is a skew multiplication, analoguous to the
 join of monads, generalized to a skew monoidal structure on presheaves.
 |*)
-Equations t_subst {Γ Δ} (f : forall t, Γ ∋ t -> term Δ t) {t}
-          : term Γ t -> term Δ t :=
-  t_subst f (Var i)       := f _ i ;
-  t_subst f (Lam u)       := Lam (t_subst (s_shift f) u) ;
-  t_subst f (Rec u)       := Rec (t_subst (s_shift2 f) u) ;
-  t_subst f (App u v)     := App (t_subst f u) (t_subst f v) ;
-  t_subst f (Pair u v)    := Pair (t_subst f u) (t_subst f v) ;
-  t_subst f (PMatch u v)  := PMatch (t_subst f u)
-                                    (t_subst (s_shift2 f) v) ;
-  t_subst f (Inl u)       := Inl (t_subst f u) ;
-  t_subst f (Inr u)       := Inr (t_subst f u) ;
-  t_subst f (SMatch u v w) := SMatch (t_subst f u)
-                                     (t_subst (s_shift f) v)
-                                     (t_subst (s_shift f) w).
+Equations t_subst_aux {Γ Δ} (ts : t_ctx) (f : Γ =[ term ]> Δ) [t]
+          : term (Γ +▶ ts) t -> term (Δ +▶ ts) t :=
+  t_subst_aux ts f (Var i)       := s_shift_n ts f _ i ;
+  t_subst_aux ts f (Lam u)       := Lam (t_subst_aux (ts ▶ _) f u) ;
+  t_subst_aux ts f (Rec u)       := Rec (t_subst_aux (ts ▶ _ ▶ _) f u) ;
+  t_subst_aux ts f (App u v)     := App (t_subst_aux ts f u) (t_subst_aux ts f v) ;
+  t_subst_aux ts f (Pair u v)    := Pair (t_subst_aux ts f u) (t_subst_aux ts f v) ;
+  t_subst_aux ts f (PMatch u v)  := PMatch (t_subst_aux ts f u)
+                                           (t_subst_aux (ts ▶ _ ▶ _) f v) ;
+  t_subst_aux ts f (Inl u)       := Inl (t_subst_aux ts f u) ;
+  t_subst_aux ts f (Inr u)       := Inr (t_subst_aux ts f u) ;
+  t_subst_aux ts f (SMatch u v w) := SMatch (t_subst_aux ts f u)
+                                            (t_subst_aux (ts ▶ _) f v)
+                                            (t_subst_aux (ts ▶ _) f w).
+
+Definition t_subst {Γ Δ} (f : Γ =[ term ]> Δ) [t] := @t_subst_aux Γ Δ ∅ f t.
 
 (*|
 Substituting the top variable only.
 |*)
-Equations t_subst1 {Γ a b} : term (Γ ▶ a) b -> term Γ a -> term Γ b :=
-  t_subst1 u v := t_subst f u
-    where f : forall t, (Γ ▶ a) ∋ t -> term Γ t := {
-          f _ top     := v ;
-          f _ (pop i) := Var i }.
+Definition t_subst1 {Γ a b} (u : term (Γ ▶ a) b) (v : term Γ a) : term Γ b :=
+  t_subst (has_case v (@Var _)) u .
 
 Notation "u /ₛ v" := (t_subst1 u v) (at level 50, left associativity).
 
