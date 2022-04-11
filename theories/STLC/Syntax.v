@@ -10,6 +10,7 @@ Simply-typed lambda-calculus
 Set Primitive Projections.
 
 From Coq Require Import Logic.
+From Coq Require Import Program.Equality.
 Import EqNotations.
 Require Import Psatz.
 
@@ -89,12 +90,14 @@ only destruct it (eg apply a function).
 We'll define an ``is_neg`` predicate, negative types and contexts
 containing only negative types.
 |*)
-Variant is_neg : ty -> Type := | NArr {a b} : is_neg (a → b) .
-Definition neg_ty : Type := { t : ty & is_neg t }.
+Variant is_neg : ty -> Prop := | NArr {a b} : is_neg (a → b) .
+Definition neg_ty : Type := { t : ty | is_neg t }.
 Definition neg_ctx : Type := Ctx.ctx neg_ty.
+Print sig.
+Search sig.
 
 (*| .. coq:: none |*)
-Definition of_n_ty (t : neg_ty) : ty := projT1 t.
+Definition of_n_ty (t : neg_ty) : ty := proj1_sig t.
 Coercion of_n_ty : neg_ty >-> ty.
 
 Bind Scope ctx_scope with neg_ctx.
@@ -112,13 +115,14 @@ type ``x`` then ``x`` is negative.
 |*)
 Equations neg_var {Γ : neg_ctx} {x : ty} : (Γ : t_ctx) ∋ x -> is_neg x :=
   @neg_var ∅       _ (!) ;
-  @neg_var (_ ▶ t) _ (top)   := projT2 t ;
+  @neg_var (_ ▶ t) _ (top)   := proj2_sig t ;
   @neg_var (_ ▶ _) _ (pop i) := neg_var i .
+Print sig.
 
 Equations neg_upgrade {Γ : neg_ctx} {x : ty} (i : (Γ : t_ctx) ∋ x) :
-  Γ ∋ (x ,' neg_var i) :=
-  @neg_upgrade (_ ▶ (_ ,' _)) _ (top)   := top ;
-  @neg_upgrade (_ ▶ _)        _ (pop i) := pop (neg_upgrade i) .
+  Γ ∋ exist _ x (neg_var i) :=
+  @neg_upgrade (_ ▶ (exist _ _ _)) _ (top)   := top ;
+  @neg_upgrade (_ ▶ _)             _ (pop i) := pop (neg_upgrade i) .
 
 (*|
 Syntax of terms
@@ -630,7 +634,7 @@ turns an abstract value into a term, extending the context with a fresh variable
 for everything that has been hiden.
 |*)
 Equations a_cext {x} : a_val x -> neg_ctx :=
-  a_cext (@AArr a b)   := nil ▶ ((a → b)%ty ,' NArr) ;
+  a_cext (@AArr a b)   := nil ▶ (exist _ (a → b)%ty NArr) ;
   a_cext (APair u v)   := a_cext u +▶ a_cext v ;
   a_cext (AInl u)      := a_cext u ;
   a_cext (AInr u)      := a_cext u .
@@ -663,16 +667,16 @@ We will also need to define the set of queries (or observations) that can be mad
 on a given negative type.
 |*)
 Equations t_obs : neg_ty -> Type :=
-  t_obs (_ ,' @NArr a b) := a_val a .
+  t_obs (exist _ (a → b)%ty _) := a_val a .
 
 (*|
 And how the typing context and goal type change at a given observation.
 |*)
 Equations t_obs_args (x : neg_ty) : t_obs x -> neg_ctx :=
-  @t_obs_args (_ ,' @NArr a b) o := a_cext o.
+  t_obs_args (exist _ (a → b)%ty _)   o := a_cext o .
 
 Equations t_obs_goal (x : neg_ty) : t_obs x -> ty :=
-  @t_obs_goal (_ ,' @NArr a b) o := b.
+  t_obs_goal (exist _ (a → b)%ty _)   o := b .
 
 Definition t_obs_nxt (x : neg_ty) (o : t_obs x) : frame :=
   (t_obs_args x o , t_obs_goal x o).
@@ -688,7 +692,7 @@ Arguments t_obs_nxt {x} o.
 |*)
 Equations t_obs_apply {Γ : neg_ctx} {x : neg_ty} (o : t_obs x)
           : term Γ x -> term ((Γ +▶ t_obs_args o) : neg_ctx) (t_obs_goal o) :=
-  @t_obs_apply Γ (_ ,' @NArr a b) o t :=
+  @t_obs_apply Γ (exist _ (a → b)%ty _)   o t :=
     App (t_rename r_concat_l' t)
         (t_rename r_concat_r' (t_of_a o)).
 
@@ -710,39 +714,44 @@ Equations a_of_val {Γ : neg_ctx} x (v : e_val Γ x) : a_val x :=
 |*)
 Arguments a_of_val {Γ x}.
 
-Equations? cext_get {Γ : neg_ctx} x (v : e_val Γ x) (y : neg_ty)
+Equations cext_get {Γ : neg_ctx} x (v : e_val Γ x) {y : neg_ty}
          : a_cext (a_of_val v) ∋ y -> e_val Γ y :=
-  cext_get (_ → _) v           (_ ,' _) top := v ;
-  cext_get (_ × _) (VPair u v) (_ ,' _) j := _ ;
-  cext_get (_ + _) (VInl u)    (_ ,' _) j := cext_get _ u _ j ;
-  cext_get (_ + _) (VInr v)    (_ ,' _) j := cext_get _ v _ j ;
-  cext_get Unit    (VVar i) _ _ with neg_var i := { | (!) } ;
-  cext_get (_ × _) (VVar i) _ _ with neg_var i := { | (!) } ;
-  cext_get (_ + _) (VVar i) _ _ with neg_var i := { | (!) } .
+  cext_get (_ → _) v           top := v ;
 
-r_fixup; destruct (concat_split _ _ j) as [k|k].
-all: refine (cext_get _ _ _ (_ ,' _) k); auto.
-Defined.
+  cext_get (_ × _) (VPair u v) j with concat_split _ _ j :=
+    { | inl k := cext_get _ u k ;
+      | inr k := cext_get _ v k } ;
+  cext_get (_ + _) (VInl u) j := cext_get _ u j ;
+  cext_get (_ + _) (VInr v) j := cext_get _ v j ;
+
+  cext_get Unit    (VVar i) _ with neg_var i := { | (!) } ;
+  cext_get (_ × _) (VVar i) _ with neg_var i := { | (!) } ;
+  cext_get (_ + _) (VVar i) _ with neg_var i := { | (!) } .
 (*|
 .. coq:: none
 |*)
 Arguments cext_get {Γ} x v {y} i.
 
-Equations o_of_elim {Γ : neg_ctx} {x y} (i : (Γ : t_ctx) ∋ x)
-  : e_elim Γ x y -> t_obs (x ,' neg_var i) :=
-  o_of_elim i e with neg_var i := { o_of_elim i (RApp v) NArr := _ } .
+Equations o_of_elim {Γ : neg_ctx} x {y} (i : (Γ : t_ctx) ∋ x)
+  : e_elim Γ x y -> t_obs (exist _ x (neg_var i)) :=
+  o_of_elim _ i e with neg_var i := {
+      o_of_elim (_ → _) i (RApp v) _ := _
+  } .
 Obligation 1. exact (a_of_val v). Defined.
+Arguments o_of_elim {Γ x y} i e.
 
 Definition o_of_elim_eq {Γ : neg_ctx} {x y} (i : (Γ : t_ctx) ∋ x)
           (e : e_elim Γ x y) : t_obs_goal (o_of_elim i e) = y.
-cbv [o_of_elim]; pose (u := neg_var i); fold u.
-dependent elimination u; dependent elimination e; reflexivity.
+  cbv [o_of_elim]; pose (u := neg_var i); fold u.
+  destruct x; try dependent elimination u.
+  dependent elimination e.
+  reflexivity.
 Defined.
 
 Definition o_args_get {Γ : neg_ctx} {x y z} (i : (Γ : t_ctx) ∋ x)
-          (e : e_elim Γ x y) : t_obs_args (o_of_elim i e) ∋ z -> e_val Γ z.
-  intro j.
+          (e : e_elim Γ x y) (j : t_obs_args (o_of_elim i e) ∋ z) : e_val Γ z.
   cbv [o_of_elim] in j; pose (u := neg_var i); fold u in j.
-  dependent elimination u; dependent elimination e; cbv -[a_cext a_of_val] in j.
-  refine (cext_get _ e j).
+  destruct x; try dependent elimination u.
+  dependent elimination e.
+  exact (cext_get _ e j).
 Defined.

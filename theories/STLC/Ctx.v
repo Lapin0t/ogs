@@ -33,8 +33,9 @@ Inductive has : ctx X -> X -> Type :=
 Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
 Derive Signature for has.
 
-Definition renaming (Γ Δ : ctx X) : Type := forall x, Γ ∋ x -> Δ ∋ x.
-Notation "Γ ⊆ Δ" := (renaming Γ%ctx Δ%ctx) (at level 30).
+Definition substitution (F : ctx X -> X -> Type) (Γ Δ : ctx X) := forall x, Γ ∋ x -> F Δ x.
+Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30).
+Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30).
 
 Equations has_get (Γ : ctx X) i : Γ ∋ (Γ.[i]) :=
   has_get (x :: xs) F0     := top ;
@@ -59,6 +60,11 @@ Definition r_shift {Γ Δ : ctx X} {a} (f : Γ ⊆ Δ) : (Γ ▶ a) ⊆ (Δ ▶ 
 
 Definition r_shift2 {Γ Δ : ctx X} {a b} (f : Γ ⊆ Δ) : (Γ ▶ a ▶ b) ⊆ (Δ ▶ a ▶ b)
   := r_shift (r_shift f).
+
+Equations r_shift_n {Γ Δ : ctx X} (xs : ctx X) (f : Γ ⊆ Δ) : (Γ +▶ xs) ⊆ (Δ +▶ xs) :=
+  r_shift_n ∅        f _ i       := f _ i ;
+  r_shift_n (xs ▶ _) f _ top     := top ;
+  r_shift_n (xs ▶ _) f _ (pop i) := pop (r_shift_n xs f _ i) .
 
 Equations concat_split (Γ Δ : ctx X) {s} : (Γ +▶ Δ) ∋ s -> (Γ ∋ s) + (Δ ∋ s) :=
   concat_split Γ ∅       i := inl i ;
@@ -194,7 +200,8 @@ Equations any_c_split_coh2 {P xs ys zs} (c : xs ⊎ ys ≡ zs) (a : any P zs) :
 End lemma.
 #[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30) : type_scope.
 #[global] Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30) : type_scope.
-#[global] Notation "Γ ⊆ Δ" := (renaming Γ%ctx Δ%ctx) (at level 30) : type_scope.
+#[global] Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30) : type_scope.
+#[global] Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30) : type_scope.
 
 
 Equations has_map0 {X Y} (f : X -> Y) (Γ : ctx X) {y} : map f Γ ∋ y -> X :=
