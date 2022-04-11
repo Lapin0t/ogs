@@ -3,7 +3,6 @@
 Simply-typed lambda-calculus
 ============================
 
-:alectryon/pygments/decls: Equations
 
 .. coq:: none
 |*)
@@ -93,8 +92,6 @@ containing only negative types.
 Variant is_neg : ty -> Prop := | NArr {a b} : is_neg (a → b) .
 Definition neg_ty : Type := { t : ty | is_neg t }.
 Definition neg_ctx : Type := Ctx.ctx neg_ty.
-Print sig.
-Search sig.
 
 (*| .. coq:: none |*)
 Definition of_n_ty (t : neg_ty) : ty := proj1_sig t.
@@ -117,7 +114,6 @@ Equations neg_var {Γ : neg_ctx} {x : ty} : (Γ : t_ctx) ∋ x -> is_neg x :=
   @neg_var ∅       _ (!) ;
   @neg_var (_ ▶ t) _ (top)   := proj2_sig t ;
   @neg_var (_ ▶ _) _ (pop i) := neg_var i .
-Print sig.
 
 Equations neg_upgrade {Γ : neg_ctx} {x : ty} (i : (Γ : t_ctx) ∋ x) :
   Γ ∋ exist _ x (neg_var i) :=

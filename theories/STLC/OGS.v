@@ -47,16 +47,11 @@ transitions are the same for PLY and OPP (swapping roles after each
 move), hence we will only describe half of it (from the point of view
 of PLY).
 
-Abstract states are pairs
-
-.. code:: coq
-  { p_ctx : list chan_t ;
-    o_ctx : list chan_t }
-
-where ``p_ctx`` is akin to a typing scope for channels given by
-OPP to PLY and ``o_ctx`` is the reverse. Channel names will be
-represented in typed-de-bruijn, ie a channel name will be an indice
-into the scope (0 being the last introduced channel).
+Abstract states are pairs ``{ p_ctx : list chan_t ; o_ctx : list chan_t }``
+where ``p_ctx`` is akin to a typing scope for channels given by OPP to PLY and
+``o_ctx`` is the reverse. Channel names will be represented in typed-de-bruijn,
+ie a channel name will be an indice into the scope (0 being the last
+introduced channel).
 
 A move in state ``(p_ctx , o_ctx)`` is a pair ``(i , m)`` such that:
 
@@ -173,7 +168,8 @@ to implement more general kinds of strategy families than what is
 usually called an LTS. An LTS can be more precisely defined as such a
 function that is "tail-corecursive".
 
-.. TODO::
+.. note:: TODO
+
   Actually an LTS is more than tail-corecursive: we could have the
   additional constraint that each step only gives a single level of
   event.  This is related to the two flavors of guarded recursive
@@ -253,7 +249,6 @@ syntactic data that we need to store in the configuration.
 Equations ch_val (k : chan_t) : chan_t_ext k -> Type :=
   ch_val (COut x) f := e_ctx (fst f) (snd f) x ;
   ch_val (CIn x) Γ := e_val (Γ : neg_ctx) x .
-Print ch_val.
 
 (*|
 Return channels and scope consistency
@@ -613,6 +608,8 @@ cbn.
 Check ()
     _compo c2ₚ c2ₒ (_c_pa (fun r => _compo c1ₚ c1ₒ (_c_pa a (b r))) c) .
 *)
+
+End composition.
 
 Definition obs_eq {Γ x} (a b : term Γ x) : Prop :=
   forall y (E : e_ctx Γ y x), eval_enf (EArg E a) ≈ eval_enf (EArg E b).
