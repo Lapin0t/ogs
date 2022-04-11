@@ -705,6 +705,10 @@ Equations a_of_val {Γ : neg_ctx} x (v : e_val Γ x) : a_val x :=
 |*)
 Arguments a_of_val {Γ x}.
 
+(*|
+If we turn a concrete value into an abstract value, for every new variable that we
+introduced (``a_cext``) we can get it's original value.
+|*)
 Equations cext_get {Γ : neg_ctx} x (v : e_val Γ x) {y : neg_ty}
          : a_cext (a_of_val v) ∋ y -> e_val Γ y :=
   cext_get (_ → _) v           top := v ;
@@ -723,6 +727,11 @@ Equations cext_get {Γ : neg_ctx} x (v : e_val Γ x) {y : neg_ty}
 |*)
 Arguments cext_get {Γ} x v {y} i.
 
+(*|
+We end with 3 functions that will enable to treat ``e_elim`` and ``t_obs`` as
+opaque in the OGS development. They respectively construct an observation and
+explain how it is eliminated.
+|*)
 Equations o_of_elim {Γ : neg_ctx} x {y} (i : (Γ : t_ctx) ∋ x)
   : e_elim Γ x y -> t_obs (exist _ x (neg_var i)) :=
   o_of_elim _ i e with neg_var i := {
