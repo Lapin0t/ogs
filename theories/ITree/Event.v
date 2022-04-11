@@ -20,8 +20,7 @@ Record event (I J : Type) : Type := Event {
 
 CoInductive game : Type :=
   { move : Type ;
-    play : move -> game
-    }.
+    play : move -> game }.
 
 Definition e_to_g {I : Type} (E : event I I) : I -> game :=
   cofix _aux (i : I) : game := {|
