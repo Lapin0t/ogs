@@ -105,7 +105,7 @@ On s'aperçoit que ce type ressemble très fortement à celui du constructeur 'V
 des itree: c'est la pair d'un événement q et d'une continuation k. Pour rappel,
 dans les itree classiques, les arguments de VisF sont:
 
-  VisF {R : Type} (q : E R) (k : R -> itree E X)
+  VisF {R : Type} (q : E R) (k : R -> itree E X) : itree E X
 
 et le foncteur associé est donc:
 
@@ -144,29 +144,49 @@ do Do est exactement F (freeer E X) -> freeer E X (avec F défini plus haut).
 <<< fam vs pow
 Ce choix est lié aux 2 représentations des sous-ensemble d'un ensemble X:
 
-  fam X := ∃ Y : Type, Y ↪ X
+  fam X := ∃ Y : Type, Y ↪  X
   pow X := X → Prop
 
-Un léger avantage d'utiliser fam plutôt que pow apparait lorsque l'on quantifie
-sur les éléments du sous-ensemble:
+Les élements du sous ensemble (le domaine):
 
-  elems (Y , i : fam X) := Y
-  elems (P : pow X) := ∃ a : X, P a
+  elems_fam (Y , inj) := Y
+  elems_pow P := ∃ a : X, P a
 
-On s'aperçoit que elems pour pow contient une quantification sur Type,
-il s'agit donc d'un *grand* ensemble (un niveau plus haut que le
-niveau de Type dans la hiérarchie), alors que cette montée de niveau n'apparait
-pas dans la version fam.
+Preuves d'appartenances:
+
+  has_fam (Y , inj) x := ∃ y : Y, inj y = x
+  has_pow P x := P x
+
+Injection:
+
+  inj_fam (Y , inj) y := inj y
+  inj_pow P (a , p) := a
+
+On voit donc que dans la représentation par prédicat, c'est le prédicat
+d'appartenance qui est primitif alors que dans la représentation famille, c'est
+le domaine et l'injection qui sont primitives.
+
+<<< considérations sur les univers:
+
+Une différence est que le domaine en représentaition "pow" sera du même niveau
+d'univers que `X`, alors que dans la représentation "fam" on peut décider en
+amont du niveau souhaité. C'est utile pour garder au niveau 0 la quantification
+sur les éléments des petits sous-ensemble d'un ensemble de niveau grand. Avec
+cette idée, dans la représentation "fam" on peut même restreindre aux
+sous-ensembles finis avec un type `ffam X := ∃ n : nat, fin n ↪  X`. De manière
+générale si on a un univers `U : Type` et un décodage `el : U -> Type`, on peut
+former les familles à domaine dans l'univers par `ufam X := ∃ a : U, el a ↪ X`.
+Maitriser le choix de l'univers du domaine n'est pas possible dans la
+représentation par prédicat. >>>
+
 >>> fam vs pow
 
-Les extensions de conteneurs indexés sont strictement positifs en leur
-argument, on peut donc en construire les algèbres initiales et
-terminale. Les algèbres initiales sont les familles inductives que
-l'on connait en Coq ou Agda (à ceci prêt qu'on ne peut pas forcer
-d'unification des paramètres dans les constructeurs, on ne peut donc
-pas exprimer l'égalité inductive, ou le type inductif des fibres d'une
-fonction).
-
+Les extensions de conteneurs indexés sont strictement positives en leur
+argument, on peut donc en construire les algèbres initiales et terminale. Les
+algèbres initiales sont plus ou moins les familles inductives que l'on connait
+en Coq ou Agda (sans indices, uniquement des paramètres): il faut/suffit l'ajout
+d'un type égalité (qui n'est pas un conteneur) pour retrouver l'entièreté des
+familles inductives (on obtient toutefois vec, fin ou encore lambda).
 
 ## OGS et preuves
 
