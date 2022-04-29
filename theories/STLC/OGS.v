@@ -315,12 +315,13 @@ Arguments C_move {ks k}.
 
 (* configuration passive: pour chaque chan_t donné à l'opposant on doit avoir
    une conf_pass_el *)
-Definition conf_pass (p : state) : Type := forall k, p.(o_ctx) ∋ k -> conf_pass_el p.(p_ctx) k .
+Definition conf_pass (p : state) : Type :=
+  forall k, p.(o_ctx) ∋ k -> conf_pass_el p.(p_ctx) k .
 
 Record conf_foc (ks : ch_ctx) : Type := ConfA {
   C_focus_t : frame ;
   C_focus_v : ch_frame_loc ks C_focus_t ;
-  C_focus : eval_arg' C_focus_t ;
+  C_focus : zterm' C_focus_t ;
 }.
 Arguments ConfA {ks}.
 Arguments C_focus_t {ks}.
@@ -328,6 +329,8 @@ Arguments C_focus_v {ks}.
 Arguments C_focus {ks}.
 
 Definition conf_act (p : state) : Type := conf_foc p.(p_ctx) * conf_pass p .
+Definition C_foc {p} : conf_act p -> conf_foc p.(p_ctx) := fst.
+Definition C_pass {p} : conf_act p -> conf_pass p := snd.
 
 (* weakening the inclusion proofs for a singleton passive configuration *)
 Equations ch_loc_lift {ks ks'} (k : chan_t) (e : chan_t_ext k)
@@ -359,8 +362,8 @@ Definition conf_p_cat {ps os os'}
          | inr j => d k j
          end.
 
-Notation "c ▶p d" := (conf_p_app c d) (at level 40).
-Notation "c +▶p d" := (conf_p_cat c d) (at level 40).
+Notation "c ▶ₚ d" := (conf_p_app c d) (at level 40).
+Notation "c +▶ₚ d" := (conf_p_cat c d) (at level 40).
 
 
 (* create an active configuration given a passive configuration and a move on it *)
@@ -369,12 +372,12 @@ Equations? conf_p_apply {ks} (k : chan_t) (c : conf_pass_el ks k) (m : ch_move k
   conf_p_apply (COut x) c m :=
     ConfA ((fst c.(C_chan_t) +▶ a_cext m)%ctx , snd c.(C_chan_t))
           (_ , r_concat_l _ _ _ (snd c.(C_move_v)))
-          (EArg (e_rename r_concat_l' c.(C_move))
-                (t_rename r_concat_r' (t_of_a m))) ;
+          (EZ (e_rename r_concat_l' c.(C_move))
+              (t_rename r_concat_r' (t_of_a m))) ;
   conf_p_apply (CIn x) c m :=
     ConfA ((c.(C_chan_t) +▶ t_obs_args m)%ctx , t_obs_goal m)
           (_ , top)
-          (EArg EHole (t_obs_apply m c.(C_move))) .
+          (EZ EHole (t_obs_apply m c.(C_move))) .
 all: cbv [ch_vars] in X; r_fixup.
 all: destruct (concat_split _ _ X).
 refine (r_concat_l _ _ _ (fst c.(C_move_v) _ h)).
@@ -387,8 +390,6 @@ Defined.
 Equations inj_ogs_p_aux {p} (c : conf_pass p) : passive g_ogs conf_act (s_swap p) :=
   inj_ogs_p_aux c (@Any _ _ _ k i m) :=
     (conf_p_apply k (c k i) m , (fun k i => conf_p_el_lift (c k i))).
-
-Definition e_val' : frame -> Type := uncurry (e_val ∘ of_n_ctx).
 
 (* create a passive configuration from a set of variables *)
 Equations conf_p_vars {ks} (c : conf_foc ks)
@@ -410,38 +411,41 @@ Equations conf_p_el_ctx {ks b} (c : conf_foc ks)
        C_move := e |} .
 
 (* inject normal forms into active player strategies *)
-Equations inj_ogs_enf_aux {p} (c : conf_act p) : e_nf' (fst c).(C_focus_t)
+Equations inj_ogs_enf_aux {p} (c : conf_act p) : e_nf' (C_foc c).(C_focus_t)
                                            -> itree g_ogs (conf_act +ᵢ ∅ᵢ) p :=
   inj_ogs_enf_aux c (NVal v) :=
-    Vis (Any (snd (fst c).(C_focus_v))
-             (a_of_val v) : qry g_ogs _)
-        (fun r =>
-           Ret (inl (inj_ogs_p_aux
-                       (snd c +▶p conf_p_vars _ (fun _ i => cext_get _ v i)) r))) ;
+    (* get the return channel from the config *)
+    let ch_ret := snd (C_focus_v (C_foc c)) in
+    (* construct new passive configs for input/value channels *)
+    let cp_ext := conf_p_vars _ (fun _ i => cext_get _ v i) in
+
+    Vis (Any ch_ret (a_of_val v) : qry g_ogs _)
+        (ret ∘ inl ∘ inj_ogs_p_aux (C_pass c +▶ₚ cp_ext)) ;
 
   inj_ogs_enf_aux c (NRed E i v) :=
-    Vis (Any (fst (fst c).(C_focus_v) _ (map_has CIn _ (neg_upgrade i)))
-             (o_of_elim i v) : qry g_ogs _)
-        (fun r =>
-           Ret (inl (inj_ogs_p_aux
-                       (snd c
-                        +▶p conf_p_vars _ (fun _ i => o_args_get _ v i)
-                         ▶p conf_p_el_ctx _ (rew <- [fun t => e_ctx _ _ t]
-                                             o_of_elim_eq i v in E)) r))) .
+    (* get query channel by renaming [i], plus some type fixup *)
+    let ch_qry := fst (C_focus_v (C_foc c)) _ (map_has CIn _ (neg_upgrade i)) in
+    (* construct new passive configs for input/value channels *)
+    let cp_ext1 := conf_p_vars _ (fun _ i => o_args_get _ v i) in
+    (* construct new passive config for the output/ctx channel *)
+    let cp_ext2 := conf_p_el_ctx _ (rew <- [fun t => e_ctx _ _ t]
+                                          o_of_elim_eq i v in E) in
+
+    Vis (Any ch_qry (o_of_elim i v) : qry g_ogs _)
+        (ret ∘ inl ∘ inj_ogs_p_aux (C_pass c +▶ₚ cp_ext1 ▶ₚ cp_ext2)) .
 
 (* inject active and passive configurations into strategies *)
-Definition inj_ogs_act : forall p, conf_act p -> itree g_ogs ∅ᵢ p :=
-  iter (fun _ c => emb_comp _ _ (eval_enf (fst c).(C_focus))
-                !>= inj_ogs_enf_aux c).
+Definition inj_ogs_act : conf_act ⇒ᵢ itree g_ogs ∅ᵢ :=
+  iter (fun _ c => emb_comp _ _ (eval_enf (fst c).(C_focus)) !>= inj_ogs_enf_aux _).
 
 Definition inj_ogs_pass p (c : conf_pass p) : iforest g_ogs ∅ᵢ (s_swap p) :=
   fun r => inj_ogs_act _ (inj_ogs_p_aux c r).
 
 Definition conf_start {Γ : neg_ctx} {x} (a : term Γ x)
   : conf_act (State (ch_vars Γ ▶ COut x) ∅) :=
-  ({| C_focus_t := (Γ , x);
-      C_focus_v := ((fun _ i => pop i) , top);
-      C_focus := earg_start a |},
+  ({| C_focus_t := (Γ , x) ;
+      C_focus_v := (r_pop , top) ;
+      C_focus := ez_init a |},
    (fun k (i : ∅ ∋ k) => match i with end)).  
 
 Section composition.
@@ -612,7 +616,7 @@ Check ()
 End composition.
 
 Definition obs_eq {Γ x} (a b : term Γ x) : Prop :=
-  forall y (E : e_ctx Γ y x), eval_enf (EArg E a) ≈ eval_enf (EArg E b).
+  forall y (E : e_ctx Γ y x), eval_enf (EZ E a) ≈ eval_enf (EZ E b).
 
 Definition ogs_eq {Γ : neg_ctx} {x} (a b : term Γ x) : Prop :=
   inj_ogs_act _ (conf_start a) ≈ inj_ogs_act _ (conf_start b).
@@ -622,20 +626,8 @@ Notation "a ≈ogs b" := (ogs_eq a b) (at level 40).
 
 
 Lemma ogs_correctness {Γ : neg_ctx} {x} (a b : term Γ x) : a ≈ogs b -> a ≈obs b.
-  (*
-intros H y E.
-cbv [eval_enf].
-pstep.
-cbv [eqit_ observe]. cbv [iterₐ].
-cbv [NonDep.ret bind ret pin bindₐ fib_into].
-fold (fun x0 => tauₐ (@iterₐ T1 ∅ₑ (eval_arg Γ y + e_nf Γ y) (e_nf Γ y) T1_0 x0)).
-Locate "=<<".
-cbv [e_focus].
-funelim (focus_aux.focus_aux E (inl a)).
-+ cbn in *.
-+ cbn.
-*)
   Admitted.
+
 
 
     
@@ -701,3 +693,26 @@ forall {Γ : neg_ctx} {τ} (a b : term Γ τ),
  inj_ogs a ≈ inj_ogs b
 
 ***)
+
+Definition g_lassen : game frame {ks : ch_ctx & forall k , ks ∋ k -> chan_t_ext k} frame.
+  econstructor.
+  - unshelve econstructor.
+    + intros s. refine (a_val (snd s) + any t_obs (fst s)).
+    + intros s [a | [y i o]].
+      * refine (ch_vars (a_cext a) ,' fun k i => _).
+        cbv [ch_vars] in i.
+        rewrite <- (has_map2 CIn _ i).
+        refine (fst s).
+      * refine ((ch_vars (t_obs_args o) ▶ COut (t_obs_goal o))%ctx ,' fun k i => _).
+        dependent elimination i.
+        refine s.
+        rewrite <- (has_map2 CIn _ h).
+        cbn. refine (fst s).
+  - unshelve econstructor.
+    + intros s. refine (any ch_move (projT1 s)).
+    + intros s [[] i m].
+      * refine ((fst (projT2 s _ i) +▶ a_cext m)%ctx , snd (projT2 s _ i)).
+      * refine ((projT2 s _ i +▶ t_obs_args m)%ctx , t_obs_goal m).
+Defined.
+Print g_lassen.
+    

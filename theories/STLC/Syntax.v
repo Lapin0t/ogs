@@ -383,108 +383,50 @@ Variant e_term (Γ : t_ctx) (x : ty) : Type :=
 Arguments EVal {Γ x}.
 Arguments ERed {Γ x a b}.
 
-Module focus_aux.
-(*|
-Finding the redex
-^^^^^^^^^^^^^^^^^
+Variant e_zip (A : t_ctx -> ty -> Type) (Γ : t_ctx) (x : ty) :=
+| EZ {y} (E : e_ctx Γ x y) : A Γ y -> e_zip A Γ x
+.
+Arguments EZ {A Γ x y} E a.
 
-Given an ongoing computation, that is a term in an evaluation context ``E[t]``,
-we want to find the next redex in CBV evaluation order.
+Definition ez_init {A : t_ctx -> ty -> Type} {Γ x} (a : A Γ x) : e_zip A Γ x :=
+  EZ EHole a.
 
-We do it efficiently with only tail-calls by leveraging our type of
-evaluation contexts. The recursion pattern of these tail calls is non-trivial
-so we need some helpers to get coq (and coq-equations) to accept our definition.
-We do that extrinsically by providing a strictly decreasing measure on arguments
-across calls. 
+Definition zterm := e_zip term.
 
-.. coq:: none
-|*)
-Equations term_size {Γ x} : term Γ x -> nat :=
-  term_size (Var _) := S O ;
-  term_size (Lam _) := S O ;
-  term_size (Rec _) := S O ;
-  term_size (App a b) := S (S (term_size a + term_size b)) ;
-  term_size (Pair a b) := S (S (S (term_size a + term_size b))) ;
-  term_size (PMatch a b) := S (term_size a) ;
-  term_size (Inl a) := S (S (term_size a)) ;
-  term_size (Inr a) := S (S (term_size a)) ;
-  term_size (SMatch a b c) := S (term_size a) .
-
-Equations ctx_size {Γ y x} : e_ctx Γ y x -> nat :=
-  ctx_size EHole := O ;
-  ctx_size (EApp_l E u) := S (ctx_size E + term_size u) ;
-  ctx_size (EApp_r E u) := O ;
-  ctx_size (EPair_l E u) := S (S (ctx_size E + term_size u)) ;
-  ctx_size (EPair_r E u) := S (ctx_size E) ;
-  ctx_size (EPMatch E u) := O ;
-  ctx_size (EInl E) := S (ctx_size E) ;
-  ctx_size (EInr E) := S (ctx_size E) ;
-  ctx_size (ESMatch E u v) := O .
-
-Equations aux_size {Γ x} : term Γ x + e_val Γ x -> nat :=
-  aux_size (inl t) := term_size t ;
-  aux_size (inr v) := O .
+Definition focus_arg (Γ : t_ctx) (x : ty) : Type :=
+  e_zip term Γ x + e_zip e_val Γ x.
 
 (*|
-The following definition should actually be two mutually recursive functions::
-
-     e_focus : e_ctx Γ y x → term Γ x → e_term Γ y 
-     e_focus_backtrack : e_ctx Γ y x → e_val Γ x → e_term Γ y
-
-But coq-equations does not seem to allow ``by wf ...`` hints in mutual blocks
-so we had to hack it into a single function using a sum.
-
-The idea is that ``e_focus`` will descend into the left-most
-unexplored branches, recording its path by growing the evaluation
-context. When hitting a value we have to backtrack on the evaluation
-context, either finding a suitable redex or descending in another
-branch.
+This function terminates, but it's elimination order is not trivial
+(it's not simply structural) and we won't use it outside of itree context so
+we just wrap it into an ``itree ∅ₑ`` to get general recursion and make coq happy.
 |*)
-Equations? focus_aux {Γ x y} (E : e_ctx Γ y x) (t : term Γ x + e_val Γ x)
-          : e_term Γ y by wf (ctx_size E + aux_size t)%nat lt :=
-  focus_aux E (inl (Var i))      := focus_aux E (inr (VVar i)) ;
-  focus_aux E (inl (Lam a))      := focus_aux E (inr (VLam a)) ;
-  focus_aux E (inl (Rec a))      := focus_aux E (inr (VRec a)) ;
-  focus_aux E (inl (App a b))    := focus_aux (EApp_l E b) (inl a) ;
-  focus_aux E (inl (Pair a b))   := focus_aux (EPair_l E b) (inl a) ;
-  focus_aux E (inl (PMatch a b)) := focus_aux (EPMatch E b) (inl a) ;
-  focus_aux E (inl (Inl a))      := focus_aux (EInl E) (inl a) ;
-  focus_aux E (inl (Inr a))      := focus_aux (EInr E) (inl a) ;
-  focus_aux E (inl (SMatch a b c)) := focus_aux (ESMatch E b c) (inl a) ;
-
-  focus_aux EHole         (inr v) := EVal v ;
-  focus_aux (EApp_l E u)  (inr v) := focus_aux (EApp_r E v) (inl u) ;
-  focus_aux (EApp_r E u)  (inr v) := ERed E u (RApp v) ;
-  focus_aux (EPair_l E u) (inr v) := focus_aux (EPair_r E v) (inl u) ;
-  focus_aux (EPair_r E u) (inr v) := focus_aux E (inr (VPair u v)) ;
-  focus_aux (EPMatch E b) (inr v) := ERed E v (RPMatch b) ;
-  focus_aux (EInl E)      (inr v) := focus_aux E (inr (VInl v)) ;
-  focus_aux (EInr E)      (inr v) := focus_aux E (inr (VInr v)) ;
-  focus_aux (ESMatch E a b) (inr v) := ERed E v (RSMatch a b) .
-all: lia.
+Definition focus_aux {Γ x} : focus_arg Γ x -> computation (e_term Γ x).
+  apply iterₐ.
+  intros [[]|[]]; cbn in *.
+  + destruct t; refine (tauₐ (retₐ (inl _))).
+    - refine (inr (EZ E (VVar h))).
+    - refine (inr (EZ E (VLam t))).
+    - refine (inr (EZ E (VRec t))).
+    - refine (inl (EZ (EApp_l E t2) t1)).
+    - refine (inl (EZ (EPair_l E t2) t1)).
+    - refine (inl (EZ (EPMatch E t2) t1)).
+    - refine (inl (EZ (EInl E) t)).
+    - refine (inl (EZ (EInr E) t)).
+    - refine (inl (EZ (ESMatch E t2 t3) t1)).
+  + destruct E.
+    - refine (retₐ (inr _)). refine (EVal e).
+    - refine (tauₐ (retₐ (inl _))). refine (inl (EZ (EApp_r E e) t)).
+    - refine (retₐ (inr _)). refine (ERed E e0 (RApp e)).
+    - refine (tauₐ (retₐ (inl _))). refine (inl (EZ (EPair_r E e) t)).
+    - refine (tauₐ (retₐ (inl _))). refine (inr (EZ E (VPair e0 e))).
+    - refine (retₐ (inr _)). refine (ERed E e (RPMatch t)).
+    - refine (tauₐ (retₐ (inl _))). refine (inr (EZ E (VInl e))).
+    - refine (tauₐ (retₐ (inl _))). refine (inr (EZ E (VInr e))).
+    - refine (retₐ (inr _)). refine (ERed E e (RSMatch t t0)).
 Defined.
-End focus_aux.
- 
-(*|
-From now on, a lot of functions which would usually be presented as taking a term
-as input, will take an ongoing evaluation instead, that is a term ``a`` decomposed
-as ``E[b]``. We call such a package a "focused term".
-|*)
-Variant eval_arg (Γ : t_ctx) (x : ty) : Type :=
-| EArg {y} : e_ctx Γ x y -> term Γ y -> eval_arg Γ x.
-(*|
-.. coq:: none
-|*)
-Arguments EArg {Γ x y}.
 
-(*||*)
-Definition earg_start {Γ x} (u : term Γ x) : eval_arg Γ x := EArg EHole u.
-
-(*|
-Efficiently find the first redex in ``E[t]``
-|*)
-Equations e_focus {Γ x} : eval_arg Γ x -> e_term Γ x :=
-  e_focus (EArg E t) := focus_aux.focus_aux E (inl t).
+Definition focus {Γ x} : zterm Γ x -> computation (e_term Γ x) := focus_aux ∘ inl.
 
 (*|
 Eager normal forms
@@ -511,26 +453,26 @@ This next function is the core of our evaluator implementing a single
 reduction step, outputing either a term-in-context to continue
 evaluation on, or a normal form if the evaluation is done.
 |*)
-Equations eval_step {Γ x} (t : e_term Γ x) : eval_arg Γ x + e_nf Γ x :=
+Equations eval_step {Γ x} (t : e_term Γ x) : zterm Γ x + e_nf Γ x :=
   eval_step (EVal v)                   := inr (NVal v) ;
   eval_step (ERed E (VVar i) r)        := inr (NRed E i r) ;
   eval_step (ERed E (VRec u) (RApp v)) :=
-    inl (EArg E (u /ₛ t_shift (t_of_val v) /ₛ Rec u)) ;
+    inl (EZ E (u /ₛ t_shift (t_of_val v) /ₛ Rec u)) ;
   eval_step (ERed E (VLam u) (RApp v)) :=
-    inl (EArg E (u /ₛ t_of_val v)) ;
+    inl (EZ E (u /ₛ t_of_val v)) ;
   eval_step (ERed E (VPair u0 u1) (RPMatch a)) :=
-    inl (EArg E (a /ₛ t_shift (t_of_val u1) /ₛ t_of_val u0)) ;
+    inl (EZ E (a /ₛ t_shift (t_of_val u1) /ₛ t_of_val u0)) ;
   eval_step (ERed E (VInl u) (RSMatch a b)) :=
-    inl (EArg E (a /ₛ t_of_val u)) ;
+    inl (EZ E (a /ₛ t_of_val u)) ;
   eval_step (ERed E (VInr u) (RSMatch a b)) :=
-    inl (EArg E (b /ₛ t_of_val u)) .
+    inl (EZ E (b /ₛ t_of_val u)) .
 
 (*|
 And now the evaluator is complete: our iterₐ combinator encoding tail-recursion
 ties the knot, repeatedly finding the next redex and reducing it.
 |*)
-Definition eval_enf {Γ x} : eval_arg Γ x -> computation (e_nf Γ x) :=
-  iterₐ (NonDep.ret ∘ eval_step ∘ e_focus).
+Definition eval_enf {Γ x} : zterm Γ x -> computation (e_nf Γ x) :=
+  iterₐ (focus !$> eval_step).
 
 (*|
 For encoding reasons, our dependent-itree machinerie works on indexed
@@ -540,12 +482,12 @@ we constrain contexts to contain only negative types as we would like to work wi
 *focused* terms that do not contain spurious stuck redexes.
 |*)
 Definition frame : Type := neg_ctx * ty.
-Definition eval_arg' : frame -> Type := uncurry (eval_arg ∘ of_n_ctx).
+Definition zterm' : frame -> Type := uncurry (zterm ∘ of_n_ctx).
 Definition term' : frame -> Type := uncurry (term ∘ of_n_ctx).
 Definition e_nf' : frame -> Type := uncurry (e_nf ∘ of_n_ctx).
-Definition earg_start' {i} (u : term' i) : eval_arg' i := EArg EHole u.
+Definition ez_init' {i} (u : term' i) : zterm' i := EZ EHole u.
 Definition e_ctx' : ty -> frame -> Type := fun t e => e_ctx (fst e) (snd e) t.
-Definition earg' {t e} : e_ctx' t e -> term (fst e) t -> eval_arg' e := EArg.
+Definition earg' {t e} : e_ctx' t e -> term (fst e) t -> zterm' e := EZ.
 
 Equations lift_frame : neg_ctx -> frame -> frame :=
   lift_frame Γ e := ((Γ +▶ fst e)%ctx , snd e).

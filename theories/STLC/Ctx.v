@@ -33,9 +33,13 @@ Inductive has : ctx X -> X -> Type :=
 Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
 Derive Signature for has.
 
+
+
 Definition substitution (F : ctx X -> X -> Type) (Γ Δ : ctx X) := forall x, Γ ∋ x -> F Δ x.
 Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30).
 Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30).
+
+Definition r_pop {Γ : ctx X} {x : X} : Γ ⊆ (Γ ▶ x) := fun _ i => pop i.
 
 Equations has_get (Γ : ctx X) i : Γ ∋ (Γ.[i]) :=
   has_get (x :: xs) F0     := top ;
