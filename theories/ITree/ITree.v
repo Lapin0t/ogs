@@ -79,3 +79,9 @@ Instance FunctorItree {I} (E : event I I) : Functor (itree E) :=
 
 Instance MonadItree {I} (E : event I I) : Monad (itree E) :=
   Build_Monad _ (fun X => @ret I E X) (fun X Y => @subst I E X Y).
+
+Definition kcomp {I} {E : event I I} {X Y Z : psh I} (f : X ⇒ᵢ itree E Y) (g : Y ⇒ᵢ itree E Z) : X ⇒ᵢ itree E Z :=
+  fun i x => f i x >>= g.
+
+#[global]
+Notation "f >> g" := (kcomp f g) (at level 30).

@@ -37,19 +37,30 @@ Definition tauₐ {X i j} (t : itreeₐ E i j X) : itreeₐ E i j X := tau t.
 Definition retₐ {X i} (x : X) : itreeₐ E i i X := ret (pin _ x).
 Definition visₐ {X i j} q (k : forall r, itreeₐ E _ j X) : itreeₐ E i j X := vis q k.
 
+Definition fmapₐ {X Y i j} (f : X -> Y) (x : itreeₐ E i j X) : itreeₐ E i j Y :=
+  fmap (fib_into _ (Fib ∘ f)) x.
+
+Definition kmapₐ {X Y Z i j} (f : X -> itreeₐ E i j Y) (g : Y -> Z) : X -> itreeₐ E i j Z :=
+  fun x => fmapₐ g (f x).
+
 Definition bindₐ {X Y i j} (x : itreeₐ E i j X) (f : X -> itree E Y j)
                        : itree E Y i :=
  x >>= fib_into (itree _ _) f.
 
-Notation "x !>= f" := (bindₐ x f) (at level 30).
+Definition kcompₐ {X Y Z i j} (f : X -> itreeₐ E i j Y) (g : Y -> itree E Z j)
+           (x : X) : itree E Z i
+  := bindₐ (f x) g.
 
 Definition iterₐ {X Y i} (f : X -> itreeₐ E i i (X + Y)) : X -> itreeₐ E i i Y :=
-  cofix _iter x := f x !>= fun r => match r with
-                                 | inl x => tauₐ (_iter x)
-                                 | inr y => retₐ y
-                                 end.
+  cofix _iter x := bindₐ (f x) (fun r => match r with
+                                | inl x => tauₐ (_iter x)
+                                | inr y => retₐ y
+                                end).
 End angelic.
 #[global] Notation "x !>= f" := (bindₐ x f) (at level 30).
+#[global] Notation "f !>> g" := (kcompₐ f g) (at level 30).
+#[global] Notation "f <!> x" := (fmapₐ f x) (at level 30).
+#[global] Notation "f !$> g" := (kmapₐ f g) (at level 30).
 
 
 (** Non-dependent itrees, ie itrees that are trivially indexed benefit
