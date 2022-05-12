@@ -9,6 +9,7 @@ Simply-typed lambda-calculus
 Set Primitive Projections.
 
 From Coq Require Import Logic.
+From Coq.Logic Require Import StrictProp.
 From Coq Require Import Program.Equality.
 Import EqNotations.
 Require Import Psatz.
@@ -21,11 +22,6 @@ From OGS.STLC Require Import Ctx.
 
 From Equations Require Import Equations.
 Set Equations Transparent.
-
-(*
-From OGS Require Import OGSD.
-From OGS Require Import EqD.
-*)
 
 (*|
 Syntax
@@ -89,36 +85,56 @@ only destruct it (eg apply a function).
 We'll define an ``is_neg`` predicate, negative types and contexts
 containing only negative types.
 |*)
-Variant is_neg : ty -> Prop := | NArr {a b} : is_neg (a → b) .
-Definition neg_ty : Type := { t : ty | is_neg t }.
-Definition neg_ctx : Type := Ctx.ctx neg_ty.
 
-(*| .. coq:: none |*)
-Definition of_n_ty (t : neg_ty) : ty := proj1_sig t.
-Coercion of_n_ty : neg_ty >-> ty.
+Equations is_neg : ty -> SProp :=
+  is_neg (a → b)%ty := sUnit ;
+  is_neg _          := sEmpty .
+
+Definition neg_ty : Type := subset is_neg.
+Definition neg_coe : neg_ty -> ty := sub_elt.
+Coercion neg_coe : neg_ty >-> ty.
+
+Definition neg_ctx : Type := subset (fun Γ : t_ctx => forall k, Γ ∋ k -> is_neg k).
+Definition neg_c_coe : neg_ctx -> t_ctx := sub_elt.
+Coercion neg_c_coe : neg_ctx >-> t_ctx.
 
 Bind Scope ctx_scope with neg_ctx.
 Bind Scope ctx_scope with ctx.
-Definition of_n_ctx : neg_ctx -> t_ctx := map of_n_ty.
-Coercion of_n_ctx : neg_ctx >-> t_ctx.
 
-Equations of_n_var {Γ x} (i : Γ ∋ x) : (of_n_ctx Γ) ∋ of_n_ty x :=
-  of_n_var top     := top ;
-  of_n_var (pop i) := pop (of_n_var i) .
+Definition app_neg (Γ : neg_ctx) (x : neg_ty) : neg_ctx.
+  refine ({| sub_elt := (Γ.(sub_elt) ▶ x.(sub_elt))%ctx ;
+             sub_prf := fun k i => _ |}).
+  remember (sub_elt Γ ▶ sub_elt x)%ctx.
+  destruct i; injection Heql; intros Ha Hb.
+  rewrite Hb; exact (sub_prf x).
+  rewrite Ha in i; exact (sub_prf Γ x0 i).
+Defined.
 
-(*|
-Our first non-trivial lemma: if a variable in negative context has
-type ``x`` then ``x`` is negative.
-|*)
-Equations neg_var {Γ : neg_ctx} {x : ty} : (Γ : t_ctx) ∋ x -> is_neg x :=
-  @neg_var ∅       _ (!) ;
-  @neg_var (_ ▶ t) _ (top)   := proj2_sig t ;
-  @neg_var (_ ▶ _) _ (pop i) := neg_var i .
+Definition concat_neg (Γ Δ : neg_ctx) : neg_ctx.
+  refine ({| sub_elt := (Γ.(sub_elt) +▶ Δ.(sub_elt))%ctx ;
+             sub_prf := fun k i => _ |}).
+  destruct (concat_split _ _ i).
+  exact (Γ.(sub_prf) k h).
+  exact (Δ.(sub_prf) k h).
+  Defined.
 
-Equations neg_upgrade {Γ : neg_ctx} {x : ty} (i : (Γ : t_ctx) ∋ x) :
-  Γ ∋ exist _ x (neg_var i) :=
-  @neg_upgrade (_ ▶ (exist _ _ _)) _ (top)   := top ;
-  @neg_upgrade (_ ▶ _)             _ (pop i) := pop (neg_upgrade i) .
+Definition nil' : neg_ctx.
+  refine ({| sub_elt := ∅%ctx ; sub_prf := fun k i => _ |}).
+  remember ∅%ctx; destruct i; discriminate Heql.
+  Defined.
+
+Definition arr_neg (a b : ty) : neg_ty :=
+  {| sub_elt := (a → b)%ty ; sub_prf := stt |}.
+
+Notation "Γ +▶' Δ" := (concat_neg Γ Δ) (at level 40).
+Notation "Γ ▶' x" := (app_neg Γ x) (at level 40).
+Notation "∅'" := nil'.
+Notation "a →' b" := (arr_neg a b) (at level 40).
+
+Bind Scope ctx_scope with neg_ctx.
+Bind Scope ctx_scope with ctx.
+
+Definition neg_var {Γ : neg_ctx} {x} : (Γ : t_ctx) ∋ x -> is_neg x := Γ.(sub_prf) x.
 
 (*|
 Syntax of terms
@@ -279,7 +295,28 @@ Equations v_rename {Γ Δ} (f : forall t, Γ ∋ t -> Δ ∋ t) {t}
   v_rename f (VPair u v) := VPair (v_rename f u) (v_rename f v) ;
   v_rename f (VInl u)    := VInl (v_rename f u) ;
   v_rename f (VInr u)    := VInr (v_rename f u) .
+
+Equations v_shift_n {Γ Δ} (ts : t_ctx) (f : Γ =[ e_val ]> Δ)
+          : (Γ +▶ ts) =[ e_val ]> (Δ +▶ ts) :=
+  v_shift_n ts f _ i with concat_split _ _ i :=
+    { | inl j := v_rename (r_concat_l _ _) (f _ j) ;
+      | inr j := VVar (r_concat_r _ _ _ j) } .
+
+Definition s_t_of_val {Γ Δ} : Γ =[ e_val ]> Δ -> Γ =[ term ]> Δ :=
+  fun f _ i => t_of_val (f _ i).
   
+
+Equations v_subst_aux {Γ Δ} (ts : t_ctx) (f : Γ =[ e_val ]> Δ) [t]
+          : e_val (Γ +▶ ts) t -> e_val (Δ +▶ ts) t :=
+  v_subst_aux ts f (VVar i) := v_shift_n ts f _ i ;
+  v_subst_aux ts f (VLam u) := VLam (t_subst_aux (ts ▶ _) (s_t_of_val f) u) ;
+  v_subst_aux ts f (VRec u) := VRec (t_subst_aux (ts ▶ _ ▶ _) (s_t_of_val f) u) ;
+  v_subst_aux ts f (VPair u v) := VPair (v_subst_aux ts f u) (v_subst_aux ts f v) ;
+  v_subst_aux ts f (VInl u) := VInl (v_subst_aux ts f u) ;
+  v_subst_aux ts f (VInr u) := VInr (v_subst_aux ts f u) .
+  
+Definition v_subst {Γ Δ} (f : Γ =[ e_val ]> Δ) [t] := @v_subst_aux Γ Δ ∅ f t.
+
 (*|
 
 Eager contexts
@@ -345,6 +382,33 @@ Equations e_rename {Γ Δ x y} (f : forall t, Γ ∋ t -> Δ ∋ t)
                                         (t_rename (r_shift f) u)
                                         (t_rename (r_shift f) v) .
 
+Equations e_comp {Γ x y z} : e_ctx Γ z y -> e_ctx Γ y x -> e_ctx Γ z x :=
+  e_comp E EHole           := E ;
+  e_comp E (EApp_r F u)    := EApp_r (e_comp E F) u ;
+  e_comp E (EApp_l F u)    := EApp_l (e_comp E F) u ;
+  e_comp E (EPair_r F u)   := EPair_r (e_comp E F) u ;
+  e_comp E (EPair_l F u)   := EPair_l (e_comp E F) u ;
+  e_comp E (EPMatch F u)   := EPMatch (e_comp E F) u ;
+  e_comp E (EInl F)        := EInl (e_comp E F) ;
+  e_comp E (EInr F)        := EInr (e_comp E F) ;
+  e_comp E (ESMatch F u v) := ESMatch (e_comp E F) u v .
+  
+Equations e_subst {Γ Δ} (f : Γ =[ e_val ]> Δ) [y t]
+  : e_ctx Γ y t -> e_ctx Δ y t :=
+  e_subst f EHole           := EHole ;
+  e_subst f (EApp_r E u)    := EApp_r (e_subst f E) (v_subst f u) ;
+  e_subst f (EApp_l E u)    := EApp_l (e_subst f E) (t_subst (s_t_of_val f) u) ;
+  e_subst f (EPair_r E u)   := EPair_r (e_subst f E) (v_subst f u) ;
+  e_subst f (EPair_l E u)   := EPair_l (e_subst f E) (t_subst (s_t_of_val f) u) ;
+  e_subst f (EPMatch E u)   :=
+    EPMatch (e_subst f E) (t_subst_aux (∅ ▶ _ ▶ _) (s_t_of_val f) u) ;
+  e_subst f (EInl E)        := EInl (e_subst f E) ;
+  e_subst f (EInr E)        := EInr (e_subst f E) ;
+  e_subst f (ESMatch E u v) :=
+    ESMatch (e_subst f E)
+            (t_subst_aux (∅ ▶ _) (s_t_of_val f) u)
+            (t_subst_aux (∅ ▶ _) (s_t_of_val f) v).
+
 (*|
 Eager redex decomposition
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -401,32 +465,29 @@ This function terminates, but it's elimination order is not trivial
 (it's not simply structural) and we won't use it outside of itree context so
 we just wrap it into an ``itree ∅ₑ`` to get general recursion and make coq happy.
 |*)
-Definition focus_aux {Γ x} : focus_arg Γ x -> computation (e_term Γ x).
-  apply iterₐ.
-  intros [[]|[]]; cbn in *.
-  + destruct t; refine (tauₐ (retₐ (inl _))).
-    - refine (inr (EZ E (VVar h))).
-    - refine (inr (EZ E (VLam t))).
-    - refine (inr (EZ E (VRec t))).
-    - refine (inl (EZ (EApp_l E t2) t1)).
-    - refine (inl (EZ (EPair_l E t2) t1)).
-    - refine (inl (EZ (EPMatch E t2) t1)).
-    - refine (inl (EZ (EInl E) t)).
-    - refine (inl (EZ (EInr E) t)).
-    - refine (inl (EZ (ESMatch E t2 t3) t1)).
-  + destruct E.
-    - refine (retₐ (inr _)). refine (EVal e).
-    - refine (tauₐ (retₐ (inl _))). refine (inl (EZ (EApp_r E e) t)).
-    - refine (retₐ (inr _)). refine (ERed E e0 (RApp e)).
-    - refine (tauₐ (retₐ (inl _))). refine (inl (EZ (EPair_r E e) t)).
-    - refine (tauₐ (retₐ (inl _))). refine (inr (EZ E (VPair e0 e))).
-    - refine (retₐ (inr _)). refine (ERed E e (RPMatch t)).
-    - refine (tauₐ (retₐ (inl _))). refine (inr (EZ E (VInl e))).
-    - refine (tauₐ (retₐ (inl _))). refine (inr (EZ E (VInr e))).
-    - refine (retₐ (inr _)). refine (ERed E e (RSMatch t t0)).
-Defined.
+Equations focus_aux {Γ x} : focus_arg Γ x -> (focus_arg Γ x + e_term Γ x) :=
+  focus_aux (inl (EZ E (Var i)))        := inl (inr (EZ E (VVar i))) ;
+  focus_aux (inl (EZ E (Lam m)))        := inl (inr (EZ E (VLam m))) ;
+  focus_aux (inl (EZ E (Rec m)))        := inl (inr (EZ E (VRec m))) ;
+  focus_aux (inl (EZ E (App m n)))      := inl (inl (EZ (EApp_l E n) m)) ;
+  focus_aux (inl (EZ E (Pair m n)))     := inl (inl (EZ (EPair_l E n) m)) ;
+  focus_aux (inl (EZ E (PMatch m n)))   := inl (inl (EZ (EPMatch E n) m)) ;
+  focus_aux (inl (EZ E (Inl m)))        := inl (inl (EZ (EInl E) m)) ;
+  focus_aux (inl (EZ E (Inr m)))        := inl (inl (EZ (EInr E) m)) ;
+  focus_aux (inl (EZ E (SMatch m n p))) := inl (inl (EZ (ESMatch E n p) m)) ;
 
-Definition focus {Γ x} : zterm Γ x -> computation (e_term Γ x) := focus_aux ∘ inl.
+  focus_aux (inr (EZ EHole           v)) := inr (EVal v) ;
+  focus_aux (inr (EZ (EApp_l E m)    v)) := inl (inl (EZ (EApp_r E v) m)) ;
+  focus_aux (inr (EZ (EApp_r E w)    v)) := inr (ERed E w (RApp v)) ;
+  focus_aux (inr (EZ (EPair_l E m)   v)) := inl (inl (EZ (EPair_r E v) m)) ;
+  focus_aux (inr (EZ (EPair_r E w)   v)) := inl (inr (EZ E (VPair w v))) ;
+  focus_aux (inr (EZ (EPMatch E m)   v)) := inr (ERed E v (RPMatch m)) ;
+  focus_aux (inr (EZ (EInl E)        v)) := inl (inr (EZ E (VInl v))) ;
+  focus_aux (inr (EZ (EInr E)        v)) := inl (inr (EZ E (VInr v))) ;
+  focus_aux (inr (EZ (ESMatch E m n) v)) := inr (ERed E v (RSMatch m n)) .
+
+Definition focus {Γ x} : zterm Γ x -> computation (e_term Γ x) :=
+  iterₐ (retₐ ∘ focus_aux) ∘ inl.
 
 (*|
 Eager normal forms
@@ -482,15 +543,15 @@ we constrain contexts to contain only negative types as we would like to work wi
 *focused* terms that do not contain spurious stuck redexes.
 |*)
 Definition frame : Type := neg_ctx * ty.
-Definition zterm' : frame -> Type := uncurry (zterm ∘ of_n_ctx).
-Definition term' : frame -> Type := uncurry (term ∘ of_n_ctx).
-Definition e_nf' : frame -> Type := uncurry (e_nf ∘ of_n_ctx).
+Definition zterm' : frame -> Type := uncurry (zterm ∘ neg_c_coe).
+Definition term' : frame -> Type := uncurry (term ∘ neg_c_coe).
+Definition e_nf' : frame -> Type := uncurry (e_nf ∘ neg_c_coe).
 Definition ez_init' {i} (u : term' i) : zterm' i := EZ EHole u.
 Definition e_ctx' : ty -> frame -> Type := fun t e => e_ctx (fst e) (snd e) t.
 Definition earg' {t e} : e_ctx' t e -> term (fst e) t -> zterm' e := EZ.
 
 Equations lift_frame : neg_ctx -> frame -> frame :=
-  lift_frame Γ e := ((Γ +▶ fst e)%ctx , snd e).
+  lift_frame Γ e := ((Γ +▶' fst e)%ctx , snd e).
 
 (*|
 Lassen trees
@@ -567,31 +628,15 @@ turns an abstract value into a term, extending the context with a fresh variable
 for everything that has been hiden.
 |*)
 Equations a_cext {x} : a_val x -> neg_ctx :=
-  a_cext (@AArr a b)   := nil ▶ (exist _ (a → b)%ty NArr) ;
-  a_cext (APair u v)   := a_cext u +▶ a_cext v ;
+  a_cext (@AArr a b)   := ∅' ▶' (a →' b) ;
+  a_cext (APair u v)   := a_cext u +▶' a_cext v ;
   a_cext (AInl u)      := a_cext u ;
   a_cext (AInr u)      := a_cext u .
 
-(*|
-.. coq:: none
-|*)
-Ltac r_fixup :=
-  unfold of_n_ctx in *;
-  repeat rewrite map_app in *.
-
-Definition r_concat_l' {Γ Δ : neg_ctx} : forall t, of_n_ctx Γ ∋ t -> of_n_ctx (Γ +▶ Δ) ∋ t.
-  r_fixup; eapply r_concat_l.
-Defined.
-
-Definition r_concat_r' {Γ Δ : neg_ctx} : forall t, of_n_ctx Δ ∋ t -> of_n_ctx (Γ +▶ Δ) ∋ t.
-  r_fixup; eapply r_concat_r.
-Defined.
-
-(*||*)
 Equations t_of_a {x} (u : a_val x) : term (a_cext u) x :=
   t_of_a (AArr)      := Var top ;
-  t_of_a (APair u v) := Pair (t_rename r_concat_l' (t_of_a u))
-                             (t_rename r_concat_r' (t_of_a v));
+  t_of_a (APair u v) := Pair (t_rename (r_concat_l _ _) (t_of_a u))
+                             (t_rename (r_concat_r _ _) (t_of_a v));
   t_of_a (AInl u)    := Inl (t_of_a u) ;
   t_of_a (AInr u)    := Inr (t_of_a u) .
 
@@ -599,35 +644,48 @@ Equations t_of_a {x} (u : a_val x) : term (a_cext u) x :=
 We will also need to define the set of queries (or observations) that can be made
 on a given negative type.
 |*)
+Equations t_obs_aux (t : ty) : is_neg t -> Type :=
+  t_obs_aux (a → b)%ty _ := a_val a .
+
 Equations t_obs : neg_ty -> Type :=
-  t_obs (exist _ (a → b)%ty _) := a_val a .
+  t_obs n := t_obs_aux n.(sub_elt) n.(sub_prf).
 
 (*|
 And how the typing context and goal type change at a given observation.
 |*)
-Equations t_obs_args (x : neg_ty) : t_obs x -> neg_ctx :=
-  t_obs_args (exist _ (a → b)%ty _)   o := a_cext o .
+Equations t_obs_args_aux (t : ty) (p : is_neg t) : t_obs_aux t p -> neg_ctx :=
+  t_obs_args_aux (a → b)%ty _ o := a_cext o .
 
-Equations t_obs_goal (x : neg_ty) : t_obs x -> ty :=
-  t_obs_goal (exist _ (a → b)%ty _)   o := b .
+Equations t_obs_goal_aux (t : ty) (p : is_neg t) : t_obs_aux t p -> ty :=
+  t_obs_goal_aux (a → b)%ty _ o := b .
 
-Definition t_obs_nxt (x : neg_ty) (o : t_obs x) : frame :=
-  (t_obs_args x o , t_obs_goal x o).
+Definition t_obs_args (t : neg_ty) : t_obs t -> neg_ctx :=
+  t_obs_args_aux t.(sub_elt) t.(sub_prf) . 
+
+Definition t_obs_goal (t : neg_ty) : t_obs t -> ty :=
+  t_obs_goal_aux t.(sub_elt) t.(sub_prf) . 
+
+Definition t_obs_nxt (t : neg_ty) (o : t_obs t) : frame :=
+  (t_obs_args t o , t_obs_goal t o).
 
 (*|
 .. coq:: none
 |*)
-Arguments t_obs_args {x} o.
-Arguments t_obs_goal {x} o.
-Arguments t_obs_nxt {x} o.
+Arguments t_obs_args {t} o.
+Arguments t_obs_goal {t} o.
+Arguments t_obs_nxt {t} o.
 
 (*|
 |*)
-Equations t_obs_apply {Γ : neg_ctx} {x : neg_ty} (o : t_obs x)
-          : term Γ x -> term ((Γ +▶ t_obs_args o) : neg_ctx) (t_obs_goal o) :=
-  @t_obs_apply Γ (exist _ (a → b)%ty _)   o t :=
-    App (t_rename r_concat_l' t)
-        (t_rename r_concat_r' (t_of_a o)).
+Equations t_obs_apply_aux {Γ : neg_ctx} (x : ty) (p : is_neg x) (o : t_obs_aux x p)
+          : term Γ x -> term ((Γ +▶' t_obs_args_aux x p o)) (t_obs_goal_aux x p o) :=
+  t_obs_apply_aux (a → b)%ty _ o t :=
+    App (t_rename (r_concat_l _ _) t)
+        (t_rename (r_concat_r _ _) (t_of_a o)).
+
+Definition t_obs_apply {Γ : neg_ctx} {x : neg_ty} (o : t_obs x)
+  : term Γ x -> term ((Γ +▶' t_obs_args o)) (t_obs_goal o) :=
+  t_obs_apply_aux x.(sub_elt) x.(sub_prf) o.
 
 (*|
 Now we explain how to turn a value into an abstract value. It is crucial that the
@@ -651,19 +709,28 @@ Arguments a_of_val {Γ x}.
 If we turn a concrete value into an abstract value, for every new variable that we
 introduced (``a_cext``) we can get it's original value.
 |*)
-Equations cext_get {Γ : neg_ctx} x (v : e_val Γ x) {y : neg_ty}
-         : a_cext (a_of_val v) ∋ y -> e_val Γ y :=
-  cext_get (_ → _) v           top := v ;
-
-  cext_get (_ × _) (VPair u v) j with concat_split _ _ j :=
-    { | inl k := cext_get _ u k ;
-      | inr k := cext_get _ v k } ;
-  cext_get (_ + _) (VInl u) j := cext_get _ u j ;
-  cext_get (_ + _) (VInr v) j := cext_get _ v j ;
-
-  cext_get Unit    (VVar i) _ with neg_var i := { | (!) } ;
-  cext_get (_ × _) (VVar i) _ with neg_var i := { | (!) } ;
-  cext_get (_ + _) (VVar i) _ with neg_var i := { | (!) } .
+Definition cext_get {Γ : neg_ctx} (x : ty) (v : e_val Γ x) {y : neg_ty}
+         : (a_cext (a_of_val v) : t_ctx) ∋ y -> e_val Γ y.
+  induction x.
+  - dependent elimination v.
+    + destruct (neg_var h).
+  - dependent elimination v.
+    + destruct (neg_var h).
+    + intro i. destruct (concat_split _ _ i).
+      * exact (IHx1 e h).
+      * exact (IHx2 e0 h).
+  - intro i.
+    cbv [a_of_val] in i. cbn in i.
+    remember (∅ ▶ (x1 → x2)%ty)%ctx.
+    destruct i; injection Heql; intros Ha Hb.
+    rewrite Hb; exact v.
+    rewrite Ha in i; dependent elimination i.
+  - dependent elimination v.
+    + destruct (neg_var h).
+    + exact (IHx1 e1).
+    + exact (IHx2 e2).
+Defined.
+      
 (*|
 .. coq:: none
 |*)
@@ -675,7 +742,7 @@ opaque in the OGS development. They respectively construct an observation and
 explain how it is eliminated.
 |*)
 Equations o_of_elim {Γ : neg_ctx} x {y} (i : (Γ : t_ctx) ∋ x)
-  : e_elim Γ x y -> t_obs (exist _ x (neg_var i)) :=
+  : e_elim Γ x y -> t_obs (Build_subset _ _ x (neg_var i)) :=
   o_of_elim _ i e with neg_var i := {
       o_of_elim (_ → _) i (RApp v) _ := _
   } .
@@ -691,9 +758,10 @@ Definition o_of_elim_eq {Γ : neg_ctx} {x y} (i : (Γ : t_ctx) ∋ x)
 Defined.
 
 Definition o_args_get {Γ : neg_ctx} {x y z} (i : (Γ : t_ctx) ∋ x)
-          (e : e_elim Γ x y) (j : t_obs_args (o_of_elim i e) ∋ z) : e_val Γ z.
-  cbv [o_of_elim] in j; pose (u := neg_var i); fold u in j.
+          (e : e_elim Γ x y) (j : (t_obs_args (o_of_elim i e) : t_ctx) ∋ z) : e_val Γ z.
+  cbv [o_of_elim o_of_elim_clause_1] in j. pose (u := neg_var i); fold u in j.
   destruct x; try dependent elimination u.
   dependent elimination e.
-  exact (cext_get _ e j).
+  cbn in j; cbv [o_of_elim_obligations_obligation_1] in j.
+  exact (cext_get _ e (j : _ ∋ neg_coe {| sub_elt := z ; sub_prf := neg_var j |})).
 Defined.
