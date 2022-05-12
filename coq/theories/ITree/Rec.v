@@ -13,6 +13,10 @@ Definition iter {I} {E : event I I} {X Y : I -> Type} (body : X ⇒ᵢ itree E (
 Instance ITreeMonadIter {I} (E : event I I) : MonadIter (itree E) :=
   Build_MonadIter _ (fun X Y => @iter I E X Y).
 
+Definition loop {I} {E : event I I} {X : I -> Type}
+  : X ⇒ᵢ itree E X -> X ⇒ᵢ itree E ∅ᵢ
+  := fun f => cofix _loop i x := bind (f i x) (fun i x => Tau (_loop i x)).
+
 Definition translate {I} {E F : event I I} (f : E ⇒ₑ F) : itree E ⇒ₙ itree F :=
   fun _ => cofix _translate _ u :=
     match (observe u) with

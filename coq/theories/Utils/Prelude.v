@@ -1,5 +1,8 @@
 (** misc notations *)
 
+From Equations Require Import Equations.
+Set Equations Transparent.
+
 #[global] Notation endo T := (T -> T).
   
 #[global] Notation "f ∘ g" := (fun x => f (g x))
@@ -27,5 +30,10 @@ Variant T0 := .
 Variant T1 := T1_0.
 Variant T2 := T2_0 | T2_1.
 Variant T3 := T3_0 | T3_1 | T3_2.
+Derive NoConfusion for T0.
+Derive NoConfusion for T1.
+Derive NoConfusion for T2.
+Derive NoConfusion for T3.
+
 
 Definition ex_falso {A : Type} (bot : T0) : A := match bot with end.

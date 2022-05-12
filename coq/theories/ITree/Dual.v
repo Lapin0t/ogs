@@ -27,11 +27,77 @@ Record half_game (I J : Type) : Type := HGame {
   next : forall i, move i -> J ;
 }.
 
+Definition h_act {I J} (A : half_game I J) : psh J -> psh I :=
+  fun X i => { m : A.(move) i & X (A.(next) i m) }.
+
+Definition h_pas {I J} (A : half_game I J) : psh J -> psh I :=
+  fun X i => forall m : A.(move) i, X (A.(next) i m).
+
+Definition h_par {I J K L : Type} (A : half_game I J) (B : half_game K L)
+  : half_game (I * K) (J * K + I * L)
+  := {| move := fun x => (A.(move) (fst x) + B.(move) (snd x))%type ;
+        next := fun x m => match m with
+                        | inl m => inl (A.(next) _ m , snd x)
+                        | inr m => inr (fst x , B.(next) _ m)
+                        end |} .
+
+Definition h_par_nat_left {I J K L} {A : half_game I J} {B : half_game K L}
+           (X : psh (J * K + I * L)) (Y : psh J) k (f : forall j, Y j -> X (inl (j , k)))
+           i : h_act A Y i -> h_act (h_par A B) X (i , k).
+intros [m x]. refine (existT _ (inl m) (f _ x)).
+Defined.
+
+Definition h_par_nat_right {I J K L} {A : half_game I J} {B : half_game K L}
+           (X : psh (J * K + I * L)) (Y : psh L) i (f : forall l, Y l -> X (inr (i , l)))
+           k : h_act B Y k -> h_act (h_par A B) X (i , k).
+intros [m x]. refine (existT _ (inr m) (f _ x)).
+Defined.
+
+Definition h_par_nat_univ {I J K L} {A : half_game I J} {B : half_game K L}
+           {C : half_game (I * K) (J * K + I * L)}
+           (X : psh (J * K + I * L))
+           (nat_left : forall (Y0 : psh J) k (f0 : forall j, Y0 j -> X (inl (j , k)))
+                         i , h_act A Y0 i -> h_act C X (i , k))
+           (nat_right : forall (Y1 : psh L) i (f1 : forall l, Y1 l -> X (inr (i , l)))
+                          k , h_act B Y1 k -> h_act C X (i , k))
+           i k : h_act (h_par A B) X (i , k) -> h_act C X (i , k).
+intros [[m|m] x].
+- exact (nat_left (fun j => X (inl (j , k))) k (fun j x => x) _ (existT _ m x)).
+- exact (nat_right (fun l => X (inr (i , l))) i (fun l x => x) _ (existT _ m x)).
+Defined.
+
+Definition h_ten {I J K L : Type} (A : half_game I J) (B : half_game K L)
+  : half_game (I * L + J * K) (J * L)
+  := {| move := fun x => match x with
+                      | inl x => A.(move) (fst x)
+                      | inr x => B.(move) (snd x)
+                      end ;
+        next := fun x => match x as s
+                      return (match s with | inl _ => _ | inr _ => _ end -> J * L)
+                      with
+                      | inl x => fun m => (A.(next) (fst x) m, snd x)
+                      | inr x => fun m => (fst x , B.(next) (snd x) m)
+                      end |}.
+
+Record hg_arrow {I J : Type} (A B : half_game I J) :=
+  HArr {
+      tr_move : forall i , A.(move) i -> B.(move) i ;
+      tr_next : forall i (a : A.(move) i), B.(next) i (tr_move i a) = A.(next) i a
+}.
+                                                                                 
+
 (*| A 2-player game is then simply two half-games with matching state-space. |*)
 Record game (I J K : Type) : Type := Game {
   client : half_game I J ;
   server : half_game J K ;
 }.
+
+Record g_arrow {I J K : Type} (A B : game I J K) : Type :=
+  GArr {
+      tr_client : hg_arrow A.(client) B.(client) ;
+      tr_server : hg_arrow B.(server) A.(server) ;
+      }.
+
 
 Definition c_move {I J K : Type} (G : game I J K) := G.(client).(move).
 Definition c_next {I J K : Type} (G : game I J K) := G.(client).(next).
@@ -59,8 +125,14 @@ Definition iforest {I J} (G : game' I J) (X : I -> Type) (j : J) : Type :=
   passive G (itree G X) j.
 
 Definition dual {I J} (G : game' I J) : game' J I :=
-  Game (server G) (client G).
+  {| client := G.(server) ; server := G.(client) |} .
 
+Definition parallel {I J K L} (A : game' I J) (B : game' K L)
+  : game' (I * K) (J * K + I * L) :=
+{| client := h_par A.(client) B.(client) ;
+   server := h_ten A.(server) B.(server) |} .
+  
+(*
 Definition parallel {I J K L} (A : game' I J) (B : game' K L)
   : game' (I * K) (J * K + I * L) :=
 {| client := {|
@@ -80,6 +152,7 @@ Definition parallel {I J K L} (A : game' I J) (B : game' K L)
                     | inl p => fun m => (s_next A (fst p) m, snd p)
                     | inr p => fun m => (fst p , s_next B (snd p) m)
                     end |} |}.
+*)
 
 Notation "A ⅋ B" := (parallel A B) (at level 30).
 Notation "A ⊸ B" := (dual A ⅋ B) (at level 30).

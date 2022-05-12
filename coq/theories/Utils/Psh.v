@@ -37,15 +37,27 @@ Definition relᵢ {I : Type} (A B : psh I) := forall i, A i -> B i -> Prop.
 Notation Reflexiveᵢ R := (forall i, Reflexive (R i)).
 Notation Symmetricᵢ R := (forall i, Symmetric (R i)).
 Notation Transitiveᵢ R := (forall i, Transitive (R i)).
+Notation subrelᵢ R S := (forall i, subrelation (R i) (S i)).
 
+(*
 Definition subrelᵢ {I : Type} {A B : psh I} (R1 R2 : relᵢ A B) : Prop :=
   forall i a b, R1 i a b -> R2 i a b.
+*)
 
 Definition flipᵢ {I : Type} {A B : psh I} (R : relᵢ A B) : relᵢ B A :=
   fun i x y => R i y x.
 
 Definition eqᵢ {I : Type} {X : psh I} : relᵢ X X := fun i x y => x = y.
 Arguments eqᵢ _ _ _ /.
+
+Global Instance Reflexive_eqᵢ {I} {X : psh I} : Reflexiveᵢ (@eqᵢ I X).
+Proof. intros i x; reflexivity. Qed.
+
+Global Instance Symmetric_eqᵢ {I} {X : psh I} : Symmetricᵢ (@eqᵢ I X).
+Proof. intros i x y e; symmetry; exact e. Qed.
+
+Global Instance Transitive_eqᵢ {I} {X : psh I} : Transitiveᵢ (@eqᵢ I X).
+Proof. intros i x y z a b; transitivity y; [exact a | exact b]. Qed.
 
 Inductive fiber {A B} (f : A -> B) : psh B := | Fib a : fiber f (f a).
 Arguments Fib {A B f}.

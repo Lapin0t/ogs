@@ -244,6 +244,24 @@ gcofix CIH. gstep; intros.
 repeat red. destruct (observe x); eauto with paco.
 econstructor; apply H0.
 Qed.
+(*
+Global Instance Reflexive_upaco3 b1 b2
+  : Reflexiveᵢ (upaco3 (fun R i x y => @eqitF I E _ _ R b1 b2 i x y)).
+    -> Reflexiveᵢ (upaco3 (eqit_ RR b1 b2 id) (eqitC RR b1 b2) r rg).
+*)
+
+Global Instance Reflexive_upaco3 b1 b2 :
+  Reflexiveᵢ RR ->
+  Reflexiveᵢ
+    (upaco3
+       (@eqit_ I E _ _ RR b1 b2 id)
+       bot3).
+intros H i x.
+left.
+ginit.
+apply Reflexive_eqit_gen.
+exact H.
+Qed.
 
 Global Instance Reflexive_eqit b1 b2 : Reflexiveᵢ RR
                                        -> Reflexiveᵢ (@eqit I E _ _ RR b1 b2).
