@@ -1,8 +1,8 @@
+Set Printing Projections.
 Set Primitive Projections.
 
 From Coq Require Import Logic.
 Import EqNotations.
-Require Import Psatz.
 
 From ExtLib.Data Require Import List Fin.
 
@@ -10,13 +10,14 @@ From OGS Require Import Utils.
 From OGS.ITree Require Import Cat Event Dual ITree Rec Angelic Eq.
 From OGS.STLC Require Import Ctx Syntax.
 
-From Equations Require Import Equations.
-Set Equations Transparent.
-
 
 From OGS.ITree Require Import Eq.
 From Paco Require Import paco.
-Require Import Coq.Program.Equality.
+(*Require Import Coq.Program.Equality.*)
+Require Import RelationClasses.
+
+From Equations Require Import Equations.
+Set Equations Transparent.
 
 (*|
 
@@ -154,8 +155,13 @@ Definition half_ogs : half_game state state :=
 Definition g_ogs : game' state state :=
   {| client := half_ogs ; server := half_ogs |}.
 
-(*| The type of OGS strategies that don't return a value. |*)
-Definition ogs := itree g_ogs ∅ᵢ.
+(*| The type of OGS strategies. |*)
+Definition ogs' := itree g_ogs.
+Definition ogs := ogs' ∅ᵢ.
+Definition ogs_p' := iforest g_ogs.
+Definition ogs_p := ogs_p' ∅ᵢ.
+
+Definition ogs_mv {Γ Δ : ch_ctx} {k} (i : Γ ∋ k) (m : ch_move k) : qry g_ogs (State Γ Δ) := Any i m.
 
 (*|
 The OGS LTS: injecting terms into OGS strategies
@@ -386,6 +392,7 @@ refine (pop (r_concat_l _ _ _ (c.(C_move_v) _ h))).
 refine (pop (r_concat_r _ _ _ h)).
 Defined.
 
+
 (* inject passive configurations into passive opponent strategies *)
 Equations inj_ogs_p_aux {p} (c : conf_pass p) : passive g_ogs conf_act (s_swap p) :=
   inj_ogs_p_aux c (@Any _ _ _ k i m) :=
@@ -419,7 +426,7 @@ Equations inj_ogs_enf_aux {p} (c : conf_act p) : e_nf' (C_foc c).(C_focus_t)
     (* construct new passive configs for input/value channels *)
     let cp_ext := conf_p_vars _ (fun _ i => cext_get _ v i) in
 
-    Vis (Any ch_ret (a_of_val v) : qry g_ogs _)
+    Vis (ogs_mv ch_ret (a_of_val v))
         (ret ∘ inl ∘ inj_ogs_p_aux (C_pass c +▶ₚ cp_ext)) ;
 
   inj_ogs_enf_aux c (NRed E i v) :=
@@ -431,71 +438,183 @@ Equations inj_ogs_enf_aux {p} (c : conf_act p) : e_nf' (C_foc c).(C_focus_t)
     let cp_ext2 := conf_p_el_ctx _ (rew <- [fun t => e_ctx _ _ t]
                                           o_of_elim_eq i v in E) in
 
-    Vis (Any ch_qry (o_of_elim i v) : qry g_ogs _)
+    Vis (ogs_mv ch_qry (o_of_elim i v))
         (ret ∘ inl ∘ inj_ogs_p_aux (C_pass c +▶ₚ cp_ext1 ▶ₚ cp_ext2)) .
 
 (* inject active and passive configurations into strategies *)
 Definition inj_ogs_act : conf_act ⇒ᵢ itree g_ogs ∅ᵢ :=
   iter (fun _ c => emb_comp _ _ (eval_enf (fst c).(C_focus)) !>= inj_ogs_enf_aux _).
 
-Definition inj_ogs_pass p (c : conf_pass p) : iforest g_ogs ∅ᵢ (s_swap p) :=
+Definition inj_ogs_pass p (c : conf_pass p) : ogs_p (s_swap p) :=
   fun r => inj_ogs_act _ (inj_ogs_p_aux c r).
 
-Definition conf_start {Γ : neg_ctx} {x} (a : term Γ x)
+Definition mk_conf_act {Γ : neg_ctx} {x} (a : zterm Γ x)
   : conf_act (State (ch_vars Γ ▶ COut x) ∅) :=
   ({| C_focus_t := (Γ , x) ;
       C_focus_v := (r_pop , top) ;
-      C_focus := ez_init a |},
-   (fun k (i : ∅ ∋ k) => match i with end)).  
+      C_focus := a |},
+   (fun k (i : ∅ ∋ k) => match i with end)).
 
 Section composition.
 
-Definition compat (s h f : state) :=
-  s.(p_ctx) ⊎ h.(p_ctx) ≡ f.(p_ctx)
-  * s.(o_ctx) ⊎ h.(o_ctx) ≡ f.(o_ctx).
-
-Variant _compo_arg (hideₚ hideₒ fullₚ fullₒ : ch_ctx) : Type :=
-| _c_ap  : ogs (State fullₚ fullₒ) -> iforest g_ogs ∅ᵢ (State hideₚ hideₒ)
-         -> _compo_arg hideₚ hideₒ fullₚ fullₒ
-| _c_pa : iforest g_ogs ∅ᵢ (State fullₒ fullₚ) -> ogs (State hideₒ hideₚ)
-        -> _compo_arg hideₚ hideₒ fullₚ fullₒ
+(*jeudi 14h*)
+  
+Variant _compo_arg (X : Type) (h : state) : Type :=
+| _c_ap  : ogs' (fun _ => X) h -> ogs_p' (fun _ => X) h -> _compo_arg X h
+| _c_pa : ogs_p' (fun _ => X) (s_swap h) -> ogs' (fun _ => X) (s_swap h) -> _compo_arg X h
   .
-Arguments _c_pa {hideₚ hideₒ fullₚ fullₒ} a b.
-Arguments _c_ap {hideₚ hideₒ fullₚ fullₒ} a b.
+Arguments _c_pa {X h} a b.
+Arguments _c_ap {X h} a b.
 
-Definition _compo : forall showₚ showₒ hideₚ hideₒ fullₚ fullₒ
-                    , showₚ ⊎ hideₚ ≡ fullₚ
-                    -> showₒ ⊎ hideₒ ≡ fullₒ
-                    -> _compo_arg hideₚ hideₒ fullₚ fullₒ
-                    -> ogs (State showₚ showₒ).
+Equations _compo_body {X} : endo (forall h, _compo_arg X h -> ogs' (fun _ => X) (State ∅ ∅)) :=
+  _compo_body CIH h (_c_ap a b) with observe a := {
+    | RetF x := Ret (x : X) ;
+    | TauF t := Tau (CIH h (_c_ap t b)) ;
+    | VisF e k := Tau (CIH _ (_c_pa (k : ogs_p' _ (s_swap (State _ _))) (b e))) ;
+    } ;
+  _compo_body CIH h (_c_pa a b) with observe b := {
+    | RetF x := Ret (x : X) ;
+    | TauF t := Tau (CIH h (_c_pa a t)) ;
+    | VisF e k := Tau (CIH _ (_c_ap (a e) (k : ogs_p' _ (s_swap (State _ _)))))
+    }.
+
+Definition _compo {X h} : _compo_arg X h -> ogs' (fun _ => X) (State ∅ ∅) :=
+  (cofix CIH h a := _compo_body CIH h a) h.
+
+Definition inj_ectx_barb {Γ : neg_ctx} {x y}
+           (E : e_ctx Γ y x)
+           (ρ : forall t, Γ ∋ t -> e_val ∅ t)
+  : ogs_p' (fun _ => a_val y) (State (map CIn Γ ▶ COut x) (∅ ▶ COut y)).
+  revert E ρ.
   cofix CIH.
-  intros ? ? ? ? ? ? cₚ cₒ [a b|a b].
-  - destruct (observe a).
-    + destruct r.
-    + exact (Tau (CIH _ _ _ _ _ _ cₚ cₒ (_c_ap t b))).
-    + destruct e as [x i m].
-      destruct (cover_split cₚ i) as [j|j].
-      * refine (Vis (Any j m : qry g_ogs (State _ _)) (fun r => _)).
-        refine (CIH _ _ _ _ _ _ _ (ext_cover_l _ cₒ)
-                    (_c_ap (k (r_any (r_cover_l (ext_cover_l _ cₒ)) r)) b)).
-        refine (@cat_cover _ _ _ _ ∅ _ _ cₚ _); destruct r; refine (cover_nil_r).
-      * exact (Tau (CIH _ _ _ _ _ _ cₚ (ext_cover_r _ cₒ)
-                        (_c_pa k (b (Any j m))))).
-  - destruct (observe b).
-    + destruct r.
-    + exact (Tau (CIH _ _ _ _ _ _ cₚ cₒ (_c_pa a t))).
-    + destruct e as [x i m].
-      exact (Tau (CIH _ _ _ _ _ _ (ext_cover_r _ cₚ) cₒ
-                      (_c_ap (a (Any (r_cover_r cₒ x i) m)) k))).
-Defined.
-Arguments _compo {_ _ _ _ _ _}.
+  intros E ρ r.
+  dependent elimination r.
+  dependent elimination h.
+  - refine (_ !>= fun m => _).
+    refine (emb_comp _ _
+              (eval_enf (EZ (e_rename r_concat_l' E)
+                            (t_rename r_concat_r' (t_of_a c))))).
+    destruct m.
+    + refine (Ret (a_of_val e)).
+    + 
+      rewrite <- (has_map2 of_n_ty _ h) in e0.
+      destruct (concat_split Γ _ (has_map1 of_n_ty _ h)).
+      * Check (ρ _ h0).
+        
+      
+      rewrite (has_map2 of_n_ty _ h).
+    intros 
+    
+  - cbn in c.
+    Check (EZ (e_rename r_concat_l' E) (t_rename r_concat_r' (t_of_a c))).
+  cbn in c.
+  refine (emb_comp _ _ (eval_enf (EZ (e_rename r_concat_l' E)
+                   (t_rename r_concat_r' (t_of_a c)))) !>= _).
+  intro e.
+  refine (eval_enf (EZ ))
+  cbn in r.
 
-Definition compo_ap {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ fₚ) (cₒ : sₒ ⊎ hₒ ≡ fₒ)
-      := fun a b => _compo cₚ cₒ (_c_ap a b).
 
-Definition compo_pa {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ fₚ) (cₒ : sₒ ⊎ hₒ ≡ fₒ)
-      := fun a b => _compo cₚ cₒ (_c_pa a b).
-Check compo_ap.
+(*
+Obligation 1.
+Variant _compo_arg (X : psh state) (h f : state) : Type :=
+| _c_ap  : ogs' X f -> ogs_p h -> _compo_arg X h f
+| _c_pa : ogs_p' X (s_swap f) -> ogs (s_swap h) -> _compo_arg X h f
+  .
+Arguments _c_pa {X h f} a b.
+Arguments _c_ap {X h f} a b.
+
+(* hand eta-expanding type parameters *)
+Definition _c_pa' {X} {hₚ hₒ fₚ fₒ}
+           (a : ogs_p' X (State fₒ fₚ))
+           (b : ogs (State hₒ hₚ))
+  : _compo_arg X (State hₚ hₒ) (State fₚ fₒ)
+  := _c_pa (a : ogs_p' X (s_swap (State _ _)))
+           (b : ogs (s_swap (State _ _))).
+
+Equations _compo_body {X : psh state}
+  : endo (forall s h f, compat s h f -> _compo_arg X h f -> ogs' X s) :=
+  _compo_body CIH s h f c (_c_ap a b) with observe a := {
+    | RetF r := _ ;
+    | TauF t := Tau (CIH s h f c (_c_ap t b)) ;
+    | VisF (Any i m) k with cover_split (p_compat c) i := {
+      | inl j := Vis (ogs_mv j m)
+                     (λ{ | Any j' m' :=
+                           let ρ0 := ext_cover_l _ (p_compat c) in
+                           let ρ1 := ext_cover_l _ (o_compat c) in
+                           CIH _ _ _
+                               (mk_compat ρ0 ρ1)
+                               (_c_ap (k (ogs_mv (r_cover_l ρ1 _ j') m')) b) }) ;
+      | inr j := Tau (CIH _ _ _
+                          (mk_compat (p_compat c) (ext_cover_r _ (o_compat c)))
+                          (_c_pa' k (b (Any j m))))
+      } ;
+    } ;
+  _compo_body CIH s h f c (_c_pa a b) with observe b := {
+    | RetF r := _ ;
+    | TauF t := Tau (CIH _ _ _ c (_c_pa a t)) ;
+    | VisF (Any i m) k :=
+      Tau (CIH _ _ _ 
+               (mk_compat (ext_cover_r _ (p_compat c)) (o_compat c))
+               (_c_ap (a (ogs_mv (r_cover_r (o_compat c) _ i) m)) k))
+    }.
+Obligation 2.
+
+Definition _compo {X : psh state} : forall s h f, compat s h f -> _compo_arg X h f -> ogs' X s. refine (
+  cofix CIH s h f c arg :=
+  match arg with
+  | _c_ap a b =>
+      match observe a with
+      | RetF r => _
+      | TauF t => Tau (CIH s h f c (_c_ap t b))
+      | VisF e k => match e as a return (forall r : rsp g_ogs a, _) -> _ with | Any i m =>
+          match cover_split (p_compat c) i with
+          | inl j => fun k => (* let the event through *)
+              let ρ := ext_cover_l _ (o_compat c) in
+              Vis (Any j m : qry g_ogs (State _ _))
+                  (fun r => CIH
+                    (State (_ +▶ _)%ctx (_ +▶ _)%ctx)
+                    (State _ _)
+                    (State (_ +▶ _)%ctx (_ +▶ _)%ctx )
+                    (Compat _ _)
+                    (*({| p_compat := ext_cover_l _ (p_compat c)
+                      ; o_compat := ρ |})*)
+                    (_c_ap (match r with | Any ri rm =>
+                               k (Any (r_cover_l ρ _ ri) rm) end)
+                           b))
+          | inr j => fun k => (* synchronize the event *)
+              Tau (CIH
+                (State _ _)
+                (State _ (_ +▶ _)%ctx)
+                (State _ (_ +▶ _)%ctx)
+                _(*(Compat (p_compat c) (ext_cover_r _ (o_compat c)))*)
+                (_c_pa (k : ogs_p' X (s_swap (State _ _)))
+                       (b (Any j m) : ogs (s_swap (State _ _)))))
+          end end k
+        end
+  | _c_pa a b =>
+      match observe b with
+      | RetF r => _
+      | TauF t => Tau (CIH s h f c (_c_pa a t))
+      | VisF e k => (* synchronize the event *)
+          Tau (CIH
+            (State _ _)
+            (State _ _)
+            (State _ _)
+            (Compat _ _) (*(Compat (ext_cover_r _ (p_compat c)) (o_compat c))*)
+            (_c_ap
+               match e as a return (ogs' X (State (_ +▶ any_elim _ _ a)%ctx _))
+               with | Any ri rm => a (Any (r_cover_r (o_compat c) _ ri) rm) end
+               k))
+      end
+  end).
+                                                                                         shelve.
+Arguments _compo {s h f}.
+
+Definition compo_ap {s h f} (c : compat s h f) a b := _compo c (_c_ap a b).
+Definition compo_pa' {s h f} (c : compat s h f) a b := _compo c (_c_pa a b).
+
+Definition compo_pa {s h f} (c : compat s h f) (a : ogs_p f) (b : ogs h) : ogs (s_swap s) := _compo ((snd c , fst c) : compat (State _ _) (State _ _) (State _ _)) (_c_pa (a : ogs_p (s_swap (State _ _))) (b : ogs (s_swap (State _ _)))).
 
 (*
 Definition compo_pp {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ fₚ) (cₒ : sₒ ⊎ hₒ ≡ fₒ)
@@ -506,48 +625,50 @@ Definition compo_pp {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ f�
   cbn.
 *)
 
+*)
 (**********)
 (* PROOFS *)
 (**********)
 
 
-Variant _compo_arg_eq (hideₚ hideₒ fullₚ fullₒ : ch_ctx) : Type :=
-| _c_pa2 (a0 a1 : iforest g_ogs ∅ᵢ (State fullₒ fullₚ)) (b0 b1 : ogs (State hideₒ hideₚ))
-  : (forall r, a0 r ≈ a1 r) -> b0 ≈ b1 -> _compo_arg_eq hideₚ hideₒ fullₚ fullₒ
-| _c_ap2 (a0 a1 : ogs (State fullₚ fullₒ)) (b0 b1 : iforest g_ogs ∅ᵢ (State hideₚ hideₒ))
-  : a0 ≈ a1 -> (forall r, b0 r ≈ b1 r) -> _compo_arg_eq hideₚ hideₒ fullₚ fullₒ
-  .
-Arguments _c_pa2 {hideₚ hideₒ fullₚ fullₒ} a0 a1 b0 b1 ea eb.
-Arguments _c_ap2 {hideₚ hideₒ fullₚ fullₒ} a0 a1 b0 b1 ea eb.
+(*
+(* CONGRUENCE OF COMPOSITION *)
 
-Equations _c_arg_eq_l {hₚ hₒ fₚ fₒ} : _compo_arg_eq hₚ hₒ fₚ fₒ
-                                    -> _compo_arg hₚ hₒ fₚ fₒ :=
+Variant _compo_arg_eq (h f : state) : Type :=
+| _c_pa2 (a0 a1 : ogs_p (s_swap f)) (b0 b1 : ogs (s_swap h))
+  : (forall r, a0 r ≈ a1 r) -> b0 ≈ b1 -> _compo_arg_eq h f
+| _c_ap2 (a0 a1 : ogs f) (b0 b1 : ogs_p h)
+  : a0 ≈ a1 -> (forall r, b0 r ≈ b1 r) -> _compo_arg_eq h f
+  .
+Arguments _c_pa2 {h f} a0 a1 b0 b1 ea eb.
+Arguments _c_ap2 {h f} a0 a1 b0 b1 ea eb.
+
+Equations _c_arg_eq_l {h f} : _compo_arg_eq h f -> _compo_arg h f :=
   _c_arg_eq_l (_c_pa2 a0 a1 b0 b1 ea eb) := _c_pa a0 b0 ;
   _c_arg_eq_l (_c_ap2 a0 a1 b0 b1 ea eb) := _c_ap a0 b0 .
 
-Equations _c_arg_eq_r {hₚ hₒ fₚ fₒ} : _compo_arg_eq hₚ hₒ fₚ fₒ
-                                    -> _compo_arg hₚ hₒ fₚ fₒ :=
+Equations _c_arg_eq_r {h f} : _compo_arg_eq h f -> _compo_arg h f :=
   _c_arg_eq_r (_c_pa2 a0 a1 b0 b1 ea eb) := _c_pa a1 b1 ;
   _c_arg_eq_r (_c_ap2 a0 a1 b0 b1 ea eb) := _c_ap a1 b1 .
 
 
 (* bisimilarity of composition of pairwise bisimilar arguments *)
-Lemma _compo_cong {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ fₚ) (cₒ : sₒ ⊎ hₒ ≡ fₒ)
-      (a : _compo_arg_eq hₚ hₒ fₚ fₒ)
-      : _compo cₚ cₒ (_c_arg_eq_l a) ≈ _compo cₚ cₒ (_c_arg_eq_r a).
-  revert sₚ sₒ hₚ hₒ fₚ fₒ cₚ cₒ a.
+Lemma _compo_cong {s h f} (c : compat s h f)
+      (a : _compo_arg_eq h f)
+      : _compo c (_c_arg_eq_l a) ≈ _compo c (_c_arg_eq_r a).
+  revert s h f c a.
   pcofix CIH; pstep.
-  intros ? ? ? ? ? ? ? ? [ a0 a1 b0 b1 ea eb | a0 a1 b0 b1 ea eb ].
+  intros ? ? ? [cₚ cₒ] [ a0 a1 b0 b1 ea eb | a0 a1 b0 b1 ea eb ].
   - cbv [eqit_ observe]; cbn; cbv [observe].
     punfold eb; cbv [eqit_ observe _observe] in eb; cbn in eb.
     dependent induction eb; cbv [_observe]; try rewrite <- x0; try rewrite <- x.
     + destruct r1.
     + econstructor; right.
-      refine (CIH _ _ _ _ _ _ _ _ (_c_pa2 _ _ _ _ ea _)).
+      refine (CIH _ _ _ _ (_c_pa2 _ _ _ _ ea _)).
       destruct REL; [exact H|destruct H].
     + destruct e.
       econstructor; right.
-      refine (CIH _ _ _ _ _ _ _ _ (_c_ap2 _ _ _ _ (ea (Any _ _)) _)).
+      refine (CIH _ _ _ _ (_c_ap2 _ _ _ _ (ea (Any _ _)) _)).
       intro r0; destruct (REL r0); [exact H|destruct H].
     + econstructor; auto.
       cbv [observe]; cbn; cbv [observe].
@@ -560,16 +681,18 @@ Lemma _compo_cong {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ fₚ
     dependent induction ea; cbv [_observe]; try rewrite <- x0; try rewrite <- x.
     + destruct r1.
     + econstructor; right.
-      refine (CIH _ _ _ _ _ _ _ _ (_c_ap2 _ _ _ _ _ eb)).
+      refine (CIH _ _ _ _ (_c_ap2 _ _ _ _ _ eb)).
       destruct (REL); [exact H|destruct H].
-    + destruct e; destruct (cover_split cₚ h).
+    + destruct e; destruct (cover_split cₚ h0).
       * econstructor; right.
-        refine (CIH _ _ _ _ _ _ _ _ (_c_ap2 _ _ _ _ _ eb)).
-        destruct (REL (r_any (r_cover_l (ext_cover_l _ cₒ)) v));
+        refine (CIH _ _ _ _ (_c_ap2 _ _ _ _ _ eb)).
+        destruct v as [? j m].
+        destruct (REL (Any (r_cover_l (ext_cover_l _ cₒ) _ j) m));
           [exact H|destruct H].
       * econstructor; right.
-        refine (CIH _ _ _ _ _ _ _ _ (_c_pa2 _ _ _ _ _ (eb (Any _ _)))).
+        refine (CIH _ _ _ _ (_c_pa2 _ _ _ _ _ _)).
         intro r0; destruct (REL r0); [exact H|destruct H].
+        eapply (eb (Any h1 c : s_move g_ogs (State _ _))).
     + econstructor; auto.
       cbv [observe]; cbn; cbv [observe].
       refine (IHea CIH _ _ _ _ _ _ eq_refl eq_refl eb).
@@ -578,22 +701,23 @@ Lemma _compo_cong {sₚ sₒ hₚ hₒ fₚ fₒ} (cₚ : sₚ ⊎ hₚ ≡ fₚ
       refine (IHea CIH _ _ _ _ _ _ eq_refl eq_refl eb).
 Qed.
 
+(* ASSOCIATIVITY OF COMPOSITION *)
+(*
 Variant _compo_arg_assoc (hₚ hₒ iₚ iₒ fₚ fₒ : ch_ctx) : Type :=
   | _c_app : ogs (State fₚ fₒ)
-             -> iforest g_ogs ∅ᵢ (State iₚ iₒ)
-             -> iforest g_ogs ∅ᵢ (State hₚ hₒ)
+             -> ogs_p (State iₚ iₒ)
+             -> ogs_p (State hₚ hₒ)
              -> _compo_arg_assoc hₚ hₒ iₚ iₒ fₚ fₒ
-  | _c_pap : iforest g_ogs ∅ᵢ (State fₒ fₚ)
+  | _c_pap : ogs_p (State fₒ fₚ)
              -> ogs (State iₒ iₚ)
-             -> iforest g_ogs ∅ᵢ (State hₚ hₒ)
+             -> ogs_p (State hₚ hₒ)
              -> _compo_arg_assoc hₚ hₒ iₚ iₒ fₚ fₒ
-  | _c_ppa : iforest g_ogs ∅ᵢ (State fₒ fₚ)
-             -> iforest g_ogs ∅ᵢ (State iₚ iₒ)
+  | _c_ppa : ogs_p (State fₒ fₚ)
+             -> ogs_p (State iₚ iₒ)
              -> ogs (State hₒ hₚ)
              -> _compo_arg_assoc hₚ hₒ iₚ iₒ fₚ fₒ
 .
 
-(*
 Equations _compo_assoc_left {hₚ hₒ iₚ iₒ fₚ fₒ s1ₚ s1ₒ s2ₚ s2ₒ}
     (c1ₚ : s1ₚ ⊎ iₚ ≡ fₚ) (c1ₒ : s1ₒ ⊎ iₒ ≡ fₒ)
     (c2ₚ : s2ₚ ⊎ hₚ ≡ s1ₚ) (c2ₒ : s2ₒ ⊎ hₒ ≡ s1ₒ)
@@ -612,20 +736,106 @@ cbn.
 Check ()
     _compo c2ₚ c2ₒ (_c_pa (fun r => _compo c1ₚ c1ₒ (_c_pa a (b r))) c) .
 *)
+*)
 
 End composition.
 
-Definition obs_eq {Γ x} (a b : term Γ x) : Prop :=
-  forall y (E : e_ctx Γ y x), eval_enf (EZ E a) ≈ eval_enf (EZ E b).
+Definition eval_ogs {Γ : neg_ctx} {x} (a : zterm Γ x) :=
+  inj_ogs_act _ (mk_conf_act a).
 
-Definition ogs_eq {Γ : neg_ctx} {x} (a b : term Γ x) : Prop :=
-  inj_ogs_act _ (conf_start a) ≈ inj_ogs_act _ (conf_start b).
+Equations obs_eq_aux {Γ : neg_ctx} {x} (a b : term Γ x) {y} (E : e_ctx Γ y x) : Prop :=
+  obs_eq_aux a b E :=  eval_enf (EZ E a)
+                     ≈ eval_enf (EZ E b) .
 
-Notation "a ≈obs b" := (obs_eq a b) (at level 40).
+(*
+Definition compat_nil {p} : compat (State ∅%ctx ∅%ctx) p p :=
+  (cover_nil_l , cover_nil_l) .
+
+*)
+Definition ogs_eq {Γ : neg_ctx} {x} (a b : zterm Γ x) : Prop :=
+  eval_ogs a ≈ eval_ogs b.
+
+Definition cio_eq_aux {Γ : neg_ctx} {x} (a b : zterm Γ x) E : Prop :=
+   _compo (_c_pa E (eval_ogs a))
+ ≈ _compo (_c_pa E (eval_ogs b)).
+
+Notation "a ≈obs b" := (forall y (E : e_ctx _ y _), obs_eq_aux a b E) (at level 40).
 Notation "a ≈ogs b" := (ogs_eq a b) (at level 40).
+Notation "a ≈cio b" := (forall E, cio_eq_aux a b E) (at level 40).
+
+Definition cio_ogs_complete {Γ : neg_ctx} {x} (a b : zterm Γ x)
+  : a ≈ogs b -> a ≈cio b :=
+  fun H E => _compo_cong _ (_c_pa2 _ _
+      (E : ogs_p (s_swap (State _ _)))
+      (E : ogs_p (s_swap (State _ _)))
+      (eval_ogs a : ogs (s_swap (State _ _)))
+      (eval_ogs b : ogs (s_swap (State _ _)))
+      (fun r => reflexivity (E r))
+      H).
+
+(* TODO: need to define the identity of composition and prove unit law
+   TODO: should not be needed for correction of ogs.
+Definition cio_ogs_correct {Γ : neg_ctx} {x} (a b : term Γ x)
+  : a ≈cio b -> a ≈ogs b.
+*)
+Require Import OGS.ITree.Eq.
+Require Import OGS.ITree.EqProps.
+
+(*
+Lemma ogs_focus {Γ : neg_ctx} {x} (a b : zterm Γ x) : a ≈ogs b -> eval_enf a ≈ eval_enf b.
+  revert a b.
+  pcofix CIH.
+  intros a b H.
+  cbv [ogs_eq eval_ogs inj_ogs_act eutt] in H.
+  Search eq_itree.
+  Check unfold_iter.
+  rewrite 2 unfold_iter in H.
+  cbv [iter_] in H.
+  Check eval_ogs.
+  fold (inj_ogs_act) in H.
+  cbn in H.
+  cbv [bind] in H.
+  *)
 
 
-Lemma ogs_correctness {Γ : neg_ctx} {x} (a b : term Γ x) : a ≈ogs b -> a ≈obs b.
+Lemma cio_obs_correct {Γ : neg_ctx} {x} (a b : zterm Γ x) : a ≈cio b -> a ≈obs b.
+  destruct a as [za Ea a], b as [zb Eb b].
+  intros H y E.
+  cbv [cio_eq_aux ogs_p iforest passive g_ogs] in H. cbn in H.
+  fold g_ogs in H; fold ogs in H.
+  cbv [obs_eq_aux].
+  cbv [eutt] in *.
+  pstep.
+  cbv [eqit_ observe]. cbn.
+
+  
+
+Lemma ogs_correctness {Γ : neg_ctx} {x} (a b : term Γ x) (H : a ≈ogs b) : a ≈obs b.
+
+
+  apply _compo_cong.
+  Check _compo_cong.
+  revert Γ x a b H.
+  pcofix CIH.
+  intros Γ x a b H E.
+  
+
+Lemma ogs_correctness {Γ : neg_ctx} {x} (a b : term Γ x) (H : a ≈ogs b) : a ≈obs b.
+  intros y E.
+  punfold H.
+  cbn in H.
+  cbv [eqit_] in H.
+  cbv [observe] in H; cbn in H.
+  cbv [observe] in H; cbn in H.
+  cbv [observe] in H; cbn in H.
+  cbv [observe] in H; cbn in H.
+  cbv [observe] in H; cbn in H.
+  cbv [observe] in H; cbn in H.
+  cbv [observe] in H; cbn in H.
+  cbv [eqit_ observe]; cbn. cbv [observe]; cbn. cbv [observe]; cbn.
+  cbv [eqit_].
+  intros H.
+  pcofix CIH.
   Admitted.
 
 

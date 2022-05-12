@@ -114,6 +114,10 @@ Equations any_elim {P} {A : forall x, P x -> Type} (f : forall x p, A x p)
           xs (a : any P xs) : A (any_el a) (any_coh a) :=
   any_elim f xs (Any _ p) := f _ p .
 
+Equations any_elim2 {P} {A : forall x, P x -> Type}
+          xs (a : any P xs) (f : forall p, A (any_el a) p) : A (any_el a) (any_coh a) :=
+  any_elim2 xs (Any _ p) f := f p .
+
 Inductive cover : ctx X -> ctx X -> ctx X -> Type :=
 | CNil :                                 cover ∅        ∅        ∅
 | CLeft {x xs ys zs} : cover xs ys zs ->  cover (xs ▶ x) ys       (zs ▶ x)
@@ -180,6 +184,16 @@ Equations any_c_split {P xs ys zs} : xs ⊎ ys ≡ zs -> any P zs -> any P xs + 
 
 Equations r_any {P xs ys} (ρ : xs ⊆ ys) : any P xs -> any P ys :=
   r_any ρ (Any i p) := Any (ρ _ i) p .
+
+(*
+Equations r_any_eq1 {P} {A : forall x, P x -> Type} {f : forall x p, A x p} {xs ys}
+          (ρ : xs ⊆ ys) (a : any P xs) : any_el a = any_el (r_any ρ a) :=
+  r_any_eq1 ρ (Any x p) := eq_refl .
+
+Equations r_any_eq {P} {A : forall x, P x -> Type} {f : forall x p, A x p} {xs ys}
+          (ρ : xs ⊆ ys) (a : any P xs) : rew [fun x => forall y, A x y] (r_any_eq1 ρ a) in any_elim f xs a = any_elim f ys (r_any ρ a) :=
+  r_any_eq a := _ .
+*)
 
 (*
 Equations any_c_split_coh1 {P xs ys zs} (c : xs ⊎ ys ≡ zs) (a : any P zs) :
