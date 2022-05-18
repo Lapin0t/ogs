@@ -98,7 +98,7 @@ Definition ch_ctx : Type := Ctx.ctx chan_t.
 Bind Scope ctx_scope with ch_ctx.
 
 (*| Injecting type scopes into channel scopes |*)
-Definition ch_vars (Γ : neg_ctx) : ch_ctx := map CIn Γ .
+Definition ch_vars (Γ : neg_ctx) : ch_ctx := map CIn (ctx_s_to_ctx Γ) .
 
 (*|
 Details: channel messages and transitions
@@ -376,12 +376,12 @@ Notation "c +▶ₚ d" := (conf_p_cat c d) (at level 40).
 Equations? conf_p_apply {ks} (k : chan_t) (c : conf_pass_el ks k) (m : ch_move k)
           : conf_foc (ks +▶ ch_next k m) :=
   conf_p_apply (COut x) c m :=
-    ConfA ((fst c.(C_chan_t) +▶ a_cext m)%ctx , snd c.(C_chan_t))
+    ConfA ((fst c.(C_chan_t) +▶' a_cext m) , snd c.(C_chan_t))
           (_ , r_concat_l _ _ _ (snd c.(C_move_v)))
-          (EZ (e_rename r_concat_l' c.(C_move))
-              (t_rename r_concat_r' (t_of_a m))) ;
+          (EZ (e_rename (r_concat_l _ _) c.(C_move))
+              (t_rename (r_concat_r _ _) (t_of_a m))) ;
   conf_p_apply (CIn x) c m :=
-    ConfA ((c.(C_chan_t) +▶ t_obs_args m)%ctx , t_obs_goal m)
+    ConfA ((c.(C_chan_t) +▶' t_obs_args m) , t_obs_goal m)
           (_ , top)
           (EZ EHole (t_obs_apply m c.(C_move))) .
 all: cbv [ch_vars] in X; r_fixup.
