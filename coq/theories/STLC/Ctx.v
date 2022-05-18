@@ -2,22 +2,35 @@ Import EqNotations.
 From ExtLib.Data Require Import Nat Fin List.
 From Equations Require Import Equations.
 From OGS Require Import Utils.
+From OGS Require Import Utils.Prelude.
 Set Equations Transparent.
 
-Definition ctx (X : Type) : Type := list X.
+Inductive ctx (X : Type) : Type :=
+| cnil : ctx X
+| ccon : ctx X -> X -> ctx X
+.
+Arguments cnil {X}.
+Arguments ccon {X} Γ x.
+Derive NoConfusion for ctx.
 
 #[global] Declare Scope ctx_scope.
 #[global] Delimit Scope ctx_scope with ctx.
 #[global] Bind Scope ctx_scope with ctx.
 
-#[global] Notation "∅" := nil : ctx_scope.
-#[global] Notation "Γ ▶ x" := (x :: Γ%ctx) (at level 40, left associativity) : ctx_scope.
-#[global] Notation "Γ +▶ Δ" := (app Δ%ctx Γ%ctx) (at level 50, left associativity) : ctx_scope.
+#[global] Notation "∅" := (cnil) : ctx_scope.
+#[global] Notation "Γ ▶ x" := (ccon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
+
+Equations ccat {X} : ctx X -> ctx X -> ctx X :=
+  ccat Γ ∅       := Γ ;
+  ccat Γ (Δ ▶ x) := (ccat Γ Δ) ▶ x .
+
+#[global] Notation "Γ +▶ Δ" := (ccat Γ%ctx Δ%ctx) (at level 50, left associativity) : ctx_scope.
 
 
 Section lemma.
 Context {X : Type}.
 
+(*
 Definition join : ctx (ctx X) -> ctx X := @Lists.List.concat X.
 
 Equations join_cat Γs Δs : join (Γs +▶ Δs)%ctx = ((join Γs) +▶ (join Δs))%ctx :=
@@ -26,6 +39,7 @@ Equations join_cat Γs Δs : join (Γs +▶ Δs)%ctx = ((join Γs) +▶ (join Δ
     rew app_assoc Δ (join Δs) (join Γs)
      in f_equal (app Δ) (join_cat Γs Δs).
 Arguments join_cat {Γs Δs}.
+*)
     
 Inductive has : ctx X -> X -> Type :=
 | top {Γ x} : has (Γ ▶ x) x
@@ -33,7 +47,14 @@ Inductive has : ctx X -> X -> Type :=
 Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
 Derive Signature for has.
 
+Equations length {X} : ctx X -> nat :=
+  length ∅       := O ;
+  length (Γ ▶ x) := S (length Γ) .
 
+Equations get {X} (xs : ctx X) : fin (length xs) -> X :=
+  get (Γ ▶ x) (F0)   := x ;
+  get (Γ ▶ x) (FS i) := get Γ i .
+Notation "Γ .[ i ]" := (get Γ%ctx i) (at level 30).
 
 Definition substitution (F : ctx X -> X -> Type) (Γ Δ : ctx X) := forall x, Γ ∋ x -> F Δ x.
 Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30).
@@ -42,8 +63,8 @@ Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30).
 Definition r_pop {Γ : ctx X} {x : X} : Γ ⊆ (Γ ▶ x) := fun _ i => pop i.
 
 Equations has_get (Γ : ctx X) i : Γ ∋ (Γ.[i]) :=
-  has_get (x :: xs) F0     := top ;
-  has_get (x :: xs) (FS i) := pop (has_get xs i) .
+  has_get (Γ ▶ x) F0     := top ;
+  has_get (Γ ▶ x) (FS i) := pop (has_get Γ i) .
 
 Equations has_index {Γ : ctx X} {x} : Γ ∋ x -> fin (length Γ) :=
   has_index top     := F0 ;
@@ -99,24 +120,6 @@ Equations r_concat3_2 (Γ Δ ϒ : ctx X) : (Γ +▶ ϒ) ⊆ (Γ +▶ (Δ +▶ ϒ
   r_concat3_2 Γ Δ (ϒ ▶ _) _ (pop i) := pop (r_concat3_2 Γ Δ ϒ _ i) .
 Arguments r_concat3_2 {Γ Δ ϒ}.
 
-Variant any (P : X -> Type) (xs : list X) : Type :=
-| Any {x} : xs ∋ x -> P x -> any P xs
-.
-#[global] Arguments Any {P xs x} i p.
-
-Equations any_el {P xs} : any P xs -> X :=
-  any_el (@Any _ _ x _ _) := x .
-
-Equations any_coh {P xs} (a : any P xs) : P (any_el a) :=
-  any_coh (Any _ p) := p .
-
-Equations any_elim {P} {A : forall x, P x -> Type} (f : forall x p, A x p)
-          xs (a : any P xs) : A (any_el a) (any_coh a) :=
-  any_elim f xs (Any _ p) := f _ p .
-
-Equations any_elim2 {P} {A : forall x, P x -> Type}
-          xs (a : any P xs) (f : forall p, A (any_el a) p) : A (any_el a) (any_coh a) :=
-  any_elim2 xs (Any _ p) f := f p .
 
 Inductive cover : ctx X -> ctx X -> ctx X -> Type :=
 | CNil :                                 cover ∅        ∅        ∅
@@ -127,6 +130,7 @@ Arguments CNil.
 Arguments CLeft {x xs ys zs} c.
 Arguments CRight {x xs ys zs} c.
 Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30).
+Derive NoConfusion for cover.
 
 Equations cover_nil_r xs : xs ⊎ ∅ ≡ xs :=
   cover_nil_r ∅        := CNil ;
@@ -175,7 +179,61 @@ Equations cover_split {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] : zs ∋ x -> xs ∋
         | inr j := inr j } ;
   cover_split (CRight c) (pop i) with cover_split c i :=
       { | inl j := inl j ;
-        | inr j := inr (pop j) } .
+      | inr j := inr (pop j) } .
+End lemma.
+
+#[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30) : type_scope.
+#[global] Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30) : type_scope.
+#[global] Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30) : type_scope.
+#[global] Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30) : type_scope.
+
+Section any.
+  Context {X : Type}.
+  
+Variant any (P : X -> Type) (xs : ctx X) : Type :=
+| Any {x} : xs ∋ x -> P x -> any P xs
+.
+#[global] Arguments Any {P xs x} i p.
+Derive NoConfusion for any.
+
+Equations any_el {P xs} : any P xs -> X :=
+  any_el (@Any _ _ x _ _) := x .
+
+Equations any_coh {P xs} (a : any P xs) : P (any_el a) :=
+  any_coh (Any _ p) := p .
+
+Equations any_elim {P} {A : forall x, P x -> Type} (f : forall x p, A x p)
+          xs (a : any P xs) : A (any_el a) (any_coh a) :=
+  any_elim f xs (Any _ p) := f _ p .
+
+Definition ctx_s (R : X -> SProp) : Type := sigS (fun Γ => forall x, Γ ∋ x -> R x).
+Definition coe_ctx {R} : ctx_s R -> ctx X := sub_elt.
+Global Coercion coe_ctx : ctx_s >-> ctx.
+
+Variant any_s {R : X -> SProp} (P : sigS R -> Type) (xs : ctx_s R) : Type :=
+| AnyS {x} : xs ∋ x.(sub_elt) -> P x -> any_s P xs
+.
+#[global] Arguments AnyS {R P xs x} i p.
+Derive NoConfusion for any_s.
+
+Equations ctx_s_to_ctx' {R : X -> SProp} Γ (H : forall x, Γ ∋ x -> R x) : ctx (sigS R) :=
+  ctx_s_to_ctx' ∅       H := ∅ ;
+  ctx_s_to_ctx' (Γ ▶ x) H :=
+    ctx_s_to_ctx' Γ (fun _ i => H _ (pop i))
+    ▶ {| sub_elt := x ; sub_prf := H _ top |} .
+
+Definition ctx_s_to_ctx {R} (Γ : ctx_s R) : ctx (sigS R) :=
+  ctx_s_to_ctx' Γ.(sub_elt) Γ.(sub_prf) .
+
+Equations any_s_el {R P xs} : @any_s R P xs -> sigS R :=
+  any_s_el (@AnyS _ _ _ x _ _) := x .
+
+Equations any_s_coh {R P xs} (a : @any_s R P xs) : P (any_s_el a) :=
+  any_s_coh (AnyS _ p) := p .
+
+Equations any_s_elim {R P} {A : forall x, P x -> Type} (f : forall x p, A x p)
+          {xs} (a : @any_s R P xs) : A (any_s_el a) (any_s_coh a) :=
+  any_s_elim f (AnyS _ p) := f _ p .
 
 Equations any_c_split {P xs ys zs} : xs ⊎ ys ≡ zs -> any P zs -> any P xs + any P ys :=
   any_c_split c (Any i p) with cover_split c i :=
@@ -184,6 +242,8 @@ Equations any_c_split {P xs ys zs} : xs ⊎ ys ≡ zs -> any P zs -> any P xs + 
 
 Equations r_any {P xs ys} (ρ : xs ⊆ ys) : any P xs -> any P ys :=
   r_any ρ (Any i p) := Any (ρ _ i) p .
+
+End any.
 
 (*
 Equations r_any_eq1 {P} {A : forall x, P x -> Type} {f : forall x p, A x p} {xs ys}
@@ -215,12 +275,9 @@ Equations any_c_split_coh2 {P xs ys zs} (c : xs ⊎ ys ≡ zs) (a : any P zs) :
       | inr j := eq_refl } .
 *)
 
-End lemma.
-#[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30) : type_scope.
-#[global] Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30) : type_scope.
-#[global] Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30) : type_scope.
-#[global] Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30) : type_scope.
-
+Equations map {X Y} (f : X -> Y) : ctx X -> ctx Y :=
+  map f ∅       := ∅ ;
+  map f (Γ ▶ x) := map f Γ ▶ f x .
 
 Equations has_map0 {X Y} (f : X -> Y) (Γ : ctx X) {y} : map f Γ ∋ y -> X :=
   has_map0 f (Γ ▶ x) top     := x ;

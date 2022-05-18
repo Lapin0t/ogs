@@ -15,3 +15,4 @@ theories/ITree/Dual.v
 theories/STLC/Ctx.v
 theories/STLC/Syntax.v
 theories/STLC/OGS.v
+theories/STLC/Lassen.v

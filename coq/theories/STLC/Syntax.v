@@ -89,29 +89,32 @@ containing only negative types.
 Equations is_neg : ty -> SProp :=
   is_neg (a → b)%ty := sUnit ;
   is_neg _          := sEmpty .
-
-Definition neg_ty : Type := subset is_neg.
+Definition neg_ty : Type := sigS is_neg.
 Definition neg_coe : neg_ty -> ty := sub_elt.
-Coercion neg_coe : neg_ty >-> ty.
+Global Coercion neg_coe : neg_ty >-> ty.
 
-Definition neg_ctx : Type := subset (fun Γ : t_ctx => forall k, Γ ∋ k -> is_neg k).
-Definition neg_c_coe : neg_ctx -> t_ctx := sub_elt.
-Coercion neg_c_coe : neg_ctx >-> t_ctx.
+Definition neg_ctx : Type := ctx_s is_neg.
+Definition neg_c_coe : neg_ctx -> ctx ty := sub_elt.
+Global Coercion neg_c_coe : neg_ctx >-> ctx.
+(*Definition neg_ctx : Type := subset (fun Γ : t_ctx => forall k, Γ ∋ k -> is_neg k).
+Definition neg_c_coe : neg_ctx -> ctx ty := sub_elt.
+Coercion neg_c_coe : neg_ctx >-> ctx.*)
 
 Bind Scope ctx_scope with neg_ctx.
 Bind Scope ctx_scope with ctx.
 
+  Set Printing All.
 Definition app_neg (Γ : neg_ctx) (x : neg_ty) : neg_ctx.
-  refine ({| sub_elt := (Γ.(sub_elt) ▶ x.(sub_elt))%ctx ;
+  refine ({| sub_elt := (Γ ▶ (x : ty))%ctx ;
              sub_prf := fun k i => _ |}).
-  remember (sub_elt Γ ▶ sub_elt x)%ctx.
-  destruct i; injection Heql; intros Ha Hb.
-  rewrite Hb; exact (sub_prf x).
-  rewrite Ha in i; exact (sub_prf Γ x0 i).
+  remember (Γ ▶ (x : ty))%ctx as H.
+  destruct i; injection HeqH; intros Ha Hb.
+  rewrite Ha; exact (sub_prf x).
+  rewrite Hb in i; exact (sub_prf Γ x0 i).
 Defined.
 
 Definition concat_neg (Γ Δ : neg_ctx) : neg_ctx.
-  refine ({| sub_elt := (Γ.(sub_elt) +▶ Δ.(sub_elt))%ctx ;
+  refine ({| sub_elt := (Γ +▶ Δ)%ctx ;
              sub_prf := fun k i => _ |}).
   destruct (concat_split _ _ i).
   exact (Γ.(sub_prf) k h).
@@ -120,7 +123,7 @@ Definition concat_neg (Γ Δ : neg_ctx) : neg_ctx.
 
 Definition nil' : neg_ctx.
   refine ({| sub_elt := ∅%ctx ; sub_prf := fun k i => _ |}).
-  remember ∅%ctx; destruct i; discriminate Heql.
+  remember ∅%ctx as H; destruct i; discriminate HeqH.
   Defined.
 
 Definition arr_neg (a b : ty) : neg_ty :=
@@ -134,7 +137,11 @@ Notation "a →' b" := (arr_neg a b) (at level 40).
 Bind Scope ctx_scope with neg_ctx.
 Bind Scope ctx_scope with ctx.
 
-Definition neg_var {Γ : neg_ctx} {x} : (Γ : t_ctx) ∋ x -> is_neg x := Γ.(sub_prf) x.
+Definition neg_var {Γ : neg_ctx} {x} : Γ ∋ x -> is_neg x := Γ.(sub_prf) x.
+Definition ty_upg {Γ : neg_ctx} {x} : Γ ∋ x -> neg_ty :=
+  fun i => {| sub_elt := x ; sub_prf := neg_var i |}.
+
+Definition var_upg {Γ : neg_ctx} {x} (i : Γ ∋ x) : Γ ∋ ty_upg i := i.
 
 (*|
 Syntax of terms
@@ -280,7 +287,7 @@ Equations t_of_val {Γ x} : e_val Γ x -> term Γ x :=
   t_of_val (VPair u v) := Pair (t_of_val u) (t_of_val v) ;
   t_of_val (VInl u) := Inl (t_of_val u) ;
   t_of_val (VInr u) := Inr (t_of_val u) .
-Coercion t_of_val : e_val >-> term.
+Global Coercion t_of_val : e_val >-> term.
 
 (*|
 In an ideal world, values being a subset of terms, we could lift the
@@ -627,7 +634,7 @@ on an abstract value ``a`` and continue on ``E[t_of_a(a)]`` where ``t_of_a``
 turns an abstract value into a term, extending the context with a fresh variable
 for everything that has been hiden.
 |*)
-Equations a_cext {x} : a_val x -> neg_ctx :=
+Equations a_cext [x] : a_val x -> neg_ctx :=
   a_cext (@AArr a b)   := ∅' ▶' (a →' b) ;
   a_cext (APair u v)   := a_cext u +▶' a_cext v ;
   a_cext (AInl u)      := a_cext u ;
@@ -659,32 +666,26 @@ Equations t_obs_args_aux (t : ty) (p : is_neg t) : t_obs_aux t p -> neg_ctx :=
 Equations t_obs_goal_aux (t : ty) (p : is_neg t) : t_obs_aux t p -> ty :=
   t_obs_goal_aux (a → b)%ty _ o := b .
 
-Definition t_obs_args (t : neg_ty) : t_obs t -> neg_ctx :=
+Definition t_obs_args [t : neg_ty] : t_obs t -> neg_ctx :=
   t_obs_args_aux t.(sub_elt) t.(sub_prf) . 
 
-Definition t_obs_goal (t : neg_ty) : t_obs t -> ty :=
+Definition t_obs_goal [t : neg_ty] : t_obs t -> ty :=
   t_obs_goal_aux t.(sub_elt) t.(sub_prf) . 
 
-Definition t_obs_nxt (t : neg_ty) (o : t_obs t) : frame :=
-  (t_obs_args t o , t_obs_goal t o).
+Definition t_obs_nxt [t : neg_ty] (o : t_obs t) : frame :=
+  (t_obs_args o , t_obs_goal o).
 
-(*|
-.. coq:: none
-|*)
-Arguments t_obs_args {t} o.
-Arguments t_obs_goal {t} o.
-Arguments t_obs_nxt {t} o.
 
 (*|
 |*)
 Equations t_obs_apply_aux {Γ : neg_ctx} (x : ty) (p : is_neg x) (o : t_obs_aux x p)
-          : term Γ x -> term ((Γ +▶' t_obs_args_aux x p o)) (t_obs_goal_aux x p o) :=
+          : term Γ x -> term (Γ +▶' t_obs_args_aux x p o) (t_obs_goal_aux x p o) :=
   t_obs_apply_aux (a → b)%ty _ o t :=
     App (t_rename (r_concat_l _ _) t)
         (t_rename (r_concat_r _ _) (t_of_a o)).
 
 Definition t_obs_apply {Γ : neg_ctx} {x : neg_ty} (o : t_obs x)
-  : term Γ x -> term ((Γ +▶' t_obs_args o)) (t_obs_goal o) :=
+  : term Γ x -> term (Γ +▶' t_obs_args o) (t_obs_goal o) :=
   t_obs_apply_aux x.(sub_elt) x.(sub_prf) o.
 
 (*|
@@ -709,8 +710,8 @@ Arguments a_of_val {Γ x}.
 If we turn a concrete value into an abstract value, for every new variable that we
 introduced (``a_cext``) we can get it's original value.
 |*)
-Definition cext_get {Γ : neg_ctx} (x : ty) (v : e_val Γ x) {y : neg_ty}
-         : (a_cext (a_of_val v) : t_ctx) ∋ y -> e_val Γ y.
+Definition cext_get {Γ : neg_ctx} {x : ty} (v : e_val Γ x) [y : ty]
+         : a_cext (a_of_val v) ∋ y -> e_val Γ y.
   induction x.
   - dependent elimination v.
     + destruct (neg_var h).
@@ -721,20 +722,15 @@ Definition cext_get {Γ : neg_ctx} (x : ty) (v : e_val Γ x) {y : neg_ty}
       * exact (IHx2 e0 h).
   - intro i.
     cbv [a_of_val] in i. cbn in i.
-    remember (∅ ▶ (x1 → x2)%ty)%ctx.
-    destruct i; injection Heql; intros Ha Hb.
-    rewrite Hb; exact v.
-    rewrite Ha in i; dependent elimination i.
+    remember (∅ ▶ (x1 → x2)%ty)%ctx as H.
+    destruct i; injection HeqH; intros Ha Hb.
+    rewrite Ha; exact v.
+    rewrite Hb in i; dependent elimination i.
   - dependent elimination v.
     + destruct (neg_var h).
     + exact (IHx1 e1).
     + exact (IHx2 e2).
 Defined.
-      
-(*|
-.. coq:: none
-|*)
-Arguments cext_get {Γ} x v {y} i.
 
 (*|
 We end with 3 functions that will enable to treat ``e_elim`` and ``t_obs`` as
@@ -742,7 +738,7 @@ opaque in the OGS development. They respectively construct an observation and
 explain how it is eliminated.
 |*)
 Equations o_of_elim {Γ : neg_ctx} x {y} (i : (Γ : t_ctx) ∋ x)
-  : e_elim Γ x y -> t_obs (Build_subset _ _ x (neg_var i)) :=
+  : e_elim Γ x y -> t_obs (ty_upg i) :=
   o_of_elim _ i e with neg_var i := {
       o_of_elim (_ → _) i (RApp v) _ := _
   } .
@@ -757,11 +753,10 @@ Definition o_of_elim_eq {Γ : neg_ctx} {x y} (i : (Γ : t_ctx) ∋ x)
   reflexivity.
 Defined.
 
-Definition o_args_get {Γ : neg_ctx} {x y z} (i : (Γ : t_ctx) ∋ x)
-          (e : e_elim Γ x y) (j : (t_obs_args (o_of_elim i e) : t_ctx) ∋ z) : e_val Γ z.
+Definition o_args_get {Γ : neg_ctx} {x y} (i : (Γ : t_ctx) ∋ x)
+          (e : e_elim Γ x y) [z] (j : t_obs_args (o_of_elim i e) ∋ z) : e_val Γ z.
   cbv [o_of_elim o_of_elim_clause_1] in j. pose (u := neg_var i); fold u in j.
   destruct x; try dependent elimination u.
   dependent elimination e.
-  cbn in j; cbv [o_of_elim_obligations_obligation_1] in j.
-  exact (cext_get _ e (j : _ ∋ neg_coe {| sub_elt := z ; sub_prf := neg_var j |})).
+  exact (cext_get e j) .
 Defined.

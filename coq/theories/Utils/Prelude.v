@@ -38,6 +38,6 @@ Derive NoConfusion for T3.
 
 Definition ex_falso {A : Type} (bot : T0) : A := match bot with end.
 
-Record subset {X : Type} (P : X -> SProp) := { sub_elt : X ; sub_prf : P sub_elt }.
+Record sigS {X : Type} (P : X -> SProp) := { sub_elt : X ; sub_prf : P sub_elt }.
 Arguments sub_elt {X P}.
 Arguments sub_prf {X P}.
