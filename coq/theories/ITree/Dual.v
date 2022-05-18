@@ -11,8 +11,6 @@ Set Primitive Projections.
 From Equations Require Import Equations.
 Set Equations Transparent.
 
-(*From ExtLib.Data Require Import Nat Fin List Unit.*)
-
 From OGS Require Import Utils.
 From OGS.ITree Require Import Event ITree Angelic Rec.
 
@@ -27,12 +25,15 @@ Record half_game (I J : Type) : Type := HGame {
   next : forall i, move i -> J ;
 }.
 
+(*| Active interpretation |*)
 Definition h_act {I J} (A : half_game I J) : psh J -> psh I :=
   fun X i => { m : A.(move) i & X (A.(next) i m) }.
 
+(*| Passive interpretation |*)
 Definition h_pas {I J} (A : half_game I J) : psh J -> psh I :=
   fun X i => forall m : A.(move) i, X (A.(next) i m).
 
+(*| Parallel product of half-games |*)
 Definition h_par {I J K L : Type} (A : half_game I J) (B : half_game K L)
   : half_game (I * K) (J * K + I * L)
   := {| move := fun x => (A.(move) (fst x) + B.(move) (snd x))%type ;
@@ -66,6 +67,7 @@ intros [[m|m] x].
 - exact (nat_right (fun l => X (inr (i , l))) i (fun l x => x) _ (existT _ m x)).
 Defined.
 
+(*| Tensor product of half-games |*)
 Definition h_ten {I J K L : Type} (A : half_game I J) (B : half_game K L)
   : half_game (I * L + J * K) (J * L)
   := {| move := fun x => match x with
@@ -127,37 +129,25 @@ Definition iforest {I J} (G : game' I J) (X : I -> Type) (j : J) : Type :=
 Definition dual {I J} (G : game' I J) : game' J I :=
   {| client := G.(server) ; server := G.(client) |} .
 
+(*| Parallel product of games: clients can choose, servers must cope. |*)
 Definition parallel {I J K L} (A : game' I J) (B : game' K L)
   : game' (I * K) (J * K + I * L) :=
 {| client := h_par A.(client) B.(client) ;
    server := h_ten A.(server) B.(server) |} .
-  
-(*
-Definition parallel {I J K L} (A : game' I J) (B : game' K L)
-  : game' (I * K) (J * K + I * L) :=
-{| client := {|
-     move := fun ix => (c_move A (fst ix) + c_move B (snd ix))%type;
-     next := fun ix c => match c with
-                      | inl m => inl (c_next A (fst ix) m, snd ix)
-                      | inr m => inr (fst ix, c_next B (snd ix) m)
-                      end |};
-   server := {|
-     move := fun ix => match ix with
-                   | inl ix0 => s_move A (fst ix0)
-                   | inr ix0 => s_move B (snd ix0)
-                   end;
-     next := fun ix => match ix as s
-                    return (match s with | inl _ => _ | inr _ => _ end -> I * K)
-                    with
-                    | inl p => fun m => (s_next A (fst p) m, snd p)
-                    | inr p => fun m => (fst p , s_next B (snd p) m)
-                    end |} |}.
-*)
 
+(*| All of these could be expressed with h_par and h_ten, but it's
+    definitionally the same. |*)
 Notation "A ⅋ B" := (parallel A B) (at level 30).
 Notation "A ⊸ B" := (dual A ⅋ B) (at level 30).
 Notation "A ⊗ B" := (dual (dual A ⅋ dual B)) (at level 30).
 
+Definition symmetric {I} (A : half_game I I) : game' I I :=
+  {| client := A ; server := A |}.
+
+(*|
+This composition is still not the most general as here we fix the shape of
+the events whereas we could simply require arrows (like we do for leaf families).
+|*)
 Section comp.
   Context {I J K L M N : Type}.
   Context {A : game' I J} {B : game' K L} {C : game' M N}.

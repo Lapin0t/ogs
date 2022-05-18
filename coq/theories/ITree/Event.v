@@ -182,6 +182,7 @@ Definition e_of_classic {E : Type -> Type} {X} : E X -> ⟦₀ classicₑ E ⟧ 
   refine (fun x => x).
 Defined.
 
+(*
 Record uniformₑ (I J : Type) : Type := UEvent {
   u_qry : J -> Type ;
   kon : Type ;
@@ -205,3 +206,5 @@ Definition e_of_u {I J} (U : uniformₑ I J) : event I J :=
         (fun _ q => { i : _ & k_rsp U (u_rsp U q .[i]) })
         (fun _ q r => k_nxt U (projT2 r)).
 Coercion e_of_u : uniformₑ >-> event.
+
+*)
