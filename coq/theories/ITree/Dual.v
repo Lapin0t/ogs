@@ -387,6 +387,8 @@ Qed.
 End comp_id.
 
 
+(*
+
 Definition bang {I J} (A : game' I J)
   : game' (I * list J) (list J) :=
 {| client :=
@@ -395,3 +397,5 @@ Definition bang {I J} (A : game' I J)
    server :=
    {| move := fun js => { n : fin (length js) & s_move A (js .[ n ]) } ;
       next := fun js m => (s_next A (js .[ projT1 m]) (projT2 m), js) |} |}.
+
+*)
