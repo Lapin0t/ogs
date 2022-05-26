@@ -56,6 +56,10 @@ Definition iterₐ {X Y i} (f : X -> itreeₐ E i i (X + Y)) : X -> itreeₐ E i
                                 | inl x => tauₐ (_iter x)
                                 | inr y => retₐ y
                                 end).
+
+Definition loopₐ {X i} (f : X -> itreeₐ E i i X) : X -> itreeₐ E i i T0 :=
+  cofix _loop x := bindₐ (f x) (tauₐ ∘ _loop).
+
 End angelic.
 #[global] Notation "x !>= f" := (bindₐ x f) (at level 30).
 #[global] Notation "f !>> g" := (kcompₐ f g) (at level 30).

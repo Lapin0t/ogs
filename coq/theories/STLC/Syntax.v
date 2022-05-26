@@ -103,7 +103,6 @@ Coercion neg_c_coe : neg_ctx >-> ctx.*)
 Bind Scope ctx_scope with neg_ctx.
 Bind Scope ctx_scope with ctx.
 
-  Set Printing All.
 Definition app_neg (Γ : neg_ctx) (x : neg_ty) : neg_ctx.
   refine ({| sub_elt := (Γ ▶ (x : ty))%ctx ;
              sub_prf := fun k i => _ |}).
@@ -113,13 +112,16 @@ Definition app_neg (Γ : neg_ctx) (x : neg_ty) : neg_ctx.
   rewrite Hb in i; exact (sub_prf Γ x0 i).
 Defined.
 
-Definition concat_neg (Γ Δ : neg_ctx) : neg_ctx.
-  refine ({| sub_elt := (Γ +▶ Δ)%ctx ;
-             sub_prf := fun k i => _ |}).
-  destruct (concat_split _ _ i).
-  exact (Γ.(sub_prf) k h).
-  exact (Δ.(sub_prf) k h).
-  Defined.
+Definition concat_is_neg (Γ Δ : neg_ctx) : allS is_neg (Γ +▶ Δ).
+intros x i.
+destruct (concat_split _ _ i).
+exact (Γ.(sub_prf) x h).
+exact (Δ.(sub_prf) x h).
+Defined.
+
+Definition concat_neg (Γ Δ : neg_ctx) : neg_ctx :=
+  {| sub_elt := (Γ +▶ Δ)%ctx ;
+     sub_prf := concat_is_neg Γ Δ |}.
 
 Definition nil' : neg_ctx.
   refine ({| sub_elt := ∅%ctx ; sub_prf := fun k i => _ |}).
@@ -472,6 +474,7 @@ This function terminates, but it's elimination order is not trivial
 (it's not simply structural) and we won't use it outside of itree context so
 we just wrap it into an ``itree ∅ₑ`` to get general recursion and make coq happy.
 |*)
+(* todo: *)
 Equations focus_aux {Γ x} : focus_arg Γ x -> (focus_arg Γ x + e_term Γ x) :=
   focus_aux (inl (EZ E (Var i)))        := inl (inr (EZ E (VVar i))) ;
   focus_aux (inl (EZ E (Lam m)))        := inl (inr (EZ E (VLam m))) ;

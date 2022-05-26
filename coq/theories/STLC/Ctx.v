@@ -206,7 +206,8 @@ Equations any_elim {P} {A : forall x, P x -> Type} (f : forall x p, A x p)
           xs (a : any P xs) : A (any_el a) (any_coh a) :=
   any_elim f xs (Any _ p) := f _ p .
 
-Definition ctx_s (R : X -> SProp) : Type := sigS (fun Γ => forall x, Γ ∋ x -> R x).
+Definition allS (R : X -> SProp) (Γ : ctx X) : SProp := forall x, Γ ∋ x -> R x.
+Definition ctx_s (R : X -> SProp) : Type := sigS (allS R).
 Definition coe_ctx {R} : ctx_s R -> ctx X := sub_elt.
 Global Coercion coe_ctx : ctx_s >-> ctx.
 

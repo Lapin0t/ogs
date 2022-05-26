@@ -2,6 +2,7 @@ Set Printing Projections.
 Set Primitive Projections.
 
 From Coq Require Import Logic.
+Require Import Coq.Program.Equality.
 Import EqNotations.
 
 From ExtLib.Data Require Import List Fin.
@@ -99,6 +100,32 @@ Bind Scope ctx_scope with ch_ctx.
 
 (*| Injecting type scopes into channel scopes |*)
 Definition ch_vars (Γ : neg_ctx) : ch_ctx := map CIn (ctx_s_to_ctx Γ) .
+Equations eq_cong [A B : Type] (f : A -> B) [x y : A] : x = y -> f x = f y :=
+  eq_cong f eq_refl := eq_refl .
+
+Definition ch_vars_cat Γ Δ : ch_vars (Γ +▶' Δ) = (ch_vars Γ +▶ ch_vars Δ)%ctx.
+  destruct Δ; dependent induction sub_elt.
+  reflexivity.
+  apply (eq_cong (fun Γ => (Γ ▶ CIn _)%ctx)); exact (IHsub_elt _).
+Defined.
+  
+Definition ch_vars_elim (P : chan_t -> Type) [Γ : neg_ctx]
+           (H : forall (x : neg_ty), Γ ∋ x -> P (CIn x))
+  : forall k, ch_vars Γ ∋ k -> P k.
+  intros k i; destruct Γ; dependent induction sub_elt.
+  - dependent elimination i.
+  - dependent elimination i.
+    + apply H; exact top.
+    + apply (IHsub_elt (fun x i => sub_prf x (pop i)) (fun x i => H x (pop i))); exact h.
+Defined.
+
+Definition ch_var_upg [Γ : neg_ctx] [x : ty] (i : Γ ∋ x) : ch_vars Γ ∋ CIn {| sub_elt := x ; sub_prf := Γ.(sub_prf) _ i |}.
+  destruct Γ. dependent induction sub_elt.
+  + dependent elimination i.
+  + dependent elimination i.
+    exact top.
+    exact (pop (IHsub_elt (fun x i => sub_prf x (pop i)) _ h)).
+Defined.
 
 (*|
 Details: channel messages and transitions
@@ -384,14 +411,13 @@ Equations? conf_p_apply {ks} (k : chan_t) (c : conf_pass_el ks k) (m : ch_move k
     ConfA ((c.(C_chan_t) +▶' t_obs_args m) , t_obs_goal m)
           (_ , top)
           (EZ EHole (t_obs_apply m c.(C_move))) .
-all: cbv [ch_vars] in X; r_fixup.
+all: rewrite ch_vars_cat in X.
 all: destruct (concat_split _ _ X).
-refine (r_concat_l _ _ _ (fst c.(C_move_v) _ h)).
-refine (r_concat_r _ _ _ h).
-refine (pop (r_concat_l _ _ _ (c.(C_move_v) _ h))).
-refine (pop (r_concat_r _ _ _ h)).
+exact (r_concat_l _ _ _ (fst c.(C_move_v) _ h)).
+exact (r_concat_r _ _ _ h).
+exact (pop (r_concat_l _ _ _ (c.(C_move_v) _ h))).
+exact (pop (r_concat_r _ _ _ h)).
 Defined.
-
 
 (* inject passive configurations into passive opponent strategies *)
 Equations inj_ogs_p_aux {p} (c : conf_pass p) : passive g_ogs conf_act (s_swap p) :=
@@ -402,20 +428,20 @@ Equations inj_ogs_p_aux {p} (c : conf_pass p) : passive g_ogs conf_act (s_swap p
 Equations conf_p_vars {ks} (c : conf_foc ks)
           {Γ : neg_ctx} (f : forall x, Γ ∋ x -> e_val (fst c.(C_focus_t)) x)
           : conf_pass {| p_ctx := ks ; o_ctx := ch_vars Γ |} :=
-  conf_p_vars c f k i :=
-    rew has_map2 CIn _ i
-    in {| C_chan_t := fst c.(C_focus_t) : chan_t_ext (CIn _) ;
-          C_move_v := fst c.(C_focus_v) ;
-          C_move := f _ (has_map1 _ _ i) |}.
+  conf_p_vars c f :=
+    ch_vars_elim (conf_pass_el ks)
+                 (fun x i => {| C_chan_t := fst c.(C_focus_t) : chan_t_ext (CIn _) ;
+                             C_move_v := fst c.(C_focus_v) ;
+                             C_move := f x i |}).
 
 (* create a passive configuration from an evaluation context *)
 Equations conf_p_el_ctx {ks b} (c : conf_foc ks)
           : e_ctx (fst c.(C_focus_t)) (snd c.(C_focus_t)) b
             -> conf_pass_el ks (COut b) :=
   conf_p_el_ctx c e :=
-    {| C_chan_t := c.(C_focus_t) : chan_t_ext (COut _);
-       C_move_v := c.(C_focus_v) ;
-       C_move := e |} .
+    {| C_chan_t := c.(C_focus_t) : chan_t_ext (COut _);   (* \Delta , y *)
+       C_move_v := c.(C_focus_v) ;                        (* \Delta \subseteq ks *)
+       C_move := e |} .                                   (* E : \Delta |- x -o y *)
 
 (* inject normal forms into active player strategies *)
 Equations inj_ogs_enf_aux {p} (c : conf_act p) : e_nf' (C_foc c).(C_focus_t)
@@ -424,14 +450,14 @@ Equations inj_ogs_enf_aux {p} (c : conf_act p) : e_nf' (C_foc c).(C_focus_t)
     (* get the return channel from the config *)
     let ch_ret := snd (C_focus_v (C_foc c)) in
     (* construct new passive configs for input/value channels *)
-    let cp_ext := conf_p_vars _ (fun _ i => cext_get _ v i) in
+    let cp_ext := conf_p_vars _ (fun _ i => cext_get v i) in
 
     Vis (ogs_mv ch_ret (a_of_val v))
         (ret ∘ inl ∘ inj_ogs_p_aux (C_pass c +▶ₚ cp_ext)) ;
 
   inj_ogs_enf_aux c (NRed E i v) :=
     (* get query channel by renaming [i], plus some type fixup *)
-    let ch_qry := fst (C_focus_v (C_foc c)) _ (map_has CIn _ (neg_upgrade i)) in
+    let ch_qry := fst (C_focus_v (C_foc c)) _ (ch_var_upg i) in
     (* construct new passive configs for input/value channels *)
     let cp_ext1 := conf_p_vars _ (fun _ i => o_args_get _ v i) in
     (* construct new passive config for the output/ctx channel *)

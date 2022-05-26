@@ -66,19 +66,23 @@ Equations liftP_xframe (X : psh frame) : psh xframe :=
   liftP_xframe X (Γ , Some t) := X (Γ , t) .
   
 
+(* argument and transition for CALL *)
 Definition lsn_call_qry (Γ : neg_ctx) : Type := any_s t_obs Γ .
 Definition lsn_call_nxt [Γ] (a : lsn_call_qry Γ) : xframe :=
   (any_s_elim t_obs_args a , Some (any_s_elim t_obs_goal a)) .
 
+(* argument and transition for RET *)
 Definition lsn_ret_qry (x : option ty) : Type := optP a_val x .
 Definition lsn_ret_nxt [x] (a : lsn_ret_qry x) : xframe :=
   (optP_elim a_cext a , None) .
   
+(* argument and transition for an xframe *)
 Definition lsn_qry0 (s : xframe) := lsn_call_qry (fst s) + lsn_ret_qry (snd s) .
 Equations lsn_nxt0 [s] : lsn_qry0 s -> xframe :=
   lsn_nxt0 (inl o) := lsn_call_nxt o ;
   lsn_nxt0 (inr a) := lsn_ret_nxt a .
 
+(* query, response and transition for frame *)
 Definition lsn_qry (s : frame) := lsn_qry0 (inj_frame s) .
 Definition lsn_rsp [s] (q : lsn_qry s) := lsn_qry0 (lsn_nxt0 q) .
 Definition lsn_nxt [s] [q : lsn_qry s] (r : lsn_rsp q) : frame :=
@@ -121,22 +125,27 @@ Equations lassen_p_sub {f : frame} {Γ : neg_ctx}
   lassen_p_sub σ (AnyS i o) := Ret (EZ EHole (t_obs_apply o (σ _ i))
                                     : liftP_xframe zterm' (_ +▶' _ , Some _)) .
 
-Equations lassen_enf {f} (m : e_nf' f) : lassen' zterm' f :=
-  lassen_enf (NVal v) :=
+Equations lassen_enf : e_nf' ⇒ᵢ lassen' zterm' :=
+  lassen_enf _ (NVal v) :=
     Vis (lsn_ret (a_of_val v))
         (λ{ | inl o => lassen_p_sub (cext_get v) o }) ;
-  lassen_enf (NRed E i r) :=
-    Vis (lsn_call _ (o_of_elim i r))
-        (λ{ | inl o := lassen_p_sub (o_args_get i r) o ;
+  lassen_enf _ (NRed E i0 r) :=
+    Vis (lsn_call _ (o_of_elim i0 r))
+        (λ{ | inl o := lassen_p_sub (o_args_get i0 r) o ;
             | inr u := lassen_p_ctx (rew <- [fun t => e_ctx _ _ t]
-                                             (o_of_elim_eq i r) in E)
+                                             (o_of_elim_eq i0 r) in E)
                                      u }) .
 
 Definition lassen_zterm : zterm' ⇒ᵢ lassen' zterm' :=
-  fun _ m => emb_comp _ _ (eval_enf m) !>= lassen_enf .
+  fun j m => emb_comp (e_nf' j) (inj_frame j) (eval_enf m) !>= lassen_enf j .
 
 Definition eval_lassen : zterm' ⇒ᵢ (lassen ∅ᵢ ∘ inj_frame).
   refine (fun j m => loop _ (inj_frame j) (m : liftP_xframe zterm' (_ , Some _))).
+  intros j' x.
+  destruct j'.
+  cbn in x.
+  destruct o.
+  shelve.
   
   intros j m.
   refine (loop _ (inj_frame j) m).
