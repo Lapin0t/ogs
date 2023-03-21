@@ -23,3 +23,5 @@
 **.fls
 **.lia.cache
 **.out
+**.DS_Store
+*auto

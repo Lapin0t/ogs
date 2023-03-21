@@ -1,6 +1,1 @@
--Q theories OGS
-
-theories/Utils/Prelude.v
-theories/Utils/Psh.v
-theories/Utils.v
-theories/ITree/ITree.v
+-Q _build/default/theories OGS
