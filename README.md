@@ -10,7 +10,7 @@ We aim to encode the approach using the itree library.
   - Tom Hirschowitz
   - Guilhem Jaber
   - Yannick Zakowski
-- License: TODO
+- License: GPLv3
 - Compatible Coq versions: 8.16 or later
 - Additional dependencies:
   - dune (>= 3.6)
