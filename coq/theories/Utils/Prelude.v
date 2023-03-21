@@ -1,7 +1,4 @@
-(** misc notations *)
-
 From Equations Require Import Equations.
-Set Equations Transparent.
 
 #[global] Notation endo T := (T -> T).
   
@@ -10,21 +7,14 @@ Set Equations Transparent.
 
 Notation "a ,' b" := (existT _ a b) (at level 30).
 
-(** currying *)
-
-Definition uncurry {A B} {C : A -> B -> Type}
-           (f : forall a b, C a b) (i : A * B)
+Definition uncurry {A B} {C : A -> B -> Type} (f : forall a b, C a b) (i : A * B)
   := f (fst i) (snd i).
 
-Definition curry {A B} {C : A -> B -> Type} (f : forall i, C (fst i) (snd i)) a b :=
-  f (a , b).
+Definition curry {A B} {C : A -> B -> Type} (f : forall i, C (fst i) (snd i)) a b
+  := f (a , b).
 
-(* dependent versions (actually untyped) *)
 Notation curry' := (fun f a b => f (a ,' b)).
 Notation uncurry' := (fun f x => f (projT1 x) (projT2 x)).
-
-(***************)
-(* Finite sets *)
 
 Variant T0 := .
 Variant T1 := T1_0.
@@ -34,7 +24,6 @@ Derive NoConfusion for T0.
 Derive NoConfusion for T1.
 Derive NoConfusion for T2.
 Derive NoConfusion for T3.
-
 
 Definition ex_falso {A : Type} (bot : T0) : A := match bot with end.
 

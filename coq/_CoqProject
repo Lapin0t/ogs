@@ -1,18 +1,6 @@
 -Q theories OGS
 
 theories/Utils/Prelude.v
-theories/Utils/FFun.v
 theories/Utils/Psh.v
 theories/Utils.v
-theories/ITree/Cat.v
-theories/ITree/Event.v
 theories/ITree/ITree.v
-theories/ITree/Eq.v
-theories/ITree/EqProps.v
-theories/ITree/Angelic.v
-theories/ITree/Rec.v
-theories/ITree/Dual.v
-theories/STLC/Ctx.v
-theories/STLC/Syntax.v
-theories/STLC/OGS.v
-theories/STLC/Lassen.v
