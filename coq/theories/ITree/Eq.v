@@ -65,20 +65,20 @@ Definition it_eq_mon {I} (E : event I I) {R1 R2} (RR : relᵢ R1 R2) : mon (rel�
 
 Definition it_eq {I} (E : event I I) {R1 R2} (RR RR : relᵢ R1 R2) := gfp (it_eq_mon E RR).
 
-
 Equations it_eq_seq {I} {E : event I I}
-      {X1 X2 X3} {RX1 : relᵢ X1 X2} {RX2 : relᵢ X2 X3}
-      {Y1 Y2 Y3} {RY1 : relᵢ Y1 Y2} {RY2 : relᵢ Y2 Y3}
-      : (it_eqF E RX1 RY1 ⨟ it_eqF E RX2 RY2) <= it_eqF E (RX1 ⨟ RX2) (RY1 ⨟ RY2) :=
-  it_eq_seq _ _ _ (EqRet r_rel1 ⨟⨟ EqRet r_rel2) := EqRet (r_rel1 ⨟⨟ r_rel2) ;
-  it_eq_seq _ _ _ (EqTau t_rel1 ⨟⨟ EqTau t_rel2) := EqTau (t_rel1 ⨟⨟ t_rel2) ;
-  it_eq_seq _ _ _ (EqVis k_rel1 ⨟⨟ EqVis k_rel2) := EqVis (fun v => k_rel1 v ⨟⨟ k_rel2 v) .
+      {X1 X2 X3} {RX1 : relᵢ X1 X2} {RX2 : relᵢ X2 X3} {RX3 : relᵢ X1 X3} (HX : (RX1 ⨟ RX2) <= RX3)
+      {Y1 Y2 Y3} {RY1 : relᵢ Y1 Y2} {RY2 : relᵢ Y2 Y3} {RY3 : relᵢ Y1 Y3} (HY : (RY1 ⨟ RY2) <= RY3)
+      : (it_eqF E RX1 RY1 ⨟ it_eqF E RX2 RY2) <= it_eqF E RX3 RY3 :=
+  it_eq_seq HX HY _ _ _ (EqRet r_rel1 ⨟⨟ EqRet r_rel2) := EqRet (HX _ _ _ (r_rel1 ⨟⨟ r_rel2)) ;
+  it_eq_seq HX HY _ _ _ (EqTau t_rel1 ⨟⨟ EqTau t_rel2) := EqTau (HY _ _ _ (t_rel1 ⨟⨟ t_rel2)) ;
+  it_eq_seq HX HY _ _ _ (EqVis k_rel1 ⨟⨟ EqVis k_rel2) := EqVis (fun v => HY _ _ _ (k_rel1 v ⨟⨟ k_rel2 v)) .
 
 Lemma it_eq_rev {I} {E : event I I} {X1 X2} {RX : relᵢ X1 X2} {Y1 Y2} {RY : relᵢ Y1 Y2}
       : revᵢ (it_eqF E RX RY) <= it_eqF E (revᵢ RX) (revᵢ RY).
 intros ? ? ? p; cbv [revᵢ] in p; dependent elimination p; auto.
 Qed.
 
+(*
 Section it_eq_swap.
   Context {I : Type} {E : event I I}.
   Context {R1 R2 : psh I} {RR : relᵢ R1 R2}.
@@ -102,19 +102,84 @@ Section it_eq_swap.
       let (y , s) := _swap_eq_eat H (H _ _ _ p) q in
       EatStep _ ⨟⨟  _ .
 
+  Equations _swap_eq_eat' (H : RREC <= it_eq_mon E RR RREC) {i x y z}
+    : RREC i x y -> it_eat i (observe y) z -> (it_eat ⨟ it_eqF E RR RREC) i (observe x) z :=
+    _swap_eq_eat' H p q   := _ .
+
+    _swap_eq_eat' H p (EatStep q) := _ .
+      let (y , s) := _swap_eq_eat H (H _ _ _ p) q in
+      EatStep _ ⨟⨟  _ .
+
   Equations swap_eq_eat (H : RREC <= it_eq_mon E RR RREC)
     : (it_eqF E RR RREC ⨟ it_eat) <= (it_eat ⨟ it_eqF E RR RREC) :=
     swap_eq_eat H _ _ _ (p ⨟⨟ q) := _swap_eq_eat H p q .
 
 End it_eq_swap.
+*)
 
-  
-
-Section bisim.
-  Context {I : Type} {E : event I I}.
+Section wbisim.
+  Context {I : Type} (E : event I I).
   Context {R1 R2 : I -> Type} (RR : relᵢ R1 R2).
 
-  Variant it_wbisimF (RREC : relᵢ (itree E R1) (itree E R2)) i (t1 : itree' E R1 i) (t2 : itree' E R2 i) : Prop :=
-    | WBisim {x1 x2} : it_eat i t1 x1 -> it_eat i t2 x2 -> it_eqF E RR RREC i x1 x2 -> it_wbisimF RREC i t1 t2. 
+  Variant it_wbisimF RREC i (t1 : itree' E R1 i) (t2 : itree' E R2 i) : Prop :=
+    | WBisim {x1 x2}
+        (r1 : it_eat i t1 x1)
+        (r2 : it_eat i t2 x2)
+        (rr : it_eqF E RR RREC i x1 x2)
+      : it_wbisimF RREC i t1 t2. 
   Arguments WBisim {RREC i t1 t2 x1 x2}.
   Hint Constructors it_wbisimF : core.
+
+  Definition it_wbisim_mon : mon (relᵢ (itree E R1) (itree E R2)) := {|
+    body RREC i x y := it_wbisimF RREC i (observe x) (observe y) ;
+    Hbody _ _ H1 _ _ _ '(WBisim r1 r2 rr) := WBisim r1 r2 (it_eqF_mon _ _ (fun _ _ _ r => r) _ _ H1 _ _ _ rr) ;
+  |}.
+
+  Definition it_wbisim := gfp it_wbisim_mon.
+
+End wbisim.
+#[global] Arguments WBisim {I E R1 R2 RR RREC i t1 t2 x1 x2}.
+
+Section wbisim_facts.
+  Context {I : Type} {E : event I I}.
+
+  Equations? _swap_eat_eq {R1 R2} {RR : relᵢ R1 R2} {i} x1 {x2} x3 {x4}
+    : it_eat i x1 x2 -> it_eqF E RR (it_wbisim E RR) i x2 x3 -> it_eat i x3 x4 -> (it_eat ⨟ it_eqF E RR (it_wbisim E RR)) i x1 x4 :=
+    _swap_eat_eq _          (TauF _)   u           v         (EatRefl)   := u ⨟⨟ v ;
+    _swap_eat_eq _          (RetF _)   u           v         (EatRefl)   := u ⨟⨟ v ;
+    _swap_eat_eq _          (VisF _ _) u           v         (EatRefl)   := u ⨟⨟ v ;
+    _swap_eat_eq (TauF _)   (TauF _)   (EatRefl)   (EqTau v) (EatStep w) := _ ;
+    _swap_eat_eq (TauF _)   (TauF _)   (EatStep u) (EqTau v) (EatStep w) := _ ;
+    _swap_eat_eq (RetF _)   (TauF _)   u           (EqTau v) (EatStep w) with u := { | (!) } ;
+    _swap_eat_eq (VisF _ _) (TauF _)   u           (EqTau v) (EatStep w) with u := { | (!) } .
+  Check (EqTau v).
+  shelve.
+  dependent destruction u.
+  shelve.
+  dependent destruction u.
+  Check ()
+  dependent destruction u.
+  - dependent destruction v.
+  dependent destruction w.
+  econstructor; econstructor; auto.
+  shelve.
+  - dependent destruction
+  - dependent destruction v.
+  dependent induction w.
+  econstructor; econstructor.
+  exact u. exact (EqTau t_rel).
+  Check (IHw R1 RR x1' t1 t0)
+
+  Check (EatStep v).
+  cbv [seqᵢ]. cbn.
+
+  Equations? it_wbisim_seq {X1 X2 X3} {RX1 RX2 RX3} (HX : (RX1 ⨟ RX2) <= RX3) {RY1 RY2 RY3} (HY : (RY1 ⨟ RY2) <= RY3)
+    : (@it_wbisimF I E X1 X2 RX1 RY1 ⨟ @it_wbisimF I E X2 X3 RX2 RY2) <= it_eqF E RX3 RY3 :=
+    it_wbisim_seq HX HY _ _ _ (WBisim r11 r21 rr1 ⨟⨟ WBisim r12 r22 rr2) :=
+      let '(ex_intro _ xx (conj r21' r12')) := eat_confluence _ _ _ (r21 ⨟⨟ r12) in _  .
+  dependent induction r21'.
+  
+  destruct (eat_confluence _ _ _ (r21 ⨟⨟ r12)) as [xx [r21' r12']].
+  dependent induction 
+  cbv[revᵢ] in r12'.
+  Check (swap_eat_eq _ _ _ _ ((r11 ⨟⨟ rr1) ⨟⨟ r21')).
