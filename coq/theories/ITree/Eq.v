@@ -33,7 +33,15 @@ Section it_eat.
 
   Equations eat_confluence : (revᵢ it_eat ⨟ it_eat) <= (it_eat ⨟ revᵢ it_eat) :=
     eat_confluence _ _ _ (p ⨟⨟ q) := _eat_confluence p q .
-    
+
+  Equations _eat_confluence' {i a x y} : it_eat i a x -> it_eat i a y -> (it_eat i x y \/ it_eat i y x) :=
+    _eat_confluence' (EatRefl)   q           := or_introl q ;
+    _eat_confluence' p           (EatRefl)   := or_intror p ;
+    _eat_confluence' (EatStep p) (EatStep q) := _eat_confluence' p q .
+
+  Equations eat_confluence' : (revᵢ it_eat ⨟ it_eat) <= (it_eat ∨ᵢ revᵢ it_eat) :=
+    eat_confluence' _ _ _ (p ⨟⨟ q) := _eat_confluence' p q .
+
 End it_eat.
 
 #[global] Hint Constructors it_eat : core.
@@ -142,44 +150,51 @@ End wbisim.
 
 Section wbisim_facts.
   Context {I : Type} {E : event I I}.
+  Context {R1 R2 : psh I} {RR : relᵢ R1 R2}.
 
-  Equations? _swap_eat_eq {R1 R2} {RR : relᵢ R1 R2} {i} x1 {x2} x3 {x4}
-    : it_eat i x1 x2 -> it_eqF E RR (it_wbisim E RR) i x2 x3 -> it_eat i x3 x4 -> (it_eat ⨟ it_eqF E RR (it_wbisim E RR)) i x1 x4 :=
-    _swap_eat_eq _          (TauF _)   u           v         (EatRefl)   := u ⨟⨟ v ;
-    _swap_eat_eq _          (RetF _)   u           v         (EatRefl)   := u ⨟⨟ v ;
-    _swap_eat_eq _          (VisF _ _) u           v         (EatRefl)   := u ⨟⨟ v ;
-    _swap_eat_eq (TauF _)   (TauF _)   (EatRefl)   (EqTau v) (EatStep w) := _ ;
-    _swap_eat_eq (TauF _)   (TauF _)   (EatStep u) (EqTau v) (EatStep w) := _ ;
-    _swap_eat_eq (RetF _)   (TauF _)   u           (EqTau v) (EatStep w) with u := { | (!) } ;
-    _swap_eat_eq (VisF _ _) (TauF _)   u           (EqTau v) (EatStep w) with u := { | (!) } .
-  Check (EqTau v).
-  shelve.
-  dependent destruction u.
-  shelve.
-  dependent destruction u.
-  Check ()
-  dependent destruction u.
-  - dependent destruction v.
-  dependent destruction w.
-  econstructor; econstructor; auto.
-  shelve.
-  - dependent destruction
-  - dependent destruction v.
-  dependent induction w.
-  econstructor; econstructor.
-  exact u. exact (EqTau t_rel).
-  Check (IHw R1 RR x1' t1 t0)
+  Equations wbisim_step_l {R1 R2 : psh I} {RR : relᵢ R1 R2} {i x y}
+            : it_wbisimF E RR (it_wbisim E RR) i x (TauF y)
+            -> it_wbisimF E RR (it_wbisim E RR) i x (observe y) :=
+    wbisim_step_l (WBisim p (EatRefl) (EqTau r))
+      with proj1 (gfp_fp (it_wbisim_mon E RR) _ _ _) r :=
+      { | WBisim w1 w2 s := WBisim (eat_trans _ _ _ _ p (EatStep w1)) w2 s } ;
+    wbisim_step_l (WBisim p (EatStep q) v) := WBisim p q v .
 
-  Check (EatStep v).
-  cbv [seqᵢ]. cbn.
+  Equations wbisim_tau_up {R1 R2 : psh I} {RR : relᵢ R1 R2} {i x y z}
+            : it_eat i x (TauF y) -> it_eqF E RR (it_wbisim E RR) i (TauF y) z
+            -> it_eqF E RR (it_wbisim E RR) i x z :=
+    wbisim_tau_up (EatRefl) q := q ;
+    wbisim_tau_up (EatStep p) (EqTau q) with proj1 (gfp_fp (it_wbisim_mon E RR) _ _ _) q := {
+      | WBisim w1 w2 s := EqTau (proj2 (gfp_fp (it_wbisim_mon E RR) _ _ _) (WBisim (eat_trans _ _ _ _ p (EatStep w1)) w2 s))
+      } .
 
-  Equations? it_wbisim_seq {X1 X2 X3} {RX1 RX2 RX3} (HX : (RX1 ⨟ RX2) <= RX3) {RY1 RY2 RY3} (HY : (RY1 ⨟ RY2) <= RY3)
-    : (@it_wbisimF I E X1 X2 RX1 RY1 ⨟ @it_wbisimF I E X2 X3 RX2 RY2) <= it_eqF E RX3 RY3 :=
-    it_wbisim_seq HX HY _ _ _ (WBisim r11 r21 rr1 ⨟⨟ WBisim r12 r22 rr2) :=
-      let '(ex_intro _ xx (conj r21' r12')) := eat_confluence _ _ _ (r21 ⨟⨟ r12) in _  .
-  dependent induction r21'.
-  
-  destruct (eat_confluence _ _ _ (r21 ⨟⨟ r12)) as [xx [r21' r12']].
-  dependent induction 
-  cbv[revᵢ] in r12'.
-  Check (swap_eat_eq _ _ _ _ ((r11 ⨟⨟ rr1) ⨟⨟ r21')).
+  Equations wbisim_ret_down {R1 R2 : psh I} {RR : relᵢ R1 R2} {i x y r}
+            : it_wbisimF E RR (it_wbisim E RR) i x y -> it_eat i y (RetF r)
+            -> (it_eat ⨟ it_eqF E RR (it_wbisim E RR)) i x (RetF r) :=
+    wbisim_ret_down (WBisim p (EatRefl) w) (EatRefl)   := p ⨟⨟ w ;
+    wbisim_ret_down w                      (EatStep q) := wbisim_ret_down (wbisim_step_l w) q .
+
+  Equations wbisim_vis_down {R1 R2 : psh I} {RR : relᵢ R1 R2} {i x y e k}
+            : it_wbisimF E RR (it_wbisim E RR) i x y -> it_eat i y (VisF e k)
+            -> (it_eat ⨟ it_eqF E RR (it_wbisim E RR)) i x (VisF e k) :=
+    wbisim_vis_down (WBisim p (EatRefl) w) (EatRefl)   := p ⨟⨟ w ;
+    wbisim_vis_down w                      (EatStep q) := wbisim_vis_down (wbisim_step_l w) q .
+
+  Lemma it_wbisim_seq
+    {X1 X2 X3} {RX1 : relᵢ X1 X2} {RX2 : relᵢ X2 X3} {RX3 : relᵢ X1 X3} (HX : (RX1 ⨟ RX2) <= RX3)
+        (HY : (it_wbisim E RX1 ⨟ it_wbisim E RX2) <= it_wbisim E RX3)
+      : (it_wbisimF E RX1 (it_wbisim E RX1) ⨟ it_wbisimF E RX2 (it_wbisim E RX2)) <= it_wbisimF E RX3 (it_wbisim E RX3).
+    intros i x y [z [[x1 x2 u1 u2 uS] [y1 y2 v1 v2 vS]]].
+    pose (w := eat_confluence' _ _ _ (u2 ⨟⨟ v1)); destruct w as [w | w]; clear z u2 v1.
+    - destruct y1.
+      + destruct (wbisim_ret_down (WBisim u1 EatRefl uS) w) as [z [w1 ww]]; clear u1 uS w.
+        dependent destruction vS.
+        dependent destruction ww.
+        exact (WBisim w1 v2 (EqRet (HX _ _ _ (r_rel0 ⨟⨟ r_rel)))).
+      + pose (uu := wbisim_tau_up w vS).
+        exact (WBisim u1 v2 (it_eq_seq HX HY _ _ _ (uS ⨟⨟ uu))).
+      + destruct (wbisim_vis_down (WBisim u1 EatRefl uS) w) as [z [w1 ww]]; clear u1 uS w.
+        dependent destruction vS.
+        dependent destruction ww.
+        exact (WBisim w1 v2 (EqVis (fun r => HY _ _ _ (k_rel0 r ⨟⨟ k_rel r)))).
+    (* WIP : core argument works, need to tie up properly with coq-coinduction instead of HY *)
