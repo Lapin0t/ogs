@@ -29,6 +29,7 @@ Definition seqᵢ {I} {X Y Z : psh I} (R0 : relᵢ X Y) (R1 : relᵢ Y Z) : rel�
 #[global] Notation "u ⨟⨟ v" := (ex_intro _ _ (conj u v)) (at level 70).
 
 Definition revᵢ {I} {X Y : psh I} (R : relᵢ X Y) : relᵢ Y X := fun i x y => R i y x.
+#[global] Hint Unfold revᵢ : core.
 
 Definition orᵢ {I} {X Y : psh I} (R S : relᵢ X Y) : relᵢ X Y := fun i x y => R i x y \/ S i x y.
 #[global] Infix "∨ᵢ" := (orᵢ) (at level 70).

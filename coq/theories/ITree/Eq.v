@@ -24,14 +24,13 @@ Section it_eat.
   #[global] Instance eat_trans : Transitiveᵢ it_eat.
   intros i x y z r1 r2; dependent induction r1; auto.
   Defined.
-
-  Equations _eat_cmp {i x y z} : it_eat i x y -> it_eat i x z -> (it_eat i y z \/ it_eat i z y) :=
+  
+  Equations eat_cmp : (revᵢ it_eat ⨟ it_eat) <= (it_eat ∨ᵢ revᵢ it_eat) :=
+    eat_cmp i' x' y' (ex_intro _ z' (conj p' q')) := _eat_cmp p' q'
+  where _eat_cmp {i x y z} : it_eat i x y -> it_eat i x z -> (it_eat i y z \/ it_eat i z y) :=
     _eat_cmp (EatRefl)   q           := or_introl q ;
     _eat_cmp p           (EatRefl)   := or_intror p ;
     _eat_cmp (EatStep p) (EatStep q) := _eat_cmp p q .
-
-  Equations eat_cmp : (revᵢ it_eat ⨟ it_eat) <= (it_eat ∨ᵢ revᵢ it_eat) :=
-    eat_cmp _ _ _ (p ⨟⨟ q) := _eat_cmp p q .
 
 End it_eat.
 
@@ -52,7 +51,6 @@ Variant it_eqF {I} E {R1 R2 Y1 Y2} (RR : relᵢ R1 R2) (RY : relᵢ Y1 Y2) (i : 
 #[global] Arguments EqRet {I E R1 R2 Y1 Y2 RR RY i r1 r2}.
 #[global] Arguments EqTau {I E R1 R2 Y1 Y2 RR RY i t1 t2}.
 #[global] Arguments EqVis {I E R1 R2 Y1 Y2 RR RY i q k1 k2}.
-
 
 Equations it_eqF_mon {I E X1 X2 Y1 Y2} : Proper (leq ==> leq ==> leq) (@it_eqF I E X1 X2 Y1 Y2) :=
   it_eqF_mon _ _ H0 _ _ H1 _ _ _ (EqRet r_rel) := EqRet (H0 _ _ _ r_rel) ;
@@ -91,7 +89,7 @@ Abort.
 Reversal, symmetry.
 |*)
 Lemma it_eqF_rev {I E X1 X2 RX Y1 Y2 RY} : revᵢ (@it_eqF I E X1 X2 Y1 Y2 RX RY) <= it_eqF E (revᵢ RX) (revᵢ RY).
-intros ? ? ? p; cbv [revᵢ] in p; dependent elimination p; auto.
+intros ? ? ? p; dependent elimination p; auto.
 Qed.
 
 Lemma it_eq_rev {I} {E : event I I} {X1 X2} {R : relᵢ X1 X2} : revᵢ (it_eq E R) <= it_eq E (revᵢ R).
@@ -136,9 +134,7 @@ Lemma it_eq_seq {I} {E : event I I} {X1 X2 X3} {RX1 : relᵢ X1 X2} {RX2 : rel�
   - intros ? ? ? r; exact r.
   - apply id_t.
   - apply (it_eqF_seq HX).
-    apply (gfp_fp (it_eq_map E RX1)) in u.
-    apply (gfp_fp (it_eq_map E RX2)) in v.
-    exact (u ⨟⨟ v).
+    refine (_ ⨟⨟ _); apply (gfp_fp (it_eq_map _ _)); [ exact u | exact v ].
 Qed.
 
 #[global] Instance it_eq_trans {I E X R} (H : Transitiveᵢ R) : Transitiveᵢ (@it_eq I E X X R).
@@ -181,9 +177,10 @@ Reversal, symmetry.
 
   Lemma it_wbisim_rev : revᵢ (it_wbisim E RR) <= it_wbisim E (revᵢ RR).
     apply coinduction; intros ? ? ? u.
-    apply (gfp_fp (it_wbisim_map E RR)) in u.
-    eapply (Hbody (it_wbisim_map _ _)); [ apply id_t | ].
-    apply it_wbisimF_rev; exact u.
+    eapply (Hbody (it_wbisim_map _ _)).
+    - apply id_t.
+    - apply it_wbisimF_rev.
+      apply (gfp_fp (it_wbisim_map E RR)); auto.
   Qed.
 
   Equations wbisim_step_l {i x y} : it_wbisim' E RR i x (TauF y) -> it_wbisim' E RR i x (observe y) :=
@@ -258,12 +255,10 @@ Lemma it_wbisimF_seq {I E X1 X2 X3 RX1 RX2 RX3} (HX : (RX1 ⨟ RX2) <= RX3)
       exact (WBisim w1 v2 (EqVis (fun r => k_rel0 r ⨟⨟ k_rel r))).
   - destruct x2.
     + destruct (wbisim_ret_down_r w (WBisim EatRefl v2 vS)) as [z [ww w1]]; clear v2 vS w.
-      cbv [revᵢ] in ww.
       dependent destruction uS; dependent destruction ww.
       exact (WBisim u1 w1 (EqRet (HX _ _ _ (r_rel ⨟⨟ r_rel0)))).
     + exact (WBisim u1 v2 (it_eqF_seq HX _ _ _ (wbisim_tau_up_l uS w ⨟⨟ vS))).
     + destruct (wbisim_vis_down_r w (WBisim EatRefl v2 vS)) as [z [ww w1]]; clear v2 vS w.
-      cbv [revᵢ] in ww.
       dependent destruction uS; dependent destruction ww.
       exact (WBisim u1 w1 (EqVis (fun r => k_rel r ⨟⨟ k_rel0 r))).
 Qed.
@@ -271,12 +266,11 @@ Qed.
 Lemma it_wbisim_seq {I E X1 X2 X3 RX1 RX2 RX3} (HX : (RX1 ⨟ RX2) <= RX3)
       : (@it_wbisim I E X1 X2 RX1 ⨟ @it_wbisim I E X2 X3 RX2) <= it_wbisim E RX3 .
   apply coinduction; intros ? ? ? [ ? [ u v ] ].
-  apply (gfp_fp (it_wbisim_map E RX1)) in u.
-  apply (gfp_fp (it_wbisim_map E RX2)) in v.
-  eapply (Hbody (it_wbisim_map _ _)); [ apply id_t | ].
-  apply (it_wbisimF_seq HX); exact (u ⨟⨟ v).
+  eapply (Hbody (it_wbisim_map _ _)).
+  - apply id_t.
+  - apply (it_wbisimF_seq HX).
+    refine (_ ⨟⨟ _); apply (gfp_fp (it_wbisim_map _ _)); [ exact u | exact v ].
 Qed.
-
 
 #[global] Instance it_wbisim_trans {I E X R} (H : Transitiveᵢ R) : Transitiveᵢ (@it_wbisim I E X X R).
   intros ? ? ? ? u v; refine (it_wbisim_seq _ _ _ _ (u ⨟⨟ v)).
