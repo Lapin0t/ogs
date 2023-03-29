@@ -22,6 +22,11 @@ We aim to encode the approach using the itree library.
 
 ### Installing dependencies
 
+To install them with opam, first ensure the coq repository for opam is installed:
+```shell
+opam repo add coq-released https://coq.inria.fr/opam/released
+```
+
 Installing the opam dependencies
 ```shell
 opam install dune
