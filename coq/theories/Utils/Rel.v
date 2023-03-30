@@ -2,27 +2,14 @@ From Coq.Classes Require Import RelationClasses.
 From Coinduction Require Import lattice.
 From OGS.Utils Require Import Psh.
 
-Definition relᵢ {I : Type} (A B : psh I) := forall i, A i -> B i -> Prop.
+#[export] Existing Instance CompleteLattice_dfun.
+
+Notation relᵢ A B := (forall i, A i -> B i -> Prop).
 
 #[global] Notation Reflexiveᵢ R := (forall i, Reflexive (R i)).
 #[global] Notation Symmetricᵢ R := (forall i, Symmetric (R i)).
 #[global] Notation Transitiveᵢ R := (forall i, Transitive (R i)).
 #[global] Notation Subrelationᵢ R S := (forall i, subrelation (R i) (S i)).
-
-Print CompleteLattice.
-
-#[global] Program Instance CompleteLatticeRelᵢ {I : Type} {A B : psh I} : CompleteLattice (relᵢ A B) := {|
-    weq R1 R2 := forall i x y, R1 i x y <-> R2 i x y ;
-    leq R1 R2 := forall i x y, R1 i x y -> R2 i x y ;
-    sup U X P := fun i x y => exists u, X u /\ P u i x y ;
-    inf U X P := fun i x y => forall u, X u -> P u i x y ;
-    cup R1 R2 := fun i x y =>  R1 i x y \/ R2 i x y ;
-    cap R1 R2 := fun i x y =>  R1 i x y /\ R2 i x y ;
-    bot := fun i x y => False ;
-    top := fun i x y => True ;
-|}.
-Solve All Obligations with firstorder.
-Next Obligation. firstorder; apply H; exact (ex_intro _ _ (conj H0 H1)). Qed.
 
 Definition eqᵢ {I : Type} {X : psh I} : relᵢ X X := fun i x y => x = y.
 Arguments eqᵢ _ _ _ /.

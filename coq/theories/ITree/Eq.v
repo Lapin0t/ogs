@@ -1,5 +1,5 @@
 Require Import Coq.Program.Equality.
-From Coinduction Require Import lattice rel coinduction.
+From Coinduction Require Import lattice rel coinduction tactics.
 
 From OGS Require Import Utils.
 From OGS.Utils Require Import Rel.
@@ -12,7 +12,7 @@ Could be generalized to any itreeF coalgebra if needed.
 |*)
 Section it_eat.
   Context {I : Type} {E : event I I} {R : psh I}.
-                      
+
   Inductive it_eat i : itree' E R i -> itree' E R i -> Prop :=
     | EatRefl {t} : it_eat i t t
     | EatStep {t1 t2} : it_eat _ (observe t1) t2 -> it_eat i (TauF t1) t2
@@ -24,7 +24,7 @@ Section it_eat.
   #[global] Instance eat_trans : Transitiveᵢ it_eat.
   intros i x y z r1 r2; dependent induction r1; auto.
   Defined.
-  
+
   Equations _eat_cmp {i x y z} : it_eat i x y -> it_eat i x z -> (it_eat i y z \/ it_eat i z y) :=
     _eat_cmp (EatRefl)   q           := or_introl q ;
     _eat_cmp p           (EatRefl)   := or_intror p ;
@@ -74,6 +74,18 @@ Definition it_eq {I} E {X1 X2} R := gfp (@it_eq_map I E X1 X2 R).
   - apply id_t.
   - apply (gfp_fp (it_eq_map _ _)); auto.
 Qed.
+
+(* the tactic works now, but only after `it_eq`.
+   I whined about it here in the past: https://github.com/damien-pous/coinduction/issues/3
+   And in the ctrees hacked my way by overloading the `coinduction` tactic to first unfold, run the tactic, and refold.
+   We can also just defined `it_eq` as a notation of course otherwise.
+ *)
+Lemma foo : forall {I E i X} (t : @itree I E i X),
+    it_eq _ eqᵢ _ t t.
+  intros.
+  unfold it_eq.
+  coinduction r cih.
+Abort.
 
 (*|
 Reversal, symmetry.
@@ -196,7 +208,7 @@ Reversal, symmetry.
   refine (WBisim _ r2 rr); eapply eat_trans; [ exact p | exact (EatStep r1) ].
   Defined.
 
-  Equations? wbisim_tau_up_l {i x y z} : it_eqF E RR (it_wbisim E RR) i x (TauF y) -> it_eat i z (TauF y) 
+  Equations? wbisim_tau_up_l {i x y z} : it_eqF E RR (it_wbisim E RR) i x (TauF y) -> it_eat i z (TauF y)
                                     -> it_eqF E RR (it_wbisim E RR) i x z :=
     wbisim_tau_up_l p         (EatRefl)   := p ;
     wbisim_tau_up_l (EqTau p) (EatStep q) := EqTau _ .

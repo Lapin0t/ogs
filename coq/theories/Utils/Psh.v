@@ -1,12 +1,12 @@
 From OGS Require Import Utils.Prelude.
 
 (* (covariant) presheaves *)
-Definition psh (I : Type) : Type := I -> Type.
+Notation psh I := (I -> Type).
 
 Declare Scope indexed_scope.
 Open Scope indexed_scope.
 Delimit Scope indexed_scope with indexed.
-Bind Scope indexed_scope with psh.
+(* Bind Scope indexed_scope with psh. *)
 
 (* pointwise arrows *)
 Definition arrᵢ {I} (X Y : psh I) : Type := forall i, X i -> Y i.
