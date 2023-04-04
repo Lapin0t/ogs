@@ -9,6 +9,7 @@ Notation relᵢ A B := (forall i, A i -> B i -> Prop).
 #[global] Notation Reflexiveᵢ R := (forall i, Reflexive (R i)).
 #[global] Notation Symmetricᵢ R := (forall i, Symmetric (R i)).
 #[global] Notation Transitiveᵢ R := (forall i, Transitive (R i)).
+#[global] Notation Equivalenceᵢ R := (forall i, Equivalence (R i)).
 #[global] Notation Subrelationᵢ R S := (forall i, subrelation (R i) (S i)).
 #[global] Notation PreOrderᵢ R := (forall i, PreOrder (R i)).
 
@@ -30,7 +31,7 @@ Definition seqᵢ {I} {X Y Z : psh I} (R0 : relᵢ X Y) (R1 : relᵢ Y Z) : rel�
 #[global] Notation "u ⨟⨟ v" := (ex_intro _ _ (conj u v)) (at level 70).
 
 #[global] Instance seq_mon {I} {X Y Z : psh I} : Proper (leq ==> leq ==> leq) (@seqᵢ I X Y Z).
-Proof. firstorder. Qed.
+Proof. intros ? ? H1 ? ? H2 ? ? ? [z []]. exists z. split. now apply H1. now apply H2. Qed.
 
 Definition squareᵢ {I} {X : psh I} : mon (relᵢ X X) :=
   {| body R := R ⨟ R ; Hbody _ _ H := seq_mon _ _ H _ _ H |}.
@@ -50,13 +51,13 @@ Definition orᵢ {I} {X Y : psh I} (R S : relᵢ X Y) : relᵢ X Y := fun i x y 
 Proof. firstorder. Qed.
 
 Lemma build_reflexive {I} {X : psh I} {R : relᵢ X X} : eqᵢ X <= R -> Reflexiveᵢ R.
-Proof. auto. Qed.
+Proof. intros H ? ?. now apply H. Qed.
 
 Lemma use_reflexive {I} {X : psh I} {R : relᵢ X X} (H : Reflexiveᵢ R) : eqᵢ X <= R.
 Proof. intros ? ? ? ->; now reflexivity. Qed.
 
 Lemma build_symmetric {I} {X : psh I} {R : relᵢ X X} : converseᵢ R <= R -> Symmetricᵢ R.
-Proof. auto. Qed.
+Proof. intros H ? ? ? ?. now apply H. Qed.
 
 Lemma use_symmetric {I} {X : psh I} {R : relᵢ X X} (H : Symmetricᵢ R) : converseᵢ R <= R.
 Proof. intros ? ? ? ?; now symmetry. Qed.
