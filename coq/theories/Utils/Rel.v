@@ -29,6 +29,7 @@ Definition seqᵢ {I} {X Y Z : psh I} (R0 : relᵢ X Y) (R1 : relᵢ Y Z) : rel�
   fun i x z => exists y, R0 i x y /\ R1 i y z.
 #[global] Infix "⨟" := (seqᵢ) (at level 120).
 #[global] Notation "u ⨟⨟ v" := (ex_intro _ _ (conj u v)) (at level 70).
+#[global] Hint Unfold seqᵢ : core.
 
 #[global] Instance seq_mon {I} {X Y Z : psh I} : Proper (leq ==> leq ==> leq) (@seqᵢ I X Y Z).
 Proof. intros ? ? H1 ? ? H2 ? ? ? [z []]. exists z. split. now apply H1. now apply H2. Qed.
