@@ -24,7 +24,7 @@ Section it_eat.
   #[global] Instance eat_trans : Transitiveᵢ it_eat.
   intros i x y z r1 r2; dependent induction r1; auto.
   Defined.
-  
+
   Equations eat_cmp : (revᵢ it_eat ⨟ it_eat) <= (it_eat ∨ᵢ revᵢ it_eat) :=
     eat_cmp i' x' y' (ex_intro _ z' (conj p' q')) := _eat_cmp p' q'
   where _eat_cmp {i x y z} : it_eat i x y -> it_eat i x z -> (it_eat i y z \/ it_eat i z y) :=
@@ -64,59 +64,62 @@ Definition it_eq_map {I} E {X1 X2} (R : relᵢ X1 X2) : mon (relᵢ (@itree I E 
 |}.
 
 Definition it_eq {I} E {X1 X2} R := gfp (@it_eq_map I E X1 X2 R).
+Notation it_eq_t E R := (t (@it_eq_map _ E _ _ R)).
+Notation it_eq_bt E R := (bt (@it_eq_map _ E _ _ R)).
+Notation it_eq_T E R := (T (@it_eq_map _ E _ _ R)).
 
-#[global] Instance it_eq_mon {I E X1 X2} : Proper (leq ==> leq) (@it_eq I E X1 X2).
-  intros R1 R2 H.
-  apply coinduction; intros ? ? ? p.
-  eapply (it_eqF_mon R1 R2 H).
-  - apply id_t.
-  - apply (gfp_fp (it_eq_map _ _)); auto.
-Qed.
+Section it_eq_facts.
+  Context {I} {E : event I I}.
+  Context {X1 X2 : psh I}.
+  Context {}
 
-(* the tactic works now, but only after `it_eq`.
-   I whined about it here in the past: https://github.com/damien-pous/coinduction/issues/3
-   And in the ctrees hacked my way by overloading the `coinduction` tactic to first unfold, run the tactic, and refold.
-   We can also just defined `it_eq` as a notation of course otherwise.
- *)
-Lemma foo : forall {I E i X} (t : @itree I E i X),
-    it_eq _ eqᵢ _ t t.
-  intros.
-  unfold it_eq.
-  coinduction r cih.
-Abort.
+  #[global] Instance it_eq_mon {X1 X2} : Proper (leq ==> leq) (@it_eq I E X1 X2).
+  Proof.
+    intros R1 R2 H; apply coinduction; intros ? ? ? ?.
+    eapply (it_eqF_mon R1 R2 H).
+    now apply id_t.
+    now apply (gfp_fp (it_eq_map _ _)).
+  Qed.
 
 (*|
 Reversal, symmetry.
 |*)
-Lemma it_eqF_rev {I E X1 X2 RX Y1 Y2 RY} : revᵢ (@it_eqF I E X1 X2 Y1 Y2 RX RY) <= it_eqF E (revᵢ RX) (revᵢ RY).
-intros ? ? ? p; dependent elimination p; auto.
-Qed.
+  Lemma it_eqF_rev {X1 X2 RX Y1 Y2 RY} : revᵢ (@it_eqF I E X1 X2 Y1 Y2 RX RY) <= it_eqF E (revᵢ RX) (revᵢ RY).
+  Proof. intros ? ? ? p; dependent elimination p; auto. Qed.
 
-Lemma it_eq_rev {I} {E : event I I} {X1 X2} {R : relᵢ X1 X2} : revᵢ (it_eq E R) <= it_eq E (revᵢ R).
-  apply coinduction; intros ? ? ? p.
+  Lemma it_eqF_rev' {X1 X2 RX Y1 Y2 RY} : it_eqF E (revᵢ RX) (revᵢ RY) <= revᵢ (@it_eqF I E X1 X2 Y1 Y2 RX RY).
+  Proof. intros ? ? ? p; dependent elimination p; auto. Qed.
+
+Lemma it_eq_rev {I E X1 X2} : revᵢ ∘ @it_eq I E X1 X2 <= @it_eq I E X2 X1 ∘ revᵢ.
+  intros ?; apply coinduction; intros ? ? ? CIH.
   eapply it_eqF_mon.
   - intros ? ? ? r; exact r.
   - apply id_t.
   - apply it_eqF_rev, (gfp_fp (it_eq_map _ _)); auto.
 Qed.
 
-#[global] Instance it_eq_sym {I E X R} (H : Symmetricᵢ R) : Symmetricᵢ (@it_eq I E X X R).
-  intros ? ? ? ?; apply it_eq_rev, (it_eq_mon _ _ H); auto.
+Lemma it_eq_t_sym {I E} {X : psh I} {R : relᵢ X X} (H : Symmetricᵢ R)
+      : converseᵢ <= it_eq_t E R.
+Proof.
+  apply leq_t; intros ? ? ? ? p.
+  now apply it_eqF_rev, (it_eqF_mon _ _ H _ _ (fun _ _ _ r => r)).
 Qed.
+
+#[global] Instance it_eq_sym {I E X R} (H : Symmetricᵢ R) : Symmetricᵢ (@it_eq I E X X R).
+Proof. intros ? ? ? ?; now apply it_eq_rev, (it_eq_mon _ _ H). Qed.
 
 (*|
 Reflexivity
 |*)
 #[global] Instance it_eqF_refl {I E X Y RX RY} (HX : Reflexiveᵢ RX) (HY : Reflexiveᵢ RY)
                    : Reflexiveᵢ (@it_eqF I E X X Y Y RX RY).
-  intros ? []; econstructor; reflexivity.
-Qed.
+Proof. intros ? []; econstructor; reflexivity. Qed.
+
+Lemma it_eq_t_refl {I E} {X : psh I} {R : relᵢ X X} {H : Reflexiveᵢ R} : const (eqᵢ _) <= @it_eq_t E R.
+Proof. apply leq_t; intros ? ? ? ? <-; now apply it_eqF_refl. Qed.
 
 #[global] Instance it_eq_refl {I E X R} (H : Reflexiveᵢ R) : Reflexiveᵢ (@it_eq I E X X R).
-  intros ? ?; refine (coinduction (it_eq_map _ _) (fun i x y => x = y) _ _ _ _ eq_refl).
-  intros ? ? ? []; apply (it_eqF_refl H).
-  intros ? ?; eapply (id_t (it_eq_map _ _)); reflexivity.
-Qed.
+Proof. apply build_reflexive, it_eq_t_refl. Qed.
 
 (*|
 Concatenation, transitivity.
@@ -129,6 +132,7 @@ Equations it_eqF_seq {I E X1 X2 X3 RX1 RX2 RX3} (HX : (RX1 ⨟ RX2) <= RX3) {Y1 
 
 Lemma it_eq_seq {I} {E : event I I} {X1 X2 X3} {RX1 : relᵢ X1 X2} {RX2 : relᵢ X2 X3} {RX3}
                 (HX : (RX1 ⨟ RX2) <= RX3) : (it_eq E RX1 ⨟ it_eq E RX2) <= it_eq E RX3.
+Proof.
   apply coinduction; intros ? ? ? [ ? [ u v ] ].
   eapply it_eqF_mon.
   - intros ? ? ? r; exact r.
@@ -137,10 +141,15 @@ Lemma it_eq_seq {I} {E : event I I} {X1 X2 X3} {RX1 : relᵢ X1 X2} {RX2 : rel�
     refine (_ ⨟⨟ _); apply (gfp_fp (it_eq_map _ _)); [ exact u | exact v ].
 Qed.
 
-#[global] Instance it_eq_trans {I E X R} (H : Transitiveᵢ R) : Transitiveᵢ (@it_eq I E X X R).
-  intros ? ? ? ? u v; refine (it_eq_seq _ _ _ _ (u ⨟⨟ v)).
-  intros ? ? ? [ ? [ p q ] ]; exact (H _ _ _ _ p q).
+Lemma it_eq_t_trans {I E} {X : psh I} {R : relᵢ X X} {H : Transitiveᵢ R}
+      : squareᵢ <= @it_eq_t E R.
+Proof.
+  apply leq_t; intros ? ? ? ? [ ? [ u v ] ]; cbn.
+  exact (it_eqF_seq (use_transitive H) _ _ _ (u ⨟⨟ v)).
 Qed.
+
+#[global] Instance it_eq_trans {I E X R} (H : Transitiveᵢ R) : Transitiveᵢ (@it_eq I E X X R).
+Proof. now apply build_transitive, it_eq_seq, use_transitive. Qed.
 
 Section wbisim.
   Context {I : Type} (E : event I I).
@@ -149,7 +158,6 @@ Section wbisim.
   Variant it_wbisimF RY i (t1 : itree' E R1 i) (t2 : itree' E R2 i) : Prop :=
     | WBisim {x1 x2} (r1 : it_eat i t1 x1) (r2 : it_eat i t2 x2) (rr : it_eqF E RR RY i x1 x2) .
   Arguments WBisim {RY i t1 t2 x1 x2}.
-  Hint Constructors it_wbisimF : core.
 
   Definition it_wbisim_map : mon (relᵢ (itree E R1) (itree E R2)) := {|
     body RY i x y := it_wbisimF RY i (observe x) (observe y) ;
@@ -160,7 +168,12 @@ Section wbisim.
   Definition it_wbisim' := it_wbisimF it_wbisim.
 
 End wbisim.
+#[global] Notation it_wbisim_t E R := (t (@it_wbisim_map _ E _ _ R)).
+#[global] Notation it_wbisim_bt E R := (bt (@it_wbisim_map _ E _ _ R)).
+#[global] Notation it_wbisim_T E R := (T (@it_wbisim_map _ E _ _ R)).
+
 #[global] Arguments WBisim {I E R1 R2 RR RY i t1 t2 x1 x2}.
+#[global] Hint Constructors it_wbisimF : core.
 
 Section wbisim_facts1.
   Context {I : Type} {E : event I I}.
@@ -170,18 +183,18 @@ Section wbisim_facts1.
 Reversal, symmetry.
 |*)
   Lemma it_wbisimF_rev {RY} : revᵢ (it_wbisimF E RR RY) <= it_wbisimF E (revᵢ RR) (revᵢ RY).
-    intros ? ? ? [ ? ? r1 r2 rr ].
-    apply it_eqF_rev in rr.
-    exact (WBisim r2 r1 rr).
-  Qed.
+  Proof. intros ? ? ? [ ? ? ? ? rr ]; apply it_eqF_rev in rr; eauto. Qed.
 
   Lemma it_wbisim_rev : revᵢ (it_wbisim E RR) <= it_wbisim E (revᵢ RR).
+  Proof.
     apply coinduction; intros ? ? ? u.
     eapply (Hbody (it_wbisim_map _ _)).
     - apply id_t.
     - apply it_wbisimF_rev.
       apply (gfp_fp (it_wbisim_map E RR)); auto.
   Qed.
+
+  Lemma it_wbisim_t_sym (H : Symmetricᵢ RR) : converseᵢ <= it_wbisim_t E RR.
 
   Equations wbisim_step_l {i x y} : it_wbisim' E RR i x (TauF y) -> it_wbisim' E RR i x (observe y) :=
     wbisim_step_l (WBisim p (EatRefl) (EqTau r))
@@ -276,3 +289,32 @@ Qed.
   intros ? ? ? ? u v; refine (it_wbisim_seq _ _ _ _ (u ⨟⨟ v)).
   intros ? ? ? [ ? [ p q ] ]; exact (H _ _ _ _ p q).
 Qed.
+
+
+Section wsim.
+  Context {I : Type} (E : event I I).
+  Context {R1 R2 : I -> Type} (RR : relᵢ R1 R2).
+
+  Variant it_wsimF RY i (t1 : itree' E R1 i) (t2 : itree' E R2 i) : Prop :=
+    | WSim {x1} (r1 : it_eat i t1 x1) (rr : it_eqF E RR RY i x1 t2) .
+  Arguments WSim {RY i t1 t2 x1}.
+
+  Definition it_wsim_map : mon (relᵢ (itree E R1) (itree E R2)) := {|
+    body RY i x y := it_wsimF RY i (observe x) (observe y) ;
+    Hbody _ _ H _ _ _ '(WSim r1 rr) := WSim r1 (it_eqF_mon _ _ (fun _ _ _ r => r) _ _ H _ _ _ rr) ;
+  |}.
+
+  Definition it_wsim := gfp it_wsim_map.
+  Definition it_wsim' := it_wsimF it_wsim.
+
+End wsim.
+#[global] Notation it_wsim_t E R := (t (@it_wsim_map _ E _ _ R)).
+#[global] Notation it_wsim_bt E R := (bt (@it_wsim_map _ E _ _ R)).
+#[global] Notation it_wsim_T E R := (T (@it_wsim_map _ E _ _ R)).
+
+#[global] Arguments WSim {I E R1 R2 RR RY i t1 t2 x1}.
+#[global] Hint Constructors it_wsimF : core.
+
+Section wsim_facts1.
+  Context {I : Type} {E : event I I}.
+  Context {R1 R2 : psh I} {RR : relᵢ R1 R2}.

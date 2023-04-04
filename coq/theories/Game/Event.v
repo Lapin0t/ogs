@@ -11,3 +11,10 @@ Arguments e_nxt {I J e i q} r.
 
 Definition e_interp {I J} (E : event I J) (X : psh J) : psh I :=
   fun i => { q : E.(e_qry) i & forall (r : E.(e_rsp) q), X (E.(e_nxt) r) } .
+
+Definition emptyₑ {I} : event I I :=
+  {| e_qry := fun _ => T0 ;
+     e_rsp := fun _ => ex_falso ;
+     e_nxt := fun _ x => ex_falso x |}.
+
+#[global] Notation "∅ₑ" := (emptyₑ).

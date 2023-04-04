@@ -7,7 +7,7 @@ From OGS.ITree Require Import ITree.
 Section monad.
   Context {I} {E : event I I}.
 
-  Program Definition fmap {X Y} (f : X ⇒ᵢ Y) : itree E X ⇒ᵢ itree E Y :=
+  Definition fmap {X Y} (f : X ⇒ᵢ Y) : itree E X ⇒ᵢ itree E Y :=
     cofix _fmap _ u :=
       go (match u.(_observe) with
          | RetF r => RetF (f _ r)
@@ -28,7 +28,7 @@ Section monad.
   Definition kcomp {X Y Z} (f : X ⇒ᵢ itree E Y) (g : Y ⇒ᵢ itree E Z) : X ⇒ᵢ itree E Z :=
     fun i x => bind (f i x) g.
 
-  Program Definition iter {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) : X ⇒ᵢ itree E Y :=
+  Definition iter {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) : X ⇒ᵢ itree E Y :=
     cofix _iter _ x :=
       bind (f _ x) (fun _ r => go (match r with
                                 | inl x => TauF (_iter _ x)
