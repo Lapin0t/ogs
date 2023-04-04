@@ -10,6 +10,7 @@ Notation relᵢ A B := (forall i, A i -> B i -> Prop).
 #[global] Notation Symmetricᵢ R := (forall i, Symmetric (R i)).
 #[global] Notation Transitiveᵢ R := (forall i, Transitive (R i)).
 #[global] Notation Subrelationᵢ R S := (forall i, subrelation (R i) (S i)).
+#[global] Notation PreOrderᵢ R := (forall i, PreOrder (R i)).
 
 Definition eqᵢ {I : Type} {X : psh I} : relᵢ X X := fun i x y => x = y.
 Arguments eqᵢ _ _ _ /.
