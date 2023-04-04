@@ -251,6 +251,7 @@ Concatenation, transitivity.
     - apply it_wbisimF_tra.
       refine (_ ⨟⨟ _); apply (gfp_fp (it_wbisim_map _ _)); [ exact u | exact v ].
   Qed.
+End wbisim_facts1.
 
 (* WIP tau-expansion order ⪅
 Section wsim.
