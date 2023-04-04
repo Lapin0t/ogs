@@ -13,5 +13,6 @@ Definition h_actv {I J} (H : half_game I J) (X : psh J) : psh I :=
 Definition h_pasv {I J} (H : half_game I J) (X : psh J) : psh I :=
   fun i => forall (m : H.(move) i), X (H.(next) m) .
 
-Equations h_sync {I J} (H : half_game I J) {X Y : psh J} : | h_actv H X ×ᵢ h_pasv H Y |ᵢ -> | Y ×ᵢ X |ᵢ :=
+Equations h_sync {I J} (H : half_game I J) {X Y : psh J}
+          : ⦉ h_actv H X ×ᵢ h_pasv H Y ⦊ᵢ -> ⦉ Y ×ᵢ X ⦊ᵢ :=
   h_sync H (i ,' ((m ,' x) , k)) := (_ ,' (k m , x)) .
