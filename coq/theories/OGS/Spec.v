@@ -1,3 +1,6 @@
+Require Import FunInd.
+Require Import Program.Equality.
+
 From OGS Require Import Utils.
 From OGS.Utils Require Import Ctx.
 From OGS.Game Require Import HalfGame Event.
@@ -29,7 +32,12 @@ Section a.
     env : ctx S.(typ) -> ctx S.(typ) -> Type ;
     eval {Γ} : conf Γ -> delay { m : msg' Γ & env Γ (dom' m) } ;
     emb {Γ} (m : msg' Γ) : conf (Γ +▶ dom' m) ;
-    c_sub {Γ Δ} : conf Γ -> env Δ Γ -> conf Δ
+    c_sub {Γ Δ} : conf Γ -> env Δ Γ -> conf Δ ;
+    e_empty {Δ} : env Δ ∅ ;
+    e_cat {Γ1 Γ2 Δ} : env Δ Γ1 -> env Δ Γ2 -> env Δ (Γ1 +▶ Γ2) ;
+    e_ren {Γ Δ1 Δ2} : Δ1 ⊆ Δ2 -> env Δ1 Γ -> env Δ2 Γ ;
+    e_comp {Γ1 Γ2 Γ3} : env Γ1 Γ2 -> env Γ2 Γ3 -> env Γ1 Γ3 ;
+    e_id {Γ} : env Γ Γ ;
   }.
 
   Definition sub_eval_msg {Γ Δ} (M : machine) (e : M.(env) Δ Γ) (t : M.(conf) Γ) : delay (msg' Δ) :=
@@ -63,7 +71,19 @@ Section a.
   Arguments EConT {M Δ a Γ}.
   Arguments EConF {M Δ a Γ}.
 
-  Equations? concat0 {M Δ b a} : alt_env M Δ b a -> M.(env) (Δ +▶ join_even_odd_aux b a) (join_even_odd_aux (negb b) a) :=
-    concat0 (ENil) := _ ;
-    concat0 (EConT u) := _ ;
-    concat0 (EConF u e) := _ .
+  Equations concat0 {M Δ b a} : alt_env M Δ b a
+             -> M.(env) (Δ +▶ join_even_odd_aux b a) (join_even_odd_aux (negb b) a) :=
+    concat0 (ENil) := M.(e_empty) ;
+    concat0 (EConT u) := M.(e_ren) (r_concat3_1 _ _ _) (concat0 u) ;
+    concat0 (EConF u e) := M.(e_cat) (concat0 u) e .
+
+  Definition concat1 {M Δ a} b : alt_env M Δ true a
+             -> alt_env M Δ false a -> M.(env) Δ (join_even_odd_aux b a).
+    revert b; induction a; intros b u v; dependent destruction u; dependent destruction v.
+    - refine (M.(e_empty)).
+    - destruct b; cbn in *.
+      * refine (M.(e_cat) (IHa false v u) _).
+        refine (M.(e_comp) _ e).
+        refine (M.(e_cat) M.(e_id) (IHa true v u)).
+      * exact (IHa true v u).
+   Qed.
