@@ -35,11 +35,17 @@ Equations ccat {X} : ctx X -> ctx X -> ctx X :=
 Section lemma.
 Context {X : Type}.
 
-Search "concat".
-
 Equations join : ctx (ctx X) -> ctx X :=
   join (∅)     := ∅ ;
   join (Γ ▶ xs) := join Γ +▶ xs .
+
+Equations join_even_odd_aux : bool -> ctx (ctx X) -> ctx X :=
+  join_even_odd_aux b (∅) := ∅ ;
+  join_even_odd_aux true  (Γ ▶ xs) := join_even_odd_aux false Γ +▶ xs ;
+  join_even_odd_aux false (Γ ▶ xs) := join_even_odd_aux true Γ .
+
+Notation join_even := (join_even_odd_aux true) .
+Notation join_odd := (join_even_odd_aux false) .
 
 (*
 Equations join_cat Γs Δs : join (Γs +▶ Δs)%ctx = ((join Γs) +▶ (join Δs))%ctx :=
@@ -183,6 +189,8 @@ Equations cover_split {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] : zs ∋ x -> xs ∋
       | inr j := inr (pop j) } .
 End lemma.
 
+#[global] Notation join_even := (join_even_odd_aux true) .
+#[global] Notation join_odd := (join_even_odd_aux false) .
 #[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30) : type_scope.
 #[global] Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30) : type_scope.
 #[global] Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30) : type_scope.

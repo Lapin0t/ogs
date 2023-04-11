@@ -34,3 +34,7 @@ Section monad.
                                 | inl x => TauF (_iter _ x)
                                 | inr y => RetF y end)) .
 End monad.
+
+#[global] Notation "x >>= f" := (bind x f) (at level 30).
+#[global] Notation "f =<< x" := (subst f _ x) (at level 30).
+#[global] Notation "f >=> g" := (kcomp f g) (at level 30).
