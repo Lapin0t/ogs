@@ -48,42 +48,34 @@ TODO: concretize env
      6-10: administration
    *)
   Record machine : Type := {
-      (* configurations (used to be called "terms" far in the past)
-         Roughly: active states
-       *)
+    (* configurations (used to be called "terms" far in the past)
+       roughly: active states *)
     conf : ctx S.(typ) -> Type ;
-      (* assignments
-         Roughly: passive states
-       *)
-    env : ctx S.(typ) -> ctx S.(typ) -> Type ;
-      (* evaluation function for configurations *)
-    eval {Γ} : conf Γ -> delay { m : msg' Γ & env Γ (dom' m) } ;
-      (* (very) Roughly: injecting patterns in terms *)
+    (* roughly: elementary passive states *)
+    val : ctx S.(typ) -> S.(typ) -> Type ;
+    (* evaluation function for configurations *)
+    eval {Γ} : conf Γ -> delay { m : msg' Γ & dom' m =[val]> Γ } ;
     emb {Γ} (m : msg' Γ) : conf (Γ +▶ dom' m) ;
-      (* substitution *)
-    c_sub {Γ Δ} : conf Γ -> env Δ Γ -> conf Δ ;
-
-      (* axiomatization of the assignments *)
-    e_empty {Δ} : env Δ ∅ ;
-    e_cat {Γ1 Γ2 Δ} : env Δ Γ1 -> env Δ Γ2 -> env Δ (Γ1 +▶ Γ2) ;
-    e_ren {Γ Δ1 Δ2} : Δ1 ⊆ Δ2 -> env Δ1 Γ -> env Δ2 Γ ;
-    e_comp {Γ1 Γ2 Γ3} : env Γ1 Γ2 -> env Γ2 Γ3 -> env Γ1 Γ3 ;
-    e_id {Γ} : env Γ Γ ;
+    (* value variables *)
+    v_var {Γ} : has Γ ⇒ᵢ val Γ ;
+    (* value renaming *)
+    v_ren {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ ;
+    (* value substitution *)
+    v_sub {Γ Δ} : Γ =[val]> Δ -> val Γ ⇒ᵢ val Δ ;
+    (* configuration substitution *)
+    c_sub {Γ Δ} : Γ =[val]> Δ -> conf Γ -> conf Δ ;
   }.
 
-  Arguments it_wbisim {I E X i}.
-  Definition sub_eval_msg {Γ Δ}
-    (M : machine) (e : M.(env) Δ Γ) (t : M.(conf) Γ)
-    : delay (msg' Δ) :=
-    fmap (fun _ r => projT1 r) _ (M.(eval) (M.(c_sub) t e)).
+  Definition e_comp {Γ1 Γ2 Γ3} (M : machine) (u : Γ2 =[M.(val)]> Γ3) (v : Γ1 =[M.(val)]> Γ2)
+             : Γ1 =[M.(val)]> Γ3
+    := s_map (M.(v_sub) u) v.
 
-  (* The quantification over contexts is inlined in
-     the quantification over assignments [forall (e : M.(env) Δ Γ)]
-   *)
-  Definition ciu
-    (M : machine) {Γ} Δ (x y : M.(conf) Γ) : Prop :=
-    forall (e : M.(env) Δ Γ),
-      it_wbisim (sub_eval_msg M e x) (sub_eval_msg M e y).
+  Definition sub_eval_msg {Γ Δ} (M : machine) (e : Γ =[M.(val)]> Δ) (t : M.(conf) Γ)
+             : delay (msg' Δ)
+    := fmap (fun _ r => projT1 r) _ (M.(eval) (M.(c_sub) e t)).
+
+  Definition ciu (M : machine) {Γ} Δ (x y : M.(conf) Γ) : Prop :=
+    forall (e : Γ =[M.(val)]> Δ), it_wbisim _ _ _ (sub_eval_msg M e x) (sub_eval_msg M e y).
 
   (* Section 3: game definition
      ↓+ ~ join_even
@@ -113,7 +105,7 @@ TODO: concretize env
   | EConT {a Γ} : alt_env M Δ opponent a
                   -> alt_env M Δ player (a ▶ Γ)
   | EConF {a Γ} : alt_env M Δ player a
-                  -> M.(env) (Δ +▶ join_even a) Γ
+                  -> Γ =[M.(val)]> (Δ +▶ join_even a)
                   -> alt_env M Δ opponent (a ▶ Γ)
   .
   Arguments ENil {M Δ b}.
@@ -121,39 +113,29 @@ TODO: concretize env
   Arguments EConF {M Δ a Γ}.
 
   (* flattens an alternating environment into an unstructured one *)
-  Equations concat0 {M Δ b a} :
-    alt_env M Δ b a ->
-    M.(env)
-        (Δ +▶ join_even_odd_aux b a)
-        (join_even_odd_aux (negb b) a) :=
-    concat0 (ENil) := M.(e_empty) ;
-    concat0 (EConT u) := M.(e_ren) (r_concat3_1 _ _ _) (concat0 u) ;
-    concat0 (EConF u e) := M.(e_cat) (concat0 u) e .
+  Equations concat0 {M Δ b a} : alt_env M Δ b a
+             -> (join_even_odd_aux (negb b) a) =[M.(val)]> (Δ +▶ join_even_odd_aux b a) :=
+    concat0 (ENil) := s_empty ;
+    concat0 (EConT u) := s_map (M.(v_ren) (r_concat3_1 _ _ _)) (concat0 u) ;
+    concat0 (EConF u e) := s_cat (concat0 u) e .
 
-  (* Flattens a pair of alternating environments for resp. player and opponent into a "closed" substitution
-   *)
-  Definition concat1 {M Δ a} b :
-    alt_env M Δ player a ->
-    alt_env M Δ opponent a ->
-    M.(env) Δ (join_even_odd_aux b a).
-    revert b; induction a.
-    - intros b u v.
-      exact (M.(e_empty)).
-    - intros b u v.
-      dependent destruction u.
-      dependent destruction v.
-      destruct b; cbn in *.
-      * refine (M.(e_cat) (IHa false v u) _).
-        refine (M.(e_comp) _ e).
-        refine (M.(e_cat) M.(e_id) (IHa true v u)).
+  (* Flattens a pair of alternating environments for resp. player and opponent into a "closed" substitution *)
+  Definition concat1 {M Δ a} b : alt_env M Δ true a
+             -> alt_env M Δ false a -> (join_even_odd_aux b a) =[M.(val)]> Δ.
+    revert b; induction a; intros b u v; dependent destruction u; dependent destruction v.
+    - refine (s_empty).
+    - destruct b; cbn in *.
+      * refine (s_cat (IHa false v u) _).
+        refine (e_comp M _ s).
+        refine (s_cat M.(v_var) (IHa true v u)).
       * exact (IHa true v u).
   Defined.
 
   Lemma quatre_six_un {M Δ a}
     (u : alt_env M Δ player a)
     (v : alt_env M Δ opponent a) :
-    M.(e_comp)
-        (M.(e_cat) M.(e_id) (concat1 player u v))
+    e_comp M
+        (s_cat M.(v_var) (concat1 player u v))
         (concat0 u)
     = concat1 opponent u v.
   Admitted.
@@ -161,8 +143,8 @@ TODO: concretize env
   Lemma quatre_six_deux {M Δ a}
     (u : alt_env M Δ player a)
     (v : alt_env M Δ opponent a) :
-    M.(e_comp)
-        (M.(e_cat) M.(e_id) (concat1 opponent u v))
+    e_comp M
+        (s_cat M.(v_var) (concat1 opponent u v))
         (concat0 v)
     = concat1 player u v.
   Admitted.

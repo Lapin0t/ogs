@@ -187,6 +187,22 @@ Equations cover_split {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] : zs ∋ x -> xs ∋
   cover_split (CRight c) (pop i) with cover_split c i :=
       { | inl j := inl j ;
       | inr j := inr (pop j) } .
+
+Equations s_empty {F Γ} : ∅ =[F]> Γ :=
+  s_empty x (!).
+
+Equations s_cover {F Γ1 Γ2 Γ3 Δ} : Γ1 ⊎ Γ2 ≡ Γ3 -> Γ1 =[F]> Δ -> Γ2 =[F]> Δ -> Γ3 =[F]> Δ :=
+  s_cover h u v _ i with cover_split h i := {
+    | inl j := u _ j ;
+    | inr j := v _ j
+  } .
+
+Definition s_cat {F Γ1 Γ2 Δ} : Γ1 =[F]> Δ -> Γ2 =[F]> Δ -> (Γ1 +▶ Γ2) =[F]> Δ :=
+  s_cover cover_cat .
+
+Definition s_map {F G Γ Δ1 Δ2} (f : F Δ1 ⇒ᵢ G Δ2) (u : Γ =[F]> Δ1) : Γ =[G]> Δ2 :=
+  fun _ i => f _ (u _ i) .
+
 End lemma.
 
 #[global] Notation join_even := (join_even_odd_aux true) .
