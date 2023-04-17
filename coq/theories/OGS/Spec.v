@@ -186,4 +186,11 @@ TODO: concretize env
              : m_strat_pas M Δ (∅ ▶ Γ)
     := EConF ENil (e_ren (r_concat_l _ _) γ).
 
+  Program Definition compo {Δ} : forall a, itree ogs_e (fun _ => msg' Δ) a -> h_pasv ogs_hg (itree ogs_e (fun _ => msg' Δ)) a -> delay (msg' Δ) :=
+    cofix _compo _ u v :=
+      go (match u.(_observe) with
+          | RetF r => RetF (Fib r)
+          | TauF t => TauF (_compo _ t v)
+          | VisF q k => TauF (_compo _ (v q) k)
+          end).
 End a.
