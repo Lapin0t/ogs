@@ -68,6 +68,10 @@ Notation it_eq_t E X := (t (it_eq_map E X)).
 Notation it_eq_bt E X := (bt (it_eq_map E X)).
 Notation it_eq_T E X := (T (it_eq_map E X)).
 
+#[global] Instance it_eqbt_mon {I} {E : event I I} {X} : Proper (leq ==> leq) (@it_eq_bt E X).
+  intros R1 R2 H i x y. apply it_eqF_mon. rewrite H. reflexivity.
+  Qed.
+
 Section it_eq_facts.
   Context {I} {E : event I I} {X : psh I}.
 
@@ -120,6 +124,14 @@ Concatenation, transitivity.
   #[global] Instance it_eq_t_equiv {RR} : Equivalenceᵢ (it_eq_t E X RR).
   Proof. econstructor; typeclasses eauto. Qed.
 
+  #[global] Instance it_eq_bt_equiv {RR} : Equivalenceᵢ (it_eq_bt E X RR).
+  Proof.
+    apply build_equivalence.
+    - apply (fbt_bt it_eq_up2rfl).
+    - apply (fbt_bt it_eq_up2sym).
+    - apply (fbt_bt it_eq_up2tra).
+   Qed.
+
 End it_eq_facts.
 
 Section wbisim.
@@ -142,6 +154,7 @@ End wbisim.
 #[global] Notation it_wbisim_bt E X := (bt (it_wbisim_map E X)).
 #[global] Notation it_wbisim_T E X := (T (it_wbisim_map E X)).
 
+#[global] Arguments it_wbisim {I E X} [i].
 #[global] Arguments WBisim {I E X RR i t1 t2 x1 x2}.
 #[global] Hint Constructors it_wbisimF : core.
 
@@ -175,8 +188,8 @@ Reversal, symmetry.
     wbisim_step_r (WBisim (EatStep p) q v) := WBisim p q v .
 
   Equations? wbisim_tau_up_r {i x y z} (u : it_eat i x (TauF y))
-             (v : it_eqF E X (it_wbisim E X) i (TauF y) z)
-             : it_eqF E X (it_wbisim E X) i x z :=
+             (v : it_eqF E X it_wbisim i (TauF y) z)
+             : it_eqF E X it_wbisim i x z :=
     wbisim_tau_up_r (EatRefl)   q         := q ;
     wbisim_tau_up_r (EatStep p) (EqTau q) := EqTau _ .
 
@@ -185,9 +198,9 @@ Reversal, symmetry.
   refine (WBisim _ r2 rr); eapply eat_trans; [ exact p | exact (EatStep r1) ].
   Defined.
 
-  Equations? wbisim_tau_up_l {i x y z} (u : it_eqF E X (it_wbisim E X) i x (TauF y))
+  Equations? wbisim_tau_up_l {i x y z} (u : it_eqF E X it_wbisim i x (TauF y))
              (v : it_eat i z (TauF y))
-             : it_eqF E X (it_wbisim E X) i x z :=
+             : it_eqF E X it_wbisim i x z :=
     wbisim_tau_up_l p         (EatRefl)   := p ;
     wbisim_tau_up_l (EqTau p) (EatStep q) := EqTau _ .
 
@@ -197,22 +210,22 @@ Reversal, symmetry.
   Defined.
 
   Equations wbisim_ret_down_l {i x y r} : it_wbisim' E X i x y -> it_eat i y (RetF r)
-                                      -> (it_eat ⨟ it_eqF E X (it_wbisim E X)) i x (RetF r) :=
+                                      -> (it_eat ⨟ it_eqF E X it_wbisim) i x (RetF r) :=
     wbisim_ret_down_l (WBisim p (EatRefl) w) (EatRefl)   := p ⨟⨟ w ;
     wbisim_ret_down_l w                      (EatStep q) := wbisim_ret_down_l (wbisim_step_l w) q .
 
   Equations wbisim_ret_down_r {i x y r} : it_eat i x (RetF r) -> it_wbisim' E X i x y
-                                      -> (it_eqF E X (it_wbisim E X) ⨟ revᵢ it_eat) i (RetF r) y :=
+                                      -> (it_eqF E X it_wbisim ⨟ revᵢ it_eat) i (RetF r) y :=
     wbisim_ret_down_r (EatRefl)   (WBisim (EatRefl) q w) := w ⨟⨟ q ;
     wbisim_ret_down_r (EatStep p) w                      := wbisim_ret_down_r p (wbisim_step_r w) .
 
   Equations wbisim_vis_down_l {i x y e k} : it_wbisim' E X i x y -> it_eat i y (VisF e k)
-                                        -> (it_eat ⨟ it_eqF E X (it_wbisim E X)) i x (VisF e k) :=
+                                        -> (it_eat ⨟ it_eqF E X it_wbisim) i x (VisF e k) :=
     wbisim_vis_down_l (WBisim p (EatRefl) w) (EatRefl)   := p ⨟⨟ w ;
     wbisim_vis_down_l w                      (EatStep q) := wbisim_vis_down_l (wbisim_step_l w) q .
 
   Equations wbisim_vis_down_r {i x y e k} : it_eat i x (VisF e k) -> it_wbisim' E X i x y
-                                      -> (it_eqF E X (it_wbisim E X) ⨟ revᵢ it_eat) i (VisF e k) y :=
+                                      -> (it_eqF E X it_wbisim ⨟ revᵢ it_eat) i (VisF e k) y :=
     wbisim_vis_down_r (EatRefl)   (WBisim (EatRefl) q w) := w ⨟⨟ q ;
     wbisim_vis_down_r (EatStep p) w                      := wbisim_vis_down_r p (wbisim_step_r w) .
 
@@ -221,7 +234,7 @@ Reversal, symmetry.
 Concatenation, transitivity.
 |*)
 
-  Lemma it_wbisimF_tra : (it_wbisim' E X ⨟ it_wbisim' E X) <= it_wbisimF E X (it_wbisim E X ⨟ it_wbisim E X).
+  Lemma it_wbisimF_tra : (it_wbisim' E X ⨟ it_wbisim' E X) <= it_wbisimF E X (it_wbisim ⨟ it_wbisim).
   Proof.
     intros i x y [z [[x1 x2 u1 u2 uS] [y1 y2 v1 v2 vS]]].
     destruct (eat_cmp _ _ _ (u2 ⨟⨟ v1)) as [w | w]; clear z u2 v1.
@@ -243,7 +256,7 @@ Concatenation, transitivity.
         exact (WBisim u1 w1 (EqVis (fun r => k_rel r ⨟⨟ k_rel0 r))).
   Qed.
 
-  #[global] Instance it_wbisim_tra : Transitiveᵢ (it_wbisim E X).
+  #[global] Instance it_wbisim_tra : Transitiveᵢ (@it_wbisim I E X).
   Proof.
     apply build_transitive, coinduction; intros ? ? ? [ ? [ u v ] ].
     eapply (Hbody (it_wbisim_map _ _)).
