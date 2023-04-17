@@ -124,8 +124,10 @@ TODO: concretize env
     concat0 (EConF u e) := s_cat (concat0 u) e .
 
   (* Flattens a pair of alternating environments for resp. player and opponent into a "closed" substitution *)
-  Definition concat1 {M Δ a} b : alt_env M Δ b a
-             -> alt_env M Δ (negb b) a -> (join_even_odd_aux b a) =[M.(val)]> Δ.
+  Definition concat1 {M Δ a} b :
+    alt_env M Δ b a ->
+    alt_env M Δ (negb b) a ->
+    (join_even_odd_aux b a) =[M.(val)]> Δ.
     revert b; induction a; intros b u v; dependent destruction u; dependent destruction v.
     - refine (s_empty).
     - refine (s_cat (IHa false u v) _).
@@ -156,9 +158,10 @@ TODO: concretize env
              : delay (msg' Δ + h_actv ogs_hg (m_strat_pas M Δ) a)%type.
   refine (bind (M.(eval) (fst x)) _).
   intros ? [[[? [i m]] γ]].
-  destruct (cover_split cover_cat i).
-  - refine (Ret' (Fib (inl (_ ,' (h , m))))).
-  - refine (Ret' (Fib (inr ((_ ,' (h , m)) ,' EConF (snd x) γ)))).
+  refine (match cover_split cover_cat i with
+          | inl h => Ret' (Fib (inl (_ ,' (h , m))))
+          | inr h => Ret' (Fib (inr ((_ ,' (h , m)) ,' EConF (snd x) γ)))
+          end).
   Defined.
 
   Definition m_strat_resp {M Δ a} (x : m_strat_pas M Δ a)
@@ -170,13 +173,15 @@ TODO: concretize env
   refine (e_ren (r_concat_r _ _ ∘⊆ r_concat_r _ _) M.(v_var)).
   Defined.
 
-  Definition m_strat {M Δ} : m_strat_act M Δ ⇒ᵢ itree ogs_e (fun _ => msg' Δ).
-    apply iter; intros ? e.
-    refine (emb_delay (m_strat_play e) >>= fun _ x => _).
-    destruct x as [[m | [m c]]].
-    - refine (Ret' (inr m)).
-    - refine (Vis' (m : ogs_e.(e_qry) i) (fun r => Ret' (inl (m_strat_resp c r)))).
-  Defined.
+  Definition m_strat {M Δ} : m_strat_act M Δ ⇒ᵢ itree ogs_e (fun _ => msg' Δ) :=
+    iter
+      (fun i e =>
+         emb_delay (m_strat_play e) >>=
+           fun _ '(Fib x) =>
+             match x with
+             | inl m => Ret' (inr m)
+             | inr (m,'c) => Vis' (m : ogs_e.(e_qry) i) (fun r => Ret' (inl (m_strat_resp c r)))
+             end).
 
   Definition inj_init_act {M : machine} {Δ Γ} (c : M.(conf) Γ)
              : m_strat_act M Δ (∅ ▶ Γ)
@@ -193,4 +198,6 @@ TODO: concretize env
           | TauF t => TauF (_compo _ t v)
           | VisF q k => TauF (_compo _ (v q) k)
           end).
+
+
 End a.
