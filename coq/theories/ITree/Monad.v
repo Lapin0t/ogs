@@ -1,4 +1,5 @@
 Require Import Coq.Program.Equality.
+Import EqNotations.
 
 From OGS Require Import Utils.
 From OGS.Game Require Import Event.
@@ -38,3 +39,12 @@ End monad.
 #[global] Notation "x >>= f" := (bind x f) (at level 30).
 #[global] Notation "f =<< x" := (subst f _ x) (at level 30).
 #[global] Notation "f >=> g" := (kcomp f g) (at level 30).
+
+Definition emap {I} {A B : event I I} (F : A ⇒ₑ B) {X} : itree A X ⇒ᵢ itree B X :=
+  cofix _emap _ u :=
+      go (match u.(_observe) with
+         | RetF r => RetF r
+         | TauF t => TauF (_emap _ t)
+         | VisF e k => VisF (F.(ea_qry) e)
+                           (fun r => _emap _ (rew (F.(ea_nxt)) in k (F.(ea_rsp) r)))
+         end).

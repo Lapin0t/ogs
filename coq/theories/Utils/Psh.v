@@ -51,3 +51,6 @@ Definition fib_from {A B} {f : A -> B} X (h : fiber f ⇒ᵢ X) a : X (f a) :=
 Definition pin {I X} (i : I) : X -> (X @ i) i := Fib.
 Definition pin_from {I X Y} {i : I} : ((X @ i) ⇒ᵢ Y) -> (X -> Y i) := fib_from _.
 Definition pin_into {I X Y} {i : I} : (X -> Y i) -> (X @ i ⇒ᵢ Y) := fib_into _.
+
+Equations pin_map {I X Y} (f : X -> Y) {i : I} : (X @ i) ⇒ᵢ (Y @ i) :=
+  pin_map f _ (Fib x) := Fib (f x) .

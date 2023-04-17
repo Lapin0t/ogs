@@ -1,17 +1,13 @@
-Require Import FunInd.
+
 Require Import Program.Equality.
 Import EqNotations.
 
 From OGS Require Import Utils.
 From OGS.Utils Require Import Ctx.
 From OGS.Game Require Import HalfGame Event.
-From OGS.ITree Require Import ITree Monad Eq.
+From OGS.ITree Require Import ITree Monad Eq Delay.
 
 Open Scope ctx_scope.
-
-(* domain of computations: isomorphic to Capretta's delay monad *)
-Definition delay (X : Type) : Type :=
-  itree ∅ₑ (fun _ => X) T1_0.
 
 (*
   Mapping with pdf: operational signature
@@ -78,9 +74,9 @@ TODO: concretize env
   Definition c_ren {M Γ1 Γ2} (u : Γ1 ⊆ Γ2) (c : M.(conf) Γ1) : M.(conf) Γ2
     := M.(c_sub) (fun _ i => M.(v_ren) u _ (M.(v_var) _ i)) c.
 
-  Definition sub_eval_msg {Γ Δ} (M : machine) (e : Γ =[M.(val)]> Δ) (t : M.(conf) Γ)
+  Program Definition sub_eval_msg {Γ Δ} (M : machine) (e : Γ =[M.(val)]> Δ) (t : M.(conf) Γ)
              : delay (msg' Δ)
-    := fmap (fun _ r => projT1 r) _ (M.(eval) (M.(c_sub) e t)).
+    := fmap (pin_map (@projT1 _ _)) _ (M.(eval) (M.(c_sub) e t)).
 
   Definition ciu (M : machine) {Γ} Δ (x y : M.(conf) Γ) : Prop :=
     forall (e : Γ =[M.(val)]> Δ), it_wbisim _ _ _ (sub_eval_msg M e x) (sub_eval_msg M e y).
@@ -159,10 +155,10 @@ TODO: concretize env
   Definition m_strat_play {M Δ a} (x : m_strat_act M Δ a)
              : delay (msg' Δ + h_actv ogs_hg (m_strat_pas M Δ) a)%type.
   refine (bind (M.(eval) (fst x)) _).
-  intros ? [[? [i m]] γ].
+  intros ? [[[? [i m]] γ]].
   destruct (cover_split cover_cat i).
-  - refine (Ret' (inl (_ ,' (h , m)))).
-  - refine (Ret' (inr ((_ ,' (h , m)) ,' EConF (snd x) γ))).
+  - refine (Ret' (Fib (inl (_ ,' (h , m))))).
+  - refine (Ret' (Fib (inr ((_ ,' (h , m)) ,' EConF (snd x) γ)))).
   Defined.
 
   Definition m_strat_resp {M Δ a} (x : m_strat_pas M Δ a)
@@ -174,6 +170,14 @@ TODO: concretize env
   refine (e_ren (r_concat_r _ _ ∘⊆ r_concat_r _ _) M.(v_var)).
   Defined.
 
+  Definition m_strat {M Δ} : m_strat_act M Δ ⇒ᵢ itree ogs_e (fun _ => msg' Δ).
+    apply iter; intros ? e.
+    refine (emb_delay (m_strat_play e) >>= fun _ x => _).
+    destruct x as [[m | [m c]]].
+    - refine (Ret' (inr m)).
+    - refine (Vis' (m : ogs_e.(e_qry) i) (fun r => Ret' (inl (m_strat_resp c r)))).
+  Defined.
+
   Definition inj_init_act {M : machine} {Δ Γ} (c : M.(conf) Γ)
              : m_strat_act M Δ (∅ ▶ Γ)
     := (c_ren (r_concat_r _ _ ∘⊆ r_concat_r _ _) c , EConT ENil).
@@ -181,3 +185,5 @@ TODO: concretize env
   Definition inj_init_pas {M : machine} {Δ Γ} (γ : Γ =[M.(val)]> Δ)
              : m_strat_pas M Δ (∅ ▶ Γ)
     := EConF ENil (e_ren (r_concat_l _ _) γ).
+
+End a.
