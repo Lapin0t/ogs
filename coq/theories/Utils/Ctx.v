@@ -75,6 +75,10 @@ Definition substitution (F : ctx X -> X -> Type) (Γ Δ : ctx X) := forall x, Γ
 Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30).
 Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30).
 
+Definition r_comp {Γ1 Γ2 Γ3} (a : Γ2 ⊆ Γ3) (b : Γ1 ⊆ Γ2) : Γ1 ⊆ Γ3 :=
+  fun _ i => a _ (b _ i).
+
+
 Definition r_pop {Γ : ctx X} {x : X} : Γ ⊆ (Γ ▶ x) := fun _ i => pop i.
 
 Equations has_get (Γ : ctx X) i : Γ ∋ (Γ.[i]) :=
@@ -211,3 +215,4 @@ End lemma.
 #[global] Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30) : type_scope.
 #[global] Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30) : type_scope.
 #[global] Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30) : type_scope.
+#[global] Notation "a ∘⊆ b" := (r_comp a b) (at level 30).

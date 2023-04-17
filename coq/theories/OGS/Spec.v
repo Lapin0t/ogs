@@ -1,5 +1,6 @@
 Require Import FunInd.
 Require Import Program.Equality.
+Import EqNotations.
 
 From OGS Require Import Utils.
 From OGS.Utils Require Import Ctx.
@@ -66,9 +67,16 @@ TODO: concretize env
     c_sub {Γ Δ} : Γ =[val]> Δ -> conf Γ -> conf Δ ;
   }.
 
-  Definition e_comp {Γ1 Γ2 Γ3} (M : machine) (u : Γ2 =[M.(val)]> Γ3) (v : Γ1 =[M.(val)]> Γ2)
+  Definition e_comp {M Γ1 Γ2 Γ3} (u : Γ2 =[M.(val)]> Γ3) (v : Γ1 =[M.(val)]> Γ2)
              : Γ1 =[M.(val)]> Γ3
     := s_map (M.(v_sub) u) v.
+
+  Definition e_ren {M Γ1 Γ2 Γ3} (u : Γ2 ⊆ Γ3) (v : Γ1 =[M.(val)]> Γ2)
+             : Γ1 =[M.(val)]> Γ3
+    := s_map (M.(v_ren) u) v.
+
+  Definition c_ren {M Γ1 Γ2} (u : Γ1 ⊆ Γ2) (c : M.(conf) Γ1) : M.(conf) Γ2
+    := M.(c_sub) (fun _ i => M.(v_ren) u _ (M.(v_var) _ i)) c.
 
   Definition sub_eval_msg {Γ Δ} (M : machine) (e : Γ =[M.(val)]> Δ) (t : M.(conf) Γ)
              : delay (msg' Δ)
@@ -120,33 +128,56 @@ TODO: concretize env
     concat0 (EConF u e) := s_cat (concat0 u) e .
 
   (* Flattens a pair of alternating environments for resp. player and opponent into a "closed" substitution *)
-  Definition concat1 {M Δ a} b : alt_env M Δ true a
-             -> alt_env M Δ false a -> (join_even_odd_aux b a) =[M.(val)]> Δ.
+  Definition concat1 {M Δ a} b : alt_env M Δ b a
+             -> alt_env M Δ (negb b) a -> (join_even_odd_aux b a) =[M.(val)]> Δ.
     revert b; induction a; intros b u v; dependent destruction u; dependent destruction v.
     - refine (s_empty).
-    - destruct b; cbn in *.
-      * refine (s_cat (IHa false v u) _).
-        refine (e_comp M _ s).
-        refine (s_cat M.(v_var) (IHa true v u)).
-      * exact (IHa true v u).
+    - refine (s_cat (IHa false u v) _).
+      refine (e_comp _ s).
+      refine (s_cat M.(v_var) (IHa true v u)).
+    - exact (IHa true u v).
   Defined.
 
-  Lemma quatre_six_un {M Δ a}
-    (u : alt_env M Δ player a)
-    (v : alt_env M Δ opponent a) :
-    e_comp M
-        (s_cat M.(v_var) (concat1 player u v))
-        (concat0 u)
-    = concat1 opponent u v.
+  Lemma quatre_six {M Δ a} b
+    (u : alt_env M Δ b a) (v : alt_env M Δ (negb b) a)
+    {x i} :
+    e_comp
+        (s_cat M.(v_var) (concat1 b u v))
+        (concat0 u) x i
+    = concat1 (negb b)
+        v
+        (rew [fun x => alt_env _ _ x _] (Bool.negb_involutive_reverse b) in u)
+        x i.
   Admitted.
 
-  Lemma quatre_six_deux {M Δ a}
-    (u : alt_env M Δ player a)
-    (v : alt_env M Δ opponent a) :
-    e_comp M
-        (s_cat M.(v_var) (concat1 opponent u v))
-        (concat0 v)
-    = concat1 player u v.
-  Admitted.
+  Definition m_strat_act (M : machine) Δ : alt_ext -> Type :=
+    fun a => (M.(conf) (Δ +▶ join_even a) * alt_env M Δ player a)%type.
 
+  Definition m_strat_pas (M : machine) Δ : alt_ext -> Type :=
+    fun a => alt_env M Δ opponent a.
 
+  Definition m_strat_play {M Δ a} (x : m_strat_act M Δ a)
+             : delay (msg' Δ + h_actv ogs_hg (m_strat_pas M Δ) a)%type.
+  refine (bind (M.(eval) (fst x)) _).
+  intros ? [[? [i m]] γ].
+  destruct (cover_split cover_cat i).
+  - refine (Ret' (inl (_ ,' (h , m)))).
+  - refine (Ret' (inr ((_ ,' (h , m)) ,' EConF (snd x) γ))).
+  Defined.
+
+  Definition m_strat_resp {M Δ a} (x : m_strat_pas M Δ a)
+    : h_pasv ogs_hg (m_strat_act M Δ) a.
+  intro m.
+  refine (M.(c_sub) _ (M.(emb) m) , EConT x).
+  refine (s_cat _ _).
+  refine (e_ren (r_concat3_1 _ _ _) (concat0 x)).
+  refine (e_ren (r_concat_r _ _ ∘⊆ r_concat_r _ _) M.(v_var)).
+  Defined.
+
+  Definition inj_init_act {M : machine} {Δ Γ} (c : M.(conf) Γ)
+             : m_strat_act M Δ (∅ ▶ Γ)
+    := (c_ren (r_concat_r _ _ ∘⊆ r_concat_r _ _) c , EConT ENil).
+
+  Definition inj_init_pas {M : machine} {Δ Γ} (γ : Γ =[M.(val)]> Δ)
+             : m_strat_pas M Δ (∅ ▶ Γ)
+    := EConF ENil (e_ren (r_concat_l _ _) γ).
