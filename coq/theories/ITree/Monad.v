@@ -1,7 +1,7 @@
 Require Import Coq.Program.Equality.
 Import EqNotations.
 
-From Coinduction Require Import coinduction tactics.
+From Coinduction Require Import coinduction lattice rel tactics.
 
 From OGS Require Import Utils.
 From OGS.Utils Require Import Rel.
@@ -48,7 +48,7 @@ Section monad.
   Arguments BindR {X Y R S i t1 t2 k1 k2}.    
 
   Program Definition bindR_map {X Y} : mon (relᵢ (itree E Y) (itree E Y)) :=
-    {| body S := bindR (it_eq E X) S ;
+    {| body S := bindR (@it_eq _ E X) S ;
        Hbody _ _ H _ _ _ '(BindR u v) := BindR u (fun i x => H _ _ _ (v i x)) |}.
 
   Lemma it_eq_up2bind_t {X Y} : @bindR_map X Y <= it_eq_t E Y.
@@ -65,7 +65,7 @@ Section monad.
   Qed.
 
   Lemma iter_unfold {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) {i x}
-    : it_eq _ _ i
+    : it_eq
         (iter f i x)
         (bind (f i x) (fun _ r => go (match r with
                                    | inl x => TauF (iter f _ x)
@@ -77,10 +77,10 @@ Section monad.
   Qed.
   
   Lemma iter_lem {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) (g : X ⇒ᵢ itree E Y)
-                 (H : forall i x, it_eq _ _ i (g i x) (bind (f i x) (fun _ r => go (match r with
+                 (H : forall i x, it_eq (g i x) (bind (f i x) (fun _ r => go (match r with
                                                   | inl x => TauF (g _ x)
                                                   | inr y => RetF y end))))
-                 : forall i x, it_eq _ _ i (g i x) (iter f i x).
+                 : forall i x, it_eq (g i x) (iter f i x).
   Proof.
     unfold it_eq; coinduction R CIH; intros i x.
     apply (bt_tbt (it_eq_map E Y)).
@@ -94,6 +94,19 @@ Section monad.
     econstructor. reflexivity.
     intros ? []; econstructor.
     now apply CIH.
+  Qed.
+
+  Lemma bind_bind_com {X Y Z} {f : X ⇒ᵢ itree E Y} {g : Y ⇒ᵢ itree E Z} {i} {x : itree E X i}
+    : it_eq (bind (bind x f) g) (bind x (kcomp f g)).
+  Proof.
+    revert i x; unfold it_eq; coinduction R CIH; intros i x.
+    cbn; destruct (x.(_observe)).
+    - destruct ((f i r).(_observe)).
+      + destruct ((g i r0).(_observe)); econstructor; reflexivity.
+      + econstructor; reflexivity.
+      + econstructor; reflexivity.
+    - econstructor; apply CIH.
+    - econstructor; intro r; apply CIH.
   Qed.
 End monad.
 

@@ -1,4 +1,4 @@
-
+Set Equations Transparent.
 Require Import Program.Equality.
 Import EqNotations.
 
@@ -54,7 +54,7 @@ TODO: concretize env
     eval {Γ} : conf Γ -> delay { m : msg' Γ & dom' m =[val]> Γ } ;
     emb {Γ} (m : msg' Γ) : conf (Γ +▶ dom' m) ;
     (* value variables *)
-    v_var {Γ} : has Γ ⇒ᵢ val Γ ;
+    v_var {Γ} : has Γ ⇒ᵢ val Γ ; (*  Γ ∋ x -> val Γ x   *)
     (* value renaming *)
     v_ren {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ ;
     (* value substitution *)
@@ -76,10 +76,10 @@ TODO: concretize env
 
   Program Definition sub_eval_msg {Γ Δ} (M : machine) (e : Γ =[M.(val)]> Δ) (t : M.(conf) Γ)
              : delay (msg' Δ)
-    := fmap (pin_map (@projT1 _ _)) _ (M.(eval) (M.(c_sub) e t)).
+    := fmap (fun _ => @projT1 _ _) _ (M.(eval) (M.(c_sub) e t)).
 
   Definition ciu (M : machine) {Γ} Δ (x y : M.(conf) Γ) : Prop :=
-    forall (e : Γ =[M.(val)]> Δ), it_wbisim _ _ _ (sub_eval_msg M e x) (sub_eval_msg M e y).
+    forall (e : Γ =[M.(val)]> Δ), it_wbisim (sub_eval_msg M e x) (sub_eval_msg M e y).
 
   (* Section 3: game definition
      ↓+ ~ join_even
@@ -155,23 +155,21 @@ TODO: concretize env
     fun a => alt_env M Δ opponent a.
 
   Definition m_strat_play {M Δ a} (x : m_strat_act M Δ a)
-             : delay (msg' Δ + h_actv ogs_hg (m_strat_pas M Δ) a)%type.
-  refine (bind (M.(eval) (fst x)) _).
-  intros ? [[[? [i m]] γ]].
-  refine (match cover_split cover_cat i with
-          | inl h => Ret' (Fib (inl (_ ,' (h , m))))
-          | inr h => Ret' (Fib (inr ((_ ,' (h , m)) ,' EConF (snd x) γ)))
-          end).
-  Defined.
+    : delay (msg' Δ + h_actv ogs_hg (m_strat_pas M Δ) a)%type :=
+    (M.(eval) (fst x)) >>=
+      fun _ u =>
+        match cover_split cover_cat (fst (projT2 (projT1 u))) with
+        | inl h => Ret' (inl (_ ,' (h , snd (projT2 (projT1 u)))))
+        | inr h => Ret' (inr ((_ ,' (h , snd (projT2 (projT1 u)))) ,' EConF (snd x) (projT2 u)))
+        end .
 
   Definition m_strat_resp {M Δ a} (x : m_strat_pas M Δ a)
-    : h_pasv ogs_hg (m_strat_act M Δ) a.
-  intro m.
-  refine (M.(c_sub) _ (M.(emb) m) , EConT x).
-  refine (s_cat _ _).
-  refine (e_ren (r_concat3_1 _ _ _) (concat0 x)).
-  refine (e_ren (r_concat_r _ _ ∘⊆ r_concat_r _ _) M.(v_var)).
-  Defined.
+    : h_pasv ogs_hg (m_strat_act M Δ) a
+    := fun m => (M.(c_sub)
+                  (s_cat (e_ren (r_concat3_1 _ _ _) (concat0 x))
+                         (e_ren (r_concat_r _ _ ∘⊆ r_concat_r _ _) M.(v_var)))
+              (M.(emb) m) ,
+          EConT x).
 
   Definition m_strat {M Δ} : m_strat_act M Δ ⇒ᵢ itree ogs_e (fun _ => msg' Δ) :=
     iter
@@ -183,6 +181,9 @@ TODO: concretize env
              | inr (m,'c) => Vis' (m : ogs_e.(e_qry) i) (fun r => Ret' (inl (m_strat_resp c r)))
              end).
 
+  Definition m_stratp {M Δ} : m_strat_pas M Δ ⇒ᵢ h_pasv ogs_hg (itree ogs_e (fun _ => msg' Δ)) :=
+    fun _ x m => m_strat _ (m_strat_resp x m).
+
   Definition inj_init_act {M : machine} {Δ Γ} (c : M.(conf) Γ)
              : m_strat_act M Δ (∅ ▶ Γ)
     := (c_ren (r_concat_r _ _ ∘⊆ r_concat_r _ _) c , EConT ENil).
@@ -191,13 +192,95 @@ TODO: concretize env
              : m_strat_pas M Δ (∅ ▶ Γ)
     := EConF ENil (e_ren (r_concat_l _ _) γ).
 
-  Program Definition compo {Δ} : forall a, itree ogs_e (fun _ => msg' Δ) a -> h_pasv ogs_hg (itree ogs_e (fun _ => msg' Δ)) a -> delay (msg' Δ) :=
-    cofix _compo _ u v :=
-      go (match u.(_observe) with
-          | RetF r => RetF (Fib r)
-          | TauF t => TauF (_compo _ t v)
-          | VisF q k => TauF (_compo _ (v q) k)
-          end).
+  Definition compo_t M (Δ : ctx S.(typ)) : Type := ⦉ m_strat_act M Δ ×ᵢ m_strat_pas M Δ ⦊ᵢ .
 
+  Equations compo_body {M Δ} : (fun (_ : T1) => compo_t M Δ)
+                             ⇒ᵢ itree ∅ₑ (fun _ => compo_t M Δ + msg' Δ)%type :=
+    compo_body T1_0 x :=
+      m_strat_play (fst (projT2 x)) >>= fun _ r =>
+          go (match r with
+              | inl r => RetF (inr r)
+              | inr e => RetF (inl (_ ,' (m_strat_resp (snd (projT2 x)) (projT1 e) , (projT2 e))))
+              end).  
+
+  Definition compo {M Δ} a
+    (u : m_strat_act M Δ a)
+    (v : m_strat_pas M Δ a)
+    : delay (msg' Δ)
+    := iter compo_body T1_0 (a ,' (u , v)).
+
+  (* guilhem: rename? *)
+  Definition barb (M : machine) {Γ} Δ (x y : M.(conf) Γ) : Prop :=
+    forall e : Γ =[M.(val)]> Δ,
+    it_wbisim (compo _ (inj_init_act x) (inj_init_pas e))
+              (compo _ (inj_init_act y) (inj_init_pas e)).
+
+  Equations reduce {M : machine} {Δ} : (fun (_ : T1) => compo_t M Δ) ⇒ᵢ itree ∅ₑ (fun _ => msg' Δ) :=
+    reduce T1_0 u :=
+      fmap (fun _ => (@projT1 _ _)) _ (M.(eval) (M.(c_sub) (s_cat (M.(v_var)) (concat1 _ (snd (fst (projT2 u))) (snd (projT2 u)))) (fst (fst (projT2 u))))) .
+
+  From Coinduction Require Import coinduction tactics.
+
+  Lemma quatre_trois_pre {M : machine} {Δ} (x : compo_t M Δ)
+    : it_eq
+        (compo_body T1_0 x >>= fun _ r => go (match r with
+                                     | inl x' => TauF (reduce _ x')
+                                     | inr y => RetF (y : (fun _ => msg' _) _)
+                                     end))
+      (M.(eval) (fst (fst (projT2 x))) >>=
+                      fun _ u =>
+                        go (match cover_split cover_cat (fst (projT2 (projT1 u))) with
+                            | inl h => RetF (_ ,' (h, snd (projT2 (projT1 u))))
+                            | inr h => TauF (reduce _ (_ ,'
+                                                    (m_strat_resp (snd (projT2 x)) (_ ,' (h, snd (projT2 (projT1 u)))), EConF (snd (fst (projT2 x))) (projT2 u))))
+                            end)).
+  Proof.
+    etransitivity.
+    unfold compo_body; apply bind_bind_com.
+    etransitivity.
+    unfold m_strat_play; apply bind_bind_com.
+    remember (M.(eval) (fst (fst (projT2 x)))) as t eqn:H; clear H; revert t.
+    unfold it_eq; coinduction R CIH; intros t.
+    cbn; destruct (t.(_observe)).
+    + destruct r as [[? [i m]] γ]; cbn.
+      destruct (cover_split cover_cat i).
+      econstructor; reflexivity.
+      econstructor; reflexivity.
+    + econstructor. apply CIH.
+    + destruct q.
+  Qed.
+    
+  Hypothesis eval_ok : forall {M : machine} {Γ Δ}
+    (c : M.(conf) (Δ +▶ Γ))
+    (e : Γ =[M.(val)]> Δ),
+    it_eq
+        (M.(eval) (M.(c_sub) (s_cat M.(v_var) e) c))
+        (M.(eval) c >>= fun 'T1_0 x =>
+               go (match cover_split cover_cat (fst (projT2 (projT1 x))) with
+                   | inl h => RetF ((_ ,' (h , snd (projT2 (projT1 x)))) ,'
+                                   e_comp (s_cat M.(v_var) e) (projT2 x))
+                   | inr h => TauF (M.(eval) _)
+                   end)) .
+    refine (M.(c_sub) (s_cat (s_cat M.(v_var) e) (e_comp (s_cat M.(v_var) e) (projT2 x))) (M.(emb) (projT1 x))))
+    refine (M.(eval) _).
+    refine .
+    refine (s_cat  _).
+    refine ((_ ,' (h , snd (projT2 (projT1 x)))) ,' (e_comp (s_cat M.(v_var) e) (projT2 x))).
+    cbv [dom'] in *; cbn in *.
+    refine (e_comp (s_cat M.(v_var) e) (projT2 x)).
+
+  Lemma quatre_trois {M : machine} {Δ a}
+    (c : m_strat_act M Δ a)
+    (e : m_strat_pas M Δ a)
+    : it_eq (reduce _ (_ ,' (c , e))) (compo _ c e) .
+    refine (iter_lem compo_body reduce _ _ (_ ,' (c , e))).
+    clear a c e; intros [] [ ? [ u v ] ].
+    etransitivity; cycle 1.
+    symmetry; apply quatre_trois_pre.
+    unfold reduce at 1.
+
+  Theorem ogs_correction (M : machine) {Γ} Δ (x y : M.(conf) Γ)
+          : barb M Δ x y -> ciu M Δ x y.
+    Admitted.
 
 End a.

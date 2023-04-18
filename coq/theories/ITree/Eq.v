@@ -63,7 +63,7 @@ Definition it_eq_map {I} E X : mon (relᵢ (@itree I E X) (@itree I E X)) := {|
   Hbody _ _ H _ _ _ r := it_eqF_mon _ _ H _ _ _ r ;
 |}.
 
-Definition it_eq {I} E X := gfp (@it_eq_map I E X).
+Definition it_eq {I E X} [i] := gfp (@it_eq_map I E X) i.
 Notation it_eq_t E X := (t (it_eq_map E X)).
 Notation it_eq_bt E X := (bt (it_eq_map E X)).
 Notation it_eq_T E X := (T (it_eq_map E X)).
