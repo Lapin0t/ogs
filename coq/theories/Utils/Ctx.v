@@ -2,6 +2,8 @@ From Coq Require Import Program.Equality.
 From Equations Require Import Equations.
 Set Equations Transparent.
 
+From Coinduction Require Import lattice.
+
 From OGS Require Import Utils.
 From OGS Require Import Utils.Prelude.
 
@@ -74,6 +76,9 @@ Notation "Γ .[ i ]" := (get Γ%ctx i) (at level 30).
 Definition substitution (F : ctx X -> X -> Type) (Γ Δ : ctx X) := forall x, Γ ∋ x -> F Δ x.
 Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30).
 Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30).
+
+Definition sub_eq {F : ctx X -> X -> Type} Γ Δ : relation (Γ =[F]> Δ) :=
+  dpointwise_relation (fun x => eq ==> eq)%signature.
 
 Definition r_comp {Γ1 Γ2 Γ3} (a : Γ2 ⊆ Γ3) (b : Γ1 ⊆ Γ2) : Γ1 ⊆ Γ3 :=
   fun _ i => a _ (b _ i).

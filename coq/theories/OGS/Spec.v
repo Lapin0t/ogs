@@ -77,6 +77,14 @@ TODO: concretize env
   Definition c_ren {M Γ1 Γ2} (u : Γ1 ⊆ Γ2) (c : M.(conf) Γ1) : M.(conf) Γ2
     := M.(c_sub) (fun _ i => M.(v_ren) u _ (M.(v_var) _ i)) c.
 
+  Record machine_law (M : machine) : Type := {
+    c_sub_sub {Γ1 Γ2 Γ3} u v x :
+      M.(c_sub) u (M.(c_sub) v x) = M.(c_sub) (@e_comp M Γ1 Γ2 Γ3 u v) x ;
+    c_sub_proper {Γ Δ} : Proper (sub_eq Γ Δ ==> eq ==> eq) M.(c_sub) ;
+  }. 
+  Arguments c_sub_sub {M}.
+  Arguments c_sub_proper {M}.
+
   Program Definition sub_eval_msg {Γ Δ} (M : machine) (e : Γ =[M.(val)]> Δ) (t : M.(conf) Γ)
              : delay (msg' Δ)
     := fmap (fun _ => @projT1 _ _) _ (M.(eval) (M.(c_sub) e t)).
@@ -219,8 +227,7 @@ TODO: concretize env
               (compo _ (inj_init_act y) (inj_init_pas e)).
 
   Equations reduce {M : machine} {Δ} : (fun (_ : T1) => compo_t M Δ) ⇒ᵢ itree ∅ₑ (fun _ => msg' Δ) :=
-    reduce T1_0 u :=
-      fmap (fun _ => (@projT1 _ _)) _ (M.(eval) (M.(c_sub) (s_cat (M.(v_var)) (concat1 _ (snd (fst (projT2 u))) (snd (projT2 u)))) (fst (fst (projT2 u))))) .
+    reduce T1_0 u := sub_eval_msg M (s_cat (M.(v_var)) (concat1 _ (snd (fst (projT2 u))) (snd (projT2 u)))) (fst (fst (projT2 u))) .
 
   Lemma quatre_trois_pre {M : machine} {Δ} (x : compo_t M Δ)
     : it_eq
@@ -271,7 +278,7 @@ TODO: concretize env
                           (e : Γ =[M.(val)]> Δ),
                           it_eq (eval_sub_1 c e) (eval_sub_2 c e) .
 
-  Lemma quatre_trois {M : machine} {Δ a}
+  Lemma quatre_trois {M : machine} {MH : machine_law M} {Δ a}
     (c : m_strat_act M Δ a)
     (e : m_strat_pas M Δ a)
     : it_eq (reduce _ (_ ,' (c , e))) (compo _ c e) .
@@ -284,9 +291,8 @@ TODO: concretize env
     apply fmap_eq, eval_hyp.
     etransitivity.
     apply bind_fmap_com.
-    unfold it_eq.
+    unfold it_eq; cbn [fst snd projT2 projT1].
     apply (tt_t (it_eq_map ∅ₑ (fun _ : T1 => msg' Δ))).
-    cbn [fst snd projT2 projT1].
     refine (@it_eq_up2bind_t _ ∅ₑ (fun _ => {m : msg' (Δ +▶ join_even x) & dom' m =[ val M ]> (Δ +▶ join_even x)}) _ _ _ (M.(eval) (fst u) >>= _) (M.(eval) (fst u) >>= _) _).
     econstructor; eauto.
     intros [] [m γ].
@@ -296,10 +302,23 @@ TODO: concretize env
     - econstructor.
     - econstructor.
       unfold reduce.
+      fold (@fmap _ ∅ₑ _ _ (fun _ : T1 => projT1 (P:=fun m0 : msg' Δ => dom' m0 =[ val M ]> Δ)) T1_0).
+      change (it_eq_t ∅ₑ (fun _ : T1 => msg' Δ) bot T1_0 ?a ?b) with (it_eq a b).
+      apply fmap_eq.
+      unfold m_strat_resp.
+      cbn [fst snd projT1 projT2].
+      rewrite MH.(c_sub_sub).
+      unshelve rewrite MH.(c_sub_proper); try reflexivity.
+      intros ? ? ? ->.
+      destruct m as [? [i m]]; unfold dom' in *; cbn [dom' fst snd projT1 projT2] in *.
   Admitted.
 
   Theorem ogs_correction (M : machine) {Γ} Δ (x y : M.(conf) Γ)
           : barb M Δ x y -> ciu M Δ x y.
+    intros H e.
+    unfold barb in H.
+    etransitivity. etransitivity.
+    2: refine (H e).
     Admitted.
 
 End a.
