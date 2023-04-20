@@ -1,11 +1,14 @@
-Set Equations Transparent.
 Require Import Program.Equality.
 Import EqNotations.
+
+From Coinduction Require Import coinduction tactics.
 
 From OGS Require Import Utils.
 From OGS.Utils Require Import Ctx.
 From OGS.Game Require Import HalfGame Event.
 From OGS.ITree Require Import ITree Monad Eq Delay.
+
+Set Equations Transparent.
 
 Open Scope ctx_scope.
 
@@ -219,8 +222,6 @@ TODO: concretize env
     reduce T1_0 u :=
       fmap (fun _ => (@projT1 _ _)) _ (M.(eval) (M.(c_sub) (s_cat (M.(v_var)) (concat1 _ (snd (fst (projT2 u))) (snd (projT2 u)))) (fst (fst (projT2 u))))) .
 
-  From Coinduction Require Import coinduction tactics.
-
   Lemma quatre_trois_pre {M : machine} {Δ} (x : compo_t M Δ)
     : it_eq
         (compo_body T1_0 x >>= fun _ r => go (match r with
@@ -250,24 +251,25 @@ TODO: concretize env
     + destruct q.
   Qed.
     
-  Hypothesis eval_ok : forall {M : machine} {Γ Δ}
-    (c : M.(conf) (Δ +▶ Γ))
-    (e : Γ =[M.(val)]> Δ),
-    it_eq
-        (M.(eval) (M.(c_sub) (s_cat M.(v_var) e) c))
-        (M.(eval) c >>= fun 'T1_0 x =>
+  Definition eval_sub_1 {M : machine} {Γ Δ} (c : M.(conf) (Δ +▶ Γ)) (e : Γ =[M.(val)]> Δ)
+             : delay { m : msg' Δ & dom' m =[M.(val)]> Δ } :=
+        M.(eval) (M.(c_sub) (s_cat M.(v_var) e) c) .
+
+  Definition eval_sub_2 {M : machine} {Γ Δ} (c : M.(conf) (Δ +▶ Γ)) (e : Γ =[M.(val)]> Δ)
+             : delay { m : msg' Δ & dom' m =[M.(val)]> Δ }.
+    refine (M.(eval) c >>= fun 'T1_0 x =>
                go (match cover_split cover_cat (fst (projT2 (projT1 x))) with
                    | inl h => RetF ((_ ,' (h , snd (projT2 (projT1 x)))) ,'
                                    e_comp (s_cat M.(v_var) e) (projT2 x))
-                   | inr h => TauF (M.(eval) _)
+                   | inr h => TauF _
                    end)) .
-    refine (M.(c_sub) (s_cat (s_cat M.(v_var) e) (e_comp (s_cat M.(v_var) e) (projT2 x))) (M.(emb) (projT1 x))))
-    refine (M.(eval) _).
-    refine .
-    refine (s_cat  _).
-    refine ((_ ,' (h , snd (projT2 (projT1 x)))) ,' (e_comp (s_cat M.(v_var) e) (projT2 x))).
-    cbv [dom'] in *; cbn in *.
-    refine (e_comp (s_cat M.(v_var) e) (projT2 x)).
+    refine (M.(eval) (M.(c_sub) (s_cat e (e_comp (s_cat M.(v_var) e) (projT2 x))) (M.(emb) (_ ,' (h , (snd (projT2 (projT1 x)))))))).
+  Defined.
+
+  Hypothesis eval_hyp : forall {M : machine} {Γ Δ}
+                          (c : M.(conf) (Δ +▶ Γ))
+                          (e : Γ =[M.(val)]> Δ),
+                          it_eq (eval_sub_1 c e) (eval_sub_2 c e) .
 
   Lemma quatre_trois {M : machine} {Δ a}
     (c : m_strat_act M Δ a)
@@ -278,6 +280,23 @@ TODO: concretize env
     etransitivity; cycle 1.
     symmetry; apply quatre_trois_pre.
     unfold reduce at 1.
+    etransitivity.
+    apply fmap_eq, eval_hyp.
+    etransitivity.
+    apply bind_fmap_com.
+    unfold it_eq.
+    apply (tt_t (it_eq_map ∅ₑ (fun _ : T1 => msg' Δ))).
+    cbn [fst snd projT2 projT1].
+    refine (@it_eq_up2bind_t _ ∅ₑ (fun _ => {m : msg' (Δ +▶ join_even x) & dom' m =[ val M ]> (Δ +▶ join_even x)}) _ _ _ (M.(eval) (fst u) >>= _) (M.(eval) (fst u) >>= _) _).
+    econstructor; eauto.
+    intros [] [m γ].
+    apply (bt_t (it_eq_map ∅ₑ (fun _ : T1 => msg' Δ))).
+    cbn [fst snd projT2 projT1].
+    destruct (cover_split cover_cat (fst (projT2 m))).
+    - econstructor.
+    - econstructor.
+      unfold reduce.
+  Admitted.
 
   Theorem ogs_correction (M : machine) {Γ} Δ (x y : M.(conf) Γ)
           : barb M Δ x y -> ciu M Δ x y.
