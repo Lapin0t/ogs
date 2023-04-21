@@ -58,32 +58,58 @@ TODO: concretize env
     emb {Γ} (m : msg' Γ) : conf (Γ +▶ dom' m) ;
     (* value variables *)
     v_var {Γ} : has Γ ⇒ᵢ val Γ ; (*  Γ ∋ x -> val Γ x   *)
-    (* value renaming *)
-    v_ren {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ ;
     (* value substitution *)
     v_sub {Γ Δ} : Γ =[val]> Δ -> val Γ ⇒ᵢ val Δ ;
     (* configuration substitution *)
     c_sub {Γ Δ} : Γ =[val]> Δ -> conf Γ -> conf Δ ;
   }.
 
+  Definition v_ren {M Γ Δ} : Γ ⊆ Δ -> M.(val) Γ ⇒ᵢ M.(val) Δ :=
+    fun u => M.(v_sub) (fun _ i => M.(v_var) _ (u _ i)) .
+      
   Definition e_comp {M Γ1 Γ2 Γ3} (u : Γ2 =[M.(val)]> Γ3) (v : Γ1 =[M.(val)]> Γ2)
              : Γ1 =[M.(val)]> Γ3
     := s_map (M.(v_sub) u) v.
 
   Definition e_ren {M Γ1 Γ2 Γ3} (u : Γ2 ⊆ Γ3) (v : Γ1 =[M.(val)]> Γ2)
              : Γ1 =[M.(val)]> Γ3
-    := s_map (M.(v_ren) u) v.
+    := s_map (v_ren u) v.
 
   Definition c_ren {M Γ1 Γ2} (u : Γ1 ⊆ Γ2) (c : M.(conf) Γ1) : M.(conf) Γ2
-    := M.(c_sub) (fun _ i => M.(v_ren) u _ (M.(v_var) _ i)) c.
+    := M.(c_sub) (fun _ i => v_ren u _ (M.(v_var) _ i)) c.
 
   Record machine_law (M : machine) : Type := {
-    c_sub_sub {Γ1 Γ2 Γ3} u v x :
-      M.(c_sub) u (M.(c_sub) v x) = M.(c_sub) (@e_comp M Γ1 Γ2 Γ3 u v) x ;
-    c_sub_proper {Γ Δ} : Proper (sub_eq Γ Δ ==> eq ==> eq) M.(c_sub) ;
+    v_sub_proper {Γ Δ}
+      : Proper
+          (sub_eq Γ Δ ==> (dpointwise_relation (fun i => eq ==> eq)))
+          M.(v_sub) ;
+    c_sub_proper {Γ Δ}
+      : Proper
+          (sub_eq Γ Δ ==> eq ==> eq)
+          M.(c_sub) ;
+    v_sub_var {Γ1 Γ2} (p : Γ1 =[M.(val)]> Γ2) {t} i
+      : M.(v_sub) p t (M.(v_var) t i)
+      = p t i ;
+    v_var_sub {Γ} {t} (v : M.(val) Γ t)
+      : M.(v_sub) M.(v_var) t v
+      = v ;
+    v_sub_sub {Γ1 Γ2 Γ3} p q {t} v
+      : M.(v_sub) p t (M.(v_sub) q t v)
+      = M.(v_sub) (@e_comp M Γ1 Γ2 Γ3 p q) t v ;
+    c_var_sub {Γ} (c : M.(conf) Γ)
+      : M.(c_sub) M.(v_var) c
+      = c ;
+    c_sub_sub {Γ1 Γ2 Γ3} u v x
+      : M.(c_sub) u (M.(c_sub) v x)
+      = M.(c_sub) (@e_comp M Γ1 Γ2 Γ3 u v) x ;
   }. 
-  Arguments c_sub_sub {M}.
   Arguments c_sub_proper {M}.
+  Arguments v_sub_proper {M}.
+  Arguments v_sub_var {M}.
+  Arguments v_var_sub {M}.
+  Arguments v_sub_sub {M}.
+  Arguments c_var_sub {M}.
+  Arguments c_sub_sub {M}.
 
   Program Definition sub_eval_msg {Γ Δ} (M : machine) (e : Γ =[M.(val)]> Δ) (t : M.(conf) Γ)
              : delay (msg' Δ)
@@ -131,21 +157,22 @@ TODO: concretize env
   Equations concat0 {M Δ b a} : alt_env M Δ b a
              -> (join_even_odd_aux (negb b) a) =[M.(val)]> (Δ +▶ join_even_odd_aux b a) :=
     concat0 (ENil) := s_empty ;
-    concat0 (EConT u) := s_map (M.(v_ren) (r_concat3_1 _ _ _)) (concat0 u) ;
+    concat0 (EConT u) := s_map (v_ren r_concat3_1) (concat0 u) ;
     concat0 (EConF u e) := s_cat (concat0 u) e .
 
   (* Flattens a pair of alternating environments for resp. player and opponent into a "closed" substitution *)
-  Definition concat1 {M Δ a} b :
+  Equations concat1 {M Δ} a b :
     alt_env M Δ b a ->
     alt_env M Δ (negb b) a ->
-    (join_even_odd_aux b a) =[M.(val)]> Δ.
-    revert b; induction a; intros b u v; dependent destruction u; dependent destruction v.
-    - refine (s_empty).
-    - refine (s_cat (IHa false u v) _).
-      refine (e_comp _ s).
-      refine (s_cat M.(v_var) (IHa true v u)).
-    - exact (IHa true u v).
-  Defined.
+    (join_even_odd_aux b a) =[M.(val)]> Δ :=
+    concat1 ∅      b _ _ :=
+      s_empty ;
+    concat1 (a ▶ _) b (EConT u) (EConF v e) :=
+      s_cat
+        (concat1 a _ u v)
+        (e_comp (s_cat M.(v_var) (concat1 a _ v u)) e) ;
+    concat1 (a ▶ _) b (EConF u e) (EConT v) := concat1 a _ u v .
+  Arguments concat1 {M Δ a}.
 
   Lemma quatre_six {M Δ a} b
     (u : alt_env M Δ b a) (v : alt_env M Δ (negb b) a)
@@ -177,8 +204,8 @@ TODO: concretize env
   Definition m_strat_resp {M Δ a} (x : m_strat_pas M Δ a)
     : h_pasv ogs_hg (m_strat_act M Δ) a
     := fun m => (M.(c_sub)
-                  (s_cat (e_ren (r_concat3_1 _ _ _) (concat0 x))
-                         (e_ren (r_concat_r _ _ ∘⊆ r_concat_r _ _) M.(v_var)))
+                  (s_cat (e_ren r_concat3_1 (concat0 x))
+                         (e_ren (r_concat_r ∘⊆ r_concat_r) M.(v_var)))
               (M.(emb) m) ,
           EConT x).
 
@@ -197,11 +224,11 @@ TODO: concretize env
 
   Definition inj_init_act {M : machine} {Δ Γ} (c : M.(conf) Γ)
              : m_strat_act M Δ (∅ ▶ Γ)
-    := (c_ren (r_concat_r _ _ ∘⊆ r_concat_r _ _) c , EConT ENil).
+    := (c_ren (r_concat_r ∘⊆ r_concat_r) c , EConT ENil).
 
   Definition inj_init_pas {M : machine} {Δ Γ} (γ : Γ =[M.(val)]> Δ)
              : m_strat_pas M Δ (∅ ▶ Γ)
-    := EConF ENil (e_ren (r_concat_l _ _) γ).
+    := EConF ENil (e_ren r_concat_l γ).
 
   Definition compo_t M (Δ : ctx S.(typ)) : Type := ⦉ m_strat_act M Δ ×ᵢ m_strat_pas M Δ ⦊ᵢ .
 
@@ -313,12 +340,63 @@ TODO: concretize env
       destruct m as [? [i m]]; unfold dom' in *; cbn [dom' fst snd projT1 projT2] in *.
   Admitted.
 
-  Theorem ogs_correction (M : machine) {Γ} Δ (x y : M.(conf) Γ)
+  Lemma quatre_trois_app {M : machine} {MH : machine_law M} {Γ Δ}
+    (c : M.(conf) Γ) (e : Γ =[M.(val)]> Δ)
+    : it_eq (sub_eval_msg M e c) (compo _ (inj_init_act c) (inj_init_pas e)).
+    etransitivity.
+    2: apply (@quatre_trois M MH).
+    cbn [reduce fst snd projT1 projT2].
+    unfold inj_init_act, sub_eval_msg.
+    cbn [reduce fst snd projT1 projT2].
+    apply fmap_eq.
+    unfold c_ren.
+    rewrite MH.(c_sub_sub), MH.(c_sub_proper); try reflexivity.
+
+    intros ? i ? <-. unfold e_comp.
+    unfold s_map.
+    unfold v_ren.
+    rewrite MH.(v_sub_sub).
+    rewrite MH.(v_sub_var).
+    unfold e_comp, s_map.
+    rewrite MH.(v_sub_var).
+    unfold r_comp.
+    unfold inj_init_pas.
+    cbn [join_even].
+    rewrite concat1_equation_2, 2 concat1_equation_1.
+    unfold s_ren.
+    change (s_cat M.(v_var) ?u1 a (r_concat_r a ?u2)) with (s_ren (s_cat M.(v_var) u1) r_concat_r a u2).
+    rewrite (s_eq_cat_r _ _ _ _ _ eq_refl).
+    change (s_cat s_empty ?u1 a (r_concat_r a i)) with (s_ren (s_cat s_empty u1) r_concat_r a i).
+    rewrite (s_eq_cat_r _ _ _ _ _ eq_refl).
+    unfold e_comp, s_map.
+    etransitivity.
+    all: cycle 1.
+    apply MH.(v_sub_proper).
+    cbn [join_even].
+    symmetry.
+    exact (s_eq_cover_empty_r M.(v_var)).
+    2: symmetry; apply MH.(v_var_sub).
+    unfold e_ren, s_map, v_ren.
+    etransitivity.
+    symmetry; apply MH.(v_var_sub).
+    apply MH.(v_sub_proper); try reflexivity.
+    intros ? ? ? <-.
+    f_equal.
+    unfold r_concat_l, cover_cat.
+    symmetry.
+    exact (r_cover_l_nil _ _ x eq_refl).
+    Qed.
+
+  Theorem ogs_correction (M : machine) (MH : machine_law M) {Γ} Δ (x y : M.(conf) Γ)
           : barb M Δ x y -> ciu M Δ x y.
+  Proof.
     intros H e.
     unfold barb in H.
-    etransitivity. etransitivity.
-    2: refine (H e).
-    Admitted.
+    etransitivity.
+    apply it_eq_wbisim, (@quatre_trois_app M MH _ _ x e).
+    etransitivity.
+    apply (H e).
+    symmetry; apply it_eq_wbisim, (@quatre_trois_app M MH _ _ y e).
+  Qed.
 
 End a.

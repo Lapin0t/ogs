@@ -165,6 +165,29 @@ Section wbisim_facts1.
 Reversal, symmetry.
 |*)
 
+  Lemma it_wbisim_up2eq : const it_eq <= it_wbisim_t E X.
+    apply leq_t; intros R i x y H.
+    apply (gfp_fp (it_eq_map E X)) in H.
+    cbn in *; dependent destruction H; simpl_depind; eauto.
+  Qed.
+
+  Lemma it_wbisim_up2eqF : it_eq_map E X <= it_wbisim_t E X.
+    apply Coinduction; intros R i x y H.
+    cbn in *; dependent destruction H; simpl_depind; econstructor; eauto; econstructor.
+    - apply (b_T (it_wbisim_map E X)), t_rel.
+    - intro r; apply (b_T (it_wbisim_map E X)), k_rel.
+  Qed.
+
+  Lemma it_eq_wbisim : @it_eq I E X <= @it_wbisim I E X.
+    unfold it_wbisim, leq; cbn. unfold Basics.impl.
+    coinduction R CIH; intros i x y H.
+    apply (gfp_fp (it_eq_map E X)) in H.
+    cbn in *.
+    dependent destruction H; simpl_depind; eauto.
+    econstructor; eauto; econstructor.
+    intro r. apply CIH, k_rel.
+  Qed.
+    
   Lemma it_wbisim_up2sym : converseᵢ <= it_wbisim_t E X.
   Proof.
     apply leq_t; intros ? ? ? ? [ ? ? r1 r2 rr ].
