@@ -89,21 +89,31 @@ Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30).
 Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30).
 
 Definition sub_eq {F : ctx X -> X -> Type} Γ Δ : relation (Γ =[F]> Δ) :=
-  dpointwise_relation (fun x => eq ==> eq)%signature.
+  dpointwise_relation (fun x => pointwise_relation _ eq)%signature.
 
 #[global] Instance sub_equivalence {F Γ Δ} : Equivalence (@sub_eq F Γ Δ).
 econstructor.
-- intros u ? i ? ?. now f_equal.
-- intros u h ? i ? ? ?. symmetry. now apply (H i y x).
-- intros u v w h1 h2 ? i ? ?. transitivity (v a i). now apply h1. now apply h2.
+- intros u ? i; reflexivity.
+- intros u h ? i ?; symmetry; now apply (H i a).
+- intros u v w h1 h2 ? i. transitivity (v a i); [ now apply h1 | now apply h2 ].
 Qed.
 
 Definition s_ren {F Γ1 Γ2 Γ3} (a : Γ2 =[F]> Γ3) (b : Γ1 ⊆ Γ2) : Γ1 =[F]> Γ3 :=
   fun _ i => a _ (b _ i).
 
+#[global] Instance s_ren_proper {F Γ1 Γ2 Γ3} : Proper (sub_eq _ _ ==> sub_eq _ _ ==> sub_eq _ _) (@s_ren F Γ1 Γ2 Γ3) .
+Proof.
+  intros ? ? H1 ? ? H2 ? i.
+  unfold s_ren; now rewrite H2, H1.
+Qed.
+
 Definition r_id {Γ} : Γ ⊆ Γ := fun _ i => i .
 Definition r_comp {Γ1 Γ2 Γ3} (a : Γ2 ⊆ Γ3) (b : Γ1 ⊆ Γ2) : Γ1 ⊆ Γ3 :=
   s_ren a b.
+
+Lemma s_ren_comp {F Γ1 Γ2 Γ3 Γ4} (u : Γ3 =[F]> Γ4) (v : Γ2 ⊆ Γ3) (w : Γ1 ⊆ Γ2)
+      : sub_eq _ _ (s_ren u (r_comp v w)) (s_ren (s_ren u v) w).
+Proof. reflexivity. Qed.
 
 Definition r_pop {Γ : ctx X} {x : X} : Γ ⊆ (Γ ▶ x) := fun _ i => pop i.
 
@@ -206,7 +216,7 @@ Equations s_cover {F Γ1 Γ2 Γ3 Δ} : Γ1 ⊎ Γ2 ≡ Γ3 -> Γ1 =[F]> Δ -> Γ
   } .
 
 #[global] Instance s_cover_proper {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) : Proper (sub_eq _ _ ==> sub_eq _ _ ==> sub_eq _ _) (s_cover (F:=F) (Δ:=Δ) H).
-intros ? ? H1 ? ? H2 ? i ? <-.
+intros ? ? H1 ? ? H2 ? i.
 unfold s_cover, s_cover_clause_1.
 destruct (cover_split H i).
 now apply H1.
@@ -220,7 +230,7 @@ Definition r_concat_l {Γ Δ : ctx X} : Γ ⊆ (Γ +▶ Δ) :=
   r_cover_l cover_cat .
 
 Definition r_cover_l_nil {Γ} : sub_eq Γ (Γ +▶ ∅) (r_cover_l cover_nil_r) r_id .
-  intros ? i ? <-.
+  intros ? i.
   induction Γ.
   - dependent elimination i.
   - dependent elimination i.
@@ -244,7 +254,7 @@ Definition r_concat3_2 {Γ Δ ϒ : ctx X} : (Γ +▶ ϒ) ⊆ (Γ +▶ (Δ +▶ �
 Lemma s_eq_cover_empty_r {F Γ1 Δ} (u : Γ1 =[F]> Δ)
           : sub_eq _ _ (s_cat u s_empty) u.
 Proof.
-  intros ? i ? <-.
+  intros ? i.
   unfold s_cat, cover_cat, cover_nil_r, s_cover, s_cover_clause_1.
   dependent induction Γ1.
   - dependent elimination i.
@@ -277,7 +287,7 @@ Admitted.
 Lemma s_eq_cover_l {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
       : sub_eq _ _ (s_ren (s_cover H u v) (r_cover_l H)) u.
 Proof.
-  intros ? i ? <-. dependent induction H.
+  intros ? i. dependent induction H.
   - dependent elimination i.
   - dependent elimination i.
     + reflexivity.
@@ -305,7 +315,7 @@ Qed.
 Lemma s_eq_cover_r {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
       : sub_eq _ _ (s_ren (s_cover H u v) (r_cover_r H)) v.
 Proof.
-  dependent induction H; intros ? i ? <-.
+  dependent induction H; intros ? i.
   - dependent elimination i.
   - unfold s_ren, s_cover, s_cover_clause_1, r_comp.
     rewrite r_cover_r_equation_2, cover_split_equation_3.

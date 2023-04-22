@@ -64,44 +64,43 @@ TODO: concretize env
     c_sub {Γ Δ} : Γ =[val]> Δ -> conf Γ -> conf Δ ;
   }.
 
+  Definition env (M : machine) Γ Δ := Γ =[M.(val)]> Δ.
+
   Definition v_ren {M Γ Δ} : Γ ⊆ Δ -> M.(val) Γ ⇒ᵢ M.(val) Δ :=
-    fun u => M.(v_sub) (fun _ i => M.(v_var) _ (u _ i)) .
+    fun u => M.(v_sub) (s_ren M.(v_var) u) .
       
-  Definition e_comp {M Γ1 Γ2 Γ3} (u : Γ2 =[M.(val)]> Γ3) (v : Γ1 =[M.(val)]> Γ2)
-             : Γ1 =[M.(val)]> Γ3
+  Definition e_comp {M Γ1 Γ2 Γ3} (u : env M Γ2 Γ3) (v : env M Γ1 Γ2) : env M Γ1 Γ3
     := s_map (M.(v_sub) u) v.
 
   Definition e_ren {M Γ1 Γ2 Γ3} (u : Γ2 ⊆ Γ3) (v : Γ1 =[M.(val)]> Γ2)
              : Γ1 =[M.(val)]> Γ3
-    := s_map (v_ren u) v.
+    := e_comp (s_ren M.(v_var) u) v.
 
   Definition c_ren {M Γ1 Γ2} (u : Γ1 ⊆ Γ2) (c : M.(conf) Γ1) : M.(conf) Γ2
-    := M.(c_sub) (fun _ i => v_ren u _ (M.(v_var) _ i)) c.
+    := M.(c_sub) (e_ren u M.(v_var)) c.
 
-  Record machine_law (M : machine) : Type := {
+  Class machine_law (M : machine) : Prop := {
     v_sub_proper {Γ Δ}
-      : Proper
-          (sub_eq Γ Δ ==> (dpointwise_relation (fun i => eq ==> eq)))
+      :> Proper
+          (sub_eq Γ Δ ==> forall_relation (fun i => eq ==> eq))
           M.(v_sub) ;
     c_sub_proper {Γ Δ}
-      : Proper
+      :> Proper
           (sub_eq Γ Δ ==> eq ==> eq)
           M.(c_sub) ;
-    v_sub_var {Γ1 Γ2} (p : Γ1 =[M.(val)]> Γ2) {t} i
-      : M.(v_sub) p t (M.(v_var) t i)
-      = p t i ;
-    v_var_sub {Γ} {t} (v : M.(val) Γ t)
-      : M.(v_sub) M.(v_var) t v
-      = v ;
-    v_sub_sub {Γ1 Γ2 Γ3} p q {t} v
-      : M.(v_sub) p t (M.(v_sub) q t v)
-      = M.(v_sub) (@e_comp M Γ1 Γ2 Γ3 p q) t v ;
+    v_sub_var {Γ1 Γ2} (p : Γ1 =[M.(val)]> Γ2)
+      : sub_eq _ _ (e_comp p M.(v_var)) p ;
+    v_var_sub {Γ1 Γ2} (p : Γ1 =[M.(val)]> Γ2)
+      : sub_eq _ _ (e_comp M.(v_var) p) p ;
+    v_sub_sub {Γ1 Γ2 Γ3 Γ4}
+      (p : Γ3 =[M.(val)]> Γ4) (q : Γ2 =[M.(val)]> Γ3) (r : Γ1 =[M.(val)]> Γ2)
+      : sub_eq _ _ (e_comp p (e_comp q r)) (e_comp (e_comp p q) r) ;
     c_var_sub {Γ} (c : M.(conf) Γ)
       : M.(c_sub) M.(v_var) c
       = c ;
-    c_sub_sub {Γ1 Γ2 Γ3} u v x
-      : M.(c_sub) u (M.(c_sub) v x)
-      = M.(c_sub) (@e_comp M Γ1 Γ2 Γ3 u v) x ;
+    c_sub_sub {Γ1 Γ2 Γ3} (u : Γ2 =[M.(val)]> Γ3) (v : Γ1 =[M.(val)]> Γ2) {c}
+      : M.(c_sub) u (M.(c_sub) v c)
+      = M.(c_sub) (e_comp u v) c ;
   }. 
   Arguments c_sub_proper {M}.
   Arguments v_sub_proper {M}.
@@ -111,9 +110,41 @@ TODO: concretize env
   Arguments c_var_sub {M}.
   Arguments c_sub_sub {M}.
 
+  #[global] Instance e_comp_proper {M} {MH : machine_law M} {Γ1 Γ2 Γ3}
+             : Proper (sub_eq Γ2 Γ3 ==> sub_eq Γ1 Γ2 ==> sub_eq Γ1 Γ3) (@e_comp M _ _ _).
+    intros ? ? H1 ? ? H2 ? i.
+    unfold e_comp, s_map.
+    now rewrite H1, H2.
+  Qed.
+
+  #[global] Instance e_ren_proper {M} {MH : machine_law M} {Γ1 Γ2 Γ3}
+             : Proper (sub_eq Γ2 Γ3 ==> sub_eq Γ1 Γ2 ==> sub_eq Γ1 Γ3) (@e_ren M _ _ _).
+  intros ? ? H1 ? ? H2.
+  unfold e_ren. apply e_comp_proper; eauto. now rewrite H1.
+  Qed.
+
+  Lemma e_comp_ren_r {M Γ1 Γ2 Γ3 Γ4} (u : env M Γ3 Γ4) (v : env M Γ2 Γ3) (w : Γ1 ⊆ Γ2) :
+    sub_eq _ _ (e_comp u (s_ren v w)) (s_ren (e_comp u v) w) .
+    reflexivity.
+  Qed.
+
+  Lemma e_comp_ren_l {M} {MH : machine_law M} {Γ1 Γ2 Γ3 Γ4} (u : env M Γ3 Γ4) (v : Γ2 ⊆ Γ3) (w : env M Γ1 Γ2) :
+    sub_eq _ _ (e_comp (s_ren u v) w) (e_comp u (e_ren v w)) .
+    unfold e_ren.
+    now rewrite MH.(v_sub_sub), e_comp_ren_r, MH.(v_sub_var).
+  Qed.
+
   Program Definition sub_eval_msg {Γ Δ} (M : machine) (e : Γ =[M.(val)]> Δ) (t : M.(conf) Γ)
              : delay (msg' Δ)
     := fmap (fun _ => @projT1 _ _) _ (M.(eval) (M.(c_sub) e t)).
+
+  #[global] Instance sub_eval_msg_proper {Γ Δ} {M : machine} {MH : machine_law M}
+             : Proper (sub_eq Γ Δ ==> pointwise_relation _ eq) (@sub_eval_msg Γ Δ M).
+  Proof.
+    intros ? ? H1 e.
+    unfold sub_eval_msg.
+    now rewrite H1.
+  Qed.
 
   Definition ciu (M : machine) {Γ} Δ (x y : M.(conf) Γ) : Prop :=
     forall (e : Γ =[M.(val)]> Δ), it_wbisim (sub_eval_msg M e x) (sub_eval_msg M e y).
@@ -157,7 +188,7 @@ TODO: concretize env
   Equations concat0 {M Δ b a} : alt_env M Δ b a
              -> (join_even_odd_aux (negb b) a) =[M.(val)]> (Δ +▶ join_even_odd_aux b a) :=
     concat0 (ENil) := s_empty ;
-    concat0 (EConT u) := s_map (v_ren r_concat3_1) (concat0 u) ;
+    concat0 (EConT u) := e_ren r_concat3_1 (concat0 u) ;
     concat0 (EConF u e) := s_cat (concat0 u) e .
 
   (* Flattens a pair of alternating environments for resp. player and opponent into a "closed" substitution *)
@@ -336,55 +367,23 @@ TODO: concretize env
       cbn [fst snd projT1 projT2].
       rewrite MH.(c_sub_sub).
       unshelve rewrite MH.(c_sub_proper); try reflexivity.
-      intros ? ? ? ->.
-      destruct m as [? [i m]]; unfold dom' in *; cbn [dom' fst snd projT1 projT2] in *.
   Admitted.
 
   Lemma quatre_trois_app {M : machine} {MH : machine_law M} {Γ Δ}
     (c : M.(conf) Γ) (e : Γ =[M.(val)]> Δ)
     : it_eq (sub_eval_msg M e c) (compo _ (inj_init_act c) (inj_init_pas e)).
-    etransitivity.
-    2: apply (@quatre_trois M MH).
-    cbn [reduce fst snd projT1 projT2].
-    unfold inj_init_act, sub_eval_msg.
-    cbn [reduce fst snd projT1 projT2].
-    apply fmap_eq.
-    unfold c_ren.
-    rewrite MH.(c_sub_sub), MH.(c_sub_proper); try reflexivity.
-
-    intros ? i ? <-. unfold e_comp.
-    unfold s_map.
-    unfold v_ren.
-    rewrite MH.(v_sub_sub).
-    rewrite MH.(v_sub_var).
-    unfold e_comp, s_map.
-    rewrite MH.(v_sub_var).
-    unfold r_comp.
-    unfold inj_init_pas.
-    cbn [join_even].
-    rewrite concat1_equation_2, 2 concat1_equation_1.
-    unfold s_ren.
-    change (s_cat M.(v_var) ?u1 a (r_concat_r a ?u2)) with (s_ren (s_cat M.(v_var) u1) r_concat_r a u2).
-    rewrite (s_eq_cat_r _ _ _ _ _ eq_refl).
-    change (s_cat s_empty ?u1 a (r_concat_r a i)) with (s_ren (s_cat s_empty u1) r_concat_r a i).
-    rewrite (s_eq_cat_r _ _ _ _ _ eq_refl).
-    unfold e_comp, s_map.
-    etransitivity.
-    all: cycle 1.
-    apply MH.(v_sub_proper).
-    cbn [join_even].
-    symmetry.
-    exact (s_eq_cover_empty_r M.(v_var)).
-    2: symmetry; apply MH.(v_var_sub).
-    unfold e_ren, s_map, v_ren.
-    etransitivity.
-    symmetry; apply MH.(v_var_sub).
-    apply MH.(v_sub_proper); try reflexivity.
-    intros ? ? ? <-.
-    f_equal.
-    unfold r_concat_l, cover_cat.
-    symmetry.
-    exact (r_cover_l_nil _ _ x eq_refl).
+    etransitivity; [ | apply quatre_trois ].
+    unfold reduce, inj_init_act, sub_eval_msg; cbn [fst snd projT1 projT2]; apply fmap_eq.
+    cbv [inj_init_pas]; rewrite concat1_equation_2, 2 concat1_equation_1.
+    unfold c_ren; rewrite MH.(c_sub_sub), MH.(c_sub_proper) ; try reflexivity.
+    unfold e_ren; rewrite MH.(v_sub_sub), MH.(v_sub_var).
+    rewrite s_eq_cover_empty_r, e_comp_ren_r, MH.(v_sub_var), s_ren_comp, 2 (s_eq_cat_r).
+    etransitivity; [ | symmetry; apply MH.(v_var_sub) ].
+    etransitivity; [ | symmetry; apply e_comp_ren_l ].
+    etransitivity; [ | symmetry; apply MH.(v_var_sub) ].
+    symmetry; etransitivity.
+    apply e_ren_proper; [ apply r_cover_l_nil | reflexivity ].
+    apply MH.(v_var_sub).
     Qed.
 
   Theorem ogs_correction (M : machine) (MH : machine_law M) {Γ} Δ (x y : M.(conf) Γ)
