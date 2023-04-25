@@ -206,6 +206,26 @@ Equations cover_split {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] : zs ∋ x -> xs ∋
       { | inl j := inl j ;
       | inr j := inr (pop j) } .
 
+Equations r_cover_split_r {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] (i : zs ∋ x) {j : xs ∋ x} : cover_split p i = inl j -> i = r_cover_l p _ j :=
+  r_cover_split_r (CLeft c) top h := _ ;
+  r_cover_split_r (CRight c) top h := _ ;
+  r_cover_split_r (CLeft c) (pop i) h := _ ;
+  r_cover_split_r (CRight c) (pop i) h := _ .
+Next Obligation.
+Admitted.
+Next Obligation.
+Admitted.
+
+Equations r_cover_split_l {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] (i : zs ∋ x) {j : ys ∋ x} : cover_split p i = inr j -> i = r_cover_r p _ j :=
+  r_cover_split_l (CLeft c) top h := _ ;
+  r_cover_split_l (CRight c) top h := _ ;
+  r_cover_split_l (CLeft c) (pop i) h := _ ;
+  r_cover_split_l (CRight c) (pop i) h := _ .
+Next Obligation.
+Admitted.
+Next Obligation.
+Admitted.
+
 Equations s_empty {F Γ} : ∅ =[F]> Γ :=
   s_empty x (!).
 
@@ -223,6 +243,29 @@ Equations cover_assoc {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 :
     let '(_ ,' (x1 , x2)) := cover_assoc u v
     in (_ ,' (CRight x1 , CRight x2)) .
 
+Lemma cover_assoc_eq1 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
+  sub_eq _ _
+    (r_comp (r_cover_l H2)
+            (r_cover_l H1))
+    (r_cover_l (fst (projT2 (cover_assoc H1 H2)))).
+Admitted.
+
+Lemma cover_assoc_eq2 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
+  sub_eq _ _
+    (r_comp (r_cover_l H2)
+            (r_cover_r H1))
+    (r_comp (r_cover_r (fst (projT2 (cover_assoc H1 H2))))
+            (r_cover_l (snd (projT2 (cover_assoc H1 H2))))) .
+Admitted.
+
+Lemma cover_assoc_eq3 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
+  sub_eq _ _
+    (r_cover_r H2)
+    (r_comp (r_cover_r (fst (projT2 (cover_assoc H1 H2))))
+            (r_cover_r (snd (projT2 (cover_assoc H1 H2))))) .
+Admitted.
+
+
 Equations s_cover {F Γ1 Γ2 Γ3 Δ} : Γ1 ⊎ Γ2 ≡ Γ3 -> Γ1 =[F]> Δ -> Γ2 =[F]> Δ -> Γ3 =[F]> Δ :=
   s_cover h u v _ i with cover_split h i := {
     | inl j := u _ j ;
@@ -237,29 +280,6 @@ now apply H1.
 now apply H2.
 Qed.
 
-Definition s_cover_assoc {F Γ1 Γ2 Γ12 Γ3 Γ123 Δ}
-  (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
-  (u1 : Γ1 =[F]> Δ) (u2 : Γ2 =[F]> Δ) (u3 : Γ3 =[F]> Δ)
-  : sub_eq _ _ (s_cover H2 (s_cover H1 u1 u2) u3)
-      (let '(_ ,' (H1' , H2')) := cover_assoc H1 H2 in
-       s_cover H1' u1 (s_cover H2' u2 u3)).
-  funelim (cover_assoc H1 H2).
-  - intros ? i. dependent elimination i.
-  - intros ? i. cbn.
-    unfold s_cover, s_cover_clause_1.
-    dependent elimination i; destruct (cover_assoc u v) as [x0' [H1' H2']]; simp cover_split.
-    + reflexivity.
-    + unfold cover_split_clause_3.
-      etransitivity.
-      1: symmetry; exact (H F Δ (fun _ i => u1 _ (pop i)) u2 u3 x1 h).
-      * reflexivity.
-    + simp cover_split.
-      * simp cover_split.
-      reflexivity.
-      
-      
-unfold s_cover, s_cover_clause_1.
-Abort.
 
 
 Definition s_cat {F Γ1 Γ2 Δ} : Γ1 =[F]> Δ -> Γ2 =[F]> Δ -> (Γ1 +▶ Γ2) =[F]> Δ :=
@@ -384,6 +404,29 @@ Lemma s_eq_cat_r {F Γ1 Γ2 Δ}
           : sub_eq _ _ (s_ren (s_cat u v) r_concat_r) v.
   apply s_eq_cover_r.
 Qed.
+
+Lemma s_eq_cover_uniq {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ) (w : Γ3 =[F]> Δ)
+       (H1 : sub_eq _ _ u (s_ren w (r_cover_l H)))
+       (H2 : sub_eq _ _ v (s_ren w (r_cover_r H)))
+       : sub_eq _ _ (s_cover H u v) w.
+  intros ? i.
+  unfold s_cover, s_cover_clause_1.
+  destruct (cover_split H i) eqn:?.
+  rewrite (r_cover_split_r H _ Heqs); apply H1.
+  rewrite (r_cover_split_l H _ Heqs); apply H2.
+Qed.
+
+Definition s_cover_assoc {F Γ1 Γ2 Γ12 Γ3 Γ123 Δ}
+  (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
+  (u1 : Γ1 =[F]> Δ) (u2 : Γ2 =[F]> Δ) (u3 : Γ3 =[F]> Δ)
+  : sub_eq _ _ (s_cover H2 (s_cover H1 u1 u2) u3)
+       (s_cover (fst (projT2 (cover_assoc H1 H2))) u1 (s_cover (snd (projT2 (cover_assoc H1 H2))) u2 u3)).
+  apply s_eq_cover_uniq.
+  + apply s_eq_cover_uniq; rewrite <- s_ren_comp.
+    * now rewrite cover_assoc_eq1, s_eq_cover_l.
+    * now rewrite cover_assoc_eq2, s_ren_comp, s_eq_cover_r, s_eq_cover_l.
+  + now rewrite (cover_assoc_eq3 H1), s_ren_comp, 2 s_eq_cover_r.
+  Qed.
 
 End lemma.
 
