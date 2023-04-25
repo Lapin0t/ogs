@@ -91,6 +91,8 @@ Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30).
 Definition sub_eq {F : ctx X -> X -> Type} Γ Δ : relation (Γ =[F]> Δ) :=
   dpointwise_relation (fun x => pointwise_relation _ eq)%signature.
 
+Notation "u ≡ₛ v" := (sub_eq _ _ u v) (at level 50).
+
 #[global] Instance sub_equivalence {F Γ Δ} : Equivalence (@sub_eq F Γ Δ).
 econstructor.
 - intros u ? i; reflexivity.
@@ -100,6 +102,7 @@ Qed.
 
 Definition s_ren {F Γ1 Γ2 Γ3} (a : Γ2 =[F]> Γ3) (b : Γ1 ⊆ Γ2) : Γ1 =[F]> Γ3 :=
   fun _ i => a _ (b _ i).
+Infix "⊛ᵣ" := s_ren (at level 14).
 
 #[global] Instance s_ren_proper {F Γ1 Γ2 Γ3} : Proper (sub_eq _ _ ==> sub_eq _ _ ==> sub_eq _ _) (@s_ren F Γ1 Γ2 Γ3) .
 Proof.
@@ -109,10 +112,10 @@ Qed.
 
 Definition r_id {Γ} : Γ ⊆ Γ := fun _ i => i .
 Definition r_comp {Γ1 Γ2 Γ3} (a : Γ2 ⊆ Γ3) (b : Γ1 ⊆ Γ2) : Γ1 ⊆ Γ3 :=
-  s_ren a b.
+  a ⊛ᵣ b.
 
 Lemma s_ren_comp {F Γ1 Γ2 Γ3 Γ4} (u : Γ3 =[F]> Γ4) (v : Γ2 ⊆ Γ3) (w : Γ1 ⊆ Γ2)
-      : sub_eq _ _ (s_ren u (r_comp v w)) (s_ren (s_ren u v) w).
+      : u ⊛ᵣ (r_comp v w) ≡ₛ (u ⊛ᵣ v) ⊛ᵣ w.
 Proof. reflexivity. Qed.
 
 Definition r_pop {Γ : ctx X} {x : X} : Γ ⊆ (Γ ▶ x) := fun _ i => pop i.
@@ -151,9 +154,6 @@ Inductive cover : ctx X -> ctx X -> ctx X -> Type :=
 | CLeft {x xs ys zs} : cover xs ys zs ->  cover (xs ▶ x) ys       (zs ▶ x)
 | CRight {x xs ys zs} : cover xs ys zs -> cover xs       (ys ▶ x) (zs ▶ x)
 .
-Arguments CNil.
-Arguments CLeft {x xs ys zs} c.
-Arguments CRight {x xs ys zs} c.
 Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30).
 Derive NoConfusion for cover.
 
@@ -172,59 +172,63 @@ Equations cover_cat {xs} ys : xs ⊎ ys ≡ (xs +▶ ys) :=
   cover_cat (ys ▶ y) := CRight (cover_cat ys) .
 #[global] Arguments cover_cat {xs ys}.
 
-Equations cat_cover {xs0 xs1 ys0 ys1 zs0 zs1} : xs0 ⊎ ys0 ≡ zs0 -> xs1 ⊎ ys1 ≡ zs1
-    -> (xs0 +▶ xs1) ⊎ (ys0 +▶ ys1) ≡ (zs0 +▶ zs1) :=
+Equations cat_cover {xs0 xs1 ys0 ys1 zs0 zs1}
+          : xs0 ⊎ ys0 ≡ zs0
+          -> xs1 ⊎ ys1 ≡ zs1
+          -> (xs0 +▶ xs1) ⊎ (ys0 +▶ ys1) ≡ (zs0 +▶ zs1) :=
   cat_cover a (CNil)     := a ;
   cat_cover a (CLeft b)  := CLeft (cat_cover a b) ;
   cat_cover a (CRight b) := CRight (cat_cover a b) .
 
-Equations ext_cover_l {xs ys zs} (u : ctx X) : xs ⊎ ys ≡ zs -> (xs +▶ u) ⊎ ys ≡ (zs +▶ u) :=
-  ext_cover_l ∅ c := c ; 
-  ext_cover_l (uu ▶ _) c := CLeft (ext_cover_l uu c) .
+Equations ext_cover_l {xs ys zs} (Γ : ctx X)
+          : xs ⊎ ys ≡ zs
+          -> (xs +▶ Γ) ⊎ ys ≡ (zs +▶ Γ) :=
+  ext_cover_l ∅       c := c ; 
+  ext_cover_l (Γ ▶ _) c := CLeft (ext_cover_l Γ c) .
 
-Equations ext_cover_r {xs ys zs} (u : ctx X) : xs ⊎ ys ≡ zs -> xs ⊎ (ys +▶ u) ≡ (zs +▶ u) :=
+Equations ext_cover_r {xs ys zs} (Γ : ctx X)
+          : xs ⊎ ys ≡ zs
+          -> xs ⊎ (ys +▶ Γ) ≡ (zs +▶ Γ) :=
   ext_cover_r ∅ c := c ; 
-  ext_cover_r (uu ▶ _) c := CRight (ext_cover_r uu c) .
+  ext_cover_r (Γ ▶ _) c := CRight (ext_cover_r Γ c) .
 
-Equations r_cover_l {xs ys zs} (p : xs ⊎ ys ≡ zs) : xs ⊆ zs :=
+Equations r_cover_l {xs ys zs} : xs ⊎ ys ≡ zs -> xs ⊆ zs :=
   r_cover_l (CLeft c)  _ top     := top ;
   r_cover_l (CLeft c)  _ (pop i) := pop (r_cover_l c _ i) ;
   r_cover_l (CRight c) _ i       := pop (r_cover_l c _ i) .
 
-Equations r_cover_r {xs ys zs} (p : xs ⊎ ys ≡ zs) : ys ⊆ zs :=
+Equations r_cover_r {xs ys zs} : xs ⊎ ys ≡ zs -> ys ⊆ zs :=
   r_cover_r (CLeft c)  _ i       := pop (r_cover_r c _ i) ;
   r_cover_r (CRight c) _ top     := top ;
   r_cover_r (CRight c) _ (pop i) := pop (r_cover_r c _ i) .
 
-Equations cover_split {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] : zs ∋ x -> xs ∋ x + ys ∋ x:=
-  cover_split (CLeft c)  top     := inl top ;
-  cover_split (CRight c) top     := inr top ;
-  cover_split (CLeft c)  (pop i) with cover_split c i :=
+Equations cover_split {xs ys zs} : xs ⊎ ys ≡ zs -> has zs ⇒ᵢ (has xs +ᵢ has ys) :=
+  cover_split (CLeft c)  _ top     := inl top ;
+  cover_split (CRight c) _ top     := inr top ;
+  cover_split (CLeft c)  _ (pop i) with cover_split c _ i :=
       { | inl j := inl (pop j) ;
         | inr j := inr j } ;
-  cover_split (CRight c) (pop i) with cover_split c i :=
+  cover_split (CRight c) _ (pop i) with cover_split c _ i :=
       { | inl j := inl j ;
-      | inr j := inr (pop j) } .
+        | inr j := inr (pop j) } .
 
-Equations r_cover_split_r {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] (i : zs ∋ x) {j : xs ∋ x} : cover_split p i = inl j -> i = r_cover_l p _ j :=
-  r_cover_split_r (CLeft c) top h := _ ;
-  r_cover_split_r (CRight c) top h := _ ;
-  r_cover_split_r (CLeft c) (pop i) h := _ ;
-  r_cover_split_r (CRight c) (pop i) h := _ .
-Next Obligation.
-Admitted.
-Next Obligation.
-Admitted.
+Lemma cover_split_inv_r {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] (i : zs ∋ x) (j : xs ∋ x)
+          : cover_split p _ i = inl j
+            -> i = r_cover_l p _ j.
+  revert xs ys zs p x i j; induction p; intros ? i j H.
+  all: dependent destruction i; cbn in H; try now inversion H.
+  all: destruct (cover_split p _ i) eqn:Hs; inversion_clear H in Hs.
+  all: cbn; f_equal; now apply IHp.
+Qed.
 
-Equations r_cover_split_l {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] (i : zs ∋ x) {j : ys ∋ x} : cover_split p i = inr j -> i = r_cover_r p _ j :=
-  r_cover_split_l (CLeft c) top h := _ ;
-  r_cover_split_l (CRight c) top h := _ ;
-  r_cover_split_l (CLeft c) (pop i) h := _ ;
-  r_cover_split_l (CRight c) (pop i) h := _ .
-Next Obligation.
-Admitted.
-Next Obligation.
-Admitted.
+Lemma cover_split_inv_l {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] (i : zs ∋ x) (j : ys ∋ x)
+          : cover_split p _ i = inr j
+            -> i = r_cover_r p _ j.
+  revert xs ys zs p x i j; induction p; intros ? i j H.
+  all: dependent destruction i; cbn in H; try now inversion H.
+  all: destruct (cover_split p _ i) eqn:Hs; inversion_clear H in Hs.
+  all: cbn; f_equal; now apply IHp.
+Qed.
 
 Equations s_empty {F Γ} : ∅ =[F]> Γ :=
   s_empty x (!).
@@ -243,53 +247,70 @@ Equations cover_assoc {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 :
     let '(_ ,' (x1 , x2)) := cover_assoc u v
     in (_ ,' (CRight x1 , CRight x2)) .
 
+Definition cover_assoc_ctx {Γ1 Γ2 Γ12 Γ3 Γ123} H1 H2 := projT1 (@cover_assoc Γ1 Γ2 Γ12 Γ3 Γ123 H1 H2).
+Definition cover_assoc1 {Γ1 Γ2 Γ12 Γ3 Γ123} H1 H2 := fst (projT2 (@cover_assoc Γ1 Γ2 Γ12 Γ3 Γ123 H1 H2)).
+Definition cover_assoc2 {Γ1 Γ2 Γ12 Γ3 Γ123} H1 H2 := snd (projT2 (@cover_assoc Γ1 Γ2 Γ12 Γ3 Γ123 H1 H2)).
+
+
 Lemma cover_assoc_eq1 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
-  sub_eq _ _
-    (r_comp (r_cover_l H2)
-            (r_cover_l H1))
-    (r_cover_l (fst (projT2 (cover_assoc H1 H2)))).
-Admitted.
+    r_cover_l H2 ⊛ᵣ r_cover_l H1 ≡ₛ r_cover_l (cover_assoc1 H1 H2).
+Proof.
+  unfold cover_assoc1; funelim (cover_assoc H1 H2); simp cover_assoc.
+  dependent destruction u; intros ? i; dependent destruction i.
+  all: destruct (cover_assoc u v) as [ ? [ u' v' ]]; cbn [fst snd projT1 projT2] in *.
+  all: intros ? i.
+  dependent destruction i; eauto.
+  all: cbn; f_equal; apply H.
+  Qed.
 
 Lemma cover_assoc_eq2 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
-  sub_eq _ _
-    (r_comp (r_cover_l H2)
-            (r_cover_r H1))
-    (r_comp (r_cover_r (fst (projT2 (cover_assoc H1 H2))))
-            (r_cover_l (snd (projT2 (cover_assoc H1 H2))))) .
-Admitted.
+    r_cover_l H2 ⊛ᵣ r_cover_r H1
+    ≡ₛ
+    r_cover_r (cover_assoc1 H1 H2) ⊛ᵣ r_cover_l (cover_assoc2 H1 H2) .
+Proof.
+  unfold cover_assoc1, cover_assoc2; funelim (cover_assoc H1 H2); simp cover_assoc.
+  dependent destruction u; intros ? i; dependent destruction i.
+  all: destruct (cover_assoc u v) as [ ? [ u' v' ]]; cbn [fst snd projT1 projT2] in *.
+  all: intros ? i.
+  2: dependent destruction i; eauto.
+  all: cbn; f_equal; apply H.
+Qed.
 
 Lemma cover_assoc_eq3 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
-  sub_eq _ _
-    (r_cover_r H2)
-    (r_comp (r_cover_r (fst (projT2 (cover_assoc H1 H2))))
-            (r_cover_r (snd (projT2 (cover_assoc H1 H2))))) .
-Admitted.
-
+    r_cover_r H2 ≡ₛ 
+    r_cover_r (cover_assoc1 H1 H2) ⊛ᵣ r_cover_r (cover_assoc2 H1 H2) .
+Proof.
+  unfold cover_assoc1, cover_assoc2; funelim (cover_assoc H1 H2); simp cover_assoc.
+  dependent destruction u; intros ? i; dependent destruction i.
+  all: destruct (cover_assoc u v) as [ ? [ u' v' ]]; cbn [fst snd projT1 projT2] in *.
+  all: intros ? i.
+  3: dependent destruction i; eauto.
+  all: cbn; f_equal; apply H.
+Qed.
 
 Equations s_cover {F Γ1 Γ2 Γ3 Δ} : Γ1 ⊎ Γ2 ≡ Γ3 -> Γ1 =[F]> Δ -> Γ2 =[F]> Δ -> Γ3 =[F]> Δ :=
-  s_cover h u v _ i with cover_split h i := {
+  s_cover h u v _ i with cover_split h _ i := {
     | inl j := u _ j ;
     | inr j := v _ j
   } .
+Notation "[ u , H , v ]" := (s_cover H u v) (at level 9).
 
 #[global] Instance s_cover_proper {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) : Proper (sub_eq _ _ ==> sub_eq _ _ ==> sub_eq _ _) (s_cover (F:=F) (Δ:=Δ) H).
 intros ? ? H1 ? ? H2 ? i.
 unfold s_cover, s_cover_clause_1.
-destruct (cover_split H i).
-now apply H1.
-now apply H2.
+destruct (cover_split H _ i); [ now apply H1 | now apply H2 ].
 Qed.
 
 
 
 Definition s_cat {F Γ1 Γ2 Δ} : Γ1 =[F]> Δ -> Γ2 =[F]> Δ -> (Γ1 +▶ Γ2) =[F]> Δ :=
   s_cover cover_cat .
-Notation "[ u , v ]" := (s_cat u v) (at level 14, only printing, format "[ u  ,  v ]").
+Notation "[ u , v ]" := (s_cat u v) (at level 9).
 
 Definition r_concat_l {Γ Δ : ctx X} : Γ ⊆ (Γ +▶ Δ) :=
   r_cover_l cover_cat .
 
-Definition r_cover_l_nil {Γ} : sub_eq Γ Γ (r_cover_l cover_nil_r) r_id .
+Definition r_cover_l_nil {Γ} : r_cover_l cover_nil_r ≡ₛ @r_id Γ .
   intros ? i.
   induction Γ.
   - dependent elimination i.
@@ -306,13 +327,12 @@ Definition s_map {F G Γ Δ1 Δ2} (f : F Δ1 ⇒ᵢ G Δ2) (u : Γ =[F]> Δ1) : 
   fun _ i => f _ (u _ i) .
 
 Definition r_concat3_1 {Γ Δ ϒ : ctx X} : (Γ +▶ Δ) ⊆ (Γ +▶ (Δ +▶ ϒ)) :=
-  s_cat r_concat_l (r_comp r_concat_r r_concat_l).
+  [ r_concat_l , r_concat_r ⊛ᵣ r_concat_l ].
 
 Definition r_concat3_2 {Γ Δ ϒ : ctx X} : (Γ +▶ ϒ) ⊆ (Γ +▶ (Δ +▶ ϒ)) :=
-  s_cat r_concat_l (r_comp r_concat_r r_concat_r).
+  [ r_concat_l , r_concat_r ⊛ᵣ r_concat_r ].
 
-Lemma s_eq_cover_empty_r {F Γ1 Δ} (u : Γ1 =[F]> Δ)
-          : sub_eq _ _ (s_cat u s_empty) u.
+Lemma s_eq_cover_empty_r {F Γ1 Δ} (u : Γ1 =[F]> Δ) : [ u , s_empty ] ≡ₛ u.
 Proof.
   intros ? i.
   unfold s_cat, cover_cat, cover_nil_r, s_cover, s_cover_clause_1.
@@ -326,7 +346,7 @@ Proof.
                                 match xs as c return (c ⊎ ∅ ≡ c) with
                                 | ∅%ctx => CNil
                                 | (c ▶ x)%ctx => CLeft (cover_nil_r c)
-                                end) Γ0) h
+                                end) Γ0) _ h
                     with
                     | inl h0 => u x1 (pop h0)
                     | inr h0 => s_empty x1 h0
@@ -335,92 +355,95 @@ Proof.
                                 match xs as c return (c ⊎ ∅ ≡ c) with
                                 | ∅%ctx => CNil
                                 | (c ▶ x)%ctx => CLeft (cover_nil_r c)
-                                end) Γ0) h);
+                                end) Γ0) _ h);
         eauto.
       apply (IHΓ1 _ (fun _ i => u _ (pop i))).
   Qed.
 
-Lemma s_eq_cover_empty_l {F Γ1 Δ} (u : Γ1 =[F]> Δ)
-          : sub_eq _ _ (s_cat s_empty u) (rew <- [fun x => x =[F]> _] ccat_empty_l in u).
-Admitted.
 
 Lemma s_eq_cover_l {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
-      : sub_eq _ _ (s_ren (s_cover H u v) (r_cover_l H)) u.
+      : [ u , H , v ] ⊛ᵣ r_cover_l H ≡ₛ u.
 Proof.
   intros ? i. dependent induction H.
   - dependent elimination i.
   - dependent elimination i.
     + reflexivity.
     + unfold s_ren, s_cover, s_cover_clause_1; cbn; unfold cover_split_clause_3.
-      transitivity (match cover_split H (r_cover_l H _ h) with
+      transitivity (match cover_split H _ (r_cover_l H _ h) with
                     | inl h0 => u _ (pop h0)
                     | inr h0 => v _ h0
                     end).
-      destruct (cover_split H (r_cover_l H _ h)); eauto.
+      destruct (cover_split H _ (r_cover_l H _ h)); eauto.
       now apply (IHcover (fun _ i => u _ (pop i)) v).
   - unfold s_ren, s_cover, s_cover_clause_1; cbn; unfold cover_split_clause_4.
-    transitivity (match cover_split H (r_cover_l H _ i) with
+    transitivity (match cover_split H _ (r_cover_l H _ i) with
                   | inl h0 => u _ h0
                   | inr h0 => v _ (pop h0)
                   end).
-    destruct (cover_split H (r_cover_l H _ i)); eauto.
+    destruct (cover_split H _ (r_cover_l H _ i)); eauto.
     now apply (IHcover u (fun _ i => v _ (pop i))).
 Qed.
 
 Lemma s_eq_cat_l {F Γ1 Γ2 Δ} (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
-      : sub_eq _ _ (s_ren (s_cat u v) r_concat_l) u.
+      : [ u , v ] ⊛ᵣ r_concat_l ≡ₛ u.
   apply s_eq_cover_l.
 Qed.
 
 Lemma s_eq_cover_r {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
-      : sub_eq _ _ (s_ren (s_cover H u v) (r_cover_r H)) v.
+      : [ u , H , v ] ⊛ᵣ r_cover_r H ≡ₛ v.
 Proof.
   dependent induction H; intros ? i.
   - dependent elimination i.
   - unfold s_ren, s_cover, s_cover_clause_1, r_comp.
     rewrite r_cover_r_equation_2, cover_split_equation_3.
       unfold cover_split_clause_3.
-      transitivity (match cover_split H (r_cover_r H _ i) with
+      transitivity (match cover_split H _ (r_cover_r H _ i) with
                     | inl h0 => u _ (pop h0)
                     | inr h0 => v _ h0
                     end).
-      destruct (cover_split H (r_cover_r H a i)); eauto.
+      destruct (cover_split H _ (r_cover_r H a i)); eauto.
       now apply (IHcover (fun _ i => u _ (pop i)) v).
   - dependent elimination i.
     reflexivity.
     unfold s_ren, s_cover, s_cover_clause_1, r_comp.
     rewrite r_cover_r_equation_4, cover_split_equation_5.
     unfold cover_split_clause_4.
-    transitivity (match cover_split H (r_cover_r H _ h) with
+    transitivity (match cover_split H _ (r_cover_r H _ h) with
                   | inl h0 => u _ h0
                   | inr h0 => v _ (pop h0)
                   end).
-    destruct (cover_split H (r_cover_r H x1 h)); eauto.
+    destruct (cover_split H _ (r_cover_r H x1 h)); eauto.
     now apply (IHcover u (fun _ i => v _ (pop i))).
 Qed.
 
-Lemma s_eq_cat_r {F Γ1 Γ2 Δ}
-           (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
-          : sub_eq _ _ (s_ren (s_cat u v) r_concat_r) v.
+Lemma s_eq_cat_r {F Γ1 Γ2 Δ} (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
+      : [ u , v ] ⊛ᵣ r_concat_r ≡ₛ v.
   apply s_eq_cover_r.
 Qed.
 
-Lemma s_eq_cover_uniq {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ) (w : Γ3 =[F]> Δ)
-       (H1 : sub_eq _ _ u (s_ren w (r_cover_l H)))
-       (H2 : sub_eq _ _ v (s_ren w (r_cover_r H)))
-       : sub_eq _ _ (s_cover H u v) w.
+Lemma s_eq_cover_uniq {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3)
+       (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ) (w : Γ3 =[F]> Δ)
+       (H1 : u ≡ₛ w ⊛ᵣ r_cover_l H)
+       (H2 : v ≡ₛ w ⊛ᵣ r_cover_r H)
+       : [ u , H , v ] ≡ₛ w .
   intros ? i.
   unfold s_cover, s_cover_clause_1.
-  destruct (cover_split H i) eqn:?.
-  rewrite (r_cover_split_r H _ Heqs); apply H1.
-  rewrite (r_cover_split_l H _ Heqs); apply H2.
+  destruct (cover_split H _ i) eqn:Hs.
+  rewrite (cover_split_inv_r H _ _ Hs); apply H1.
+  rewrite (cover_split_inv_l H _ _ Hs); apply H2.
 Qed.
+
+(*
+Lemma s_eq_cover_empty_l {F Γ1 Δ} (u : Γ1 =[F]> Δ)
+          : [ s_empty , u ] ≡ₛ (rew <- [fun x => x =[F]> _] ccat_empty_l in u).
+*)
+
 
 Definition s_cover_assoc {F Γ1 Γ2 Γ12 Γ3 Γ123 Δ}
   (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
   (u1 : Γ1 =[F]> Δ) (u2 : Γ2 =[F]> Δ) (u3 : Γ3 =[F]> Δ)
-  : sub_eq _ _ (s_cover H2 (s_cover H1 u1 u2) u3)
-       (s_cover (fst (projT2 (cover_assoc H1 H2))) u1 (s_cover (snd (projT2 (cover_assoc H1 H2))) u2 u3)).
+  : [ [ u1 , H1 , u2 ] , H2 , u3 ]
+    ≡ₛ [ u1 , cover_assoc1 H1 H2 , [ u2 , cover_assoc2 H1 H2 , u3 ] ].
   apply s_eq_cover_uniq.
   + apply s_eq_cover_uniq; rewrite <- s_ren_comp.
     * now rewrite cover_assoc_eq1, s_eq_cover_l.
@@ -437,4 +460,7 @@ End lemma.
 #[global] Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30) : type_scope.
 #[global] Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30) : type_scope.
 #[global] Notation "a ∘⊆ b" := (r_comp a%ctx b%ctx) (at level 30).
-#[global] Notation "[ u , v ]" := (s_cat u v) (at level 14, only printing, format "[ u  ,  v ]").
+#[global] Notation "[ u , v ]" := (s_cat u v) (at level 14).
+#[global] Notation "u ≡ₛ v" := (sub_eq _ _ u v) (at level 50).
+
+#[global] Infix "⊛ᵣ" := s_ren (at level 14).
