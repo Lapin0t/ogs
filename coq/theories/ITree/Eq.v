@@ -64,9 +64,10 @@ Definition it_eq_map {I} E X : mon (relᵢ (@itree I E X) (@itree I E X)) := {|
 |}.
 
 Definition it_eq {I E X} [i] := gfp (@it_eq_map I E X) i.
-Notation it_eq_t E X := (t (it_eq_map E X)).
-Notation it_eq_bt E X := (bt (it_eq_map E X)).
-Notation it_eq_T E X := (T (it_eq_map E X)).
+#[global] Notation it_eq_t E X := (t (it_eq_map E X)).
+#[global] Notation it_eq_bt E X := (bt (it_eq_map E X)).
+#[global] Notation it_eq_T E X := (T (it_eq_map E X)).
+#[global] Notation "a ≊ b" := (it_eq a b) (at level 20).
 
 #[global] Instance it_eqbt_mon {I} {E : event I I} {X} : Proper (leq ==> leq) (@it_eq_bt E X).
   intros R1 R2 H i x y. apply it_eqF_mon. rewrite H. reflexivity.
@@ -155,6 +156,8 @@ End wbisim.
 #[global] Notation it_wbisim_T E X := (T (it_wbisim_map E X)).
 
 #[global] Arguments it_wbisim {I E X} [i].
+#[global] Notation "a ≈ b" := (it_wbisim a b) (at level 20).
+
 #[global] Arguments WBisim {I E X RR i t1 t2 x1 x2}.
 #[global] Hint Constructors it_wbisimF : core.
 

@@ -80,10 +80,10 @@ TODO: concretize env
 
   Definition e_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
     := fun u v => (v_var ⊛ᵣ u) ⊛ v.
-  Infix "⊛ᵣ'" := e_ren (at level 14).
+  Infix "ᵣ⊛" := e_ren (at level 14).
 
   Definition c_ren {Γ1 Γ2} : Γ1 ⊆ Γ2 -> conf Γ1 -> conf Γ2
-    := fun u c => (u ⊛ᵣ' v_var) @ₜ c.
+    := fun u c => (u ᵣ⊛ v_var) @ₜ c.
 
   Class machine_law : Prop := {
     v_sub_proper {Γ Δ}
@@ -124,7 +124,7 @@ TODO: concretize env
   Qed.
 
   Lemma e_comp_ren_l {Γ1 Γ2 Γ3 Γ4} (u : Γ3 ⇒ᵥ Γ4) (v : Γ2 ⊆ Γ3) (w : Γ1 ⇒ᵥ Γ2)
-        : (u ⊛ᵣ v) ⊛ w ≡ₛ u ⊛ (v ⊛ᵣ' w) .
+        : (u ⊛ᵣ v) ⊛ w ≡ₛ u ⊛ (v ᵣ⊛ w) .
     unfold e_ren.
     now rewrite v_sub_sub, e_comp_ren_r, v_sub_var.
   Qed.
@@ -142,7 +142,7 @@ TODO: concretize env
   Qed.
 
   Definition ciu {Γ} Δ (x y : conf Γ) : Prop :=
-    forall (e : Γ ⇒ᵥ Δ), it_wbisim (sub_eval_msg e x) (sub_eval_msg e y).
+    forall e : Γ ⇒ᵥ Δ, sub_eval_msg e x ≈ sub_eval_msg e y.
 
   (* Section 3: game definition
      ↓+ ~ join_even
@@ -186,7 +186,7 @@ TODO: concretize env
   (* flattens an alternating environment into an unstructured one *)
   Equations concat0 {Δ b a} : alt_env Δ b a -> ↓[negb b] a ⇒ᵥ (Δ +▶ ↓[b] a) :=
     concat0 (ENil) := s_empty ;
-    concat0 (EConT u) := r_concat3_1 ⊛ᵣ' concat0 u ;
+    concat0 (EConT u) := r_concat3_1 ᵣ⊛ concat0 u ;
     concat0 (EConF u e) := [ concat0 u , e ] .
 
   (* Flattens a pair of alternating environments for resp. player and opponent into a "closed" substitution *)
@@ -232,7 +232,7 @@ TODO: concretize env
   Definition m_strat_resp {Δ a} (x : m_strat_pas Δ a)
     : h_pasv ogs_hg (m_strat_act Δ) a
     := fun m =>
-         ([ (r_concat3_1 ⊛ᵣ' concat0 x) , (r_concat_r ∘⊆ r_concat_r) ⊛ᵣ' v_var ] @ₜ emb m ,
+         ([ (r_concat3_1 ᵣ⊛ concat0 x) , (r_concat_r ∘⊆ r_concat_r) ᵣ⊛ v_var ] @ₜ emb m ,
           EConT x).
 
   Definition m_strat {Δ} : m_strat_act Δ ⇒ᵢ itree ogs_e (fun _ => msg' Δ) :=
@@ -272,8 +272,7 @@ TODO: concretize env
 
   (* guilhem: rename? *)
   Definition barb {Γ} Δ (x y : conf Γ) : Prop :=
-    forall e : Γ ⇒ᵥ Δ,
-    it_wbisim (inj_init_act x ∥ inj_init_pas e) (inj_init_act y ∥ inj_init_pas e).
+    forall e : Γ ⇒ᵥ Δ, (inj_init_act x ∥ inj_init_pas e) ≈ (inj_init_act y ∥ inj_init_pas e).
 
   Equations reduce {Δ} : (fun (_ : T1) => compo_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => msg' Δ) :=
     reduce T1_0 u := sub_eval_msg
@@ -281,11 +280,12 @@ TODO: concretize env
                        (fst (fst (projT2 u))) .
 
   Lemma quatre_trois_pre {Δ} (x : compo_t Δ)
-    : it_eq
+    : 
         (compo_body T1_0 x >>= fun _ r => go (match r with
                                      | inl x' => TauF (reduce _ x')
                                      | inr y => RetF (y : (fun _ => msg' _) _)
                                      end))
+        ≊
       (eval (fst (fst (projT2 x))) >>=
                       fun _ u =>
                         go (match cover_split cover_cat _ (fst (projT2 (projT1 u))) with
@@ -327,10 +327,10 @@ TODO: concretize env
   Hypothesis eval_hyp : forall {Γ Δ}
                           (c : conf (Δ +▶ Γ))
                           (e : Γ ⇒ᵥ Δ),
-                          it_eq (eval_sub_1 c e) (eval_sub_2 c e) .
+                          eval_sub_1 c e ≊ eval_sub_2 c e .
 
   Lemma quatre_trois {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a)
-    : it_eq (reduce _ (_ ,' (c , e))) (c ∥ e) .
+    : reduce _ (_ ,' (c , e)) ≊ (c ∥ e) .
     refine (iter_lem compo_body reduce _ _ (_ ,' (c , e))).
     clear a c e; intros [] [ ? [ u v ] ].
     etransitivity; cycle 1.
@@ -362,7 +362,7 @@ TODO: concretize env
 
   Lemma quatre_trois_app {Γ Δ}
     (c : conf Γ) (e : Γ ⇒ᵥ Δ)
-    : it_eq (sub_eval_msg e c) (inj_init_act c ∥ inj_init_pas e).
+    : sub_eval_msg e c ≊ (inj_init_act c ∥ inj_init_pas e).
   Proof.
     rewrite <- quatre_trois.
     unfold reduce, inj_init_act, sub_eval_msg; cbn [fst snd projT1 projT2]; apply fmap_eq.
