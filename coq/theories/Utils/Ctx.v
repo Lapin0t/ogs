@@ -209,6 +209,20 @@ Equations cover_split {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] : zs ∋ x -> xs ∋
 Equations s_empty {F Γ} : ∅ =[F]> Γ :=
   s_empty x (!).
 
+Equations cover_assoc {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
+  : { Γ23 : _ & (Γ1 ⊎ Γ23 ≡ Γ123 * Γ2 ⊎ Γ3 ≡ Γ23)%type } :=
+  cover_assoc u          CNil :=
+    (_ ,' (u , cover_nil_r)) ;
+  cover_assoc (CLeft u)  (CLeft v) :=
+    let '(_ ,' (x1 , x2)) := cover_assoc u v
+    in (_ ,' (CLeft x1 , x2)) ;
+  cover_assoc (CRight u) (CLeft v) :=
+    let '(_ ,' (x1 , x2)) := cover_assoc u v
+    in (_ ,' (CRight x1 , CLeft x2)) ;
+  cover_assoc u          (CRight v) :=
+    let '(_ ,' (x1 , x2)) := cover_assoc u v
+    in (_ ,' (CRight x1 , CRight x2)) .
+
 Equations s_cover {F Γ1 Γ2 Γ3 Δ} : Γ1 ⊎ Γ2 ≡ Γ3 -> Γ1 =[F]> Δ -> Γ2 =[F]> Δ -> Γ3 =[F]> Δ :=
   s_cover h u v _ i with cover_split h i := {
     | inl j := u _ j ;
@@ -223,13 +237,39 @@ now apply H1.
 now apply H2.
 Qed.
 
+Definition s_cover_assoc {F Γ1 Γ2 Γ12 Γ3 Γ123 Δ}
+  (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
+  (u1 : Γ1 =[F]> Δ) (u2 : Γ2 =[F]> Δ) (u3 : Γ3 =[F]> Δ)
+  : sub_eq _ _ (s_cover H2 (s_cover H1 u1 u2) u3)
+      (let '(_ ,' (H1' , H2')) := cover_assoc H1 H2 in
+       s_cover H1' u1 (s_cover H2' u2 u3)).
+  funelim (cover_assoc H1 H2).
+  - intros ? i. dependent elimination i.
+  - intros ? i. cbn.
+    unfold s_cover, s_cover_clause_1.
+    dependent elimination i; destruct (cover_assoc u v) as [x0' [H1' H2']]; simp cover_split.
+    + reflexivity.
+    + unfold cover_split_clause_3.
+      etransitivity.
+      1: symmetry; exact (H F Δ (fun _ i => u1 _ (pop i)) u2 u3 x1 h).
+      * reflexivity.
+    + simp cover_split.
+      * simp cover_split.
+      reflexivity.
+      
+      
+unfold s_cover, s_cover_clause_1.
+Abort.
+
+
 Definition s_cat {F Γ1 Γ2 Δ} : Γ1 =[F]> Δ -> Γ2 =[F]> Δ -> (Γ1 +▶ Γ2) =[F]> Δ :=
   s_cover cover_cat .
+Notation "[ u , v ]" := (s_cat u v) (at level 14, only printing, format "[ u  ,  v ]").
 
 Definition r_concat_l {Γ Δ : ctx X} : Γ ⊆ (Γ +▶ Δ) :=
   r_cover_l cover_cat .
 
-Definition r_cover_l_nil {Γ} : sub_eq Γ (Γ +▶ ∅) (r_cover_l cover_nil_r) r_id .
+Definition r_cover_l_nil {Γ} : sub_eq Γ Γ (r_cover_l cover_nil_r) r_id .
   intros ? i.
   induction Γ.
   - dependent elimination i.
@@ -354,3 +394,4 @@ End lemma.
 #[global] Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30) : type_scope.
 #[global] Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30) : type_scope.
 #[global] Notation "a ∘⊆ b" := (r_comp a%ctx b%ctx) (at level 30).
+#[global] Notation "[ u , v ]" := (s_cat u v) (at level 14, only printing, format "[ u  ,  v ]").

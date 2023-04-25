@@ -205,8 +205,38 @@ TODO: concretize env
     concat1 (a ▶ _) b (EConF u e) (EConT v) := concat1 a _ u v .
   Arguments concat1 {M Δ a}.
 
-  Lemma quatre_six {M Δ a} b
-    (u : alt_env M Δ b a) (v : alt_env M Δ (negb b) a)
+  Lemma quatre_six {M} {MH : machine_law M} {Δ a}
+    (u : alt_env M Δ player a) (v : alt_env M Δ opponent a)
+    : sub_eq _ _ (e_comp (s_cat M.(v_var) (concat1 player u v)) (concat0 u))
+                 (concat1 opponent v u) 
+    /\ sub_eq _ _ (e_comp (s_cat M.(v_var) (concat1 opponent v u)) (concat0 v))
+                  (concat1 player u v) .
+    induction a; dependent destruction u; dependent destruction v; cbn; split.
+    - intros ? i; dependent elimination i.
+    - intros ? i; dependent elimination i.
+    - unfold r_concat3_1.
+      unfold e_ren.
+      rewrite MH.(v_sub_sub).
+      rewrite e_comp_ren_r.
+      rewrite MH.(v_sub_var).
+      Admitted.
+(*      rewrite s_eq_cat_l.
+      rewrite (proj2 (IHa v u)).
+      rewrite (proj1 (IHa v u)).
+      unfold e_ren.
+      Search s_ren.
+      unfold e_ren.
+      rewrite MH.(v_sub_sub).
+      rewrite e_comp_ren_r.
+      rewrite MH.(v_sub_var).
+      rewrite e_comp_ren_l.
+      Search s_ren.
+      rewrite 
+    
+    cbn.
+    Search s_empty.
+    rewrite s_eq_cover_empty_r.
+        
     {x i} :
     e_comp
         (s_cat M.(v_var) (concat1 b u v))
@@ -216,6 +246,7 @@ TODO: concretize env
         (rew [fun x => alt_env _ _ x _] (Bool.negb_involutive_reverse b) in u)
         x i.
   Admitted.
+*)
 
   Definition m_strat_act (M : machine) Δ : alt_ext -> Type :=
     fun a => (M.(conf) (Δ +▶ join_even a) * alt_env M Δ player a)%type.
@@ -372,30 +403,25 @@ TODO: concretize env
   Lemma quatre_trois_app {M : machine} {MH : machine_law M} {Γ Δ}
     (c : M.(conf) Γ) (e : Γ =[M.(val)]> Δ)
     : it_eq (sub_eval_msg M e c) (compo _ (inj_init_act c) (inj_init_pas e)).
-    etransitivity; [ | apply quatre_trois ].
+  Proof.
+    rewrite <- quatre_trois.
     unfold reduce, inj_init_act, sub_eval_msg; cbn [fst snd projT1 projT2]; apply fmap_eq.
     cbv [inj_init_pas]; rewrite concat1_equation_2, 2 concat1_equation_1.
     unfold c_ren; rewrite MH.(c_sub_sub), MH.(c_sub_proper) ; try reflexivity.
     unfold e_ren; rewrite MH.(v_sub_sub), MH.(v_sub_var).
-    rewrite s_eq_cover_empty_r, e_comp_ren_r, MH.(v_sub_var), s_ren_comp, 2 (s_eq_cat_r).
-    etransitivity; [ | symmetry; apply MH.(v_var_sub) ].
-    etransitivity; [ | symmetry; apply e_comp_ren_l ].
-    etransitivity; [ | symmetry; apply MH.(v_var_sub) ].
-    symmetry; etransitivity.
-    apply e_ren_proper; [ apply r_cover_l_nil | reflexivity ].
-    apply MH.(v_var_sub).
-    Qed.
+    rewrite s_eq_cover_empty_r, e_comp_ren_r, MH.(v_sub_var), s_ren_comp.
+    rewrite 2 s_eq_cat_r.
+    unfold r_concat_l, cover_cat; cbn; rewrite r_cover_l_nil.
+    now rewrite 2 MH.(v_var_sub).
+  Qed.
 
   Theorem ogs_correction (M : machine) (MH : machine_law M) {Γ} Δ (x y : M.(conf) Γ)
           : barb M Δ x y -> ciu M Δ x y.
   Proof.
     intros H e.
-    unfold barb in H.
-    etransitivity.
-    apply it_eq_wbisim, (@quatre_trois_app M MH _ _ x e).
-    etransitivity.
-    apply (H e).
-    symmetry; apply it_eq_wbisim, (@quatre_trois_app M MH _ _ y e).
+    etransitivity; [ apply it_eq_wbisim, (quatre_trois_app x e) | ].
+    etransitivity; [ apply (H e) | ].
+    symmetry; apply it_eq_wbisim, (quatre_trois_app y e).
   Qed.
 
 End a.
