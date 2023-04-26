@@ -1,6 +1,7 @@
 From Coq Require Import Program.Equality.
 From Equations Require Import Equations.
 Set Equations Transparent.
+Set Equations With UIP.
 
 Import EqNotations.
 
@@ -111,6 +112,11 @@ Proof.
 Qed.
 
 Definition r_id {Γ} : Γ ⊆ Γ := fun _ i => i .
+
+Lemma s_ren_id {F Γ1 Γ2} (a : Γ1 =[F]> Γ2) : a ⊛ᵣ r_id ≡ₛ a .
+  intros ? i; reflexivity.
+Qed.
+
 Definition r_comp {Γ1 Γ2 Γ3} (a : Γ2 ⊆ Γ3) (b : Γ1 ⊆ Γ2) : Γ1 ⊆ Γ3 :=
   a ⊛ᵣ b.
 
@@ -156,6 +162,15 @@ Inductive cover : ctx X -> ctx X -> ctx X -> Type :=
 .
 Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30).
 Derive NoConfusion for cover.
+
+Equations cover_swap {Γ1 Γ2 Γ3} : Γ1 ⊎ Γ2 ≡ Γ3 -> Γ2 ⊎ Γ1 ≡ Γ3 :=
+  cover_swap CNil := CNil ;
+  cover_swap (CLeft p) := CRight (cover_swap p) ;
+  cover_swap (CRight p) := CLeft (cover_swap p) .
+
+Lemma cover_swap_swap {Γ1 Γ2 Γ3} (p : Γ1 ⊎ Γ2 ≡ Γ3) : cover_swap (cover_swap p) = p.
+  dependent induction p; cbn; f_equal; eauto.
+Qed.
 
 Equations cover_nil_r xs : xs ⊎ ∅ ≡ xs :=
   cover_nil_r ∅        := CNil ;
@@ -233,56 +248,156 @@ Qed.
 Equations s_empty {F Γ} : ∅ =[F]> Γ :=
   s_empty x (!).
 
-Equations cover_assoc {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
-  : { Γ23 : _ & (Γ1 ⊎ Γ23 ≡ Γ123 * Γ2 ⊎ Γ3 ≡ Γ23)%type } :=
-  cover_assoc u          CNil :=
+Definition cover_split3_left (Γ1 Γ2 Γ3 Γ123 : ctx X) : Type :=
+  { Γ12 & Γ1 ⊎ Γ2 ≡ Γ12 * Γ12 ⊎ Γ3 ≡ Γ123 }%type.
+
+Definition cover_split3_right (Γ1 Γ2 Γ3 Γ123 : ctx X) : Type :=
+  { Γ23 & Γ1 ⊎ Γ23 ≡ Γ123 * Γ2 ⊎ Γ3 ≡ Γ23 }%type.
+
+Equations cover_assoc1 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
+  : cover_split3_right Γ1 Γ2 Γ3 Γ123 :=
+  cover_assoc1 u          CNil :=
     (_ ,' (u , cover_nil_r)) ;
-  cover_assoc (CLeft u)  (CLeft v) :=
-    let '(_ ,' (x1 , x2)) := cover_assoc u v
-    in (_ ,' (CLeft x1 , x2)) ;
-  cover_assoc (CRight u) (CLeft v) :=
-    let '(_ ,' (x1 , x2)) := cover_assoc u v
-    in (_ ,' (CRight x1 , CLeft x2)) ;
-  cover_assoc u          (CRight v) :=
-    let '(_ ,' (x1 , x2)) := cover_assoc u v
-    in (_ ,' (CRight x1 , CRight x2)) .
+  cover_assoc1 (CLeft u)  (CLeft v) :=
+    (_ ,' (CLeft (fst (projT2 (cover_assoc1 u v))) ,
+           snd (projT2 (cover_assoc1 u v)))) ;
+  cover_assoc1 (CRight u) (CLeft v) :=
+    (_ ,' (CRight (fst (projT2 (cover_assoc1 u v))) ,
+           CLeft  (snd (projT2 (cover_assoc1 u v))))) ;
+  cover_assoc1 u          (CRight v) :=
+    (_ ,' (CRight (fst (projT2 (cover_assoc1 u v))) ,
+           CRight (snd (projT2 (cover_assoc1 u v))))) .
 
-Definition cover_assoc_ctx {Γ1 Γ2 Γ12 Γ3 Γ123} H1 H2 := projT1 (@cover_assoc Γ1 Γ2 Γ12 Γ3 Γ123 H1 H2).
-Definition cover_assoc1 {Γ1 Γ2 Γ12 Γ3 Γ123} H1 H2 := fst (projT2 (@cover_assoc Γ1 Γ2 Γ12 Γ3 Γ123 H1 H2)).
-Definition cover_assoc2 {Γ1 Γ2 Γ12 Γ3 Γ123} H1 H2 := snd (projT2 (@cover_assoc Γ1 Γ2 Γ12 Γ3 Γ123 H1 H2)).
+Definition cover_assoc1' {Γ1 Γ2 Γ3 Γ123}
+  : cover_split3_left Γ1 Γ2 Γ3 Γ123
+    -> cover_split3_right Γ1 Γ2 Γ3 Γ123 :=
+  fun u => cover_assoc1 (fst (projT2 u)) (snd (projT2 u)) .
+
+Notation cover_assoc1_ctx H1 H2 := (projT1 (cover_assoc1 H1 H2)).
+Notation cover_assoc1_left H1 H2 := (fst (projT2 (cover_assoc1 H1 H2))).
+Notation cover_assoc1_right H1 H2 := (snd (projT2 (cover_assoc1 H1 H2))).
+
+Equations cover_assoc2 {Γ1 Γ2 Γ3 Γ23 Γ123} (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H2 : Γ2 ⊎ Γ3 ≡ Γ23)
+  : cover_split3_left Γ1 Γ2 Γ3 Γ123 :=
+  cover_assoc2 CNil v := (_ ,' (cover_nil_l , v)) ;
+  cover_assoc2 (CLeft u)  v :=
+    (_ ,' (CLeft (fst (projT2 (cover_assoc2 u v))) ,
+           CLeft (snd (projT2 (cover_assoc2 u v))))) ;
+  cover_assoc2 (CRight u) (CLeft v) :=
+    (_ ,' (CRight (fst (projT2 (cover_assoc2 u v))) ,
+           CLeft  (snd (projT2 (cover_assoc2 u v))))) ;
+  cover_assoc2 (CRight u) (CRight v) :=
+    (_ ,' (fst (projT2 (cover_assoc2 u v)) ,
+           CRight (snd (projT2 (cover_assoc2 u v))))) .
+
+Definition cover_assoc2' {Γ1 Γ2 Γ3 Γ123}
+  : cover_split3_right Γ1 Γ2 Γ3 Γ123
+    -> cover_split3_left Γ1 Γ2 Γ3 Γ123 :=
+  fun u => cover_assoc2 (fst (projT2 u)) (snd (projT2 u)) .
+
+Notation cover_assoc2_ctx H1 H2 := (projT1 (cover_assoc2 H1 H2)).
+Notation cover_assoc2_left H1 H2 := (fst (projT2 (cover_assoc2 H1 H2))).
+Notation cover_assoc2_right H1 H2 := (snd (projT2 (cover_assoc2 H1 H2))).
+
+(*
+Lemma cover_assoc12 {Γ1 Γ2 Γ3 Γ123} (u : cover_split3_left Γ1 Γ2 Γ3 Γ123)
+      : cover_assoc2' (cover_assoc1' u) = u .
+  destruct u as [? [H1 H2]]; cbn.
+  funelim (cover_assoc1 H1 H2); cbn.
+  - dependent elimination u. eauto.
+  - clear H0; unfold cover_assoc2' in H.
+    assert (H2 := projT2_eq H). 
+    remember (projT1_eq H) as H1 eqn:H3 in *; clear H3 H; cbn in *.
+    apply eq_existT_uncurried.
+    unshelve econstructor.
+    apply (f_equal (fun x => x ▶ _)%ctx); exact H1.
+    etransitivity.
+    symmetry; apply (@rew_pair _ (fun Γ12 => (_ ⊎ _ ≡ Γ12)) (fun Γ12 => Γ12 ⊎ _ ≡ _)).
+    apply pair_equal_spec; split.
+    Search "rew".
+    
+
+    Search "rew".
+    rewrite <- rew_pair.
+    dependent destruction H1.
+    Search (_ = (_ , _)).
+    Search ((_ , _) = (_ , _)).
+    Check (projT1_eq H).
+    Search (projT1 ?a = ?b).
+    Check (projT1_eq H).
+
+    Check (EqdepFacts.eq_sigT_fst H).
+Search ((_ ,' _) = (_ ,' _)).
+    Search 
+    
+    apply EqdepFacts.eq_sigT_iff_eq_dep.
+    Print EqdepFacts.eq_dep.
+
+Lemma cover_assoc_ctx12 {Γ1 Γ2 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
+  cover_assoc2_ctx (cover_assoc1_lft H1 H2) (cover_assoc1_rgt H1 H2)
+  = Γ12 .
+
+Lemma cover_assoc12 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
+  : cover_assoc2_lft (cover_assoc1_lft H1 H2) (cover_assoc1_rgt H1 H2)
+    = H1 .
+*)
 
 
-Lemma cover_assoc_eq1 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
-    r_cover_l H2 ⊛ᵣ r_cover_l H1 ≡ₛ r_cover_l (cover_assoc1 H1 H2).
-Proof.
-  unfold cover_assoc1; funelim (cover_assoc H1 H2); simp cover_assoc.
-  dependent destruction u; intros ? i; dependent destruction i.
-  all: destruct (cover_assoc u v) as [ ? [ u' v' ]]; cbn [fst snd projT1 projT2] in *.
+Lemma cover_assoc2_eq1 {Γ1 Γ2 Γ3 Γ23 Γ123} (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H2 : Γ2 ⊎ Γ3 ≡ Γ23)
+      : r_cover_l H1 ≡ₛ r_cover_l (cover_assoc2_right H1 H2) ⊛ᵣ r_cover_l (cover_assoc2_left H1 H2).
+  funelim (cover_assoc2 H1 H2); simp cover_assoc.
+  dependent destruction v; intros ? i; dependent destruction i.
   all: intros ? i.
   dependent destruction i; eauto.
   all: cbn; f_equal; apply H.
   Qed.
 
-Lemma cover_assoc_eq2 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
+Lemma cover_assoc2_eq2 {Γ1 Γ2 Γ3 Γ23 Γ123} (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H2 : Γ2 ⊎ Γ3 ≡ Γ23)
+      : r_cover_r H1 ⊛ᵣ r_cover_l H2 ≡ₛ r_cover_l (cover_assoc2_right H1 H2) ⊛ᵣ r_cover_r (cover_assoc2_left H1 H2).
+  funelim (cover_assoc2 H1 H2); simp cover_assoc.
+  dependent destruction v; intros ? i; dependent destruction i.
+  all: intros ? i.
+  2: dependent destruction i; eauto.
+  all: cbn; f_equal; apply H.
+  Qed.
+
+Lemma cover_assoc2_eq3 {Γ1 Γ2 Γ3 Γ23 Γ123} (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H2 : Γ2 ⊎ Γ3 ≡ Γ23)
+      : r_cover_r H1 ⊛ᵣ r_cover_r H2 ≡ₛ r_cover_r (cover_assoc2_right H1 H2).
+  funelim (cover_assoc2 H1 H2); simp cover_assoc.
+  dependent destruction v; intros ? i; dependent destruction i.
+  all: intros ? i.
+  3: dependent destruction i; eauto.
+  all: cbn; f_equal; apply H.
+  Qed.
+
+Lemma cover_assoc1_eq1 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
+    r_cover_l H2 ⊛ᵣ r_cover_l H1 ≡ₛ r_cover_l (cover_assoc1_left H1 H2).
+Proof.
+  funelim (cover_assoc1 H1 H2); simp cover_assoc.
+  dependent destruction u; intros ? i; dependent destruction i.
+  all: intros ? i.
+  dependent destruction i; eauto.
+  all: cbn; f_equal; apply H.
+  Qed.
+
+Lemma cover_assoc1_eq2 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
     r_cover_l H2 ⊛ᵣ r_cover_r H1
     ≡ₛ
-    r_cover_r (cover_assoc1 H1 H2) ⊛ᵣ r_cover_l (cover_assoc2 H1 H2) .
+    r_cover_r (cover_assoc1_left H1 H2) ⊛ᵣ r_cover_l (cover_assoc1_right H1 H2) .
 Proof.
-  unfold cover_assoc1, cover_assoc2; funelim (cover_assoc H1 H2); simp cover_assoc.
+  funelim (cover_assoc1 H1 H2); simp cover_assoc.
   dependent destruction u; intros ? i; dependent destruction i.
-  all: destruct (cover_assoc u v) as [ ? [ u' v' ]]; cbn [fst snd projT1 projT2] in *.
   all: intros ? i.
   2: dependent destruction i; eauto.
   all: cbn; f_equal; apply H.
 Qed.
 
-Lemma cover_assoc_eq3 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
+Lemma cover_assoc1_eq3 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
     r_cover_r H2 ≡ₛ 
-    r_cover_r (cover_assoc1 H1 H2) ⊛ᵣ r_cover_r (cover_assoc2 H1 H2) .
+    r_cover_r (cover_assoc1_left H1 H2) ⊛ᵣ r_cover_r (cover_assoc1_right H1 H2) .
 Proof.
-  unfold cover_assoc1, cover_assoc2; funelim (cover_assoc H1 H2); simp cover_assoc.
+  funelim (cover_assoc1 H1 H2); simp cover_assoc.
   dependent destruction u; intros ? i; dependent destruction i.
-  all: destruct (cover_assoc u v) as [ ? [ u' v' ]]; cbn [fst snd projT1 projT2] in *.
   all: intros ? i.
   3: dependent destruction i; eauto.
   all: cbn; f_equal; apply H.
@@ -438,18 +553,51 @@ Lemma s_eq_cover_empty_l {F Γ1 Δ} (u : Γ1 =[F]> Δ)
           : [ s_empty , u ] ≡ₛ (rew <- [fun x => x =[F]> _] ccat_empty_l in u).
 *)
 
+(*
+Lemma s_cat_assoc {F Γ1 Γ2 Γ3 Δ}
+  (u1 : Γ1 =[F]> Δ) (u2 : Γ2 =[F]> Δ) (u3 : Γ3 =[F]> Δ)
+  : [ [ u1 , u2 ] , u3 ]
+      ≡ₛ [ u1 , [ u2 , u3 ] ] ⊛ᵣ ([ [ r_concat_l , r_concat_r ⊛ᵣ r_concat_l ] , r_concat_r ⊛ᵣ r_concat_r ]) .
+Proof.
+  apply s_eq_cover_uniq.
+  - apply s_eq_cover_uniq.
+    * intros ? i.
+      unfold s_ren.
+*)
 
-Definition s_cover_assoc {F Γ1 Γ2 Γ12 Γ3 Γ123 Δ}
+Lemma s_cover_assoc1 {F Γ1 Γ2 Γ12 Γ3 Γ123 Δ}
   (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
   (u1 : Γ1 =[F]> Δ) (u2 : Γ2 =[F]> Δ) (u3 : Γ3 =[F]> Δ)
   : [ [ u1 , H1 , u2 ] , H2 , u3 ]
-    ≡ₛ [ u1 , cover_assoc1 H1 H2 , [ u2 , cover_assoc2 H1 H2 , u3 ] ].
+    ≡ₛ [ u1 , cover_assoc1_left H1 H2 , [ u2 , cover_assoc1_right H1 H2 , u3 ] ].
+Proof.
   apply s_eq_cover_uniq.
   + apply s_eq_cover_uniq; rewrite <- s_ren_comp.
-    * now rewrite cover_assoc_eq1, s_eq_cover_l.
-    * now rewrite cover_assoc_eq2, s_ren_comp, s_eq_cover_r, s_eq_cover_l.
-  + now rewrite (cover_assoc_eq3 H1), s_ren_comp, 2 s_eq_cover_r.
-  Qed.
+    * now rewrite cover_assoc1_eq1, s_eq_cover_l.
+    * now rewrite cover_assoc1_eq2, s_ren_comp, s_eq_cover_r, s_eq_cover_l.
+  + now rewrite (cover_assoc1_eq3 H1), s_ren_comp, 2 s_eq_cover_r.
+Qed.
+
+Lemma s_cover_assoc2 {F Γ1 Γ2 Γ3 Γ23 Γ123 Δ}
+  (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H2 : Γ2 ⊎ Γ3 ≡ Γ23)
+  (u1 : Γ1 =[F]> Δ) (u2 : Γ2 =[F]> Δ) (u3 : Γ3 =[F]> Δ)
+  : [ u1 , H1 , [ u2 , H2 , u3 ] ]
+    ≡ₛ [ [ u1 , cover_assoc2_left H1 H2 , u2 ] , cover_assoc2_right H1 H2 , u3 ].
+Proof.
+  apply s_eq_cover_uniq.
+  + now rewrite (cover_assoc2_eq1 H1 H2), s_ren_comp, 2 s_eq_cover_l.
+  + apply s_eq_cover_uniq; rewrite <- s_ren_comp.
+    - now rewrite cover_assoc2_eq2 , s_ren_comp, s_eq_cover_l, s_eq_cover_r.
+    - now rewrite cover_assoc2_eq3 , s_eq_cover_r.
+Qed.
+
+(*
+Lemma s_cat_assoc {F Γ1 Γ2 Γ3 Δ}
+  (u1 : Γ1 =[F]> Δ) (u2 : Γ2 =[F]> Δ) (u3 : Γ3 =[F]> Δ)
+  : [ [ u1 , u2 ] , u3 ]
+      ≡ₛ [ u1 , cover_assoc1_ cover_cat cover_cat , [ u2 , cover_assoc2 cover_cat cover_cat , u3 ] ].
+Proof. apply s_cover_assoc. Qed.
+*)
 
 End lemma.
 

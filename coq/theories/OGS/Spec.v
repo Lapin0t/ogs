@@ -67,25 +67,24 @@ TODO: concretize env
   Notation "u @ᵥ v" := (v_sub u _ v) (at level 30).
   Notation "u @ₜ c" := (c_sub u c) (at level 30).
 
-  Context {M : machine}.
  
   Notation "Γ ⇒ᵥ Δ" := (Γ =[val]> Δ) (at level 30).
 
-  Definition v_ren {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ :=
+  Definition v_ren {M : machine} {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ :=
     fun u => v_sub (v_var ⊛ᵣ u) .
       
-  Definition e_comp {Γ1 Γ2 Γ3} : Γ2 ⇒ᵥ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
+  Definition e_comp {M : machine} {Γ1 Γ2 Γ3} : Γ2 ⇒ᵥ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
     := fun u v => s_map (v_sub u) v.
   Infix "⊛" := e_comp (at level 14).
 
-  Definition e_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
+  Definition e_ren {M : machine} {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
     := fun u v => (v_var ⊛ᵣ u) ⊛ v.
   Infix "ᵣ⊛" := e_ren (at level 14).
 
-  Definition c_ren {Γ1 Γ2} : Γ1 ⊆ Γ2 -> conf Γ1 -> conf Γ2
+  Definition c_ren {M : machine} {Γ1 Γ2} : Γ1 ⊆ Γ2 -> conf Γ1 -> conf Γ2
     := fun u c => (u ᵣ⊛ v_var) @ₜ c.
 
-  Class machine_law : Prop := {
+  Class machine_law (M : machine) : Prop := {
     v_sub_proper {Γ Δ}
       :> Proper
           (sub_eq Γ Δ ==> forall_relation (fun i => eq ==> eq))
@@ -103,7 +102,7 @@ TODO: concretize env
       : u @ₜ (v @ₜ c) = (u ⊛ v) @ₜ c ;
   }.
 
-  Context {MH : machine_law}.
+  Context {M : machine} {MH : machine_law M}.
 
   #[global] Instance e_comp_proper {Γ1 Γ2 Γ3}
              : Proper (sub_eq Γ2 Γ3 ==> sub_eq Γ1 Γ2 ==> sub_eq Γ1 Γ3) e_comp.
@@ -201,18 +200,30 @@ TODO: concretize env
   Lemma quatre_six {Δ a} (u : alt_env Δ player a) (v : alt_env Δ opponent a)
     :  [ v_var , concat1 u v ] ⊛ concat0 u ≡ₛ concat1 v u
     /\ [ v_var , concat1 v u ] ⊛ concat0 v ≡ₛ concat1 u v .
-    (*
+  Proof.
     induction a; dependent destruction u; dependent destruction v; cbn; split.
     - intros ? i; dependent elimination i.
     - intros ? i; dependent elimination i.
-    - unfold s_cat. rewrite s_cover_assoc.
-    - unfold r_concat3_1.
-      unfold e_ren.
-      rewrite v_sub_sub.
-      rewrite e_comp_ren_r.
-      rewrite v_sub_var.
-*)
-      Admitted.
+    - rewrite <- e_comp_ren_l.
+      rewrite <- (proj2 (IHa v u)).
+      apply e_comp_proper; [ | reflexivity ].
+      symmetry.
+      apply s_eq_cover_uniq.
+      * unfold r_concat3_1.
+        rewrite <- s_ren_comp.
+        change (?a ∘⊆ ?b) with (a ⊛ᵣ b).
+        now rewrite 2 s_eq_cat_l.
+      * unfold r_concat3_1.
+        rewrite <- s_ren_comp.
+        change (?a ∘⊆ ?b) with (a ⊛ᵣ b).
+        rewrite s_eq_cat_r.
+        change (?a ⊛ᵣ ?b) with (a ∘⊆ b) at 2.
+        now rewrite s_ren_comp, s_eq_cat_r, s_eq_cat_l.
+    - symmetry; apply s_eq_cover_uniq. 
+      * rewrite <- e_comp_ren_r, s_eq_cat_l.
+        symmetry; apply IHa.
+      * now rewrite <- e_comp_ren_r, s_eq_cat_r.
+  Qed.
 
   Definition m_strat_act Δ : alt_ext -> Type :=
     fun a => (conf (Δ +▶ join_even a) * alt_env Δ player a)%type.
@@ -358,7 +369,30 @@ TODO: concretize env
       cbn [fst snd projT1 projT2].
       rewrite c_sub_sub.
       unshelve rewrite c_sub_proper; try reflexivity.
-  Admitted.
+      apply s_eq_cover_uniq.
+      * rewrite <- (proj2 (quatre_six (snd u) v)).
+        rewrite <- e_comp_ren_r.
+        rewrite s_eq_cat_l.
+        rewrite <- e_comp_ren_l.
+        apply e_comp_proper; try reflexivity.
+        apply s_eq_cover_uniq.
+        + unfold r_concat3_1.
+          rewrite <- s_ren_comp.
+          change (?a ∘⊆ ?b) with (a ⊛ᵣ b).
+          now rewrite 2 s_eq_cat_l.
+        + unfold r_concat3_1.
+          rewrite <- s_ren_comp.
+          change (?a ∘⊆ ?b) with (a ⊛ᵣ b).
+          rewrite s_eq_cat_r.
+          change (?a ⊛ᵣ ?b) with (a ∘⊆ b) at 2.
+          cbn; now rewrite s_ren_comp, s_eq_cat_r, s_eq_cat_l.
+      * rewrite <- e_comp_ren_r.
+          rewrite s_eq_cat_r.
+          change (?a ∘⊆ ?b) with (a ⊛ᵣ b).
+          rewrite <- e_comp_ren_l, v_sub_var.
+          change (?a ⊛ᵣ ?b) with (a ∘⊆ b) at 2.
+          cbn; now rewrite s_ren_comp, 2 s_eq_cat_r .
+   Qed.
 
   Lemma quatre_trois_app {Γ Δ}
     (c : conf Γ) (e : Γ ⇒ᵥ Δ)
@@ -370,18 +404,14 @@ TODO: concretize env
     unfold c_ren; rewrite c_sub_sub, c_sub_proper ; try reflexivity.
     unfold e_ren; rewrite v_sub_sub, v_sub_var.
     rewrite s_eq_cover_empty_r.
-    (*
-    rewrite v_var_sub.
-    rewrite s_eq_cover_empty_r, e_comp_ren_r, v_sub_var, s_ren_comp.
-    rewrite e_comp_ren_r.
-    rewrite e_comp_ren_r.
-    rewrite v_sub_var.
+    rewrite 2 e_comp_ren_r.
+    rewrite 2 v_sub_var.
+    rewrite s_ren_comp.
     rewrite 2 s_eq_cat_r.
-    unfold r_concat_l, cover_cat; cbn; rewrite r_cover_l_nil.
-    now rewrite 2 v_var_sub.
+    unfold r_concat_l, cover_cat; cbn.
+    rewrite r_cover_l_nil.
+    now rewrite s_ren_id, v_var_sub. 
   Qed.
-*)
-    Admitted.
 
   Theorem ogs_correction {Γ} Δ (x y : conf Γ)
           : barb Δ x y -> ciu Δ x y.
