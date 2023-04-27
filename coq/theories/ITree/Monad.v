@@ -22,13 +22,15 @@ Section monad.
 
   Print respectful.
 
-  #[global] Instance fmap_eq {X Y} {f : X ⇒ᵢ Y}
-    : Proper (dpointwise_relation (fun i => it_eq (i:=i) ==> it_eq (i:=i))%signature) (fmap f).
+  #[global] Instance fmap_eq {X RX Y RY} {f : X ⇒ᵢ Y}
+    {_ : forall i, Proper (@RX i ==> @RY i) (f i)}
+    {i} : Proper (it_eq RX (i:=i) ==> it_eq RY (i:=i)) (fmap f i).
   Proof.
-    unfold Proper, respectful, dpointwise_relation, it_eq.
-    coinduction R CIH; intros i x y h.
-    apply (gfp_fp (it_eq_map E X)) in h.
+    unfold Proper, respectful, it_eq.
+    revert i; coinduction R CIH; intros i x y h.
+    apply (gfp_fp (it_eq_map E RX)) in h.
     cbn in *; cbv [observe] in h; dependent destruction h; simpl_depind; eauto.
+    econstructor; now apply H.
   Qed.
 
   Definition subst {X Y} (f : X ⇒ᵢ itree E Y) : itree E X ⇒ᵢ itree E Y :=

@@ -4,7 +4,7 @@ Import EqNotations.
 From Coinduction Require Import coinduction tactics.
 
 From OGS Require Import Utils.
-From OGS.Utils Require Import Ctx.
+From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
 From OGS.ITree Require Import ITree Monad Eq Delay.
 
@@ -259,6 +259,14 @@ TODO: concretize env
   Definition m_stratp {Δ} : m_strat_pas Δ ⇒ᵢ h_pasv ogs_hg (itree ogs_e (fun _ => msg' Δ)) :=
     fun _ x m => m_strat _ (m_strat_resp x m).
 
+  Definition m_strat_act_eqv {Δ} : relᵢ (m_strat_act Δ) (m_strat_act Δ) :=
+    fun i x y => m_strat i x ≈ m_strat i y.
+  Notation "x ≈ₐ y" := (m_strat_act_eqv _ x y) (at level 50).
+
+  Definition m_strat_pas_eqv {Δ} : relᵢ (m_strat_pas Δ) (m_strat_pas Δ) :=
+    fun i x y => forall m, m_strat_resp x m ≈ₐ m_strat_resp y m .
+  Notation "x ≈ₚ y" := (m_strat_pas_eqv _ x y) (at level 50).
+
   Definition inj_init_act {Δ Γ} (c : conf Γ) : m_strat_act Δ (∅ ▶ Γ)
     := (c_ren (r_concat_r ∘⊆ r_concat_r) c , EConT ENil).
 
@@ -278,8 +286,15 @@ TODO: concretize env
 
   Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
     := iter compo_body T1_0 (a ,' (u , v)).
-
   Notation "u ∥ v" := (compo u v) (at level 40).
+
+
+  #[global] Instance compo_proper {Δ a}
+    : Proper
+        (m_strat_act_eqv a ==> m_strat_pas_eqv a ==> it_wbisim (i:=T1_0))%signature
+        (@compo Δ a).
+  Proof.
+  Admitted.
 
   (* guilhem: rename? *)
   Definition barb {Γ} Δ (x y : conf Γ) : Prop :=
@@ -413,7 +428,7 @@ TODO: concretize env
     now rewrite s_ren_id, v_var_sub. 
   Qed.
 
-  Theorem ogs_correction {Γ} Δ (x y : conf Γ)
+  Theorem barb_correction {Γ} Δ (x y : conf Γ)
           : barb Δ x y -> ciu Δ x y.
   Proof.
     intros H e.
@@ -421,5 +436,8 @@ TODO: concretize env
     etransitivity; [ apply (H e) | ].
     symmetry; apply it_eq_wbisim, (quatre_trois_app y e).
   Qed.
+
+  Theorem ogs_correction {Γ} Δ (x y : conf Γ)
+          : inj_init_act x ≈ₐ inj_init_act y -> ciu Δ x y.
 
 End a.

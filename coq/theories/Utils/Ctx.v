@@ -1,7 +1,6 @@
 From Coq Require Import Program.Equality.
 From Equations Require Import Equations.
 Set Equations Transparent.
-Set Equations With UIP.
 
 Import EqNotations.
 
