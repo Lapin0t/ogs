@@ -32,6 +32,8 @@ Section it_eat.
     _eat_cmp p           (EatRefl)   := or_intror p ;
     _eat_cmp (EatStep p) (EatStep q) := _eat_cmp p q .
 
+  Definition it_eat' : relᵢ (itree E R) (itree E R) := fun i u v => it_eat i u.(_observe) v.(_observe).
+
 End it_eat.
 
 #[global] Hint Constructors it_eat : core.
@@ -67,7 +69,7 @@ Definition it_eq {I E X} RX [i] := gfp (@it_eq_map I E X RX) i.
 #[global] Notation it_eq_t E RX := (t (it_eq_map E RX)).
 #[global] Notation it_eq_bt E RX := (bt (it_eq_map E RX)).
 #[global] Notation it_eq_T E RX := (T (it_eq_map E RX)).
-#[global] Notation "a ≊ b" := (it_eq eqᵢ a b) (at level 20).
+#[global] Notation "a ≊ b" := (it_eq (eqᵢ _) a b) (at level 20).
 
 #[global] Instance it_eqbt_mon {I} {E : event I I} {X} {RX : relᵢ X X}
   : Proper (leq ==> leq) (it_eq_bt E RX).
@@ -158,7 +160,7 @@ End wbisim.
 #[global] Notation it_wbisim_T E RX := (T (it_wbisim_map E RX)).
 
 #[global] Arguments it_wbisim {I E X} RX [i].
-#[global] Notation "a ≈ b" := (it_wbisim eqᵢ a b) (at level 20).
+#[global] Notation "a ≈ b" := (it_wbisim (eqᵢ _) a b) (at level 20).
 
 #[global] Arguments WBisim {I E X RX RR i t1 t2 x1 x2}.
 #[global] Hint Constructors it_wbisimF : core.

@@ -25,6 +25,11 @@ Proof. intros ? ? ? ?; now symmetry. Qed.
 #[global] Instance Transitive_eqᵢ {I} {X : psh I} : Transitiveᵢ (eqᵢ X).
 Proof. intros i x y z a b; now transitivity y. Qed.
 
+Variant sumᵣ {I} {X1 X2 Y1 Y2 : psh I} (R : relᵢ X1 X2) (S : relᵢ Y1 Y2) : relᵢ (X1 +ᵢ Y1) (X2 +ᵢ Y2) :=
+  | RLeft {i x1 x2} : R i x1 x2 -> sumᵣ R S i (inl x1) (inl x2)
+  | RRight {i y1 y2} : S i y1 y2 -> sumᵣ R S i (inr y1) (inr y2)
+.
+
 Definition seqᵢ {I} {X Y Z : psh I} (R0 : relᵢ X Y) (R1 : relᵢ Y Z) : relᵢ X Z :=
   fun i x z => exists y, R0 i x y /\ R1 i y z.
 #[global] Infix "⨟" := (seqᵢ) (at level 120).
