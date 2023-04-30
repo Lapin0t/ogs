@@ -1,3 +1,10 @@
+(*|
+Contexts
+=========
+
+.. coq:: none
+|*)
+
 From Coq Require Import Program.Equality.
 From Equations Require Import Equations.
 Set Equations Transparent.
@@ -9,16 +16,18 @@ From Coinduction Require Import lattice.
 From OGS Require Import Utils.
 From OGS Require Import Utils.Prelude.
 
-From Coq.Vectors Require Fin.
-
-Definition fin := Fin.t.
-Notation F0 := (Fin.F1).
-Notation FS := (Fin.FS).
-
+(*|
+Contexts are simply lists, with the purely aesthetic choice of representing cons as coming from the right.
+.. coq::
+|*)
 Inductive ctx (X : Type) : Type :=
 | cnil : ctx X
 | ccon : ctx X -> X -> ctx X
 .
+(*|
+.. coq:: none
+|*)
+
 Arguments cnil {X}.
 Arguments ccon {X} Γ x.
 Derive NoConfusion for ctx.
@@ -26,10 +35,15 @@ Derive NoConfusion for ctx.
 #[global] Declare Scope ctx_scope.
 #[global] Delimit Scope ctx_scope with ctx.
 #[global] Bind Scope ctx_scope with ctx.
-
+(*|
+.. coq::
+|*)
 #[global] Notation "∅" := (cnil) : ctx_scope.
 #[global] Notation "Γ ▶ x" := (ccon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
 
+(*|
+Concatenation of contexts, by induction on the second argument
+|*)
 Equations ccat {X} : ctx X -> ctx X -> ctx X :=
   ccat Γ ∅       := Γ ;
   ccat Γ (Δ ▶ x) := (ccat Γ Δ) ▶ x .
@@ -48,10 +62,18 @@ Qed.
 Section lemma.
 Context {X : Type}.
 
+(*|
+Join over contexts
+|*)
 Equations join : ctx (ctx X) -> ctx X :=
   join (∅)     := ∅ ;
   join (Γ ▶ xs) := join Γ +▶ xs .
 
+(*|
+Two mutually recursive functions, defined at once via a boolean argument.
+Given a context of contexts, we join them, but by keeping only half the contexts:
+the ones in odd positions (join_odd) respectively in even positions (join_even)
+|*)
 Equations join_even_odd_aux : bool -> ctx (ctx X) -> ctx X :=
   join_even_odd_aux b (∅) := ∅ ;
   join_even_odd_aux true  (Γ ▶ xs) := join_even_odd_aux false Γ +▶ xs ;
@@ -68,74 +90,73 @@ Equations join_cat Γs Δs : join (Γs +▶ Δs)%ctx = ((join Γs) +▶ (join Δ
      in f_equal (app Δ) (join_cat Γs Δs).
 Arguments join_cat {Γs Δs}.
 *)
-    
+
+(*|
+We wish to manipulate intrinsically typed terms. We hence need a tightly typed notion of position in the context: rather than a loose index, [has Γ x] is a proof of membership of [x] to [Γ].
+|*)
 Inductive has : ctx X -> X -> Type :=
 | top {Γ x} : has (Γ ▶ x) x
 | pop {Γ x y} : has Γ x -> has (Γ ▶ y) x.
 Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
 Derive Signature for has.
 
-Equations length : ctx X -> nat :=
-  length ∅       := O ;
-  length (Γ ▶ x) := S (length Γ) .
+(*|
+Assignment
+------------
+We distinguish assignments, mapping variables in a context to terms, from substitutions, applying an assignment to a term.
+Assignments are again intrinsically typed, mapping variables of a context Γ to open terms with variables in Δ.
+|*)
+Definition assignment (F : ctx X -> X -> Type) (Γ Δ : ctx X) := forall x, Γ ∋ x -> F Δ x.
+Notation "Γ =[ F ]> Δ" := (assignment F Γ%ctx Δ%ctx) (at level 30).
 
-Equations get (xs : ctx X) : fin (length xs) -> X :=
-  get (Γ ▶ x) (F0)   := x ;
-  get (Γ ▶ x) (FS i) := get Γ i .
-Notation "Γ .[ i ]" := (get Γ%ctx i) (at level 30).
-
-Definition substitution (F : ctx X -> X -> Type) (Γ Δ : ctx X) := forall x, Γ ∋ x -> F Δ x.
-Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30).
-Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30).
-
-Definition sub_eq {F : ctx X -> X -> Type} Γ Δ : relation (Γ =[F]> Δ) :=
+Definition ass_eq {F : ctx X -> X -> Type} Γ Δ : relation (Γ =[F]> Δ) :=
   dpointwise_relation (fun x => pointwise_relation _ eq)%signature.
 
-Notation "u ≡ₛ v" := (sub_eq _ _ u v) (at level 50).
+Notation "u ≡ₐ v" := (ass_eq _ _ u v) (at level 50).
 
-#[global] Instance sub_equivalence {F Γ Δ} : Equivalence (@sub_eq F Γ Δ).
+#[global] Instance ass_equivalence {F Γ Δ} : Equivalence (@ass_eq F Γ Δ).
 econstructor.
 - intros u ? i; reflexivity.
 - intros u h ? i ?; symmetry; now apply (H i a).
 - intros u v w h1 h2 ? i. transitivity (v a i); [ now apply h1 | now apply h2 ].
 Qed.
 
+(*|
+Renaming
+---------
+Context inclusion is defined as an assignment of variables in Γ to variables in Δ.
+This inclusion can be thought of as the assignment whose associated substitution is a renaming of assignments.
+|*)
+Notation "Γ ⊆ Δ" := (assignment has Γ%ctx Δ%ctx) (at level 30).
+
 Definition s_ren {F Γ1 Γ2 Γ3} (a : Γ2 =[F]> Γ3) (b : Γ1 ⊆ Γ2) : Γ1 =[F]> Γ3 :=
   fun _ i => a _ (b _ i).
 Infix "⊛ᵣ" := s_ren (at level 14).
 
-#[global] Instance s_ren_proper {F Γ1 Γ2 Γ3} : Proper (sub_eq _ _ ==> sub_eq _ _ ==> sub_eq _ _) (@s_ren F Γ1 Γ2 Γ3) .
+#[global] Instance s_ren_proper {F Γ1 Γ2 Γ3} : Proper (ass_eq _ _ ==> ass_eq _ _ ==> ass_eq _ _) (@s_ren F Γ1 Γ2 Γ3) .
 Proof.
   intros ? ? H1 ? ? H2 ? i.
   unfold s_ren; now rewrite H2, H1.
 Qed.
 
+(*|
+The identity inclusion, whose renaming is the identity.
+|*)
 Definition r_id {Γ} : Γ ⊆ Γ := fun _ i => i .
 
-Lemma s_ren_id {F Γ1 Γ2} (a : Γ1 =[F]> Γ2) : a ⊛ᵣ r_id ≡ₛ a .
+Lemma s_ren_id {F Γ1 Γ2} (a : Γ1 =[F]> Γ2) : a ⊛ᵣ r_id ≡ₐ a .
   intros ? i; reflexivity.
 Qed.
 
+(*|
+Composition of context inclusion induces a composed renaming.
+|*)
 Definition r_comp {Γ1 Γ2 Γ3} (a : Γ2 ⊆ Γ3) (b : Γ1 ⊆ Γ2) : Γ1 ⊆ Γ3 :=
   a ⊛ᵣ b.
 
 Lemma s_ren_comp {F Γ1 Γ2 Γ3 Γ4} (u : Γ3 =[F]> Γ4) (v : Γ2 ⊆ Γ3) (w : Γ1 ⊆ Γ2)
-      : u ⊛ᵣ (r_comp v w) ≡ₛ (u ⊛ᵣ v) ⊛ᵣ w.
+      : u ⊛ᵣ (r_comp v w) ≡ₐ (u ⊛ᵣ v) ⊛ᵣ w.
 Proof. reflexivity. Qed.
-
-Definition r_pop {Γ : ctx X} {x : X} : Γ ⊆ (Γ ▶ x) := fun _ i => pop i.
-
-Equations has_get (Γ : ctx X) i : Γ ∋ (Γ.[i]) :=
-  has_get (Γ ▶ x) F0     := top ;
-  has_get (Γ ▶ x) (FS i) := pop (has_get Γ i) .
-
-Equations has_index {Γ : ctx X} {x} : Γ ∋ x -> fin (length Γ) :=
-  has_index top     := F0 ;
-  has_index (pop p) := FS (has_index p) .
-
-Equations get_has {Γ : ctx X} {x} (p : Γ ∋ x) : Γ.[has_index p] = x :=
-  get_has top     := eq_refl ;
-  get_has (pop i) := get_has i .
 
 (* helper for defining various shiftings *)
 Equations has_case {Γ Δ : ctx X} {F : ctx X -> X -> Type} {a}
@@ -197,13 +218,13 @@ Equations cat_cover {xs0 xs1 ys0 ys1 zs0 zs1}
 Equations ext_cover_l {xs ys zs} (Γ : ctx X)
           : xs ⊎ ys ≡ zs
           -> (xs +▶ Γ) ⊎ ys ≡ (zs +▶ Γ) :=
-  ext_cover_l ∅       c := c ; 
+  ext_cover_l ∅       c := c ;
   ext_cover_l (Γ ▶ _) c := CLeft (ext_cover_l Γ c) .
 
 Equations ext_cover_r {xs ys zs} (Γ : ctx X)
           : xs ⊎ ys ≡ zs
           -> xs ⊎ (ys +▶ Γ) ≡ (zs +▶ Γ) :=
-  ext_cover_r ∅ c := c ; 
+  ext_cover_r ∅ c := c ;
   ext_cover_r (Γ ▶ _) c := CRight (ext_cover_r Γ c) .
 
 Equations r_cover_l {xs ys zs} : xs ⊎ ys ≡ zs -> xs ⊆ zs :=
@@ -305,7 +326,7 @@ Lemma cover_assoc12 {Γ1 Γ2 Γ3 Γ123} (u : cover_split3_left Γ1 Γ2 Γ3 Γ123
   funelim (cover_assoc1 H1 H2); cbn.
   - dependent elimination u. eauto.
   - clear H0; unfold cover_assoc2' in H.
-    assert (H2 := projT2_eq H). 
+    assert (H2 := projT2_eq H).
     remember (projT1_eq H) as H1 eqn:H3 in *; clear H3 H; cbn in *.
     apply eq_existT_uncurried.
     unshelve econstructor.
@@ -314,7 +335,7 @@ Lemma cover_assoc12 {Γ1 Γ2 Γ3 Γ123} (u : cover_split3_left Γ1 Γ2 Γ3 Γ123
     symmetry; apply (@rew_pair _ (fun Γ12 => (_ ⊎ _ ≡ Γ12)) (fun Γ12 => Γ12 ⊎ _ ≡ _)).
     apply pair_equal_spec; split.
     Search "rew".
-    
+
 
     Search "rew".
     rewrite <- rew_pair.
@@ -327,8 +348,8 @@ Lemma cover_assoc12 {Γ1 Γ2 Γ3 Γ123} (u : cover_split3_left Γ1 Γ2 Γ3 Γ123
 
     Check (EqdepFacts.eq_sigT_fst H).
 Search ((_ ,' _) = (_ ,' _)).
-    Search 
-    
+    Search
+
     apply EqdepFacts.eq_sigT_iff_eq_dep.
     Print EqdepFacts.eq_dep.
 
@@ -343,7 +364,7 @@ Lemma cover_assoc12 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : �
 
 
 Lemma cover_assoc2_eq1 {Γ1 Γ2 Γ3 Γ23 Γ123} (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H2 : Γ2 ⊎ Γ3 ≡ Γ23)
-      : r_cover_l H1 ≡ₛ r_cover_l (cover_assoc2_right H1 H2) ⊛ᵣ r_cover_l (cover_assoc2_left H1 H2).
+      : r_cover_l H1 ≡ₐ r_cover_l (cover_assoc2_right H1 H2) ⊛ᵣ r_cover_l (cover_assoc2_left H1 H2).
   funelim (cover_assoc2 H1 H2); simp cover_assoc.
   dependent destruction v; intros ? i; dependent destruction i.
   all: intros ? i.
@@ -352,7 +373,7 @@ Lemma cover_assoc2_eq1 {Γ1 Γ2 Γ3 Γ23 Γ123} (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H
   Qed.
 
 Lemma cover_assoc2_eq2 {Γ1 Γ2 Γ3 Γ23 Γ123} (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H2 : Γ2 ⊎ Γ3 ≡ Γ23)
-      : r_cover_r H1 ⊛ᵣ r_cover_l H2 ≡ₛ r_cover_l (cover_assoc2_right H1 H2) ⊛ᵣ r_cover_r (cover_assoc2_left H1 H2).
+      : r_cover_r H1 ⊛ᵣ r_cover_l H2 ≡ₐ r_cover_l (cover_assoc2_right H1 H2) ⊛ᵣ r_cover_r (cover_assoc2_left H1 H2).
   funelim (cover_assoc2 H1 H2); simp cover_assoc.
   dependent destruction v; intros ? i; dependent destruction i.
   all: intros ? i.
@@ -361,7 +382,7 @@ Lemma cover_assoc2_eq2 {Γ1 Γ2 Γ3 Γ23 Γ123} (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H
   Qed.
 
 Lemma cover_assoc2_eq3 {Γ1 Γ2 Γ3 Γ23 Γ123} (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H2 : Γ2 ⊎ Γ3 ≡ Γ23)
-      : r_cover_r H1 ⊛ᵣ r_cover_r H2 ≡ₛ r_cover_r (cover_assoc2_right H1 H2).
+      : r_cover_r H1 ⊛ᵣ r_cover_r H2 ≡ₐ r_cover_r (cover_assoc2_right H1 H2).
   funelim (cover_assoc2 H1 H2); simp cover_assoc.
   dependent destruction v; intros ? i; dependent destruction i.
   all: intros ? i.
@@ -370,7 +391,7 @@ Lemma cover_assoc2_eq3 {Γ1 Γ2 Γ3 Γ23 Γ123} (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H
   Qed.
 
 Lemma cover_assoc1_eq1 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
-    r_cover_l H2 ⊛ᵣ r_cover_l H1 ≡ₛ r_cover_l (cover_assoc1_left H1 H2).
+    r_cover_l H2 ⊛ᵣ r_cover_l H1 ≡ₐ r_cover_l (cover_assoc1_left H1 H2).
 Proof.
   funelim (cover_assoc1 H1 H2); simp cover_assoc.
   dependent destruction u; intros ? i; dependent destruction i.
@@ -381,7 +402,7 @@ Proof.
 
 Lemma cover_assoc1_eq2 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
     r_cover_l H2 ⊛ᵣ r_cover_r H1
-    ≡ₛ
+    ≡ₐ
     r_cover_r (cover_assoc1_left H1 H2) ⊛ᵣ r_cover_l (cover_assoc1_right H1 H2) .
 Proof.
   funelim (cover_assoc1 H1 H2); simp cover_assoc.
@@ -392,7 +413,7 @@ Proof.
 Qed.
 
 Lemma cover_assoc1_eq3 {Γ1 Γ2 Γ12 Γ3 Γ123} (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123) :
-    r_cover_r H2 ≡ₛ 
+    r_cover_r H2 ≡ₐ
     r_cover_r (cover_assoc1_left H1 H2) ⊛ᵣ r_cover_r (cover_assoc1_right H1 H2) .
 Proof.
   funelim (cover_assoc1 H1 H2); simp cover_assoc.
@@ -409,12 +430,11 @@ Equations s_cover {F Γ1 Γ2 Γ3 Δ} : Γ1 ⊎ Γ2 ≡ Γ3 -> Γ1 =[F]> Δ -> Γ
   } .
 Notation "[ u , H , v ]" := (s_cover H u v) (at level 9).
 
-#[global] Instance s_cover_proper {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) : Proper (sub_eq _ _ ==> sub_eq _ _ ==> sub_eq _ _) (s_cover (F:=F) (Δ:=Δ) H).
+#[global] Instance s_cover_proper {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) : Proper (ass_eq _ _ ==> ass_eq _ _ ==> ass_eq _ _) (s_cover (F:=F) (Δ:=Δ) H).
 intros ? ? H1 ? ? H2 ? i.
 unfold s_cover, s_cover_clause_1.
 destruct (cover_split H _ i); [ now apply H1 | now apply H2 ].
 Qed.
-
 
 
 Definition s_cat {F Γ1 Γ2 Δ} : Γ1 =[F]> Δ -> Γ2 =[F]> Δ -> (Γ1 +▶ Γ2) =[F]> Δ :=
@@ -424,7 +444,7 @@ Notation "[ u , v ]" := (s_cat u v) (at level 9).
 Definition r_concat_l {Γ Δ : ctx X} : Γ ⊆ (Γ +▶ Δ) :=
   r_cover_l cover_cat .
 
-Definition r_cover_l_nil {Γ} : r_cover_l cover_nil_r ≡ₛ @r_id Γ .
+Definition r_cover_l_nil {Γ} : r_cover_l cover_nil_r ≡ₐ @r_id Γ .
   intros ? i.
   induction Γ.
   - dependent elimination i.
@@ -446,7 +466,7 @@ Definition r_concat3_1 {Γ Δ ϒ : ctx X} : (Γ +▶ Δ) ⊆ (Γ +▶ (Δ +▶ �
 Definition r_concat3_2 {Γ Δ ϒ : ctx X} : (Γ +▶ ϒ) ⊆ (Γ +▶ (Δ +▶ ϒ)) :=
   [ r_concat_l , r_concat_r ⊛ᵣ r_concat_r ].
 
-Lemma s_eq_cover_empty_r {F Γ1 Δ} (u : Γ1 =[F]> Δ) : [ u , s_empty ] ≡ₛ u.
+Lemma s_eq_cover_empty_r {F Γ1 Δ} (u : Γ1 =[F]> Δ) : [ u , s_empty ] ≡ₐ u.
 Proof.
   intros ? i.
   unfold s_cat, cover_cat, cover_nil_r, s_cover, s_cover_clause_1.
@@ -474,9 +494,8 @@ Proof.
       apply (IHΓ1 _ (fun _ i => u _ (pop i))).
   Qed.
 
-
 Lemma s_eq_cover_l {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
-      : [ u , H , v ] ⊛ᵣ r_cover_l H ≡ₛ u.
+      : [ u , H , v ] ⊛ᵣ r_cover_l H ≡ₐ u.
 Proof.
   intros ? i. dependent induction H.
   - dependent elimination i.
@@ -499,12 +518,12 @@ Proof.
 Qed.
 
 Lemma s_eq_cat_l {F Γ1 Γ2 Δ} (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
-      : [ u , v ] ⊛ᵣ r_concat_l ≡ₛ u.
+      : [ u , v ] ⊛ᵣ r_concat_l ≡ₐ u.
   apply s_eq_cover_l.
 Qed.
 
 Lemma s_eq_cover_r {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
-      : [ u , H , v ] ⊛ᵣ r_cover_r H ≡ₛ v.
+      : [ u , H , v ] ⊛ᵣ r_cover_r H ≡ₐ v.
 Proof.
   dependent induction H; intros ? i.
   - dependent elimination i.
@@ -531,15 +550,15 @@ Proof.
 Qed.
 
 Lemma s_eq_cat_r {F Γ1 Γ2 Δ} (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
-      : [ u , v ] ⊛ᵣ r_concat_r ≡ₛ v.
+      : [ u , v ] ⊛ᵣ r_concat_r ≡ₐ v.
   apply s_eq_cover_r.
 Qed.
 
 Lemma s_eq_cover_uniq {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3)
        (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ) (w : Γ3 =[F]> Δ)
-       (H1 : u ≡ₛ w ⊛ᵣ r_cover_l H)
-       (H2 : v ≡ₛ w ⊛ᵣ r_cover_r H)
-       : [ u , H , v ] ≡ₛ w .
+       (H1 : u ≡ₐ w ⊛ᵣ r_cover_l H)
+       (H2 : v ≡ₐ w ⊛ᵣ r_cover_r H)
+       : [ u , H , v ] ≡ₐ w .
   intros ? i.
   unfold s_cover, s_cover_clause_1.
   destruct (cover_split H _ i) eqn:Hs.
@@ -568,7 +587,7 @@ Lemma s_cover_assoc1 {F Γ1 Γ2 Γ12 Γ3 Γ123 Δ}
   (H1 : Γ1 ⊎ Γ2 ≡ Γ12) (H2 : Γ12 ⊎ Γ3 ≡ Γ123)
   (u1 : Γ1 =[F]> Δ) (u2 : Γ2 =[F]> Δ) (u3 : Γ3 =[F]> Δ)
   : [ [ u1 , H1 , u2 ] , H2 , u3 ]
-    ≡ₛ [ u1 , cover_assoc1_left H1 H2 , [ u2 , cover_assoc1_right H1 H2 , u3 ] ].
+    ≡ₐ [ u1 , cover_assoc1_left H1 H2 , [ u2 , cover_assoc1_right H1 H2 , u3 ] ].
 Proof.
   apply s_eq_cover_uniq.
   + apply s_eq_cover_uniq; rewrite <- s_ren_comp.
@@ -581,7 +600,7 @@ Lemma s_cover_assoc2 {F Γ1 Γ2 Γ3 Γ23 Γ123 Δ}
   (H1 : Γ1 ⊎ Γ23 ≡ Γ123) (H2 : Γ2 ⊎ Γ3 ≡ Γ23)
   (u1 : Γ1 =[F]> Δ) (u2 : Γ2 =[F]> Δ) (u3 : Γ3 =[F]> Δ)
   : [ u1 , H1 , [ u2 , H2 , u3 ] ]
-    ≡ₛ [ [ u1 , cover_assoc2_left H1 H2 , u2 ] , cover_assoc2_right H1 H2 , u3 ].
+    ≡ₐ [ [ u1 , cover_assoc2_left H1 H2 , u2 ] , cover_assoc2_right H1 H2 , u3 ].
 Proof.
   apply s_eq_cover_uniq.
   + now rewrite (cover_assoc2_eq1 H1 H2), s_ren_comp, 2 s_eq_cover_l.
@@ -604,10 +623,10 @@ End lemma.
 #[global] Notation join_odd := (join_even_odd_aux false) .
 #[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30) : type_scope.
 #[global] Notation "a ⊎ b ≡ c" := (cover a%ctx b%ctx c%ctx) (at level 30) : type_scope.
-#[global] Notation "Γ ⊆ Δ" := (substitution has Γ%ctx Δ%ctx) (at level 30) : type_scope.
-#[global] Notation "Γ =[ F ]> Δ" := (substitution F Γ%ctx Δ%ctx) (at level 30) : type_scope.
+#[global] Notation "Γ ⊆ Δ" := (assignment has Γ%ctx Δ%ctx) (at level 30) : type_scope.
+#[global] Notation "Γ =[ F ]> Δ" := (assignment F Γ%ctx Δ%ctx) (at level 30) : type_scope.
 #[global] Notation "a ∘⊆ b" := (r_comp a%ctx b%ctx) (at level 30).
 #[global] Notation "[ u , v ]" := (s_cat u v) (at level 14).
-#[global] Notation "u ≡ₛ v" := (sub_eq _ _ u v) (at level 50).
+#[global] Notation "u ≡ₐ v" := (ass_eq _ _ u v) (at level 50).
 
 #[global] Infix "⊛ᵣ" := s_ren (at level 14).

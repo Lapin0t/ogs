@@ -12,13 +12,14 @@ Set Equations Transparent.
 
 Open Scope ctx_scope.
 
-(*
-  Mapping with pdf: operational signature
-
-typ : set of types
-msg : to each typ a message
-dom : for each message the context extension it entails (a.k.a. free variables of the message)
- *)
+(*|
+Operational signature
+=====================
+Specifies the interactions player and opponent communicate over.
+- typ : a set of types (meta [t])
+- msg : maps a typ to messages (meta [m])
+- dom : maps messages to the context extension they entails --- think the free variables of the message
+|*)
 Record interaction_spec : Type := {
   typ : Type ;
   msg : typ -> Type ;
@@ -26,104 +27,136 @@ Record interaction_spec : Type := {
 }.
 Arguments dom _ [_].
 
-Section a.
+Section withInteractionSpec.
 
   Context (S : interaction_spec).
 
-  (* pdf: msg* *)
-  Definition msg' (Γ : ctx S.(typ)) : Type :=
-    { t : S.(typ) & Γ ∋ t * S.(msg) t }%type.
+  Notation typ := (S.(typ)).
+  Notation msg := (S.(msg)).
+(*|
+Contexts of types (meta [Γ])
+|*)
+  Notation context := (ctx typ).
 
-  (* pdf: dom* *)
-  Definition dom' {Γ} (m : msg' Γ) : ctx S.(typ) :=
+(*|
+Lifting the notion of message to context:
+given a context Γ, a [msg'] is a message over a [typ] contained in Γ.
+|*)
+  Definition msg' (Γ : context) : Type :=
+    { t : typ & Γ ∋ t * msg t }%type.
+
+(*|
+Lifting the notion of domain to context:
+Given a context Γ, the domain of a message over Γ is the domain of its typ-level message component.
+|*)
+  Definition dom' {Γ} (m : msg' Γ) : context :=
     S.(dom) (snd (projT2 m)).
 
-  (* (Axiomatization of the) Operational machine:
-
-Question GJ: should msg' be renamed into move?
-
-TODO: concretize env
-
-     1-5 : current status of the pdf
-     6-10: administration
-   *)
+(*|
+Operational machine
+=====================
+Specifies the operational semantics of the language.
+- [conf Γ]: the configurations (meta [c]), or active states, with open variables in Γ
+- [v :::= val Γ τ]: the values (meta [v]), or elementary passive states, with open variables in Γ and of type τ
+- [eval c]: the evaluation function for configurations, evaluating down to a message and an assignment. This evaluation is partial, partiality which we embed in the delay monad.
+- [emb m]: embeds messages into configurations
+- [v_var]: well-scoped embedding of variables into values
+- [v_sub]: performs over values the substitution associated to an assignment
+- [c_sub]: performs over configurations the substitution associated to an assignment
+|*)
   Class machine : Type := {
-    (* configurations (used to be called "terms" far in the past)
-       roughly: active states *)
-    conf : ctx S.(typ) -> Type ;
-    (* roughly: elementary passive states *)
-    val : ctx S.(typ) -> S.(typ) -> Type ;
-    (* evaluation function for configurations *)
+    conf : context -> Type ;
+    val : context -> typ -> Type ;
     eval {Γ} : conf Γ -> delay { m : msg' Γ & dom' m =[val]> Γ } ;
     emb {Γ} (m : msg' Γ) : conf (Γ +▶ dom' m) ;
-    (* value variables *)
     v_var {Γ} : has Γ ⇒ᵢ val Γ ; (*  Γ ∋ x -> val Γ x   *)
-    (* value substitution *)
     v_sub {Γ Δ} : Γ =[val]> Δ -> val Γ ⇒ᵢ val Δ ;
-    (* configuration substitution *)
     c_sub {Γ Δ} : Γ =[val]> Δ -> conf Γ -> conf Δ ;
     }.
 
   Notation "u @ᵥ v" := (v_sub u _ v) (at level 30).
   Notation "u @ₜ c" := (c_sub u c) (at level 30).
-
- 
   Notation "Γ ⇒ᵥ Δ" := (Γ =[val]> Δ) (at level 30).
 
-  Definition v_ren {M : machine} {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ :=
+  Context {M: machine}.
+
+(*|
+Renaming in values, a particular case of value substitution.
+|*)
+  Definition v_ren {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ :=
     fun u => v_sub (v_var ⊛ᵣ u) .
-      
-  Definition e_comp {M : machine} {Γ1 Γ2 Γ3} : Γ2 ⇒ᵥ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
+
+(*|
+Composition of value assignments.
+|*)
+  Definition e_comp {Γ1 Γ2 Γ3} : Γ2 ⇒ᵥ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
     := fun u v => s_map (v_sub u) v.
   Infix "⊛" := e_comp (at level 14).
 
-  Definition e_ren {M : machine} {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
+(*|
+Renaming in environments
+|*)
+  Definition e_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
     := fun u v => (v_var ⊛ᵣ u) ⊛ v.
   Infix "ᵣ⊛" := e_ren (at level 14).
 
-  Definition c_ren {M : machine} {Γ1 Γ2} : Γ1 ⊆ Γ2 -> conf Γ1 -> conf Γ2
+(*|
+Renaming in configurations
+|*)
+  Definition c_ren {Γ1 Γ2} : Γ1 ⊆ Γ2 -> conf Γ1 -> conf Γ2
     := fun u c => (u ᵣ⊛ v_var) @ₜ c.
 
-  Class machine_law (M : machine) : Prop := {
+(*|
+Operational machine: axiomatization
+====================================
+The machine comes with a battery of expected laws:
+- value substitution respects the equivalence of assignments ([sub_eq])
+- configuration substitution respects the equivalence of assignments ([sub_eq])
+- the embedding of variables is the unit for composition of assignments
+- the composition of value assignments is associative
+- the embedding of variables is the unit substitution on terms
+- the composition o substitution on terms commutes with the composition of assignments
+|*)
+  Class machine_law : Prop := {
     v_sub_proper {Γ Δ}
       :> Proper
-          (sub_eq Γ Δ ==> forall_relation (fun i => eq ==> eq))
+          (ass_eq Γ Δ ==> forall_relation (fun i => eq ==> eq))
           v_sub ;
     c_sub_proper {Γ Δ}
       :> Proper
-          (sub_eq Γ Δ ==> eq ==> eq)
+          (ass_eq Γ Δ ==> eq ==> eq)
           c_sub ;
-    v_sub_var {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : p ⊛ v_var ≡ₛ p ;
-    v_var_sub {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : v_var ⊛ p ≡ₛ p ;
+    v_sub_var {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : p ⊛ v_var ≡ₐ p ;
+    v_var_sub {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : v_var ⊛ p ≡ₐ p ;
     v_sub_sub {Γ1 Γ2 Γ3 Γ4} (p : Γ3 ⇒ᵥ Γ4) (q : Γ2 ⇒ᵥ Γ3) (r : Γ1 ⇒ᵥ Γ2)
-      : p ⊛ (q ⊛ r) ≡ₛ (p ⊛ q) ⊛ r ;
+      : p ⊛ (q ⊛ r) ≡ₐ (p ⊛ q) ⊛ r ;
     c_var_sub {Γ} (c : conf Γ) : v_var @ₜ c = c ;
     c_sub_sub {Γ1 Γ2 Γ3} (u : Γ2 ⇒ᵥ Γ3) (v : Γ1 ⇒ᵥ Γ2) {c}
       : u @ₜ (v @ₜ c) = (u ⊛ v) @ₜ c ;
   }.
 
-  Context {M : machine} {MH : machine_law M}.
+  Context {MH : machine_law}.
 
   #[global] Instance e_comp_proper {Γ1 Γ2 Γ3}
-             : Proper (sub_eq Γ2 Γ3 ==> sub_eq Γ1 Γ2 ==> sub_eq Γ1 Γ3) e_comp.
+             : Proper (ass_eq Γ2 Γ3 ==> ass_eq Γ1 Γ2 ==> ass_eq Γ1 Γ3) e_comp.
     intros ? ? H1 ? ? H2 ? i.
     unfold e_comp, s_map.
     now rewrite H1, H2.
   Qed.
 
   #[global] Instance e_ren_proper {Γ1 Γ2 Γ3}
-             : Proper (sub_eq Γ2 Γ3 ==> sub_eq Γ1 Γ2 ==> sub_eq Γ1 Γ3) e_ren.
+             : Proper (ass_eq Γ2 Γ3 ==> ass_eq Γ1 Γ2 ==> ass_eq Γ1 Γ3) e_ren.
   intros ? ? H1 ? ? H2.
   unfold e_ren. apply e_comp_proper; eauto. now rewrite H1.
   Qed.
 
   Lemma e_comp_ren_r {Γ1 Γ2 Γ3 Γ4} (u : Γ3 ⇒ᵥ Γ4) (v : Γ2 ⇒ᵥ Γ3) (w : Γ1 ⊆ Γ2)
-        : u ⊛ (v ⊛ᵣ w) ≡ₛ (u ⊛ v) ⊛ᵣ w .
+        : u ⊛ (v ⊛ᵣ w) ≡ₐ (u ⊛ v) ⊛ᵣ w .
     reflexivity.
   Qed.
 
   Lemma e_comp_ren_l {Γ1 Γ2 Γ3 Γ4} (u : Γ3 ⇒ᵥ Γ4) (v : Γ2 ⊆ Γ3) (w : Γ1 ⇒ᵥ Γ2)
-        : (u ⊛ᵣ v) ⊛ w ≡ₛ u ⊛ (v ᵣ⊛ w) .
+        : (u ⊛ᵣ v) ⊛ w ≡ₐ u ⊛ (v ᵣ⊛ w) .
     unfold e_ren.
     now rewrite v_sub_sub, e_comp_ren_r, v_sub_var.
   Qed.
@@ -133,7 +166,7 @@ TODO: concretize env
     := fmap (fun _ => @projT1 _ _) _ (eval (e @ₜ t)).
 
   #[global] Instance sub_eval_msg_proper {Γ Δ}
-             : Proper (sub_eq Γ Δ ==> pointwise_relation _ eq) (@sub_eval_msg Γ Δ).
+             : Proper (ass_eq Γ Δ ==> pointwise_relation _ eq) (@sub_eval_msg Γ Δ).
   Proof.
     intros ? ? H1 e.
     unfold sub_eval_msg.
@@ -146,7 +179,7 @@ TODO: concretize env
   (* Section 3: game definition
      ↓+ ~ join_even
    *)
-  Definition alt_ext : Type := ctx (ctx S.(typ)).
+  Definition alt_ext : Type := ctx (context).
   Notation "↓⁺ a" := (join_even a) (at level 9).
   Notation "↓⁻ a" := (join_odd a) (at level 9).
   Notation "↓[ b ] a" := (join_even_odd_aux b a) (at level 9).
@@ -169,7 +202,7 @@ TODO: concretize env
      Env M Δ player es : environment part of the player (aka active at es) configuration at (Δ + es)
      Env M Δ opponent es : environment part of the opponent (aka passive at es) configuration at (Δ + es)
    *)
-  Inductive alt_env (Δ : ctx S.(typ))
+  Inductive alt_env (Δ : context)
     : bool -> alt_ext -> Type :=
   | ENil {b} : alt_env Δ b ∅
   | EConT {a Γ} : alt_env Δ opponent a
@@ -198,8 +231,8 @@ TODO: concretize env
   Arguments concat1 {Δ a b}.
 
   Lemma quatre_six {Δ a} (u : alt_env Δ player a) (v : alt_env Δ opponent a)
-    :  [ v_var , concat1 u v ] ⊛ concat0 u ≡ₛ concat1 v u
-    /\ [ v_var , concat1 v u ] ⊛ concat0 v ≡ₛ concat1 u v .
+    :  [ v_var , concat1 u v ] ⊛ concat0 u ≡ₐ concat1 v u
+    /\ [ v_var , concat1 v u ] ⊛ concat0 v ≡ₐ concat1 u v .
   Proof.
     induction a; dependent destruction u; dependent destruction v; cbn; split.
     - intros ? i; dependent elimination i.
@@ -219,7 +252,7 @@ TODO: concretize env
         rewrite s_eq_cat_r.
         change (?a ⊛ᵣ ?b) with (a ∘⊆ b) at 2.
         now rewrite s_ren_comp, s_eq_cat_r, s_eq_cat_l.
-    - symmetry; apply s_eq_cover_uniq. 
+    - symmetry; apply s_eq_cover_uniq.
       * rewrite <- e_comp_ren_r, s_eq_cat_l.
         symmetry; apply IHa.
       * now rewrite <- e_comp_ren_r, s_eq_cat_r.
@@ -273,7 +306,7 @@ TODO: concretize env
   Definition inj_init_pas {Δ Γ} (γ : Γ ⇒ᵥ Δ) : m_strat_pas Δ (∅ ▶ Γ)
     := EConF ENil (e_ren r_concat_l γ).
 
-  Definition compo_t (Δ : ctx S.(typ)) : Type := ⦉ m_strat_act Δ ×ᵢ m_strat_pas Δ ⦊ᵢ .
+  Definition compo_t (Δ : context) : Type := ⦉ m_strat_act Δ ×ᵢ m_strat_pas Δ ⦊ᵢ .
 
   Equations compo_body {Δ}
             : (fun (_ : T1) => compo_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => compo_t Δ + msg' Δ)%type :=
@@ -282,12 +315,11 @@ TODO: concretize env
           go (match r with
               | inl r => RetF (inr r)
               | inr e => RetF (inl (_ ,' (m_strat_resp (snd (projT2 x)) (projT1 e) , (projT2 e))))
-              end).  
+              end).
 
   Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
     := iter compo_body T1_0 (a ,' (u , v)).
   Notation "u ∥ v" := (compo u v) (at level 40).
-
 
   #[global] Instance compo_proper {Δ a}
     : Proper
@@ -306,7 +338,7 @@ TODO: concretize env
                        (fst (fst (projT2 u))) .
 
   Lemma quatre_trois_pre {Δ} (x : compo_t Δ)
-    : 
+    :
         (compo_body T1_0 x >>= fun _ r => go (match r with
                                      | inl x' => TauF (reduce _ x')
                                      | inr y => RetF (y : (fun _ => msg' _) _)
@@ -334,7 +366,7 @@ TODO: concretize env
     + econstructor. apply CIH.
     + destruct q.
   Qed.
-    
+
   Definition eval_sub_1 {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
              : delay { m : msg' Δ & dom' m ⇒ᵥ Δ } :=
         eval ([ v_var , e ] @ₜ c) .
@@ -425,7 +457,7 @@ TODO: concretize env
     rewrite 2 s_eq_cat_r.
     unfold r_concat_l, cover_cat; cbn.
     rewrite r_cover_l_nil.
-    now rewrite s_ren_id, v_var_sub. 
+    now rewrite s_ren_id, v_var_sub.
   Qed.
 
   Theorem barb_correction {Γ} Δ (x y : conf Γ)
@@ -438,6 +470,6 @@ TODO: concretize env
   Qed.
 
   Theorem ogs_correction {Γ} Δ (x y : conf Γ)
-          : inj_init_act x ≈ₐ inj_init_act y -> ciu Δ x y.
+    : inj_init_act x ≈ₐ inj_init_act y -> ciu Δ x y.
 
 End a.
