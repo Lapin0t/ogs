@@ -151,11 +151,8 @@ Qed.
 (*|
 Composition of context inclusion induces a composed renaming.
 |*)
-Definition r_comp {Γ1 Γ2 Γ3} (a : Γ2 ⊆ Γ3) (b : Γ1 ⊆ Γ2) : Γ1 ⊆ Γ3 :=
-  a ⊛ᵣ b.
-
 Lemma s_ren_comp {F Γ1 Γ2 Γ3 Γ4} (u : Γ3 =[F]> Γ4) (v : Γ2 ⊆ Γ3) (w : Γ1 ⊆ Γ2)
-      : u ⊛ᵣ (r_comp v w) ≡ₐ (u ⊛ᵣ v) ⊛ᵣ w.
+      : u ⊛ᵣ (v ⊛ᵣ w) ≡ₐ (u ⊛ᵣ v) ⊛ᵣ w.
 Proof. reflexivity. Qed.
 
 (* helper for defining various shiftings *)
@@ -527,7 +524,7 @@ Lemma s_eq_cover_r {F Γ1 Γ2 Γ3 Δ} (H : Γ1 ⊎ Γ2 ≡ Γ3) (u : Γ1 =[F]> �
 Proof.
   dependent induction H; intros ? i.
   - dependent elimination i.
-  - unfold s_ren, s_cover, s_cover_clause_1, r_comp.
+  - unfold s_ren, s_cover, s_cover_clause_1.
     rewrite r_cover_r_equation_2, cover_split_equation_3.
       unfold cover_split_clause_3.
       transitivity (match cover_split H _ (r_cover_r H _ i) with
@@ -538,7 +535,7 @@ Proof.
       now apply (IHcover (fun _ i => u _ (pop i)) v).
   - dependent elimination i.
     reflexivity.
-    unfold s_ren, s_cover, s_cover_clause_1, r_comp.
+    unfold s_ren, s_cover, s_cover_clause_1.
     rewrite r_cover_r_equation_4, cover_split_equation_5.
     unfold cover_split_clause_4.
     transitivity (match cover_split H _ (r_cover_r H _ h) with
@@ -625,7 +622,6 @@ End lemma.
 #[global] Notation "a ⊎ b ≡ c" := (cover a%ctx b%ctx c%ctx) (at level 30) : type_scope.
 #[global] Notation "Γ ⊆ Δ" := (assignment has Γ%ctx Δ%ctx) (at level 30) : type_scope.
 #[global] Notation "Γ =[ F ]> Δ" := (assignment F Γ%ctx Δ%ctx) (at level 30) : type_scope.
-#[global] Notation "a ∘⊆ b" := (r_comp a%ctx b%ctx) (at level 30).
 #[global] Notation "[ u , v ]" := (s_cat u v) (at level 14).
 #[global] Notation "u ≡ₐ v" := (ass_eq _ _ u v) (at level 50).
 

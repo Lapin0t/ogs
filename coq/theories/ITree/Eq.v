@@ -34,6 +34,12 @@ Section it_eat.
 
   Definition it_eat' : relᵢ (itree E R) (itree E R) := fun i u v => it_eat i u.(_observe) v.(_observe).
 
+  Definition it_eat_tau {i x y} (H : it_eat i (TauF x) (TauF y))
+    : it_eat i x.(_observe) y.(_observe).
+    dependent induction H; eauto.
+    unfold observe in H; destruct x.(_observe) eqn:Hx; try inversion H; eauto.
+  Defined.
+
 End it_eat.
 
 #[global] Hint Constructors it_eat : core.
@@ -194,6 +200,16 @@ Reversal, symmetry.
     econstructor; eauto; econstructor.
     intro r. apply CIH, k_rel.
   Qed.
+
+  #[global] Instance it_eq_wbisim_subrel : Subrelationᵢ (@it_eq I E X RX) (@it_wbisim I E X RX) := it_eq_wbisim.
+
+  Lemma it_wbisim_up2rfl {_ : Reflexiveᵢ RX} : const (eqᵢ _) <= it_wbisim_t E RX.
+  Proof. apply leq_t. repeat intro. rewrite H0. econstructor; eauto.
+         now apply it_eqF_rfl.
+  Qed.
+
+  #[global] Instance it_wbisim_t_refl {_ : Reflexiveᵢ RX} {RR} : Reflexiveᵢ (it_wbisim_t E RX RR).
+  Proof. apply build_reflexive, (ft_t it_wbisim_up2rfl RR). Qed.
     
   Lemma it_wbisim_up2sym {_ : Symmetricᵢ RX} : converseᵢ <= it_wbisim_t E RX.
   Proof.
@@ -292,6 +308,9 @@ Concatenation, transitivity.
     - apply it_wbisimF_tra.
       refine (_ ⨟⨟ _); apply (gfp_fp (it_wbisim_map _ _)); [ exact u | exact v ].
   Qed.
+
+  #[global] Instance it_wbisim_equiv {_ : Equivalenceᵢ RX} : Equivalenceᵢ (it_wbisim (E:=E) RX).
+  Proof. econstructor; typeclasses eauto. Qed.
 End wbisim_facts1.
 
 (* WIP tau-expansion order ⪅

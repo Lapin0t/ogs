@@ -152,6 +152,32 @@ Section monad.
       intros ? ? ? []; apply (bt_t (it_eq_map E RY)); cbn; eauto.
   Qed.
 
+  (*
+  Definition iter_op {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) (R : relᵢ Y Y) : mon (relᵢ X X).
+    unshelve econstructor.
+    - intros S i x y. refine (it_wbisim (sumᵣ S R) (f i x) (f i y)).
+    - intros ? ? H.
+      unfold it_wbisim; cbn; unfold Basics.impl.
+      coinduction RR CIH.
+      intros ? a b u.
+      apply (gfp_fp (it_wbisim_map E _)) in u.
+      cbn in *. destruct u. destruct rr.
+      * econstructor; [exact r1 | exact r2 | ].
+        econstructor. destruct r_rel; econstructor; try apply H; auto.
+      * econstructor; [exact r1 | exact r2 | ].
+        econstructor. apply (CIH _ _ _ t_rel).
+      * 
+        
+        destruct r_rel.
+
+      d
+      
+      
+    
+
+  Lemma iter_inv {X Y} (f : X ⇒ᵢ Y) {i x y} : iter f i x ≈ iter g i x -> gfp () i x y
+*)
+
   #[global] Instance iter_weq {X Y} {RX : relᵢ X X} {RY : relᵢ Y Y}
     : Proper (dpointwise_relation (fun i => RX i ==> it_wbisim (sumᵣ RX RY) (i:=i))
               ==> dpointwise_relation (fun i => RX i ==> it_wbisim RY (i:=i)))
