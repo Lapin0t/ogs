@@ -179,8 +179,8 @@ Section monad.
 *)
 
   #[global] Instance iter_weq {X Y} {RX : relᵢ X X} {RY : relᵢ Y Y}
-    : Proper (dpointwise_relation (fun i => RX i ==> it_wbisim (sumᵣ RX RY) (i:=i))
-              ==> dpointwise_relation (fun i => RX i ==> it_wbisim RY (i:=i)))
+    : Proper (dpointwise_relation (fun i => RX i ==> it_wbisim (sumᵣ RX RY) i)
+              ==> dpointwise_relation (fun i => RX i ==> it_wbisim RY i))
              (@iter X Y).
   Proof.
     unfold Proper, respectful, dpointwise_relation, pointwise_relation, it_wbisim.

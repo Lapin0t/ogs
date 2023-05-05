@@ -196,6 +196,9 @@ The machine comes with a battery of expected laws:
 
   Definition ogs_e : event alt_ext alt_ext := e_of_g ogs_g.
 
+  Definition ogs_act (Δ : context) : psh alt_ext := itree ogs_e (fun _ => msg' Δ).
+  Definition ogs_pas (Δ : context) : psh alt_ext := h_pasv ogs_hg (ogs_act Δ).
+
   Notation player   := true.
   Notation opponent := false.
   (* Env* (def 3.12)
@@ -283,10 +286,10 @@ The machine comes with a battery of expected laws:
              | inr (m,'c) => Vis' (m : ogs_e.(e_qry) i) (fun r => Ret' (inl (m_strat_resp c r)))
              end.
 
-  Definition m_strat {Δ} : m_strat_act Δ ⇒ᵢ itree ogs_e (fun _ => msg' Δ) :=
+  Definition m_strat {Δ} : m_strat_act Δ ⇒ᵢ ogs_act Δ :=
     iter m_strat_body.
 
-  Definition m_stratp {Δ} : m_strat_pas Δ ⇒ᵢ h_pasv ogs_hg (itree ogs_e (fun _ => msg' Δ)) :=
+  Definition m_stratp {Δ} : m_strat_pas Δ ⇒ᵢ ogs_pas Δ :=
     fun _ x m => m_strat _ (m_strat_resp x m).
 
   Definition m_strat_act_eqv {Δ} : relᵢ (m_strat_act Δ) (m_strat_act Δ) :=
@@ -303,84 +306,108 @@ The machine comes with a battery of expected laws:
   Definition inj_init_pas {Δ Γ} (γ : Γ ⇒ᵥ Δ) : m_strat_pas Δ (∅ ▶ Γ)
     := EConF ENil (e_ren r_concat_l γ).
 
-  Definition compo_t (Δ : context) : Type := ⦉ m_strat_act Δ ×ᵢ m_strat_pas Δ ⦊ᵢ .
+  Definition compo_t (Δ : context) : Type :=
+    ⦉ ogs_act Δ ×ᵢ ogs_pas Δ ⦊ᵢ .
+
   Definition compo_t_eq (Δ : context) : relation (compo_t Δ) .
     intros [a1 [u1 u2]] [a2 [v1 v2]].
     refine (exists (p : a1 = a2), _).
     rewrite p in *.
-    refine (u1 ≈ₐ v1 /\ u2 ≈ₚ v2).
+    refine (u1 ≈ v1 /\ h_pasvR ogs_hg (it_wbisim (eqᵢ _)) _ u2 v2).
   Defined.
 
   Equations compo_body {Δ}
             : (fun (_ : T1) => compo_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => compo_t Δ + msg' Δ)%type :=
-    compo_body T1_0 x :=
-      m_strat_play (fst (projT2 x)) >>= fun _ r =>
-          go (match r with
-              | inl r => RetF (inr r)
-              | inr e => RetF (inl (_ ,' (m_strat_resp (snd (projT2 x)) (projT1 e) , (projT2 e))))
-              end).
+    compo_body :=
+      cofix _compo_body T1_0 u :=
+        go (match (fst (projT2 u)).(_observe) with
+            | RetF r => RetF (inr r)
+            | TauF t => TauF (_compo_body T1_0 (_ ,' (t , (snd (projT2 u)))))
+            | VisF e k => RetF (inl (_ ,' (snd (projT2 u) e , k)))
+            end) .
 
-  Lemma wbisim_inv_tau {I} {E : event I I} {X R i x y} : @it_wbisim I E X R i (Tau' x) (Tau' y) -> @it_wbisim I E X R i x y.
-  revert i x y. unfold it_wbisim. coinduction RR CIH. intros i x y H.
-  apply (gfp_fp (it_wbisim_map E R)) in H.
-  destruct H as [ ? ? r1 r2 rr ].
-  cbn in r1 ,r2.
-  dependent destruction rr.
-  - dependent destruction r1; dependent destruction r2.
-    econstructor. exact r1. exact r2. econstructor. exact r_rel.
-  - apply (gfp_fp (it_wbisim_map E R)) in t_rel.
-    destruct t_rel as [ ? ? s1 s2 ss ].
-    econstructor.
-    exact (eat_trans _ _ _ _ (it_eat_tau r1) s1).
-    exact (eat_trans _ _ _ _ (it_eat_tau r2) s2).
-    exact (it_eqF_mon _ _ (gfp_t _ _) _ _ _ ss).
-  - dependent destruction r1; dependent destruction r2.
-    econstructor.
-    exact r1.
-    exact r2.
-    econstructor; intro r; apply (gfp_t (it_wbisim_map E R)); eauto.
-  Qed.
-
-  Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
+  Definition compo {Δ a} (u : ogs_act Δ a) (v : ogs_pas Δ a) : delay (msg' Δ)
     := iter compo_body T1_0 (a ,' (u , v)).
   Notation "u ∥ v" := (compo u v) (at level 40).
 
   #[global] Instance compo_proper {Δ a}
     : Proper
-        (m_strat_act_eqv a ==> m_strat_pas_eqv a ==> it_wbisim (eqᵢ _) (i:=T1_0))%signature
+        (it_wbisim (eqᵢ _) a ==> h_pasvR ogs_hg (it_wbisim (eqᵢ _)) a ==> it_wbisim (eqᵢ _) T1_0)%signature
         (@compo Δ a).
   Proof.
     intros ? ? H1 ? ? H2. unfold compo.
     unshelve eapply (@iter_weq _ _ _ _ (fun _ => compo_t_eq Δ) (eqᵢ _) compo_body compo_body _ T1_0 (a ,' (x , x0)) (a ,' (y , y0)) (ex_intro _ eq_refl (conj H1 H2))).
     clear a x y H1 x0 y0 H2.
-    unfold dpointwise_relation, respectful, it_wbisim; coinduction R CIH.
+    unfold dpointwise_relation, respectful.
     intros [] [? []] [? []] []; destruct x1; cbn in H; destruct H.
-    rewrite 2 compo_body_equation_1.
-    cbn [fst snd projT1 projT2].
-    unfold m_strat_act_eqv, m_strat in H.
-    unshelve eapply (fbt_bt (it_wbisim_up2bind_t (sumᵣ (eqᵢ (fun _ => msg' Δ)) _) _)).
-    3: econstructor.
-    intros ? [] []; refine (exists (p : x0 = x1), _); destruct p; refine (m3 ≈ₚ m4).
-    all: cycle 1.
-
-    intros ? ? ? []. destruct i0.
-    econstructor; auto. now repeat econstructor.
-    destruct y1, y2. destruct H1; destruct x4; cbn in H1. econstructor; auto. econstructor; econstructor. unshelve econstructor. reflexivity.
-    split; [ exact (H0 x0) | exact H1 ].
-  Admitted.
+    unfold it_wbisim.
+    revert o o1 H.
+    coinduction R CIH.
+    intros o o1 H.
+    cbn.
+    apply it_wbisim_step in H.
+    cbn in H; unfold observe in H.
+    destruct H.
+    dependent destruction rr.
+    - unshelve econstructor.
+      * exact (RetF (inr r0)).
+      * exact (RetF (inr r3)).
+      * remember (_observe o) eqn:H; clear H.
+        remember (@RetF alt_ext ogs_e (fun _ => msg' Δ) (ogs_act Δ) x r0).
+        apply (fun u => rew <- [ fun v => it_eat _ _ v ] Heqi0 in u) in r1.
+        induction r1; [ now rewrite Heqi0 | eauto ].
+      * remember (_observe o1) eqn:H; clear H.
+        remember (@RetF alt_ext ogs_e (fun _ => msg' Δ) (ogs_act Δ) x r3).
+        apply (fun u => rew <- [ fun v => it_eat _ _ v ] Heqi0 in u) in r2.
+        induction r2; [ now rewrite Heqi0 | eauto ].
+      * now repeat econstructor.
+    - unshelve econstructor.
+      * exact (TauF (compo_body T1_0 (x ,' (t1 , o0)))).
+      * exact (TauF (compo_body T1_0 (x ,' (t2 , o2)))).
+      * remember (_observe o) eqn:H; clear H.
+        remember (TauF t1) eqn:H.
+        induction r1; [ now rewrite H | eauto ].
+      * remember (_observe o1) eqn:H; clear H.
+        remember (TauF t2) eqn:H.
+        induction r2; [ now rewrite H | eauto ].
+      * eauto.
+    - unshelve econstructor.
+      * exact (RetF (inl (_ ,' (o0 q , k1)))).
+      * exact (RetF (inl (_ ,' (o2 q , k2)))).
+      * remember (_observe o) eqn:H; clear H.
+        remember (VisF q k1) eqn:H.
+        induction r1; [ now rewrite H | eauto ].
+      * remember (_observe o1) eqn:H; clear H.
+        remember (VisF q k2) eqn:H.
+        induction r2; [ now rewrite H | eauto ].
+      * econstructor. econstructor. unshelve econstructor. reflexivity.
+        econstructor.
+        exact (H0 q).
+        exact k_rel.
+   Qed.
 
   (* guilhem: rename? *)
   Definition barb {Γ} Δ (x y : conf Γ) : Prop :=
-    forall e : Γ ⇒ᵥ Δ, (inj_init_act x ∥ inj_init_pas e) ≈ (inj_init_act y ∥ inj_init_pas e).
+    forall e : Γ ⇒ᵥ Δ, (m_strat _ (inj_init_act x) ∥ m_stratp _ (inj_init_pas e)) ≈ (m_strat _ (inj_init_act y) ∥ m_stratp _ (inj_init_pas e)).
 
-  Equations reduce {Δ} : (fun (_ : T1) => compo_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => msg' Δ) :=
+  Definition reduce_t (Δ : context) : Type :=
+    ⦉ m_strat_act Δ ×ᵢ m_strat_pas Δ ⦊ᵢ .
+
+  Definition reduce_t_inj (Δ : context) : reduce_t Δ -> compo_t Δ.
+  intros [ ? [ a b ]]. refine (x ,' (m_strat _ a , m_stratp _ b)).
+  Defined.
+
+  Definition reduce_t_eq (Δ : context) : relation (reduce_t Δ) :=
+    fun u v => compo_t_eq Δ (reduce_t_inj _ u) (reduce_t_inj _ v).
+
+  Equations reduce {Δ} : (fun (_ : T1) => reduce_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => msg' Δ) :=
     reduce T1_0 u := sub_eval_msg
                        ([ v_var , concat1 (snd (fst (projT2 u))) (snd (projT2 u)) ])
                        (fst (fst (projT2 u))) .
 
-  Lemma quatre_trois_pre {Δ} (x : compo_t Δ)
+  Lemma quatre_trois_pre {Δ} (x : reduce_t Δ)
     :
-        (compo_body T1_0 x >>= fun _ r => go (match r with
+        (compo_body T1_0 (reduce_t_inj _ x) >>= fun _ r => go (match r with
                                      | inl x' => TauF (reduce _ x')
                                      | inr y => RetF (y : (fun _ => msg' _) _)
                                      end))

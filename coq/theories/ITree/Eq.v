@@ -77,6 +77,12 @@ Definition it_eq {I E X} RX [i] := gfp (@it_eq_map I E X RX) i.
 #[global] Notation it_eq_T E RX := (T (it_eq_map E RX)).
 #[global] Notation "a ≊ b" := (it_eq (eqᵢ _) a b) (at level 20).
 
+Definition it_eq_step {I E X RX} : it_eq RX <= @it_eq_map I E X RX (it_eq RX)
+  := fun i x y => proj1 (gfp_fp (it_eq_map E RX) i x y) .
+
+Definition it_eq_unstep {I E X RX} : @it_eq_map I E X RX (it_eq RX) <= it_eq RX 
+  := fun i x y => proj2 (gfp_fp (it_eq_map E RX) i x y) .
+
 #[global] Instance it_eqbt_mon {I} {E : event I I} {X} {RX : relᵢ X X}
   : Proper (leq ==> leq) (it_eq_bt E RX).
   intros R1 R2 H i x y. apply it_eqF_mon. rewrite H. reflexivity.
@@ -160,16 +166,26 @@ Section wbisim.
   Definition it_wbisim := gfp it_wbisim_map.
   Definition it_wbisim' := it_wbisimF it_wbisim.
 
+
 End wbisim.
 #[global] Notation it_wbisim_t E RX := (t (it_wbisim_map E RX)).
 #[global] Notation it_wbisim_bt E RX := (bt (it_wbisim_map E RX)).
 #[global] Notation it_wbisim_T E RX := (T (it_wbisim_map E RX)).
 
-#[global] Arguments it_wbisim {I E X} RX [i].
-#[global] Notation "a ≈ b" := (it_wbisim (eqᵢ _) a b) (at level 20).
+#[global] Arguments it_wbisim {I E X} RX i.
+#[global] Notation "a ≈ b" := (it_wbisim (eqᵢ _) _ a b) (at level 20).
 
 #[global] Arguments WBisim {I E X RX RR i t1 t2 x1 x2}.
 #[global] Hint Constructors it_wbisimF : core.
+
+Definition it_wbisim_step {I E X RX}
+  : it_wbisim RX <= @it_wbisim_map I E X RX (it_wbisim RX)
+  := fun i x y => proj1 (gfp_fp (it_wbisim_map E RX) i x y) .
+
+Definition it_wbisim_unstep {I E X RX}
+  : @it_wbisim_map I E X RX (it_wbisim RX) <= it_wbisim RX
+  := fun i x y => proj2 (gfp_fp (it_wbisim_map E RX) i x y) .
+
 
 Section wbisim_facts1.
   Context {I : Type} {E : event I I} {X : psh I} {RX : relᵢ X X}.
@@ -178,9 +194,16 @@ Section wbisim_facts1.
 Reversal, symmetry.
 |*)
 
+  Lemma it_wbisim_obs {i x y} : it_wbisim (E:=E) RX i x y -> it_wbisim RX i (go x.(_observe)) (go y.(_observe)).
+    intro H.
+    apply it_wbisim_step in H.
+    apply it_wbisim_unstep.
+    exact H.
+  Qed.
+
   Lemma it_wbisim_up2eq : const (it_eq RX) <= it_wbisim_t E RX.
     apply leq_t; intros R i x y H1.
-    apply (gfp_fp (it_eq_map E RX)) in H1.
+    cbn in H1; apply it_eq_step in H1.
     cbn in *; dependent destruction H1; simpl_depind; eauto.
   Qed.
 
@@ -194,18 +217,19 @@ Reversal, symmetry.
   Lemma it_eq_wbisim : @it_eq I E X RX <= @it_wbisim I E X RX.
     unfold it_wbisim, leq; cbn. unfold Basics.impl.
     coinduction R CIH; intros i x y H.
-    apply (gfp_fp (it_eq_map E RX)) in H.
-    cbn in *.
+    apply it_eq_step in H; cbn in *.
     dependent destruction H; simpl_depind; eauto.
-    econstructor; eauto; econstructor.
-    intro r. apply CIH, k_rel.
   Qed.
 
   #[global] Instance it_eq_wbisim_subrel : Subrelationᵢ (@it_eq I E X RX) (@it_wbisim I E X RX) := it_eq_wbisim.
 
   Lemma it_wbisim_up2rfl {_ : Reflexiveᵢ RX} : const (eqᵢ _) <= it_wbisim_t E RX.
-  Proof. apply leq_t. repeat intro. rewrite H0. econstructor; eauto.
-         now apply it_eqF_rfl.
+  Proof.
+    apply leq_t.
+    repeat intro.
+    rewrite H0.
+    econstructor; eauto.
+    now apply it_eqF_rfl.
   Qed.
 
   #[global] Instance it_wbisim_t_refl {_ : Reflexiveᵢ RX} {RR} : Reflexiveᵢ (it_wbisim_t E RX RR).
@@ -223,13 +247,13 @@ Reversal, symmetry.
 
   Equations wbisim_step_l {i x y} : it_wbisim' E RX i x (TauF y) -> it_wbisim' E RX i x (observe y) :=
     wbisim_step_l (WBisim p (EatRefl) (EqTau r))
-      with proj1 (gfp_fp (it_wbisim_map E RX) _ _ _) r :=
+      with it_wbisim_step _ _ _ r :=
       { | WBisim w1 w2 s := WBisim (eat_trans _ _ _ _ p (EatStep w1)) w2 s } ;
     wbisim_step_l (WBisim p (EatStep q) v) := WBisim p q v .
 
   Equations wbisim_step_r {i x y} : it_wbisim' E RX i (TauF x) y -> it_wbisim' E RX i (observe x) y :=
     wbisim_step_r (WBisim (EatRefl) q (EqTau r))
-      with proj1 (gfp_fp (it_wbisim_map E RX) _ _ _) r :=
+      with it_wbisim_step _ _ _ r :=
       { | WBisim w1 w2 s := WBisim w1 (eat_trans _ _ _ _ q (EatStep w2)) s } ;
     wbisim_step_r (WBisim (EatStep p) q v) := WBisim p q v .
 
@@ -237,21 +261,19 @@ Reversal, symmetry.
              (v : it_eqF E RX (it_wbisim RX) i (TauF y) z)
              : it_eqF E RX (it_wbisim RX) i x z :=
     wbisim_tau_up_r (EatRefl)   q         := q ;
-    wbisim_tau_up_r (EatStep p) (EqTau q)
-      with proj1 (gfp_fp (it_wbisim_map E RX) _ _ _) q :=
-      { | WBisim w1 w2 s :=
-          EqTau (proj2 (gfp_fp (it_wbisim_map E RX) _ _ _)
-                   (WBisim (eat_trans _ _ _ _ p (EatStep w1)) w2 s)) } .
+    wbisim_tau_up_r (EatStep p) (EqTau q) with it_wbisim_step _ _ _ q := {
+      | WBisim w1 w2 s :=
+          EqTau (it_wbisim_unstep _ _ _ (WBisim (eat_trans _ _ _ _ p (EatStep w1)) w2 s))
+    } .
 
   Equations wbisim_tau_up_l {i x y z} (u : it_eqF E RX (it_wbisim RX) i x (TauF y))
              (v : it_eat i z (TauF y))
              : it_eqF E RX (it_wbisim RX) i x z :=
     wbisim_tau_up_l p         (EatRefl)   := p ;
-    wbisim_tau_up_l (EqTau p) (EatStep q)
-      with proj1 (gfp_fp (it_wbisim_map E RX) _ _ _) p :=
-      { | WBisim w1 w2 s :=
-          EqTau (proj2 (gfp_fp (it_wbisim_map E RX) _ _ _)
-                   (WBisim w1 (eat_trans _ _ _ _ q (EatStep w2)) s)) } .
+    wbisim_tau_up_l (EqTau p) (EatStep q) with it_wbisim_step _ _ _ p := {
+     | WBisim w1 w2 s :=
+         EqTau (it_wbisim_unstep _ _ _ (WBisim w1 (eat_trans _ _ _ _ q (EatStep w2)) s))
+    } .
 
   Equations wbisim_ret_down_l {i x y r} : it_wbisim' E RX i x y -> it_eat i y (RetF r)
                                       -> (it_eat ⨟ it_eqF E RX (it_wbisim RX)) i x (RetF r) :=
@@ -306,11 +328,23 @@ Concatenation, transitivity.
     eapply (Hbody (it_wbisim_map _ _)).
     - apply id_t.
     - apply it_wbisimF_tra.
-      refine (_ ⨟⨟ _); apply (gfp_fp (it_wbisim_map _ _)); [ exact u | exact v ].
+      refine (_ ⨟⨟ _) ; apply it_wbisim_step; [ exact u | exact v ].
   Qed.
 
   #[global] Instance it_wbisim_equiv {_ : Equivalenceᵢ RX} : Equivalenceᵢ (it_wbisim (E:=E) RX).
   Proof. econstructor; typeclasses eauto. Qed.
+
+  Lemma it_wbisim_tau {_ : Equivalenceᵢ RX} {i x y} : it_wbisim (E:=E) RX i (Tau' x) (Tau' y) -> it_wbisim RX i x y.
+    intro H1.
+    transitivity (Tau' x).
+    apply it_wbisim_unstep.
+    econstructor; [ exact EatRefl | exact (EatStep EatRefl) | destruct (observe x); eauto ].
+    transitivity (Tau' y).
+    exact H1.
+    apply it_wbisim_unstep.
+    econstructor; [ exact (EatStep EatRefl) | exact EatRefl | destruct (observe y); eauto ].
+  Qed.
+
 End wbisim_facts1.
 
 (* WIP tau-expansion order ⪅

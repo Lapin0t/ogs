@@ -1,4 +1,6 @@
+Import EqNotations.
 From OGS Require Import Utils.
+From OGS.Utils Require Import Rel.
 
 Record half_game (I J : Type) := {
  g_move : I -> Type ;
@@ -10,8 +12,15 @@ Arguments g_next {I J h i} m.
 Definition h_actv {I J} (H : half_game I J) (X : psh J) : psh I :=
   fun i => { m : H.(g_move) i & X (H.(g_next) m) } .
 
+Definition h_actvR {I J} (H : half_game I J) {X Y : psh J} (R : relᵢ X Y)
+  : relᵢ (h_actv H X) (h_actv H Y) :=
+  fun i u v => exists p : projT1 u = projT1 v , R _ (rew p in projT2 u) (projT2 v) .
+
 Definition h_pasv {I J} (H : half_game I J) (X : psh J) : psh I :=
   fun i => forall (m : H.(g_move) i), X (H.(g_next) m) .
+
+Definition h_pasvR {I J} (H : half_game I J) {X Y : psh J} (R : relᵢ X Y)
+  : relᵢ (h_pasv H X) (h_pasv H Y) := fun i u v => forall m, R _ (u m) (v m) .
 
 Equations h_sync {I J} (H : half_game I J) {X Y : psh J}
           : ⦉ h_actv H X ×ᵢ h_pasv H Y ⦊ᵢ -> ⦉ Y ×ᵢ X ⦊ᵢ :=
