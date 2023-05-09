@@ -49,41 +49,41 @@ End it_eat.
 (*|
 Strong bisimilarity aka coinductive equality
 |*)
-Variant it_eqF {I} E {X} (RX : relᵢ X X) {Y1 Y2} (RR : relᵢ Y1 Y2) (i : I)
-        : itreeF E X Y1 i -> itreeF E X Y2 i -> Prop :=
+Variant it_eqF {I} E {X1 X2} (RX : relᵢ X1 X2) {Y1 Y2} (RR : relᵢ Y1 Y2) (i : I)
+        : itreeF E X1 Y1 i -> itreeF E X2 Y2 i -> Prop :=
   | EqRet {r1 r2} (r_rel : RX i r1 r2)                : it_eqF _ _ _ _ (RetF r1)   (RetF r2)
   | EqTau {t1 t2} (t_rel : RR i t1 t2)                : it_eqF _ _ _ _ (TauF t1)   (TauF t2)
   | EqVis {q k1 k2} (k_rel : forall r, RR _ (k1 r) (k2 r)) : it_eqF _ _ _ _ (VisF q k1) (VisF q k2)
 .
 #[global] Hint Constructors it_eqF : core.
-#[global] Arguments EqRet {I E X RX Y1 Y2 RR i r1 r2}.
-#[global] Arguments EqTau {I E X RX Y1 Y2 RR i t1 t2}.
-#[global] Arguments EqVis {I E X RX Y1 Y2 RR i q k1 k2}.
+#[global] Arguments EqRet {I E X1 X2 RX Y1 Y2 RR i r1 r2}.
+#[global] Arguments EqTau {I E X1 X2 RX Y1 Y2 RR i t1 t2}.
+#[global] Arguments EqVis {I E X1 X2 RX Y1 Y2 RR i q k1 k2}.
 
-Equations it_eqF_mon {I E X RX Y1 Y2} : Proper (leq ==> leq) (@it_eqF I E X RX Y1 Y2) :=
+Equations it_eqF_mon {I E X1 X2 RX Y1 Y2} : Proper (leq ==> leq) (@it_eqF I E X1 X2 RX Y1 Y2) :=
   it_eqF_mon _ _ H1 _ _ _ (EqRet r_rel) := EqRet r_rel ;
   it_eqF_mon _ _ H1 _ _ _ (EqTau t_rel) := EqTau (H1 _ _ _ t_rel) ;
   it_eqF_mon _ _ H1 _ _ _ (EqVis k_rel) := EqVis (fun r => H1 _ _ _ (k_rel r)) .
 #[global] Existing Instance it_eqF_mon.
 
-Definition it_eq_map {I} E {X} RX : mon (relᵢ (@itree I E X) (@itree I E X)) := {|
+Definition it_eq_map {I} E {X1 X2} RX : mon (relᵢ (@itree I E X1) (@itree I E X2)) := {|
   body RR i x y := it_eqF E RX RR i (observe x) (observe y) ;
   Hbody _ _ H _ _ _ r := it_eqF_mon _ _ H _ _ _ r ;
 |}.
 
-Definition it_eq {I E X} RX [i] := gfp (@it_eq_map I E X RX) i.
+Definition it_eq {I E X1 X2} RX [i] := gfp (@it_eq_map I E X1 X2 RX) i.
 #[global] Notation it_eq_t E RX := (t (it_eq_map E RX)).
 #[global] Notation it_eq_bt E RX := (bt (it_eq_map E RX)).
 #[global] Notation it_eq_T E RX := (T (it_eq_map E RX)).
 #[global] Notation "a ≊ b" := (it_eq (eqᵢ _) a b) (at level 20).
 
-Definition it_eq_step {I E X RX} : it_eq RX <= @it_eq_map I E X RX (it_eq RX)
+Definition it_eq_step {I E X1 X2 RX} : it_eq RX <= @it_eq_map I E X1 X2 RX (it_eq RX)
   := fun i x y => proj1 (gfp_fp (it_eq_map E RX) i x y) .
 
-Definition it_eq_unstep {I E X RX} : @it_eq_map I E X RX (it_eq RX) <= it_eq RX 
+Definition it_eq_unstep {I E X1 X2 RX} : @it_eq_map I E X1 X2 RX (it_eq RX) <= it_eq RX 
   := fun i x y => proj2 (gfp_fp (it_eq_map E RX) i x y) .
 
-#[global] Instance it_eqbt_mon {I} {E : event I I} {X} {RX : relᵢ X X}
+#[global] Instance it_eqbt_mon {I} {E : event I I} {X1 X2} {RX : relᵢ X1 X2}
   : Proper (leq ==> leq) (it_eq_bt E RX).
   intros R1 R2 H i x y. apply it_eqF_mon. rewrite H. reflexivity.
   Qed.
@@ -152,13 +152,13 @@ Concatenation, transitivity.
 End it_eq_facts.
 
 Section wbisim.
-  Context {I : Type} (E : event I I) {X : I -> Type} (RX : relᵢ X X).
+  Context {I : Type} (E : event I I) {X1 X2 : psh I} (RX : relᵢ X1 X2).
 
-  Variant it_wbisimF RR i (t1 : itree' E X i) (t2 : itree' E X i) : Prop :=
+  Variant it_wbisimF RR i (t1 : itree' E X1 i) (t2 : itree' E X2 i) : Prop :=
     | WBisim {x1 x2} (r1 : it_eat i t1 x1) (r2 : it_eat i t2 x2) (rr : it_eqF E RX RR i x1 x2) .
   Arguments WBisim {RR i t1 t2 x1 x2}.
 
-  Definition it_wbisim_map : mon (relᵢ (itree E X) (itree E X)) := {|
+  Definition it_wbisim_map : mon (relᵢ (itree E X1) (itree E X2)) := {|
     body RR i x y := it_wbisimF RR i (observe x) (observe y) ;
     Hbody _ _ H _ _ _ '(WBisim r1 r2 rr) := WBisim r1 r2 (it_eqF_mon _ _ H _ _ _ rr) ;
   |}.
@@ -172,23 +172,23 @@ End wbisim.
 #[global] Notation it_wbisim_bt E RX := (bt (it_wbisim_map E RX)).
 #[global] Notation it_wbisim_T E RX := (T (it_wbisim_map E RX)).
 
-#[global] Arguments it_wbisim {I E X} RX i.
+#[global] Arguments it_wbisim {I E X1 X2} RX i.
 #[global] Notation "a ≈ b" := (it_wbisim (eqᵢ _) _ a b) (at level 20).
 
-#[global] Arguments WBisim {I E X RX RR i t1 t2 x1 x2}.
+#[global] Arguments WBisim {I E X1 X2 RX RR i t1 t2 x1 x2}.
 #[global] Hint Constructors it_wbisimF : core.
 
-Definition it_wbisim_step {I E X RX}
-  : it_wbisim RX <= @it_wbisim_map I E X RX (it_wbisim RX)
+Definition it_wbisim_step {I E X1 X2 RX}
+  : it_wbisim RX <= @it_wbisim_map I E X1 X2 RX (it_wbisim RX)
   := fun i x y => proj1 (gfp_fp (it_wbisim_map E RX) i x y) .
 
-Definition it_wbisim_unstep {I E X RX}
-  : @it_wbisim_map I E X RX (it_wbisim RX) <= it_wbisim RX
+Definition it_wbisim_unstep {I E X1 X2 RX}
+  : @it_wbisim_map I E X1 X2 RX (it_wbisim RX) <= it_wbisim RX
   := fun i x y => proj2 (gfp_fp (it_wbisim_map E RX) i x y) .
 
 
-Section wbisim_facts1.
-  Context {I : Type} {E : event I I} {X : psh I} {RX : relᵢ X X}.
+Section wbisim_facts_het.
+  Context {I : Type} {E : event I I} {X1 X2 : psh I} {RX : relᵢ X1 X2}.
 
 (*|
 Reversal, symmetry.
@@ -214,36 +214,12 @@ Reversal, symmetry.
     - intro r; apply (b_T (it_wbisim_map E RX)), k_rel.
   Qed.
 
-  Lemma it_eq_wbisim : @it_eq I E X RX <= @it_wbisim I E X RX.
+  Lemma it_eq_wbisim : it_eq (E:=E) RX <= it_wbisim (E:=E) RX.
     unfold it_wbisim, leq; cbn. unfold Basics.impl.
     coinduction R CIH; intros i x y H.
     apply it_eq_step in H; cbn in *.
     dependent destruction H; simpl_depind; eauto.
   Qed.
-
-  #[global] Instance it_eq_wbisim_subrel : Subrelationᵢ (@it_eq I E X RX) (@it_wbisim I E X RX) := it_eq_wbisim.
-
-  Lemma it_wbisim_up2rfl {_ : Reflexiveᵢ RX} : const (eqᵢ _) <= it_wbisim_t E RX.
-  Proof.
-    apply leq_t.
-    repeat intro.
-    rewrite H0.
-    econstructor; eauto.
-    now apply it_eqF_rfl.
-  Qed.
-
-  #[global] Instance it_wbisim_t_refl {_ : Reflexiveᵢ RX} {RR} : Reflexiveᵢ (it_wbisim_t E RX RR).
-  Proof. apply build_reflexive, (ft_t it_wbisim_up2rfl RR). Qed.
-    
-  Lemma it_wbisim_up2sym {_ : Symmetricᵢ RX} : converseᵢ <= it_wbisim_t E RX.
-  Proof.
-    apply leq_t; intros ? ? ? ? [ ? ? r1 r2 rr ].
-    refine (WBisim r2 r1 _).
-    now apply it_eqF_sym.
-  Qed.
-
-  #[global] Instance it_wbisim_t_sym {_ : Symmetricᵢ RX} {RR} : Symmetricᵢ (it_wbisim_t E RX RR).
-  Proof. apply build_symmetric, (ft_t it_wbisim_up2sym RR). Qed.
 
   Equations wbisim_step_l {i x y} : it_wbisim' E RX i x (TauF y) -> it_wbisim' E RX i x (observe y) :=
     wbisim_step_l (WBisim p (EatRefl) (EqTau r))
@@ -295,6 +271,37 @@ Reversal, symmetry.
     wbisim_vis_down_r (EatRefl)   (WBisim (EatRefl) q w) := w ⨟⨟ q ;
     wbisim_vis_down_r (EatStep p) w                      := wbisim_vis_down_r p (wbisim_step_r w) .
 
+End wbisim_facts_het.
+
+Section wbisim_facts_hom.
+  Context {I : Type} {E : event I I} {X : psh I} {RX : relᵢ X X}.
+
+
+  #[global] Instance it_eq_wbisim_subrel
+    : Subrelationᵢ (it_eq (E:=E) RX) (it_wbisim (E:=E) RX)
+    := it_eq_wbisim.
+
+  Lemma it_wbisim_up2rfl {_ : Reflexiveᵢ RX} : const (eqᵢ _) <= it_wbisim_t E RX.
+  Proof.
+    apply leq_t.
+    repeat intro.
+    rewrite H0.
+    econstructor; eauto.
+    now apply it_eqF_rfl.
+  Qed.
+
+  #[global] Instance it_wbisim_t_refl {_ : Reflexiveᵢ RX} {RR} : Reflexiveᵢ (it_wbisim_t E RX RR).
+  Proof. apply build_reflexive, (ft_t it_wbisim_up2rfl RR). Qed.
+    
+  Lemma it_wbisim_up2sym {_ : Symmetricᵢ RX} : converseᵢ <= it_wbisim_t E RX.
+  Proof.
+    apply leq_t; intros ? ? ? ? [ ? ? r1 r2 rr ].
+    refine (WBisim r2 r1 _).
+    now apply it_eqF_sym.
+  Qed.
+
+  #[global] Instance it_wbisim_t_sym {_ : Symmetricᵢ RX} {RR} : Symmetricᵢ (it_wbisim_t E RX RR).
+  Proof. apply build_symmetric, (ft_t it_wbisim_up2sym RR). Qed.
 
 (*|
 Concatenation, transitivity.
@@ -322,7 +329,7 @@ Concatenation, transitivity.
         exact (WBisim u1 w1 (EqVis (fun r => k_rel r ⨟⨟ k_rel0 r))).
   Qed.
 
-  #[global] Instance it_wbisim_tra {_ : Transitiveᵢ RX} : Transitiveᵢ (@it_wbisim I E X RX).
+  #[global] Instance it_wbisim_tra {_ : Transitiveᵢ RX} : Transitiveᵢ (@it_wbisim I E X X RX).
   Proof.
     apply build_transitive, coinduction; intros ? ? ? [ ? [ u v ] ].
     eapply (Hbody (it_wbisim_map _ _)).
@@ -345,7 +352,7 @@ Concatenation, transitivity.
     econstructor; [ exact (EatStep EatRefl) | exact EatRefl | destruct (observe y); eauto ].
   Qed.
 
-End wbisim_facts1.
+End wbisim_facts_hom.
 
 (* WIP tau-expansion order ⪅
 Section wsim.

@@ -65,21 +65,21 @@ Section monad.
 
   Definition bind {X Y i} x f := @subst X Y f i x.
 
-  Variant bindR {X Y} (RX : relᵢ X X) (R : relᵢ (itree E X) (itree E X))
-                (S : relᵢ (itree E Y) (itree E Y))
-          : relᵢ (itree E Y) (itree E Y) :=
+  Variant bindR {X1 X2 Y1 Y2} (RX : relᵢ X1 X2) (R : relᵢ (itree E X1) (itree E X2))
+                (S : relᵢ (itree E Y1) (itree E Y2))
+          : relᵢ (itree E Y1) (itree E Y2) :=
     | BindR {i t1 t2 k1 k2}
         (u : R i t1 t2)
         (v : forall i x1 x2, RX i x1 x2 -> S i (k1 i x1) (k2 i x2))
       : bindR RX R S i (bind t1 k1) (bind t2 k2).
-  Arguments BindR {X Y RX R S i t1 t2 k1 k2}.    
+  Arguments BindR {X1 X2 Y1 Y2 RX R S i t1 t2 k1 k2}.    
   Hint Constructors bindR : core.
 
-  Program Definition bindR_eq_map {X Y} (RX : relᵢ X X) : mon (relᵢ (itree E Y) (itree E Y)) :=
-    {| body S := bindR RX (@it_eq _ E _ RX) S ;
+  Program Definition bindR_eq_map {X1 X2 Y1 Y2} (RX : relᵢ X1 X2) : mon (relᵢ (itree E Y1) (itree E Y2)) :=
+    {| body S := bindR RX (@it_eq _ E _ _ RX) S ;
        Hbody _ _ H _ _ _ '(BindR u v) := BindR u (fun i _ _ r => H _ _ _ (v i _ _ r)) |}.
 
-  Lemma it_eq_up2bind_t {X Y} RX RY : @bindR_eq_map X Y RX <= it_eq_t E RY.
+  Lemma it_eq_up2bind_t {X1 X2 Y1 Y2} RX RY : @bindR_eq_map X1 X2 Y1 Y2 RX <= it_eq_t E RY.
   Proof.
     apply Coinduction; intros R i x y [ ? ? ? ? ? u v].
     unfold it_eq in u; apply (gfp_fp (it_eq_map E RX)) in u.
@@ -92,11 +92,11 @@ Section monad.
       refine (BindR (k_rel r) (fun i _ _ r => b_T (it_eq_map E RY) _ _ _ _ _ (v i _ _ r))).
   Qed.
 
-  Program Definition bindR_w_map {X Y} (RX : relᵢ X X) : mon (relᵢ (itree E Y) (itree E Y)) :=
-    {| body S := bindR RX (@it_wbisim _ E _ RX) S ;
+  Program Definition bindR_w_map {X1 X2 Y1 Y2} (RX : relᵢ X1 X2) : mon (relᵢ (itree E Y1) (itree E Y2)) :=
+    {| body S := bindR RX (@it_wbisim _ E _ _ RX) S ;
        Hbody _ _ H _ _ _ '(BindR u v) := BindR u (fun i _ _ r => H _ _ _ (v i _ _ r)) |}.
 
-  Lemma it_wbisim_up2bind_t {X Y} RX RY : @bindR_w_map X Y RX <= it_wbisim_t E RY.
+  Lemma it_wbisim_up2bind_t {X1 X2 Y1 Y2} RX RY : @bindR_w_map X1 X2 Y1 Y2 RX <= it_wbisim_t E RY.
   Proof.
     apply Coinduction; intros R i x y [ ? ? ? ? ? u v].
     unfold it_wbisim in u; apply (gfp_fp (it_wbisim_map E RX)) in u.
@@ -129,17 +129,16 @@ Section monad.
                                 | inl x => TauF (_iter _ x)
                                 | inr y => RetF y end)) .
 
-  #[global] Instance iter_eq {X Y} {RX : relᵢ X X} {RY : relᵢ Y Y}
-    : Proper (dpointwise_relation (fun i => RX i ==> it_eq (sumᵣ RX RY) (i:=i))
-              ==> dpointwise_relation (fun i => RX i ==> it_eq RY (i:=i)))
-             (@iter X Y).
+  Open Scope signature.
+
+  Lemma iter_cong_strong {X1 X2 Y1 Y2} {RX : relᵢ X1 X2} {RY : relᵢ Y1 Y2}
+                      f g (_ : forall i a b, RX i a b ->  it_eq (sumᵣ RX RY) (f i a) (g i b))
+                      : forall i a b, RX i a b -> it_eq RY (iter f i a) (iter g i b).
   Proof.
-    unfold Proper, respectful, dpointwise_relation, pointwise_relation, it_eq.
-    intros f g h1; coinduction R CIH; intros i x y r.
-    pose (h3 := h1 i x y r).
-    apply (gfp_fp (it_eq_map E (sumᵣ RX RY))) in h3.
-    cbn in *; cbv [observe] in h3.
-    dependent destruction h3; simpl_depind.
+    unfold it_eq; coinduction R CIH; intros i a b r.
+    pose (h1 := H i a b r).
+    apply it_eq_step in h1; cbn in *; cbv [observe] in h1.
+    dependent destruction h1; simpl_depind.
     - destruct r_rel; eauto.
     - econstructor.
       apply (tt_t (it_eq_map E _)); cbn.
@@ -148,9 +147,15 @@ Section monad.
     - econstructor; intro.
       apply (tt_t (it_eq_map E _)); cbn.
       apply (it_eq_up2bind_t (sumᵣ RX RY) RY); econstructor; eauto.
-      apply k_rel.
       intros ? ? ? []; apply (bt_t (it_eq_map E RY)); cbn; eauto.
   Qed.
+
+  #[global] Instance iter_proper_strong {X Y} {RX : relᵢ X X} {RY : relᵢ Y Y}
+    : Proper (dpointwise_relation (fun i => RX i ==> it_eq (sumᵣ RX RY) (i:=i))
+              ==> dpointwise_relation (fun i => RX i ==> it_eq RY (i:=i)))
+        (@iter X Y)
+    := iter_cong_strong.
+
 
   (*
   Definition iter_op {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) (R : relᵢ Y Y) : mon (relᵢ X X).
@@ -177,22 +182,19 @@ Section monad.
 
   Lemma iter_inv {X Y} (f : X ⇒ᵢ Y) {i x y} : iter f i x ≈ iter g i x -> gfp () i x y
 *)
-
-  #[global] Instance iter_weq {X Y} {RX : relᵢ X X} {RY : relᵢ Y Y}
-    : Proper (dpointwise_relation (fun i => RX i ==> it_wbisim (sumᵣ RX RY) i)
-              ==> dpointwise_relation (fun i => RX i ==> it_wbisim RY i))
-             (@iter X Y).
+  Lemma iter_cong_weak {X1 X2 Y1 Y2} {RX : relᵢ X1 X2} {RY : relᵢ Y1 Y2}
+                      f g (_ : forall i a b, RX i a b -> it_wbisim (sumᵣ RX RY) i (f i a) (g i b))
+                      : forall i a b, RX i a b -> it_wbisim RY i (iter f i a) (iter g i b).
   Proof.
-    unfold Proper, respectful, dpointwise_relation, pointwise_relation, it_wbisim.
-    intros f g h1; coinduction R CIH; intros i x y r.
-    pose (h3 := h1 i x y r).
-    apply (gfp_fp (it_wbisim_map E (sumᵣ RX RY))) in h3.
-    cbn in *; cbv [observe] in h3.
-    destruct h3 as [ ? ? r1 r2 rr ]; dependent destruction rr.
+    unfold it_wbisim; coinduction R CIH; intros i a b r.
+    pose (H1 := H i a b r).
+    apply it_wbisim_step in H1.
+    cbn in *; cbv [observe] in H1.
+    destruct H1 as [ ? ? r1 r2 rr ]; dependent destruction rr.
     - destruct r_rel.
-      * pose (H3 := h1 _ _ _ H).
-        apply (gfp_fp (it_wbisim_map E _)) in H3.
-        destruct H3 as [ ? ? s1 s2 ss ].
+      * pose (H2 := H _ _ _ H0).
+        apply it_wbisim_step in H2.
+        destruct H2 as [ ? ? s1 s2 ss ].
         econstructor.
         exact (subst_eat _ _ (Ret' _) r1).
         exact (subst_eat _ _ (Ret' _) r2).
@@ -217,6 +219,12 @@ Section monad.
       apply (it_wbisim_up2bind_t (sumᵣ RX RY) RY); econstructor; [ apply k_rel | ].
       intros ? ? ? []; apply (tt_t (it_wbisim_map E RY)), (b_t (it_wbisim_map E RY)); cbn; eauto.
   Qed.
+
+  #[global] Instance iter_weq {X Y} {RX : relᵢ X X} {RY : relᵢ Y Y}
+    : Proper (dpointwise_relation (fun i => RX i ==> it_wbisim (sumᵣ RX RY) i)
+              ==> dpointwise_relation (fun i => RX i ==> it_wbisim RY i))
+        (@iter X Y)
+    := iter_cong_weak.
 
   Lemma iter_unfold {X Y RY} {_ : Reflexiveᵢ RY} (f : X ⇒ᵢ itree E (X +ᵢ Y)) {i x}
     : it_eq RY
@@ -273,7 +281,7 @@ Section monad.
     cbn; destruct (x.(_observe)); eauto.
     destruct ((f i r).(_observe)); eauto.
   Qed.
-      
+
 End monad.
 
 #[global] Notation "x >>= f" := (bind x f) (at level 30).
@@ -288,3 +296,13 @@ Definition emap {I} {A B : event I I} (F : A ⇒ₑ B) {X} : itree A X ⇒ᵢ it
          | VisF e k => VisF (F.(ea_qry) e)
                            (fun r => _emap _ (rew (F.(ea_nxt)) in k (F.(ea_rsp) r)))
          end).
+
+
+Lemma subst_subst {I} {E : event I I} {X Y Z} (f : Y ⇒ᵢ itree E Z) (g : X ⇒ᵢ itree E Y) {i} (x : itree E X i)
+      : ((x >>= g) >>= f) ≊ (x >>= (g >=> f)) .
+Proof.
+  revert i x; unfold it_eq; coinduction R CIH; intros i x; cbn.
+  destruct (_observe x); eauto.
+  destruct (_observe (g i r)); eauto.
+  destruct (_observe (f i r0)); eauto.
+Qed.

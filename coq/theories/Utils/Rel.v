@@ -1,4 +1,5 @@
 From Coq.Classes Require Import RelationClasses.
+Require Import Coq.Program.Equality.
 From Coinduction Require Import lattice.
 From OGS.Utils Require Import Psh.
 
@@ -29,6 +30,14 @@ Variant sumᵣ {I} {X1 X2 Y1 Y2 : psh I} (R : relᵢ X1 X2) (S : relᵢ Y1 Y2) :
   | RLeft {i x1 x2} : R i x1 x2 -> sumᵣ R S i (inl x1) (inl x2)
   | RRight {i y1 y2} : S i y1 y2 -> sumᵣ R S i (inr y1) (inr y2)
 .
+#[global] Hint Constructors sumᵣ : core.
+
+#[global] Instance sum_equiv {I} {X Y : psh I} {R : relᵢ X X} (_ : Equivalenceᵢ R) {S : relᵢ Y Y} (_ : Equivalenceᵢ S): Equivalenceᵢ (sumᵣ R S).
+econstructor.
+- intros []; eauto.
+- intros ? ? []; econstructor; symmetry; eauto.
+- intros ? ? ? ? ?. dependent destruction H1; dependent destruction H2; econstructor; etransitivity; eauto.
+Qed.
 
 Definition seqᵢ {I} {X Y Z : psh I} (R0 : relᵢ X Y) (R1 : relᵢ Y Z) : relᵢ X Z :=
   fun i x z => exists y, R0 i x y /\ R1 i y z.
