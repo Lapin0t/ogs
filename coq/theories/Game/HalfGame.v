@@ -1,6 +1,6 @@
-Import EqNotations.
-From OGS Require Import Utils.
+From OGS Require Import Prelude.
 From OGS.Utils Require Import Rel.
+From OGS.Game Require Import Event.
 
 Record half_game (I J : Type) := {
  g_move : I -> Type ;
@@ -32,8 +32,6 @@ Record game (I J : Type) : Type := {
 }.
 Arguments g_client {I J}.
 Arguments g_server {I J}.
-
-From OGS.Game Require Import Event.
 
 Definition e_of_g {I J} (G : game I J) : event I I :=
   {| e_qry := fun i => G.(g_client).(g_move) i ;

@@ -1,9 +1,6 @@
-Require Import Program.Equality.
-Import EqNotations.
-
 From Coinduction Require Import coinduction tactics.
 
-From OGS Require Import Utils.
+From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
 From OGS.ITree Require Import ITree Monad Eq Delay.
@@ -74,11 +71,11 @@ Specifies the operational semantics of the language.
     c_sub {Γ Δ} : Γ =[val]> Δ -> conf Γ -> conf Δ ;
     }.
 
-  Notation "u @ᵥ v" := (v_sub u _ v) (at level 30).
-  Notation "u @ₜ c" := (c_sub u c) (at level 30).
+  Notation "u ⊛ᵥ v" := (v_sub u _ v) (at level 30).
+  Notation "u ⊛ₜ c" := (c_sub u c) (at level 30).
   Notation "Γ ⇒ᵥ Δ" := (Γ =[val]> Δ) (at level 30).
 
-  Context {M: machine}.
+  Context {M : machine}.
 
 (*|
 Renaming in values, a particular case of value substitution.
@@ -104,7 +101,8 @@ Renaming in environments
 Renaming in configurations
 |*)
   Definition c_ren {Γ1 Γ2} : Γ1 ⊆ Γ2 -> conf Γ1 -> conf Γ2
-    := fun u c => (v_var ⊛ᵣ u) @ₜ c .
+    := fun u c => (v_var ⊛ᵣ u) ⊛ₜ c .
+  Infix "ᵣ⊛ₜ" := c_ren (at level 14).
 
 (*|
 Operational machine: axiomatization
@@ -118,63 +116,61 @@ The machine comes with a battery of expected laws:
 - the composition o substitution on terms commutes with the composition of assignments
 |*)
   Class machine_law : Prop := {
-    v_sub_proper {Γ Δ}
-      :> Proper
-          (ass_eq Γ Δ ==> forall_relation (fun i => eq ==> eq))
-          v_sub ;
-    c_sub_proper {Γ Δ}
-      :> Proper
-          (ass_eq Γ Δ ==> eq ==> eq)
-          c_sub ;
+    v_sub_proper {Γ Δ} :: Proper (ass_eq Γ Δ ==> forall_relation (fun i => eq ==> eq)) v_sub ;
+    c_sub_proper {Γ Δ} :: Proper (ass_eq Γ Δ ==> eq ==> eq) c_sub ;
     v_sub_var {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : p ⊛ v_var ≡ₐ p ;
     v_var_sub {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : v_var ⊛ p ≡ₐ p ;
     v_sub_sub {Γ1 Γ2 Γ3 Γ4} (p : Γ3 ⇒ᵥ Γ4) (q : Γ2 ⇒ᵥ Γ3) (r : Γ1 ⇒ᵥ Γ2)
       : p ⊛ (q ⊛ r) ≡ₐ (p ⊛ q) ⊛ r ;
-    c_var_sub {Γ} (c : conf Γ) : v_var @ₜ c = c ;
+    c_var_sub {Γ} (c : conf Γ) : v_var ⊛ₜ c = c ;
     c_sub_sub {Γ1 Γ2 Γ3} (u : Γ2 ⇒ᵥ Γ3) (v : Γ1 ⇒ᵥ Γ2) {c}
-      : u @ₜ (v @ₜ c) = (u ⊛ v) @ₜ c ;
+      : u ⊛ₜ (v ⊛ₜ c) = (u ⊛ v) ⊛ₜ c ;
   }.
 
   Context {MH : machine_law}.
 
-  #[global] Instance e_comp_proper {Γ1 Γ2 Γ3}
-             : Proper (ass_eq Γ2 Γ3 ==> ass_eq Γ1 Γ2 ==> ass_eq Γ1 Γ3) e_comp.
-    intros ? ? H1 ? ? H2 ? i.
-    unfold e_comp, s_map.
+(*|
+A couple derived properties on the constructed operations.
+|*)
+
+  #[global]
+  Instance e_comp_proper {Γ1 Γ2 Γ3} : Proper (ass_eq Γ2 Γ3 ==> ass_eq Γ1 Γ2 ==> ass_eq Γ1 Γ3) e_comp.
+    intros ? ? H1 ? ? H2 ? i; unfold e_comp, s_map.
     now rewrite H1, H2.
   Qed.
 
-  #[global] Instance e_ren_proper {Γ1 Γ2 Γ3}
-             : Proper (ass_eq Γ2 Γ3 ==> ass_eq Γ1 Γ2 ==> ass_eq Γ1 Γ3) e_ren.
-  intros ? ? H1 ? ? H2.
-  unfold e_ren. apply e_comp_proper; eauto. now rewrite H1.
+  #[global]
+  Instance e_ren_proper {Γ1 Γ2 Γ3} : Proper (ass_eq Γ2 Γ3 ==> ass_eq Γ1 Γ2 ==> ass_eq Γ1 Γ3) e_ren.
+  Proof.
+    intros ? ? H1 ? ? H2; unfold e_ren.
+    apply e_comp_proper; eauto; now rewrite H1.
   Qed.
 
   Lemma e_comp_ren_r {Γ1 Γ2 Γ3 Γ4} (u : Γ3 ⇒ᵥ Γ4) (v : Γ2 ⇒ᵥ Γ3) (w : Γ1 ⊆ Γ2)
         : u ⊛ (v ⊛ᵣ w) ≡ₐ (u ⊛ v) ⊛ᵣ w .
-    reflexivity.
-  Qed.
+  Proof. reflexivity. Qed.
 
   Lemma e_comp_ren_l {Γ1 Γ2 Γ3 Γ4} (u : Γ3 ⇒ᵥ Γ4) (v : Γ2 ⊆ Γ3) (w : Γ1 ⇒ᵥ Γ2)
         : (u ⊛ᵣ v) ⊛ w ≡ₐ u ⊛ (v ᵣ⊛ w) .
-    unfold e_ren.
-    now rewrite v_sub_sub, e_comp_ren_r, v_sub_var.
-  Qed.
+  Proof. unfold e_ren; now rewrite v_sub_sub, e_comp_ren_r, v_sub_var. Qed.
 
-  Program Definition sub_eval_msg {Γ Δ} (e : Γ ⇒ᵥ Δ) (t : conf Γ)
-             : delay (msg' Δ)
-    := fmap (fun _ => @projT1 _ _) _ (eval (e @ₜ t)).
+(*|
+Evaluate a configuration inside an environment (assignment), returning only the message part (the "positive" or "static" part).
+|*)
+  Definition eval_in_env {Γ Δ} (e : Γ ⇒ᵥ Δ) (t : conf Γ) : delay (msg' Δ)
+    := fmap (fun _ => @projT1 _ _) _ (eval (e ⊛ₜ t)).
 
-  #[global] Instance sub_eval_msg_proper {Γ Δ}
-             : Proper (ass_eq Γ Δ ==> pointwise_relation _ eq) (@sub_eval_msg Γ Δ).
+  #[global]
+  Instance eval_in_env_proper {Γ Δ}
+             : Proper (ass_eq Γ Δ ==> eq ==> eq) (@eval_in_env Γ Δ).
   Proof.
-    intros ? ? H1 e.
-    unfold sub_eval_msg.
-    now rewrite H1.
+    intros ? ? H1 ? ? H2.
+    unfold eval_in_env.
+    now rewrite H1, H2.
   Qed.
 
-  Definition ciu {Γ} Δ (x y : conf Γ) : Prop :=
-    forall e : Γ ⇒ᵥ Δ, sub_eval_msg e x ≈ sub_eval_msg e y.
+  Definition ciu {Γ} Δ (x y : conf Γ) : Prop
+    := forall e : Γ ⇒ᵥ Δ, eval_in_env e x ≈ eval_in_env e y.
 
   (* Section 3: game definition
      ↓+ ~ join_even
@@ -184,122 +180,114 @@ The machine comes with a battery of expected laws:
   Notation "↓⁻ a" := (join_odd a) (at level 9).
   Notation "↓[ b ] a" := (join_even_odd_aux b a) (at level 9).
 
-
-  Definition ogs_hg : half_game alt_ext alt_ext := {|
-    g_move := fun es => msg' ↓⁺es ;
-    g_next := fun es m => (es ▶ dom' m) ;
-  |}.
+  Definition ogs_hg : half_game alt_ext alt_ext :=
+    {|
+      g_move := fun es => msg' ↓⁺es ;
+      g_next := fun es m => (es ▶ dom' m) ;
+    |}.
 
   Definition ogs_g : game alt_ext alt_ext :=
-    {| g_client := ogs_hg ;
-       g_server := ogs_hg |}.
+    {|
+      g_client := ogs_hg ;
+      g_server := ogs_hg ;
+    |}.
 
   Definition ogs_e : event alt_ext alt_ext := e_of_g ogs_g.
 
   Definition ogs_act (Δ : context) : psh alt_ext := itree ogs_e (fun _ => msg' Δ).
   Definition ogs_pas (Δ : context) : psh alt_ext := h_pasv ogs_hg (ogs_act Δ).
 
-  Notation player   := true.
-  Notation opponent := false.
+  Notation "Ⓟ" := true.
+  Notation "Ⓞ" := false.
+
   (* Env* (def 3.12)
      Env M Δ player es : environment part of the player (aka active at es) configuration at (Δ + es)
      Env M Δ opponent es : environment part of the opponent (aka passive at es) configuration at (Δ + es)
    *)
-  Inductive alt_env (Δ : context)
-    : bool -> alt_ext -> Type :=
+  Inductive alt_env (Δ : context) : bool -> alt_ext -> Type :=
   | ENil {b} : alt_env Δ b ∅
-  | EConT {a Γ} : alt_env Δ opponent a
-                  -> alt_env Δ player (a ▶ Γ)
-  | EConF {a Γ} : alt_env Δ player a
-                  -> Γ ⇒ᵥ (Δ +▶ ↓⁺a)
-                  -> alt_env Δ opponent (a ▶ Γ)
+  | EConT {Φ Γ} : alt_env Δ Ⓞ Φ -> alt_env Δ Ⓟ (Φ ▶ Γ)
+  | EConF {Φ Γ} : alt_env Δ Ⓟ Φ -> Γ ⇒ᵥ (Δ +▶ ↓⁺Φ) -> alt_env Δ Ⓞ (Φ ▶ Γ)
   .
   Arguments ENil {Δ b}.
-  Arguments EConT {Δ a Γ}.
-  Arguments EConF {Δ a Γ}.
+  Arguments EConT {Δ Φ Γ}.
+  Arguments EConF {Δ Φ Γ}.
+
+  Notation εₑ := (ENil) .
+  Notation "u ▶ₑ⁺" := (EConT u) (at level 40).
+  Notation "u ▶ₑ⁻ e" := (EConF u e) (at level 40).
+
 
   (* flattens an alternating environment into an unstructured one *)
-  Equations concat0 {Δ b a} : alt_env Δ b a -> ↓[negb b] a ⇒ᵥ (Δ +▶ ↓[b] a) :=
-    concat0 (ENil) := s_empty ;
-    concat0 (EConT u) := r_concat3_1 ᵣ⊛ concat0 u ;
-    concat0 (EConF u e) := [ concat0 u , e ] .
+  Equations concat0 {Δ b Φ} : alt_env Δ b Φ -> ↓[negb b]Φ ⇒ᵥ (Δ +▶ ↓[b]Φ) :=
+    concat0 (εₑ)     := s_empty ;
+    concat0 (u ▶ₑ⁺)   := r_concat3_1 ᵣ⊛ concat0 u ;
+    concat0 (u ▶ₑ⁻ e) := [ concat0 u , e ] .
 
   (* Flattens a pair of alternating environments for resp. player and opponent into a "closed" substitution *)
-  Equations concat1 {Δ} a b : alt_env Δ b a -> alt_env Δ (negb b) a -> ↓[b] a ⇒ᵥ Δ :=
-    concat1 ∅      b _ _ :=
-      s_empty ;
-    concat1 (a ▶ _) b (EConT u) (EConF v e) :=
-      [ concat1 a _ u v , [ v_var , concat1 a _ v u ] ⊛ e ] ;
-    concat1 (a ▶ _) b (EConF u e) (EConT v) := concat1 a _ u v .
-  Arguments concat1 {Δ a b}.
+  Equations concat1 {Δ} Φ {b} : alt_env Δ b Φ -> alt_env Δ (negb b) Φ -> ↓[b]Φ ⇒ᵥ Δ :=
+    concat1 ∅       _       _         := s_empty ;
+    concat1 (Φ ▶ _) (u ▶ₑ⁺)  (v ▶ₑ⁻ e) := [ concat1 Φ u v , [ v_var , concat1 Φ v u ] ⊛ e ] ;
+    concat1 (Φ ▶ _) (u ▶ₑ⁻ e) (v ▶ₑ⁺)  := concat1 Φ u v .
+  Arguments concat1 {Δ Φ b}.
 
-  Lemma quatre_six {Δ a} (u : alt_env Δ player a) (v : alt_env Δ opponent a)
+  (* lem 4.6 *)
+  Lemma concat_fixpoint {Δ Φ} (u : alt_env Δ Ⓟ Φ) (v : alt_env Δ Ⓞ Φ)
     :  [ v_var , concat1 u v ] ⊛ concat0 u ≡ₐ concat1 v u
     /\ [ v_var , concat1 v u ] ⊛ concat0 v ≡ₐ concat1 u v .
   Proof.
-    induction a; dependent destruction u; dependent destruction v; cbn; split.
+    induction Φ; dependent destruction u; dependent destruction v; cbn; split.
     - intros ? i; dependent elimination i.
     - intros ? i; dependent elimination i.
     - rewrite <- e_comp_ren_l.
-      rewrite <- (proj2 (IHa v u)).
+      rewrite <- (proj2 (IHΦ v u)).
       apply e_comp_proper; [ | reflexivity ].
-      symmetry.
-      apply s_eq_cover_uniq.
+      symmetry; apply s_eq_cover_uniq.
       * unfold r_concat3_1.
         now rewrite <- s_ren_comp, 2 s_eq_cat_l.
       * unfold r_concat3_1.
         now rewrite <- s_ren_comp, s_eq_cat_r, s_ren_comp, s_eq_cat_r, s_eq_cat_l.
     - symmetry; apply s_eq_cover_uniq.
       * rewrite <- e_comp_ren_r, s_eq_cat_l.
-        symmetry; apply IHa.
+        symmetry; apply IHΦ.
       * now rewrite <- e_comp_ren_r, s_eq_cat_r.
   Qed.
 
-  Definition m_strat_act Δ : alt_ext -> Type :=
-    fun a => (conf (Δ +▶ join_even a) * alt_env Δ player a)%type.
+  Definition m_strat_act Δ : psh alt_ext :=
+    fun Φ => (conf (Δ +▶ ↓⁺Φ) * alt_env Δ Ⓟ Φ)%type.
 
-  Definition m_strat_pas Δ : alt_ext -> Type :=
-    fun a => alt_env Δ opponent a.
+  Definition m_strat_pas Δ : psh alt_ext :=
+    fun Φ => alt_env Δ Ⓞ Φ.
 
-  Definition m_strat_play {Δ a} (x : m_strat_act Δ a)
-    : delay (msg' Δ + h_actv ogs_hg (m_strat_pas Δ) a)%type :=
-    (eval (fst x)) >>=
+  Definition m_strat_play {Δ Φ} (x : m_strat_act Δ Φ)
+    : delay (msg' Δ + h_actv ogs_hg (m_strat_pas Δ) Φ)%type :=
+    eval (fst x) >>=
       fun _ u =>
-        match cover_split cover_cat _ (fst (projT2 (projT1 u))) with
-        | inl h => Ret' (inl (_ ,' (h , snd (projT2 (projT1 u)))))
-        | inr h => Ret' (inr ((_ ,' (h , snd (projT2 (projT1 u)))) ,' EConF (snd x) (projT2 u)))
+        match cat_split (fst (projT2 (projT1 u))) with
+        | CLeftV h => Ret' (inl (_ ,' (h , snd (projT2 (projT1 u)))))
+        | CRightV h => Ret' (inr ((_ ,' (h , snd (projT2 (projT1 u))))
+                            ,' (snd x ▶ₑ⁻ projT2 u)))
         end .
 
-  Definition m_strat_resp {Δ a} (x : m_strat_pas Δ a)
-    : h_pasv ogs_hg (m_strat_act Δ) a
+  Definition m_strat_resp {Δ Φ} (x : m_strat_pas Δ Φ)
+    : h_pasv ogs_hg (m_strat_act Δ) Φ
     := fun m =>
-         ([ (r_concat3_1 ᵣ⊛ concat0 x) , (r_concat_r ⊛ᵣ r_concat_r) ᵣ⊛ v_var ] @ₜ emb m ,
-          EConT x).
-
-  Definition m_strat_body {Δ}
-    : m_strat_act Δ ⇒ᵢ itree ogs_e (m_strat_act Δ +ᵢ (fun _ => msg' Δ))
-    := fun i e =>
-         emb_delay (m_strat_play e) >>=
-           fun _ x =>
-             match x with
-             | Fib (inl m) => Ret' (inr m)
-             | Fib (inr (m,'c)) => Vis' (m : ogs_e.(e_qry) i) (fun r => Ret' (inl (m_strat_resp c r)))
-             end.
+         ([ (r_concat3_1 ᵣ⊛ concat0 x) , (r_concat_r ⊛ᵣ r_concat_r) ᵣ⊛ v_var ] ⊛ₜ emb m ,
+          x ▶ₑ⁺).
 
   Definition m_strat {Δ} : m_strat_act Δ ⇒ᵢ ogs_act Δ :=
-    cofix _m_strat i e :=
+    cofix _m_strat Φ e :=
       emb_delay (m_strat_play e) >>=
-        fun j (r : (_ @ i) j) =>
-          go (match r
-              in (fiber _ b) return (itree' ogs_e (fun _ : alt_ext => msg' Δ) b)
-              with
-              | Fib (inl m) => RetF (m : (fun _ : alt_ext => msg' Δ) i)
-              | Fib (inr (x ,' p)) => VisF (x : ogs_e.(e_qry) _)
+        fun j (r : (_ @ Φ) j) =>
+          go (match r in (fiber _ b) return (itree' ogs_e (fun _ : alt_ext => msg' Δ) b) with
+              | Fib (inl m) => RetF (m : (fun _ : alt_ext => msg' Δ) Φ)
+              | Fib (inr (x ,' p)) => VisF (x : ogs_e.(e_qry) Φ)
                                           (fun r => _m_strat (g_next r) (m_strat_resp p r))
               end).
+
   Lemma unfold_mstrat {Δ a} (x : m_strat_act Δ a) :
-    m_strat a x ≊ 
-      (emb_delay (m_strat_play x) >>=
+    m_strat a x
+    ≊ (emb_delay (m_strat_play x) >>=
         fun j (r : (_ @ a) j) =>
           go (match r
               in (fiber _ b) return (itree' ogs_e (fun _ : alt_ext => msg' Δ) b)
@@ -308,12 +296,10 @@ The machine comes with a battery of expected laws:
               | Fib (inr (x ,' p)) => VisF (x : ogs_e.(e_qry) _)
                                           (fun r => m_strat (g_next r) (m_strat_resp p r))
               end)).
-  apply it_eq_unstep.
-  cbn -[m_strat_play].
-  destruct (_observe (m_strat_play x)).
-  - destruct r as [ | []]; eauto.
-  - eauto.
-  - destruct q.
+  Proof.
+    apply it_eq_unstep.
+    cbn -[m_strat_play].
+    destruct (_observe (m_strat_play x)) as [ [ | [] ] | | [] ]; eauto.
   Qed.
       
   Definition m_stratp {Δ} : m_strat_pas Δ ⇒ᵢ ogs_pas Δ :=
@@ -328,10 +314,10 @@ The machine comes with a battery of expected laws:
   Notation "x ≈ₚ y" := (m_strat_pas_eqv _ x y) (at level 50).
 
   Definition inj_init_act {Δ Γ} (c : conf Γ) : m_strat_act Δ (∅ ▶ Γ)
-    := (c_ren (r_concat_r ⊛ᵣ r_concat_r) c , EConT ENil).
+    := ((r_concat_r ⊛ᵣ r_concat_r) ᵣ⊛ₜ c , εₑ ▶ₑ⁺).
 
   Definition inj_init_pas {Δ Γ} (γ : Γ ⇒ᵥ Δ) : m_strat_pas Δ (∅ ▶ Γ)
-    := EConF ENil (e_ren r_concat_l γ).
+    := εₑ ▶ₑ⁻ (r_concat_l ᵣ⊛ γ).
 
   Definition compo_t (Δ : context) : Type :=
     ⦉ ogs_act Δ ×ᵢ ogs_pas Δ ⦊ᵢ .
@@ -484,7 +470,7 @@ The machine comes with a battery of expected laws:
 *)
 
   Equations reduce {Δ} : (fun (_ : T1) => reduce_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => msg' Δ) :=
-    reduce T1_0 u := sub_eval_msg
+    reduce T1_0 u := eval_in_env
                        ([ v_var , concat1 (snd (fst (projT2 u))) (snd (projT2 u)) ])
                        (fst (fst (projT2 u))) .
 
@@ -497,9 +483,9 @@ The machine comes with a battery of expected laws:
         ≊
       (eval (fst (fst (projT2 x))) >>=
                       fun _ u =>
-                        go (match cover_split cover_cat _ (fst (projT2 (projT1 u))) with
-                            | inl h => RetF (_ ,' (h, snd (projT2 (projT1 u))))
-                            | inr h => TauF (reduce _ (_ ,'
+                        go (match cat_split (fst (projT2 (projT1 u))) with
+                            | CLeftV h => RetF (_ ,' (h, snd (projT2 (projT1 u))))
+                            | CRightV h => TauF (reduce _ (_ ,'
                                                     (m_strat_resp (snd (projT2 x)) (_ ,' (h, snd (projT2 (projT1 u)))), EConF (snd (fst (projT2 x))) (projT2 u))))
                             end)).
   Proof.
@@ -511,7 +497,7 @@ The machine comes with a battery of expected laws:
     unfold it_eq; coinduction R CIH; intros t.
     cbn; destruct (t.(_observe)).
     + destruct r as [[? [i m]] γ]; cbn.
-      destruct (cover_split cover_cat _ i).
+      destruct (cat_split i).
       econstructor; reflexivity.
       econstructor; reflexivity.
     + econstructor. apply CIH.
@@ -520,17 +506,17 @@ The machine comes with a battery of expected laws:
 
   Definition eval_sub_1 {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
              : delay { m : msg' Δ & dom' m ⇒ᵥ Δ } :=
-        eval ([ v_var , e ] @ₜ c) .
+        eval ([ v_var , e ] ⊛ₜ c) .
 
   Definition eval_sub_2 {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
              : delay { m : msg' Δ & dom' m ⇒ᵥ Δ }.
     refine (eval c >>= fun 'T1_0 x =>
-               go (match cover_split cover_cat _ (fst (projT2 (projT1 x))) with
-                   | inl h => RetF ((_ ,' (h , snd (projT2 (projT1 x)))) ,'
+               go (match cat_split (fst (projT2 (projT1 x))) with
+                   | CLeftV h => RetF ((_ ,' (h , snd (projT2 (projT1 x)))) ,'
                                    [ v_var,  e ] ⊛ (projT2 x))
-                   | inr h => TauF _
+                   | CRightV h => TauF _
                    end)) .
-    refine (eval ([ e , ([v_var , e ] ⊛ projT2 x) ] @ₜ (emb (_ ,' (h , (snd (projT2 (projT1 x)))))))).
+    refine (eval ([ e , ([v_var , e ] ⊛ projT2 x) ] ⊛ₜ (emb (_ ,' (h , (snd (projT2 (projT1 x)))))))).
   Defined.
 
   Hypothesis eval_hyp : forall {Γ Δ}
@@ -556,9 +542,9 @@ The machine comes with a battery of expected laws:
     intros [] [m γ] ? <-.
     apply (bt_t (it_eq_map ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)))).
     cbn [fst snd projT2 projT1].
-    destruct (cover_split cover_cat _ (fst (projT2 m))).
-    - econstructor. reflexivity.
-    - econstructor.
+    destruct (cat_split (fst (projT2 m))).
+    - cbn; econstructor. reflexivity.
+    - cbn; econstructor.
       unfold reduce.
       fold (@fmap _ ∅ₑ _ _ (fun _ : T1 => projT1 (P:=fun m0 : msg' Δ => dom' m0 ⇒ᵥ Δ)) T1_0).
       change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)) bot T1_0 ?a ?b) with (it_eq (eqᵢ _) a b).
@@ -568,7 +554,7 @@ The machine comes with a battery of expected laws:
       rewrite c_sub_sub.
       unshelve rewrite c_sub_proper; try reflexivity.
       apply s_eq_cover_uniq.
-      * rewrite <- (proj2 (quatre_six (snd u) v)).
+      * rewrite <- (proj2 (concat_fixpoint (snd u) v)).
         rewrite <- e_comp_ren_r.
         rewrite s_eq_cat_l.
         rewrite <- e_comp_ren_l.
@@ -586,10 +572,10 @@ The machine comes with a battery of expected laws:
 
   Lemma quatre_trois_app {Γ Δ}
     (c : conf Γ) (e : Γ ⇒ᵥ Δ)
-    : sub_eval_msg e c ≊ (inj_init_act c ∥ inj_init_pas e).
+    : eval_in_env e c ≊ (inj_init_act c ∥ inj_init_pas e).
   Proof.
     rewrite <- quatre_trois.
-    unfold reduce, inj_init_act, sub_eval_msg; cbn [fst snd projT1 projT2]; apply fmap_eq.
+    unfold reduce, inj_init_act, eval_in_env; cbn [fst snd projT1 projT2]; apply fmap_eq.
     cbv [inj_init_pas]; rewrite concat1_equation_2, 2 concat1_equation_1.
     unfold c_ren; rewrite c_sub_sub, c_sub_proper ; try reflexivity.
     rewrite s_eq_cover_empty_r.
@@ -613,8 +599,7 @@ The machine comes with a battery of expected laws:
     intro H.
     apply barb_correction.
     intro e.
-    unfold compo.
-    rewrite <- 2 compo_compo0.
+    unfold compo; rewrite <- 2 compo_compo0.
     apply compo0_proper. exact H. intro r; eauto.
   Qed.
 

@@ -1,4 +1,4 @@
-From OGS Require Import Utils.Prelude.
+From OGS Require Import Prelude.
 
 (* (covariant) presheaves *)
 Notation psh I := (I -> Type).

@@ -1,10 +1,7 @@
-Require Import Coq.Program.Equality.
-Import EqNotations.
-
 From Coinduction Require Import coinduction lattice rel tactics.
 
-From OGS Require Import Utils.
-From OGS.Utils Require Import Rel.
+From OGS Require Import Prelude.
+From OGS.Utils Require Import Rel Psh.
 From OGS.Game Require Import Event.
 From OGS.ITree Require Import ITree Eq.
 
@@ -60,7 +57,9 @@ Section monad.
    : Proper (it_eat' i ==> it_eat' i) (subst f i).
   Proof.
     intros ? ? H; unfold it_eat' in *; cbn.
-    dependent induction H; simpl_depind; econstructor; cbn; eauto.
+    remember (_observe x) as _x eqn:Hx; clear Hx.
+    remember (_observe y) as _y eqn:Hy; clear Hy.
+    dependent induction H; now econstructor.
   Qed.    
 
   Definition bind {X Y i} x f := @subst X Y f i x.
@@ -198,12 +197,12 @@ Section monad.
         econstructor.
         exact (subst_eat _ _ (Ret' _) r1).
         exact (subst_eat _ _ (Ret' _) r2).
-        econstructor.
+        cbn; econstructor.
         now apply CIH.
       * econstructor.
         exact (subst_eat _ _ (Ret' _) r1).
         exact (subst_eat _ _ (Ret' _) r2).
-        now econstructor.
+        now cbn; econstructor.
     - econstructor.
       exact (subst_eat _ _ (Tau' _) r1).
       exact (subst_eat _ _ (Tau' _) r2).

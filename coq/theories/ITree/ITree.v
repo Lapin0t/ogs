@@ -1,4 +1,4 @@
-From OGS Require Import Utils.
+From OGS Require Import Prelude.
 From OGS.Game Require Import Event.
 
 Section itree.

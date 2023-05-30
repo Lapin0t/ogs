@@ -1,7 +1,8 @@
-From Coq.Classes Require Import RelationClasses.
-Require Import Coq.Program.Equality.
-From Coinduction Require Import lattice.
+From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh.
+
+From Coq.Classes Require Export RelationClasses.
+From Coinduction Require Export lattice.
 
 #[export] Existing Instance CompleteLattice_dfun.
 

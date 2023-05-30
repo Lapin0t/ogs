@@ -1,11 +1,22 @@
-From Equations Require Import Equations.
+#[global] Set Primitive Projections.
+
+From Equations Require Export Equations.
+#[global] Set Equations Transparent.
+#[global] Set Equations With UIP.
+
+Require Export Coq.Program.Equality.
+Export EqNotations.
+Require Export Coq.Logic.StrictProp.
+
+Axiom AxiomUIP : forall X : Type, UIP X.
+#[global] Existing Instance AxiomUIP.
 
 #[global] Notation endo T := (T -> T).
   
 #[global] Notation "f ∘ g" := (fun x => f (g x))
  (at level 40, left associativity) : function_scope.  
 
-Notation "a ,' b" := (existT _ a b) (at level 30).
+#[global] Notation "a ,' b" := (existT _ a b) (at level 30).
 
 Definition uncurry {A B} {C : A -> B -> Type} (f : forall a b, C a b) (i : A * B)
   := f (fst i) (snd i).
@@ -13,8 +24,8 @@ Definition uncurry {A B} {C : A -> B -> Type} (f : forall a b, C a b) (i : A * B
 Definition curry {A B} {C : A -> B -> Type} (f : forall i, C (fst i) (snd i)) a b
   := f (a , b).
 
-Notation curry' := (fun f a b => f (a ,' b)).
-Notation uncurry' := (fun f x => f (projT1 x) (projT2 x)).
+#[global] Notation curry' := (fun f a b => f (a ,' b)).
+#[global] Notation uncurry' := (fun f x => f (projT1 x) (projT2 x)).
 
 Variant T0 := .
 Variant T1 := T1_0.

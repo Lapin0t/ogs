@@ -1,4 +1,5 @@
-From OGS Require Import Utils.
+From OGS Require Import Prelude.
+From OGS.Utils Require Export Psh.
 
 Record event (I J : Type) : Type := Event {
     e_qry : I -> Type ;
