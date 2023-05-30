@@ -914,7 +914,9 @@ Defined.
 From OGS.ITree Require Import Eq.
 Lemma enf_hyp {Γ Δ} (c : enf_conf (Δ +▶ Γ)) (e : Γ =[enf_val]> Δ)
               : @eval_sub_1 enf_spec enf_machine Γ Δ c e ≊ @eval_sub_2 enf_spec enf_machine Γ Δ c e.
-Admitted.
+  unfold eval_sub_1, eval_sub_2.
+  cbn.
+Admitted
   
 
 (***** THE SIMPLE CBV EVALUATOR
