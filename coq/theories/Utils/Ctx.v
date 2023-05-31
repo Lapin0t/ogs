@@ -52,6 +52,10 @@ Lemma ccat_empty_r {X} {Γ : ctx X} : (Γ +▶ ∅)%ctx = Γ.
   reflexivity.
 Qed.
 
+Equations c_map {X Y} : (X -> Y) -> ctx X -> ctx Y :=
+  c_map f ∅ := ∅ ; 
+  c_map f (Γ ▶ x) := c_map f Γ ▶ f x .
+
 Section lemma.
 Context {X : Type}.
 
@@ -415,6 +419,30 @@ Definition ctx_s (R : X -> SProp) : Type := sigS (allS R).
 Definition coe_ctx {R} : ctx_s R -> ctx X := sub_elt.
 Global Coercion coe_ctx : ctx_s >-> ctx.
 
+Program Definition snil {R} : ctx_s R := {| sub_elt := ∅%ctx |}.
+Next Obligation. intros ? i; inversion i. Qed.
+
+Definition scon {R} : ctx_s R -> sigS R -> ctx_s R.
+  intros Γ x.
+  refine ({| sub_elt := (Γ ▶ x.(sub_elt))%ctx |}).
+  intros ? i.
+  remember (Γ ▶ x.(sub_elt))%ctx as Γx.
+  destruct i; injection HeqΓx; intros Hx HΓ.
+  rewrite Hx; exact x.(sub_prf).
+  rewrite HΓ in i; exact (Γ.(sub_prf) _ i).
+Defined.
+
+Definition scat {R} : ctx_s R -> ctx_s R -> ctx_s R.
+intros Γ Δ.
+refine ({| sub_elt := (Γ +▶ Δ)%ctx |}).
+intros ? i.
+destruct (cat_split i).
+exact (Γ.(sub_prf) _ i).
+exact (Δ.(sub_prf) _ j).
+Defined.
+
+
+
 Definition s_elt_upg {R} {Γ : ctx_s R} {x : X} (i : Γ ∋ x) : sigS R :=
   {| sub_prf := Γ.(sub_prf) x i |}.
 
@@ -473,3 +501,8 @@ Equations any_s_elim {R P} {A : forall x, P x -> Type} (f : forall x p, A x p)
   any_s_elim f (AnyS _ p) := f _ p .
 
 End any.
+
+#[global] Notation "∅ₛ" := (snil) : ctx_scope.
+#[global] Notation "Γ ▶ₛ x" := (scon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
+#[global] Notation "Γ +▶ₛ Δ" := (scat Γ%ctx Δ%ctx) (at level 50, left associativity) : ctx_scope.
+

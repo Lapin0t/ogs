@@ -1,5 +1,6 @@
 (*From Coq.Logic Require Import StrictProp.*)
 
+(*
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx.
 From OGS.Game Require Import Event.
@@ -984,3 +985,5 @@ Equations? eval_basic {Γ a} : term Γ a -> delay (e_nf Γ a) :=
     }) .
 
 *******)
+
+*)
