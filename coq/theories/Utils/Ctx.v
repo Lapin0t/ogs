@@ -185,12 +185,35 @@ reflexivity. Qed.
 
 (* helper for defining various shiftings *)
 Equations s_append {Γ Δ : ctx X} {F : ctx X -> X -> Type} {a}
-  : (forall x, Γ ∋ x -> F Δ x) -> F Δ a -> forall x, (Γ ▶ a) ∋ x -> F Δ x :=
+  : (Γ =[F]> Δ) -> F Δ a -> (Γ ▶ a) =[F]> Δ :=
   s_append s z _ top     := z ;
   s_append s z _ (pop i) := s _ i .
 
+#[global] Instance s_append_eq {Γ Δ : ctx X} {F : ctx X -> X -> Type} {a} : Proper (ass_eq _ _ ==> eq ==> ass_eq _ _) (@s_append Γ Δ F a).
+intros f g H1 x y H2 u i; dependent elimination i.
+- exact H2.
+- apply H1.
+Qed.
+
 Definition r_shift {Γ Δ : ctx X} {a} (f : Γ ⊆ Δ) : (Γ ▶ a) ⊆ (Δ ▶ a)
   := s_append (s_ren s_pop f) top.
+
+Lemma r_shift_comp {Γ1 Γ2 Γ3 : ctx X} {a} (f1 : Γ2 ⊆ Γ3) (f2 : Γ1 ⊆ Γ2)
+  : r_shift (a:=a) (f1 ⊛ᵣ f2) ≡ₐ r_shift (a:=a) f1 ⊛ᵣ r_shift (a:=a) f2 .
+  intros x i; dependent elimination i; reflexivity.
+Qed.
+
+Lemma r_shift_id {Γ : ctx X} {a} : @r_shift Γ Γ a r_id ≡ₐ r_id .
+  intros x i; dependent elimination i; reflexivity.
+Qed.
+
+#[global] Instance r_shift_eq {Γ Δ : ctx X} {a} : Proper (ass_eq _ _ ==> ass_eq _ _) (@r_shift Γ Δ a).
+intros f1 f2 H x i.
+unfold r_shift.
+dependent elimination i.
+- reflexivity.
+- unfold s_ren, s_pop; cbn; f_equal; apply H.
+Qed.
 
 Definition r_shift2 {Γ Δ : ctx X} {a b} (f : Γ ⊆ Δ) : (Γ ▶ a ▶ b) ⊆ (Δ ▶ a ▶ b)
   := r_shift (r_shift f).
