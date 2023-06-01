@@ -66,7 +66,7 @@ Specifies the operational semantics of the language.
     val : context -> typ -> Type ;
     eval {Γ} : conf Γ -> delay { m : msg' Γ & dom' m =[val]> Γ } ;
     emb {Γ} (m : msg' Γ) : conf (Γ +▶ dom' m) ;
-    v_var {Γ} : has Γ ⇒ᵢ val Γ ; (*  Γ ∋ x -> val Γ x   *)
+    v_var {Γ} : Γ =[val]> Γ ; (*  Γ ∋ x -> val Γ x   *)
     v_sub {Γ Δ} : Γ =[val]> Δ -> val Γ ⇒ᵢ val Δ ;
     c_sub {Γ Δ} : Γ =[val]> Δ -> conf Γ -> conf Δ ;
     }.

@@ -263,7 +263,7 @@ Equations pat_dom {t} : pat t -> neg_ctx :=
   pat_dom (@PFst a b) := ∅ₛ ▶ₛ {| sub_elt := t- a ; sub_prf := stt |} ;
   pat_dom (@PSnd a b) := ∅ₛ ▶ₛ {| sub_elt := t- b ; sub_prf := stt |} .
 
-Definition pat' (Γ : neg_ctx) : Type := { a : ty & (Γ ∋ a * pat (t_neg a))%type }.
+Definition pat' (Γ : t_ctx) : Type := { a : ty & (Γ ∋ a * pat (t_neg a))%type }.
 Definition pat_dom' Γ : pat' Γ -> neg_ctx := fun p => pat_dom (snd (projT2 p)).
 
 Equations t_of_p {a} (p : pat a) : val (pat_dom p) a :=
@@ -275,14 +275,6 @@ Equations t_of_p {a} (p : pat a) : val (pat_dom p) a :=
   t_of_p (PApp v) := App (v_shift _ (t_of_p v)) (VarN top) ;
   t_of_p (PFst) := Fst (VarN top) ;
   t_of_p (PSnd) := Snd (VarN top) .
-
-From OGS.OGS Require Spec.
-
-Definition mu_spec : Spec.interaction_spec :=
-  {| Spec.typ := neg_ty ;
-     Spec.msg := fun t => pat (t_neg t) ;
-     Spec.dom := fun t p => ctx_s_to_ctx (pat_dom p) |}
-.
 
 Equations p_of_v0 {Γ : neg_ctx} a : val0 Γ a -> pat (t+ a) :=
   p_of_v0 (Zer)   (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
@@ -356,6 +348,51 @@ Definition emb {Γ} (m : pat' Γ) : state (Γ +▶ pat_dom' Γ m) .
     + refine (VarN (r_concat_l _ i)).
 Defined.
 
+From OGS.OGS Require Spec.
+
+Definition mu_spec : Spec.interaction_spec :=
+  {| Spec.typ := neg_ty ;
+     Spec.msg := fun t => pat (t_neg t) ;
+     Spec.dom := fun t p => ctx_s_to_ctx (pat_dom p) |}
+.
+
+Definition ctx_allS (Γ : ctx neg_ty) : allS is_neg (c_map sub_elt Γ).
+  induction Γ; intros ? i; cbn in *.
+  - remember ∅%ctx as Γ; destruct i; inversion HeqΓ.
+  - remember (_ ▶ _)%ctx as Γ' in i; destruct i; inversion HeqΓ'.
+    + exact x.(sub_prf).
+    + rewrite <- H0 in IHΓ; exact (IHΓ _ i).
+Defined.
+
+Definition ctx_to_s (Γ : ctx neg_ty) : neg_ctx := {| sub_elt := c_map sub_elt Γ ; sub_prf := ctx_allS Γ |}.
+
 Program Definition mu_machine : Spec.machine mu_spec :=
-  {| Spec.conf := fun Γ => state (c_map sub_elt Γ) ;
-     Spec.val := fun Γ t => val (c_map sub_elt Γ) t.(sub_elt) |} .
+  {| Spec.conf := fun Γ => state (ctx_to_s Γ) ;
+     Spec.val := fun Γ t => val (ctx_to_s Γ) t.(sub_elt) |} .
+Next Obligation.
+  refine (fmap_delay _ (@play (ctx_to_s Γ) X)).
+  intros [ [ a [ i m ] ] s ]; cbn in *.
+  destruct (view_has_map sub_elt Γ i); cbn in *.
+  unshelve refine ((x ,' (i , m)) ,' _). cbn.
+  intros ? j.
+  destruct (view_s_has_map _ _ j); cbn in *.
+  exact (s _ i0).
+Defined.
+Next Obligation.
+  destruct m as [ a [ i m ]].
+  rewrite map_cat, <- ctx_s_to_ctx_eq.
+  exact (emb (_ ,' (map_has _ _ i , m))).
+Defined.
+Next Obligation.
+  exact (Var _ (map_has _ _ X)).
+Defined.
+Next Obligation.
+  refine (v_subst _ _ X0).
+  intros ? j.
+  destruct (view_has_map _ _ j); exact (X _ i0).
+Defined.
+Next Obligation.
+  refine (s_subst _ X0).
+  intros ? j.
+  destruct (view_has_map _ _ j); exact (X _ i).
+Defined.

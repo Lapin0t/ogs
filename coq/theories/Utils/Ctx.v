@@ -2,6 +2,32 @@
 Contexts
 =========
 
+---
+
+nil : ctx
+++ : ctx -> ctx -> ctx
+
+nil-cat : nil ++ Γ = Γ
+cat-nil : Γ ++ nil = Γ
+
+⊆ : ctx -> ctx -> Type
+
+nil-lt : nil ⊆ Γ
+nil-gt : 
+
+cat⊆ : 
+
+---
+
+=> : ctx -> ctx -> Type
+
+s-nil : nil => Γ 
+s-cat : Γ1 => Δ -> Γ2 => Δ -> (Γ1 ++ Γ2) => Δ
+
+s-nil-eq : (u : nil => Γ) -> u ~~ s-nil
+s-cat-eq : (a : Γ1 => Δ) (b : Γ2 => Δ) (u : (Γ1 ++ Γ2) => Δ)
+
+
 .. coq:: none
 |*)
 
@@ -384,6 +410,32 @@ Qed.
 
 End lemma.
 
+Definition map_has {X Y} (f : X -> Y) (Γ : ctx X)
+  {x} (i : has Γ x) : has (c_map f Γ) (f x).
+  induction Γ; dependent elimination i.
+  - exact top.
+  - exact (pop (IHΓ h)).
+Defined.
+
+Variant has_map_view {X Y} (f : X -> Y) Γ : forall y, has (c_map f Γ) y -> Type :=
+| MapV {x} (i : has Γ x) : has_map_view f Γ _ (map_has f Γ i)
+.
+#[global] Arguments MapV {X Y f Γ x}.
+
+Definition view_has_map {X Y} (f : X -> Y) Γ
+  [y] (i : has (c_map f Γ) y) : has_map_view f Γ y i.
+induction Γ; dependent elimination i.
+- exact (MapV top).
+- destruct (IHΓ h); exact (MapV (pop i)).
+Defined.
+
+Lemma map_cat {X Y} (f : X -> Y) (Γ Δ : ctx X)
+  : c_map f (Γ +▶ Δ)%ctx = (c_map f Γ +▶ c_map f Δ)%ctx.
+  induction Δ.
+  - reflexivity.
+  - cbn; f_equal; exact IHΔ.
+Qed.
+
 #[global] Notation join_even := (join_even_odd_aux true) .
 #[global] Notation join_odd := (join_even_odd_aux false) .
 #[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30) : type_scope.
@@ -483,6 +535,14 @@ induction Γ; dependent elimination i.
 - destruct (IHΓ (fun _ i => H _ (pop i)) h).
   exact (@SMapV _ _ _ {| sub_prf := H |} _ (pop i)).
 Defined.
+
+Lemma ctx_s_to_ctx_eq {R : X -> SProp} (Γ : ctx_s R)
+      : (Γ : ctx X) = c_map sub_elt (ctx_s_to_ctx Γ).
+  destruct Γ as [ Γ H ].
+  induction Γ.
+  - reflexivity.
+  - cbn; f_equal; apply IHΓ.
+Qed.
 
 Variant any_s {R : X -> SProp} (P : sigS R -> Type) (xs : ctx_s R) : Type :=
 | AnyS {x} : xs ∋ x.(sub_elt) -> P x -> any_s P xs
