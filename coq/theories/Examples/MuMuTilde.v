@@ -2,6 +2,7 @@ From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel Ctx.
 From OGS.Game Require Import Event.
 From OGS.ITree Require Import ITree Monad Delay.
+Set Equations Transparent.
 
 Inductive ty0 : Type :=
 | Zer : ty0
@@ -219,6 +220,7 @@ Equations eval_aux {Γ} : state Γ -> (state Γ + nf Γ) :=
 Definition eval {Γ} : state Γ -> delay (nf Γ) := iter_delay (fun c => Ret' (eval_aux c)).
 
 Equations is_neg0 : ty0 -> SProp :=
+  is_neg0 One     := sUnit ;
   is_neg0 (a → b) := sUnit ;
   is_neg0 (a × b) := sUnit ;
   is_neg0 _       := sEmpty .
@@ -279,7 +281,7 @@ Inductive pat : ty -> Type :=
 Equations pat_dom {t} : pat t -> neg_ctx :=
   pat_dom (PInl u) := pat_dom u ;
   pat_dom (PInr u) := pat_dom u ;
-  pat_dom (POneI) := ∅ₛ ;
+  pat_dom (POneI) := ∅ₛ ▶ₛ {| sub_elt := t+ One ; sub_prf := stt |} ;
   pat_dom (@PLam a b) := ∅ₛ ▶ₛ {| sub_elt := t+ (a → b) ; sub_prf := stt |} ;
   pat_dom (@PPair a b) := ∅ₛ ▶ₛ {| sub_elt := t+ (a × b) ; sub_prf := stt |} ;
   pat_dom (@PApp a b v) := pat_dom v ▶ₛ {| sub_elt := t- b ; sub_prf := stt |} ;
@@ -292,7 +294,7 @@ Definition pat_dom' Γ : pat' Γ -> neg_ctx := fun p => pat_dom (snd (projT2 p))
 Equations t_of_p {a} (p : pat a) : val (pat_dom p) a :=
   t_of_p (PInl u) := Inl (t_of_p u) ;
   t_of_p (PInr u) := Inr (t_of_p u) ;
-  t_of_p (POneI) := OneI ;
+  t_of_p (POneI) := VarP top ;
   t_of_p (PLam) := VarP top ;
   t_of_p (PPair) := VarP top ;
   t_of_p (PApp v) := App (v_shift _ (t_of_p v)) (VarN top) ;
@@ -307,21 +309,20 @@ Equations p_of_v0 {Γ : neg_ctx} a : val0 Γ a -> pat (t+ a) :=
   p_of_v0 (One)   _ := POneI ;
   p_of_v0 (a → b) _ := PLam ;
   p_of_v0 (a × b) _ := PPair .
+Transparent p_of_v0.
 
 Definition p_dom_of_v0 {Γ : neg_ctx} a (v : val0 Γ a)
            : pat_dom (p_of_v0 a v) =[val]> Γ .
   induction a.
   + dependent elimination v.
-    pose(nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
+    pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
+  + exact (s_append s_empty v).
+  + exact (s_append s_empty v).
   + dependent elimination v.
-    pose(nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
-    exact s_empty.
-  + refine (s_append s_empty v).
-  + dependent elimination v.
-    pose(nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
+    pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
     - apply IHa1.
     - apply IHa2.
-  + refine (s_append s_empty v).
+  + exact (s_append s_empty v).
 Defined.
 
 Equations p_of_k0 {Γ : neg_ctx} a : is_neg0 a -> forcing0 Γ a -> pat (t- a) :=
@@ -748,6 +749,42 @@ now apply (state_ind_mut _ _ _ sub_id_l_prf). Qed.
 Lemma v_sub_id_l {Γ} a (v : val Γ a) : v_subst Var a v = v.
 destruct a; [ apply v0_sub_id_l | apply t_sub_id_l ]; auto. Qed.
 
+Lemma sub1_sub {Γ Δ a} (f : Γ =[val]> Δ) (v : val Γ a) :
+  a_comp (ass1 (v_subst f a v)) (a_shift f) ≡ₐ a_comp f (ass1 v).
+  intros ? i.
+  dependent elimination i.
+  - unfold a_comp; cbn; rewrite v_sub_id_r; reflexivity.
+  - unfold a_comp, a_shift, v_shift; cbn.
+    rewrite v_sub_ren, v_sub_id_r.
+    apply v_sub_id_l.
+Qed.
+
+Lemma v_sub1_sub {Γ Δ a b} (f : Γ =[val]> Δ) (v : val Γ a) (w : val (Γ ▶ a) b)
+  : v_subst (a_shift f) b w /ᵥ v_subst f a v = v_subst f b (w /ᵥ v) .
+  unfold v_subst1. rewrite 2 v_sub_sub.
+  apply v_sub_eq; auto.
+  rewrite sub1_sub; reflexivity.
+Qed.
+
+Lemma s_sub1_sub {Γ Δ a} (f : Γ =[val]> Δ) (v : val Γ a) (s : state (Γ ▶ a))
+  : s_subst (a_shift f) s /ₛ v_subst f a v = s_subst f (s /ₛ v) .
+  unfold s_subst1; rewrite 2 s_sub_sub, sub1_sub; reflexivity.
+Qed.
+
+Lemma emb_split {Γ : neg_ctx} {a} (v : val0 Γ a)
+      : v0_subst (p_dom_of_v0 a v) a (t_of_p (p_of_v0 a v)) = v .
+  induction a.
+  - dependent elimination v.
+    + destruct (sub_prf Γ (t+ Zer) h).
+  - reflexivity.
+  - reflexivity.
+  - dependent elimination v.
+    + destruct (sub_prf Γ (t+ (_ + _)) h).
+    + exact (f_equal Inl (IHa1 _)).
+    + exact (f_equal Inr (IHa2 _)).
+  - reflexivity.
+Qed.
+
 From Coinduction Require Import coinduction lattice rel tactics.
 From OGS.Utils Require Import Psh Rel.
 From OGS.ITree Require Import ITree Eq Monad.
@@ -770,12 +807,82 @@ Definition clean_hyp {Γ Δ : neg_ctx} (c : state (Δ +▶ₛ Γ)) (e : Γ =[val
   rewrite fmap_bind_com.
   unfold bind.
   revert Γ c e; coinduction R CIH; intros Γ c e.
-  remember ([Var,e]) as e'.
+  pose (e' := [Var,e]). change ([Var,e]) with e'.
   dependent elimination c.
   dependent elimination t0; cbn; change (iter _ T1_0 ?a) with (eval a).
-  - econstructor.
-    unfold s_subst1 at 1.
-    rewrite s_sub_sub.
+  - econstructor. (* Cut (Mu _) _) *)
+    change (t_subst e' (t- a0) t1) with (v_subst e' (t- a0) t1).
+    rewrite s_sub1_sub.
+    apply CIH.
+  - dependent elimination t1.
+    + cbn. unfold play_split. (* Cut (Val _) (VarN i) *)
+      fold e'.
+      cbn [fst snd projT1 projT2].
+      unfold e' at 1, s_cat at 1, s_cover at 1.
+      change (cover_split cover_cat h) with (cat_split h).      
+      pose (u := cat_split h); change (cat_split h) with u.
+      destruct u.
+      * econstructor; cbn.
+        shelve.
+      * cbn.
+        rewrite v0_sub_ren.
+        change (([e', a_comp e' ?a]) (t- a2) (r_concat_l (t- a2) (r_cover_r cover_cat (t- a2) j)))
+          with (([[Var,e], a_comp e' a] ⊛ᵣ r_concat_l) _ (r_concat_r (t- a2) j)).
+        rewrite s_eq_cat_l.
+        change ([Var,e] (t- a2) (r_concat_r (t- a2) j))
+                 with (([Var,e] ⊛ᵣ r_concat_r) (t- a2) j).
+        rewrite s_eq_cat_r.
+        rewrite (v0_sub_eq _ _ (s_eq_cat_r e' (a_comp e' _)) _ _ _ eq_refl).
+        rewrite <- v0_sub_sub.
+        remember (v0_subst (p_dom_of_v0 _ _) a2 (t_of_p (p_of_v0 a2 _))).
+        rewrite (@emb_split (Δ +▶ₛ Γ) a2 v).
+
+        rewrite (emb_split (v : val0 (_ +▶ₛ _) _)).
+        pose (xx := e (t- a2) j).
+        fold xx.
+        unfold e'; clear e'.
+        destruct xx eqn:H.
+        dependent elimination xx.
+        
+        etransitivity 
+        Search r_concat_l
+        pose (xx := e _ j).
+        fold xx.
+        shelve.
+    + cbn; econstructor. (* Cut (Val _) (Mu' _) *)
+      change (v0_subst e' _ v) with (v_subst e' (t+ _) v).
+      rewrite s_sub1_sub.
+      apply CIH.
+    + dependent elimination v. (* Cut (Val _) ZerK *)
+      * assert (u : (Δ +▶ₛ Γ) ∋ t+ Zer) by exact h.       
+        pose (nope := (s_elt_upg u).(sub_prf)); dependent elimination nope.
+    + dependent elimination v. (* Cut (Val _) (App _ _)) *)
+      * shelve. (* synchro step *)
+      * cbn. (* normal redex *)
+        econstructor.
+        shelve.
+    + dependent elimination v. (* Cut (Val _) Fst *)
+      * shelve. (* synchro *)
+      * econstructor; apply CIH.
+    + dependent elimination v. (* Cut (Val _) Snd *)
+      * shelve.
+      * econstructor; apply CIH.
+    + dependent elimination v. (* Cut (Val _) (Match _ _) *)
+      * assert (u : (Δ +▶ₛ Γ) ∋ t+ (_ + _)) by exact h.       
+        pose (nope := (s_elt_upg u).(sub_prf)); dependent elimination nope.
+      * cbn; econstructor.
+        change (v0_subst e' a0 v) with (v_subst e' (t+ a0) v).
+        rewrite s_sub1_sub.
+        apply CIH.
+      * cbn; econstructor.
+        change (v0_subst e' b0 v0) with (v_subst e' (t+ b0) v0).
+        rewrite s_sub1_sub.
+        apply CIH.
+
+        
+      
+
+        pose ()
   Admitted.
 
 From OGS.OGS Require Spec.
