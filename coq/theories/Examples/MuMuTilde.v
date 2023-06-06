@@ -199,26 +199,6 @@ Equations f_subst {Γ Δ} : Γ =[val]> Δ -> forcing Γ ⇒ᵢ forcing Δ :=
   f_subst s (t+ a) v := v0_subst s a v ;
   f_subst s (t- a) f := f0_subst s a f .
 
-Definition nf (Γ : t_ctx) : Type := { a : ty & (Γ ∋ a * forcing Γ (t_neg a))%type }.
-
-Equations eval_aux {Γ} : state Γ -> (state Γ + nf Γ) :=
-  eval_aux (Cut (Mu c) k) := inl (c /ₛ k) ;
-  eval_aux (Cut (Val v) (Mu' c)) := inl (c /ₛ v) ;
-  eval_aux (Cut (Val v) (VarN i)) := inr (_ ,' (i , v)) ;
-  eval_aux (Cut (Val (VarP i)) (ZerK)) := inr (_ ,' (i , FZerK)) ;
-  eval_aux (Cut (Val (VarP i)) (App v k)) := inr (_ ,' (i , FApp v k)) ;
-  eval_aux (Cut (Val (VarP i)) (Fst k)) := inr (_ ,' (i , FFst k)) ;
-  eval_aux (Cut (Val (VarP i)) (Snd k)) := inr (_ ,' (i , FSnd k)) ;
-  eval_aux (Cut (Val (VarP i)) (Match c1 c2)) := inr (_ ,' (i , FMatch c1 c2)) ;
-
-  eval_aux (Cut (Val (LamRec u)) (App v k)) := inl (Cut (u /ₜ v0_shift _ v /ₜ LamRec u) k) ;
-  eval_aux (Cut (Val (Pair u v)) (Fst k)) := inl (Cut u k) ;
-  eval_aux (Cut (Val (Pair u v)) (Snd k)) := inl (Cut v k) ;
-  eval_aux (Cut (Val (Inl u)) (Match c1 c2)) := inl (c1 /ₛ u) ;
-  eval_aux (Cut (Val (Inr u)) (Match c1 c2)) := inl (c2 /ₛ u) .
-
-Definition eval {Γ} : state Γ -> delay (nf Γ) := iter_delay (fun c => Ret' (eval_aux c)).
-
 Equations is_neg0 : ty0 -> SProp :=
   is_neg0 One     := sUnit ;
   is_neg0 (a → b) := sUnit ;
@@ -239,32 +219,6 @@ Global Coercion neg_c_coe : neg_ctx >-> ctx.
 
 Bind Scope ctx_scope with neg_ctx.
 Bind Scope ctx_scope with ctx.
-
-(*
-Inductive a_val : ty0 -> Type :=
-| AInl {a b} : a_val a -> a_val (a + b)
-| AInr {a b} : a_val b -> a_val (a + b)
-| AOneI : a_val One
-| ALam {a b} : a_val (a → b)
-| APair {a b} : a_val (a × b)
-.
-
-Equations a_dom {t} : a_val t -> neg_ctx :=
-  a_dom (AInl u) := a_dom u ;
-  a_dom (AInr u) := a_dom u ;
-  a_dom (AOneI) := ∅ₛ ;
-  a_dom (@ALam a b) := ∅ₛ ▶ₛ {| sub_elt := t+ (a → b) ; sub_prf := stt |} ;
-  a_dom (@APair a b) := ∅ₛ ▶ₛ {| sub_elt := t+ (a × b) ; sub_prf := stt |} .
-
-Equations a_of_v0 {Γ : neg_ctx} a : val0 Γ a -> a_val a :=
-  a_of_v0 (Zer)   (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
-  a_of_v0 (a + b) (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
-  a_of_v0 (a + b) (Inl v) := AInl (a_of_v0 _ v) ;
-  a_of_v0 (a + b) (Inr v) := AInr (a_of_v0 _ v) ;
-  a_of_v0 (One)   _ := AOneI ;
-  a_of_v0 (a → b) _ := ALam ;
-  a_of_v0 (a × b) _ := APair .
-*)
 
 Inductive pat : ty -> Type :=
 | PInl {a b} : pat (t+ a) -> pat (t+ (a + b))
@@ -291,15 +245,15 @@ Equations pat_dom {t} : pat t -> neg_ctx :=
 Definition pat' (Γ : t_ctx) : Type := { a : ty & (Γ ∋ a * pat (t_neg a))%type }.
 Definition pat_dom' Γ : pat' Γ -> neg_ctx := fun p => pat_dom (snd (projT2 p)).
 
-Equations t_of_p {a} (p : pat a) : val (pat_dom p) a :=
-  t_of_p (PInl u) := Inl (t_of_p u) ;
-  t_of_p (PInr u) := Inr (t_of_p u) ;
-  t_of_p (POneI) := VarP top ;
-  t_of_p (PLam) := VarP top ;
-  t_of_p (PPair) := VarP top ;
-  t_of_p (PApp v) := App (v_shift _ (t_of_p v)) (VarN top) ;
-  t_of_p (PFst) := Fst (VarN top) ;
-  t_of_p (PSnd) := Snd (VarN top) .
+Equations v_of_p {a} (p : pat a) : val (pat_dom p) a :=
+  v_of_p (PInl u) := Inl (v_of_p u) ;
+  v_of_p (PInr u) := Inr (v_of_p u) ;
+  v_of_p (POneI) := VarP top ;
+  v_of_p (PLam) := VarP top ;
+  v_of_p (PPair) := VarP top ;
+  v_of_p (PApp v) := App (v_shift _ (v_of_p v)) (VarN top) ;
+  v_of_p (PFst) := Fst (VarN top) ;
+  v_of_p (PSnd) := Snd (VarN top) .
 
 Equations p_of_v0 {Γ : neg_ctx} a : val0 Γ a -> pat (t+ a) :=
   p_of_v0 (Zer)   (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
@@ -309,7 +263,6 @@ Equations p_of_v0 {Γ : neg_ctx} a : val0 Γ a -> pat (t+ a) :=
   p_of_v0 (One)   _ := POneI ;
   p_of_v0 (a → b) _ := PLam ;
   p_of_v0 (a × b) _ := PPair .
-Transparent p_of_v0.
 
 Definition p_dom_of_v0 {Γ : neg_ctx} a (v : val0 Γ a)
            : pat_dom (p_of_v0 a v) =[val]> Γ .
@@ -324,6 +277,87 @@ Definition p_dom_of_v0 {Γ : neg_ctx} a (v : val0 Γ a)
     - apply IHa2.
   + exact (s_append s_empty v).
 Defined.
+
+Definition nf (Γ : neg_ctx) : Type := { p : pat' Γ & pat_dom' Γ p =[val]> Γ }.
+
+Equations eval_aux {Γ : neg_ctx} : state Γ -> (state Γ + nf Γ) :=
+  eval_aux (Cut (Mu c)           (k))     := inl (c /ₛ k) ;
+  eval_aux (Cut (Val v)          (Mu' c)) := inl (c /ₛ v) ;
+
+  eval_aux (Cut (Val v)          (VarN i)) :=
+    inr ((_ ,' (i , p_of_v0 _ v)) ,' p_dom_of_v0 _ v) ;
+
+  eval_aux (Cut (Val (VarP i))   (ZerK))
+    with (s_elt_upg i).(sub_prf) := { | (!) } ;
+
+  eval_aux (Cut (Val (VarP i))   (App v k)) :=
+    inr ((_ ,' (i , PApp (p_of_v0 _ v))) ,'
+         s_append (p_dom_of_v0 _ v) (k : val _ (t- _))) ;
+
+  eval_aux (Cut (Val (VarP i))   (Fst k)) :=
+    inr ((_ ,' (i , PFst)) ,' s_append s_empty k) ;
+
+  eval_aux (Cut (Val (VarP i))   (Snd k)) :=
+    inr ((_ ,' (i , PSnd)) ,' s_append s_empty k) ;
+
+  eval_aux (Cut (Val (VarP i))   (Match c1 c2))
+    with (s_elt_upg i).(sub_prf) := { | (!) } ;
+
+  eval_aux (Cut (Val (LamRec u)) (App v k))     := inl (Cut (u /ₜ v0_shift _ v /ₜ LamRec u) k) ;
+  eval_aux (Cut (Val (Pair u v)) (Fst k))       := inl (Cut u k) ;
+  eval_aux (Cut (Val (Pair u v)) (Snd k))       := inl (Cut v k) ;
+  eval_aux (Cut (Val (Inl u))    (Match c1 c2)) := inl (c1 /ₛ u) ;
+  eval_aux (Cut (Val (Inr u))    (Match c1 c2)) := inl (c2 /ₛ u) .
+
+Definition eval {Γ : neg_ctx} : state Γ -> delay (nf Γ)
+  := iter_delay (fun c => Ret' (eval_aux c)).
+Notation play := eval.
+
+(*
+Inductive pat : ty -> Type :=
+| PInl {a b} : pat (t+ a) -> pat (t+ (a + b))
+| PInr {a b} : pat (t+ b) -> pat (t+ (a + b))
+| POneI : pat (t+ One)
+| PLam {a b} : pat (t+ (a → b))
+| PPair {a b} : pat (t+ (a × b))
+
+| PApp {a b} : pat (t+ a) -> pat (t- (a → b))
+| PFst {a b} : pat (t- (a × b))
+| PSnd {a b} : pat (t- (a × b))
+.
+
+Equations pat_dom {t} : pat t -> neg_ctx :=
+  pat_dom (PInl u) := pat_dom u ;
+  pat_dom (PInr u) := pat_dom u ;
+  pat_dom (POneI) := ∅ₛ ▶ₛ {| sub_elt := t+ One ; sub_prf := stt |} ;
+  pat_dom (@PLam a b) := ∅ₛ ▶ₛ {| sub_elt := t+ (a → b) ; sub_prf := stt |} ;
+  pat_dom (@PPair a b) := ∅ₛ ▶ₛ {| sub_elt := t+ (a × b) ; sub_prf := stt |} ;
+  pat_dom (@PApp a b v) := pat_dom v ▶ₛ {| sub_elt := t- b ; sub_prf := stt |} ;
+  pat_dom (@PFst a b) := ∅ₛ ▶ₛ {| sub_elt := t- a ; sub_prf := stt |} ;
+  pat_dom (@PSnd a b) := ∅ₛ ▶ₛ {| sub_elt := t- b ; sub_prf := stt |} .
+
+Definition pat' (Γ : t_ctx) : Type := { a : ty & (Γ ∋ a * pat (t_neg a))%type }.
+Definition pat_dom' Γ : pat' Γ -> neg_ctx := fun p => pat_dom (snd (projT2 p)).
+
+Equations v_of_p {a} (p : pat a) : val (pat_dom p) a :=
+  v_of_p (PInl u) := Inl (v_of_p u) ;
+  v_of_p (PInr u) := Inr (v_of_p u) ;
+  v_of_p (POneI) := VarP top ;
+  v_of_p (PLam) := VarP top ;
+  v_of_p (PPair) := VarP top ;
+  v_of_p (PApp v) := App (v_shift _ (v_of_p v)) (VarN top) ;
+  v_of_p (PFst) := Fst (VarN top) ;
+  v_of_p (PSnd) := Snd (VarN top) .
+
+Equations p_of_v0 {Γ : neg_ctx} a : val0 Γ a -> pat (t+ a) :=
+  p_of_v0 (Zer)   (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
+  p_of_v0 (a + b) (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
+  p_of_v0 (a + b) (Inl v) := PInl (p_of_v0 _ v) ;
+  p_of_v0 (a + b) (Inr v) := PInr (p_of_v0 _ v) ;
+  p_of_v0 (One)   _ := POneI ;
+  p_of_v0 (a → b) _ := PLam ;
+  p_of_v0 (a × b) _ := PPair .
+Transparent p_of_v0.
 
 Equations p_of_k0 {Γ : neg_ctx} a : is_neg0 a -> forcing0 Γ a -> pat (t- a) :=
   p_of_k0 (a → b) _ (FApp v k) := PApp (p_of_v0 _ v) ;
@@ -361,14 +395,25 @@ Definition play {Γ : neg_ctx} (c : state Γ)
   : delay ({ m : pat' Γ & pat_dom' Γ m =[val]> Γ })
   := fmap_delay (fun n => (p_of_nf n ,' p_dom_of_nf n)) (eval c).
 
+Definition p_app {Γ : neg_ctx} {a} (v : val Γ a) (m : pat (t_neg a)) : state (Γ +▶ pat_dom m) + nf (Γ +▶ pat_dom m) .
+  destruct a; cbn in m.
+  - refine (eval_aux (Cut _ _)).
+    + refine (Val (v0_rename r_concat_l _ v)).
+    + refine (t_rename r_concat_r _ (v_of_p m)).
+  - refine (eval_aux (Cut _ _)).
+    + refine (Val (v0_rename r_concat_r _ (v_of_p m))).
+    + refine (t_of_v _ (v_rename r_concat_l _ v)).
+Defined.
+*)
+
 Definition emb {Γ} (m : pat' Γ) : state (Γ +▶ pat_dom' Γ m) .
   destruct m as [a [i v]]; cbn in *.
   destruct a.
   - refine (Cut _ _).
     + refine (Val (VarP (r_concat_l _ i))).
-    + refine (t_rename r_concat_r _ (t_of_p v)).
+    + refine (t_rename r_concat_r _ (v_of_p v)).
   - refine (Cut _ _).
-    + refine (Val (v_rename r_concat_r _ (t_of_p v))).
+    + refine (Val (v_rename r_concat_r _ (v_of_p v))).
     + refine (VarN (r_concat_l _ i)).
 Defined.
 
@@ -772,7 +817,7 @@ Lemma s_sub1_sub {Γ Δ a} (f : Γ =[val]> Δ) (v : val Γ a) (s : state (Γ ▶
 Qed.
 
 Lemma emb_split {Γ : neg_ctx} {a} (v : val0 Γ a)
-      : v0_subst (p_dom_of_v0 a v) a (t_of_p (p_of_v0 a v)) = v .
+      : v0_subst (p_dom_of_v0 a v) a (v_of_p (p_of_v0 a v)) = v .
   induction a.
   - dependent elimination v.
     + destruct (sub_prf Γ (t+ Zer) h).
@@ -789,101 +834,142 @@ From Coinduction Require Import coinduction lattice rel tactics.
 From OGS.Utils Require Import Psh Rel.
 From OGS.ITree Require Import ITree Eq Monad.
 
+(*
 Definition play_split {Γ Δ : neg_ctx} (e : Γ =[val]> Δ)
   (p : { m : pat' (Δ +▶ Γ) & pat_dom' (Δ +▶ Γ) m =[val]> (Δ +▶ Γ) })
            : delay ({ m : pat' Δ & pat_dom' Δ m =[val]> Δ }).
   destruct (cat_split (fst (projT2 (projT1 p)))).
   - refine (Ret' ((_ ,' (i , snd (projT2 (projT1 p)))) ,' a_comp ([Var,e]) (projT2 p))).
-  - refine (Tau' _).
-    refine (play _).
-    refine (s_subst _ (emb (projT1 p))).
+  - destruct (p_app (e _ j) (snd (projT2 (projT1 p)))).
+    + refine (Tau' _).
+      refine (play (s_subst ([Var, (a_comp ([Var,e]) (projT2 p))]) s)).
+    + refine (Ret' _).
+      pose (u := @p_of_nf (Δ +▶ₛ _) n).
+      pose (s := @p_dom_of_nf (Δ +▶ₛ _) n).
+      unshelve refine ((projT1 u ,' (_ , _)) ,' _).
+      refine (p_of_nf n ,' p_dom_of_nf n).
+      refine 
     refine ([[Var,e], (a_comp ([Var,e]) (projT2 p))]).
 Defined.
+*)
 
+Definition Cut' {Γ a} (x : term Γ a) (y : term Γ (t_neg a)) : state Γ.
+destruct a.
+- exact (Cut x y).
+- exact (Cut y x).
+Defined.
 
-Definition clean_hyp {Γ Δ : neg_ctx} (c : state (Δ +▶ₛ Γ)) (e : Γ =[val]> Δ) :
-  play (s_subst ([Var,e]) c) ≊ bind_delay' (play c) (play_split e).
-  unfold play, bind_delay', iter_delay, fmap_delay, it_eq.
-  rewrite fmap_bind_com.
-  unfold bind.
+Definition refold {Γ : neg_ctx} (p : nf Γ)
+  : (Γ ∋ (projT1 (projT1 p)) * val Γ (t_neg (projT1 (projT1 p))))%type.
+destruct p as [ [x [i p]] s]; cbn in *.
+exact (i , v_subst s _ (v_of_p p)).
+Defined.
+
+Lemma refold_id {Γ : neg_ctx} (a : ty0) (v : val0 Γ a)
+  : v0_subst (p_dom_of_v0 a v) a (v_of_p (p_of_v0 a v)) = v.
+  induction a.
+  - dependent elimination v.
+    pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
+  - reflexivity.
+  - reflexivity.
+  - dependent elimination v.
+    pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
+    + exact (f_equal Inl (IHa1 v)).
+    + exact (f_equal Inr (IHa2 v0)).
+  - reflexivity.
+Qed.
+
+(*
+Definition one_step {Γ : neg_ctx} {a}
+  (v : val Γ a)
+  (p : pat (t_neg a))
+  (s : pat_dom p =[val]> Γ)
+  : delay (nf Γ).
+  destruct (eval_aux (Cut' (t_of_v _ v) (t_of_v _ (v_subst s _ (v_of_p p))))).
+  - exact (tau_delay (play s0)). 
+  - exact (ret_delay n).
+Defined.
+*)
+
+Definition then_play {Γ Δ : neg_ctx} (e : Γ =[val]> Δ) (n : nf Γ) : delay (nf Δ) :=
+  let '(i , v) := refold n in
+  match eval_aux (Cut' (t_of_v _ (e _ i)) (t_of_v _ (v_subst e _ v))) with
+  | inl s => tau_delay (play s)
+  | inr n => ret_delay n
+  end .
+
+Definition clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
+   : play (s_subst e c) ≊ bind_delay' (play c) (then_play e) .
+  unfold bind_delay', iter_delay, it_eq, bind.
   revert Γ c e; coinduction R CIH; intros Γ c e.
-  pose (e' := [Var,e]). change ([Var,e]) with e'.
   dependent elimination c.
-  dependent elimination t0; cbn; change (iter _ T1_0 ?a) with (eval a).
-  - econstructor. (* Cut (Mu _) _) *)
-    change (t_subst e' (t- a0) t1) with (v_subst e' (t- a0) t1).
+  dependent elimination t0.
+  - cbn; econstructor. (* Cut (Mu _) _) *)
+    change (t_subst e (t- a0) t1) with (v_subst e (t- a0) t1).
     rewrite s_sub1_sub.
     apply CIH.
   - dependent elimination t1.
-    + cbn. unfold play_split. (* Cut (Val _) (VarN i) *)
-      fold e'.
-      cbn [fst snd projT1 projT2].
-      unfold e' at 1, s_cat at 1, s_cover at 1.
-      change (cover_split cover_cat h) with (cat_split h).      
-      pose (u := cat_split h); change (cat_split h) with u.
-      destruct u.
-      * econstructor; cbn.
-        shelve.
-      * cbn.
-        rewrite v0_sub_ren.
-        change (([e', a_comp e' ?a]) (t- a2) (r_concat_l (t- a2) (r_cover_r cover_cat (t- a2) j)))
-          with (([[Var,e], a_comp e' a] ⊛ᵣ r_concat_l) _ (r_concat_r (t- a2) j)).
-        rewrite s_eq_cat_l.
-        change ([Var,e] (t- a2) (r_concat_r (t- a2) j))
-                 with (([Var,e] ⊛ᵣ r_concat_r) (t- a2) j).
-        rewrite s_eq_cat_r.
-        rewrite (v0_sub_eq _ _ (s_eq_cat_r e' (a_comp e' _)) _ _ _ eq_refl).
-        rewrite <- v0_sub_sub.
-        remember (v0_subst (p_dom_of_v0 _ _) a2 (t_of_p (p_of_v0 a2 _))).
-        rewrite (@emb_split (Δ +▶ₛ Γ) a2 v).
-
-        rewrite (emb_split (v : val0 (_ +▶ₛ _) _)).
-        pose (xx := e (t- a2) j).
-        fold xx.
-        unfold e'; clear e'.
-        destruct xx eqn:H.
-        dependent elimination xx.
-        
-        etransitivity 
-        Search r_concat_l
-        pose (xx := e _ j).
-        fold xx.
-        shelve.
-    + cbn; econstructor. (* Cut (Val _) (Mu' _) *)
-      change (v0_subst e' _ v) with (v_subst e' (t+ _) v).
-      rewrite s_sub1_sub.
-      apply CIH.
+    + rewrite s_subst_equation_1, t_subst_equation_3.
+      unfold play at 2; cbn -[play then_play].
+      unfold then_play.
+      cbn -[eval eval_aux].
+      rewrite refold_id.
+      cbn -[eval_aux].
+      destruct (eval_aux (Cut (Val (v0_subst e a2 v)) (e (t- a2) h))); econstructor; reflexivity.
+    + unfold play. cbn -[then_play]; change (iter _ T1_0 ?x) with (play x).
+      change (v0_subst e a3 v) with (v_subst e (t+ a3) v); rewrite s_sub1_sub.
+      econstructor; apply CIH.
     + dependent elimination v. (* Cut (Val _) ZerK *)
-      * assert (u : (Δ +▶ₛ Γ) ∋ t+ Zer) by exact h.       
-        pose (nope := (s_elt_upg u).(sub_prf)); dependent elimination nope.
+      pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
     + dependent elimination v. (* Cut (Val _) (App _ _)) *)
-      * shelve. (* synchro step *)
-      * cbn. (* normal redex *)
-        econstructor.
-        shelve.
+      * unfold play at 2; cbn -[play then_play].
+        unfold then_play; cbn -[play eval_aux].
+        rewrite v0_sub_ren.
+        assert ((@s_append _ _ _ _ (t- b) (p_dom_of_v0 a4 v1) t0 ⊛ᵣ s_pop)
+                ≡ₐ p_dom_of_v0 a4 v1) by auto.
+        rewrite (v0_sub_eq _ _ H a4 _ _ eq_refl), refold_id.
+        cbn -[eval_aux];
+          destruct (eval_aux (Cut (Val (e _ h)) (App (v0_subst e _ v1) (t_subst e _ t0))));
+          econstructor;
+          reflexivity.
+      * cbn; econstructor; change (iter _ T1_0 ?x) with (play x).
+        unfold a_shift2.
+        unfold t_subst1 at 2.
+        change (Cut (t_subst ?f))
+        rewrite 2 t_sub_sub.
+        Check s_sub1_sub.
     + dependent elimination v. (* Cut (Val _) Fst *)
-      * shelve. (* synchro *)
-      * econstructor; apply CIH.
+      * unfold play at 2; cbn -[play then_play].
+        unfold then_play; cbn -[play eval_aux].
+        cbn -[eval_aux];
+          destruct (eval_aux (Cut (Val (e _ h)) (Fst (t_subst e _ t1))));
+          econstructor;
+          reflexivity.
+      * cbn; econstructor; apply CIH.
     + dependent elimination v. (* Cut (Val _) Snd *)
-      * shelve.
-      * econstructor; apply CIH.
+      * unfold play at 2; cbn -[play then_play].
+        unfold then_play; cbn -[play eval_aux].
+        cbn -[eval_aux];
+          destruct (eval_aux (Cut (Val (e _ h)) (Snd (t_subst e _ t2))));
+          econstructor;
+          reflexivity.
+      * cbn; econstructor; apply CIH.
     + dependent elimination v. (* Cut (Val _) (Match _ _) *)
-      * assert (u : (Δ +▶ₛ Γ) ∋ t+ (_ + _)) by exact h.       
-        pose (nope := (s_elt_upg u).(sub_prf)); dependent elimination nope.
-      * cbn; econstructor.
-        change (v0_subst e' a0 v) with (v_subst e' (t+ a0) v).
-        rewrite s_sub1_sub.
+      * pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
+      * cbn; econstructor; change (iter _ T1_0 ?x) with (play x).
+        change (v0_subst e a0 v) with (v_subst e (t+ a0) v); rewrite s_sub1_sub.
         apply CIH.
-      * cbn; econstructor.
-        change (v0_subst e' b0 v0) with (v_subst e' (t+ b0) v0).
-        rewrite s_sub1_sub.
+      * cbn; econstructor; change (iter _ T1_0 ?x) with (play x).
+        change (v0_subst e b0 v0) with (v_subst e (t+ b0) v0); rewrite s_sub1_sub.
         apply CIH.
+Admitted.
 
         
       
 
         pose ()
   Admitted.
+*)
 
 From OGS.OGS Require Spec.
 
