@@ -27,10 +27,10 @@ Definition curry {A B} {C : A -> B -> Type} (f : forall i, C (fst i) (snd i)) a 
 #[global] Notation curry' := (fun f a b => f (a ,' b)).
 #[global] Notation uncurry' := (fun f x => f (projT1 x) (projT2 x)).
 
-Variant T0 := .
-Variant T1 := T1_0.
-Variant T2 := T2_0 | T2_1.
-Variant T3 := T3_0 | T3_1 | T3_2.
+Variant T0 : Type := .
+Variant T1 : Type := T1_0.
+Variant T2 : Type := T2_0 | T2_1.
+Variant T3 : Type := T3_0 | T3_1 | T3_2.
 Derive NoConfusion for T0.
 Derive NoConfusion for T1.
 Derive NoConfusion for T2.

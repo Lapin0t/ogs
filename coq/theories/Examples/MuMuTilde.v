@@ -64,6 +64,10 @@ Equations val : t_ctx -> ty -> Type :=
   val Γ (t+ a) := val0 Γ a ;
   val Γ (t- a) := term Γ (t- a) .
 
+Equations Var {Γ} : has Γ ⇒ᵢ val Γ :=
+  Var (t+ _) i := VarP i ;
+  Var (t- _) i := VarN i .
+
 Equations t_rename {Γ Δ} : Γ ⊆ Δ -> term Γ ⇒ᵢ term Δ :=
   t_rename f _ (Mu c)    := Mu (s_rename (r_shift f) c) ;
   t_rename f _ (Val v)   := Val (v0_rename f _ v) ;
@@ -92,10 +96,6 @@ Equations v_rename {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ :=
 
 Definition a_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 =[val]> Γ2 -> Γ1 =[val]> Γ3 :=
   fun f g _ i => v_rename f _ (g _ i) .
-
-Equations Var {Γ} : has Γ ⇒ᵢ val Γ :=
-  Var (t+ _) i := VarP i ;
-  Var (t- _) i := VarN i .
 
 Definition t_shift  {Γ} [y] : term Γ ⇒ᵢ term (Γ ▶ y)  := @t_rename _ _ s_pop.
 Definition v0_shift {Γ} [y] : val0 Γ ⇒ᵢ val0 (Γ ▶ y)  := @v0_rename _ _ s_pop.
@@ -130,6 +130,12 @@ Defined.
 Equations t_of_v {Γ} : val Γ ⇒ᵢ term Γ :=
   t_of_v (t+ _) v := Val v ;
   t_of_v (t- _) k := k .
+
+(*  μx. ⟨ inr ( λy. μz. ⟨ inl z | x ⟩ ) | x ⟩    *)
+Definition LEM {a} : term ∅ (t+ (a + (a → Zer))) :=
+  Mu (Cut (Val (Inr (LamRec (Mu (Cut (Val (Inl (VarP (pop top))))
+                                     (VarN (pop (pop (pop top)))))))))
+           (VarN top)) .
 
 Equations t_subst {Γ Δ} : Γ =[val]> Δ -> term Γ ⇒ᵢ term Δ :=
   t_subst f _ (Mu c)    := Mu (s_subst (a_shift f) c) ;
@@ -280,6 +286,8 @@ Defined.
 
 Definition nf (Γ : neg_ctx) : Type := { p : pat' Γ & pat_dom' Γ p =[val]> Γ }.
 
+Definition pre_redex (Γ : neg_ctx) : Type := { x : ty & val Γ x * pat x }%type.
+
 Equations eval_aux {Γ : neg_ctx} : state Γ -> (state Γ + nf Γ) :=
   eval_aux (Cut (Mu c)           (k))     := inl (c /ₛ k) ;
   eval_aux (Cut (Val v)          (Mu' c)) := inl (c /ₛ v) ;
@@ -313,89 +321,17 @@ Definition eval {Γ : neg_ctx} : state Γ -> delay (nf Γ)
   := iter_delay (fun c => Ret' (eval_aux c)).
 Notation play := eval.
 
+Definition Cut' {Γ a} (x : term Γ a) (y : term Γ (t_neg a)) : state Γ.
+destruct a.
+- exact (Cut x y).
+- exact (Cut y x).
+Defined.
+
 (*
-Inductive pat : ty -> Type :=
-| PInl {a b} : pat (t+ a) -> pat (t+ (a + b))
-| PInr {a b} : pat (t+ b) -> pat (t+ (a + b))
-| POneI : pat (t+ One)
-| PLam {a b} : pat (t+ (a → b))
-| PPair {a b} : pat (t+ (a × b))
-
-| PApp {a b} : pat (t+ a) -> pat (t- (a → b))
-| PFst {a b} : pat (t- (a × b))
-| PSnd {a b} : pat (t- (a × b))
-.
-
-Equations pat_dom {t} : pat t -> neg_ctx :=
-  pat_dom (PInl u) := pat_dom u ;
-  pat_dom (PInr u) := pat_dom u ;
-  pat_dom (POneI) := ∅ₛ ▶ₛ {| sub_elt := t+ One ; sub_prf := stt |} ;
-  pat_dom (@PLam a b) := ∅ₛ ▶ₛ {| sub_elt := t+ (a → b) ; sub_prf := stt |} ;
-  pat_dom (@PPair a b) := ∅ₛ ▶ₛ {| sub_elt := t+ (a × b) ; sub_prf := stt |} ;
-  pat_dom (@PApp a b v) := pat_dom v ▶ₛ {| sub_elt := t- b ; sub_prf := stt |} ;
-  pat_dom (@PFst a b) := ∅ₛ ▶ₛ {| sub_elt := t- a ; sub_prf := stt |} ;
-  pat_dom (@PSnd a b) := ∅ₛ ▶ₛ {| sub_elt := t- b ; sub_prf := stt |} .
-
-Definition pat' (Γ : t_ctx) : Type := { a : ty & (Γ ∋ a * pat (t_neg a))%type }.
-Definition pat_dom' Γ : pat' Γ -> neg_ctx := fun p => pat_dom (snd (projT2 p)).
-
-Equations v_of_p {a} (p : pat a) : val (pat_dom p) a :=
-  v_of_p (PInl u) := Inl (v_of_p u) ;
-  v_of_p (PInr u) := Inr (v_of_p u) ;
-  v_of_p (POneI) := VarP top ;
-  v_of_p (PLam) := VarP top ;
-  v_of_p (PPair) := VarP top ;
-  v_of_p (PApp v) := App (v_shift _ (v_of_p v)) (VarN top) ;
-  v_of_p (PFst) := Fst (VarN top) ;
-  v_of_p (PSnd) := Snd (VarN top) .
-
-Equations p_of_v0 {Γ : neg_ctx} a : val0 Γ a -> pat (t+ a) :=
-  p_of_v0 (Zer)   (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
-  p_of_v0 (a + b) (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
-  p_of_v0 (a + b) (Inl v) := PInl (p_of_v0 _ v) ;
-  p_of_v0 (a + b) (Inr v) := PInr (p_of_v0 _ v) ;
-  p_of_v0 (One)   _ := POneI ;
-  p_of_v0 (a → b) _ := PLam ;
-  p_of_v0 (a × b) _ := PPair .
-Transparent p_of_v0.
-
-Equations p_of_k0 {Γ : neg_ctx} a : is_neg0 a -> forcing0 Γ a -> pat (t- a) :=
-  p_of_k0 (a → b) _ (FApp v k) := PApp (p_of_v0 _ v) ;
-  p_of_k0 (a × b) _ (FFst k)   := PFst ;
-  p_of_k0 (a × b) _ (FSnd k)   := PSnd .
-
-Definition p_dom_of_k0 {Γ : neg_ctx} a (p : is_neg0 a) (k : forcing0 Γ a)
-           : pat_dom (p_of_k0 a p k) =[val]> Γ .
-  induction a; try inversion p; dependent elimination k.
-  - exact (s_append s_empty t0).
-  - exact (s_append s_empty t1).
-  - exact (s_append (p_dom_of_v0 a v) (t : val _ (t- _))).
-Defined.
-
-Equations p_of_f {Γ : neg_ctx} a (_ : is_neg a) : forcing Γ (t_neg a) -> pat (t_neg a) :=
-  p_of_f (t+ a) p v := p_of_k0 a p v ;
-  p_of_f (t- a) _ v := p_of_v0 a v.
-
-Equations p_dom_of_f {Γ : neg_ctx} a (p : is_neg a) (v : forcing Γ (t_neg a))
-  : pat_dom (p_of_f a p v) =[val]> Γ :=
-  p_dom_of_f (t+ a) p v := p_dom_of_k0 a p v ;
-  p_dom_of_f (t- a) _ v := p_dom_of_v0 a v .
-
-Definition p_of_nf {Γ : neg_ctx} : nf Γ -> pat' Γ.
-  intros [ a [ i f ] ].
-  refine (a ,' (i , p_of_f a (s_elt_upg i).(sub_prf) f)).
-Defined.
-
-Definition p_dom_of_nf {Γ : neg_ctx} : forall n : nf Γ, pat_dom' Γ (p_of_nf n) =[val]> Γ.
-  intros [ a [ i f ] ].
-  refine (p_dom_of_f a (s_elt_upg i).(sub_prf) f).
-Defined.
-
-Definition play {Γ : neg_ctx} (c : state Γ)
-  : delay ({ m : pat' Γ & pat_dom' Γ m =[val]> Γ })
-  := fmap_delay (fun n => (p_of_nf n ,' p_dom_of_nf n)) (eval c).
-
-Definition p_app {Γ : neg_ctx} {a} (v : val Γ a) (m : pat (t_neg a)) : state (Γ +▶ pat_dom m) + nf (Γ +▶ pat_dom m) .
+Definition p_app {Γ : neg_ctx} {a} (v : val Γ a) (m : pat (t_neg a)) : state (Γ +▶ pat_dom m) .
+  eapply Cut'.
+  - apply t_of_v.
+    exact (v_rename r_concat_l _ v).
   destruct a; cbn in m.
   - refine (eval_aux (Cut _ _)).
     + refine (Val (v0_rename r_concat_l _ v)).
@@ -405,6 +341,12 @@ Definition p_app {Γ : neg_ctx} {a} (v : val Γ a) (m : pat (t_neg a)) : state (
     + refine (t_of_v _ (v_rename r_concat_l _ v)).
 Defined.
 *)
+
+Definition refold {Γ : neg_ctx} (p : nf Γ)
+  : (Γ ∋ (projT1 (projT1 p)) * val Γ (t_neg (projT1 (projT1 p))))%type.
+destruct p as [ [x [i p]] s]; cbn in *.
+exact (i , v_subst s _ (v_of_p p)).
+Defined.
 
 Definition emb {Γ} (m : pat' Γ) : state (Γ +▶ pat_dom' Γ m) .
   destruct m as [a [i v]]; cbn in *.
@@ -853,18 +795,6 @@ Definition play_split {Γ Δ : neg_ctx} (e : Γ =[val]> Δ)
 Defined.
 *)
 
-Definition Cut' {Γ a} (x : term Γ a) (y : term Γ (t_neg a)) : state Γ.
-destruct a.
-- exact (Cut x y).
-- exact (Cut y x).
-Defined.
-
-Definition refold {Γ : neg_ctx} (p : nf Γ)
-  : (Γ ∋ (projT1 (projT1 p)) * val Γ (t_neg (projT1 (projT1 p))))%type.
-destruct p as [ [x [i p]] s]; cbn in *.
-exact (i , v_subst s _ (v_of_p p)).
-Defined.
-
 Lemma refold_id {Γ : neg_ctx} (a : ty0) (v : val0 Γ a)
   : v0_subst (p_dom_of_v0 a v) a (v_of_p (p_of_v0 a v)) = v.
   induction a.
@@ -900,6 +830,8 @@ Definition then_play {Γ Δ : neg_ctx} (e : Γ =[val]> Δ) (n : nf Γ) : delay (
 
 Definition clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
    : play (s_subst e c) ≊ bind_delay' (play c) (then_play e) .
+  Admitted.
+(*
   unfold bind_delay', iter_delay, it_eq, bind.
   revert Γ c e; coinduction R CIH; intros Γ c e.
   dependent elimination c.
