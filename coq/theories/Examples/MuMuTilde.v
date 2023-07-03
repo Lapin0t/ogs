@@ -713,6 +713,11 @@ Lemma v_sub_sub {Γ1 Γ2 Γ3} (f1 : Γ2 =[val]> Γ3) (f2 : Γ1 =[val]> Γ2) a (v
   : v_subst f1 a (v_subst f2 a v) = v_subst (a_comp f1 f2) a v.
 destruct a; [ apply v0_sub_sub | apply t_sub_sub ]; auto. Qed.
 
+Lemma a_comp_assoc {Γ1 Γ2 Γ3 Γ4} (u : Γ3 =[val]> Γ4) (v : Γ2 =[val]> Γ3) (w : Γ1 =[val]> Γ2)
+           : a_comp u (a_comp v w) ≡ₐ a_comp (a_comp u v) w .
+  intros ? i; unfold a_comp; now apply v_sub_sub.
+Qed.
+
 Definition t_sub_id_l_P Γ a (t : term Γ a) : Prop := t_subst Var a t = t.
 Definition v0_sub_id_l_P Γ a (v : val0 Γ a) : Prop := v0_subst Var a v = v.
 Definition s_sub_id_l_P Γ (s : state Γ) : Prop := s_subst Var s = s.
@@ -748,7 +753,7 @@ Qed.
 
 Lemma v_sub1_sub {Γ Δ a b} (f : Γ =[val]> Δ) (v : val Γ a) (w : val (Γ ▶ a) b)
   : v_subst (a_shift f) b w /ᵥ v_subst f a v = v_subst f b (w /ᵥ v) .
-  unfold v_subst1. rewrite 2 v_sub_sub.
+  unfold v_subst1; rewrite 2 v_sub_sub.
   apply v_sub_eq; auto.
   rewrite sub1_sub; reflexivity.
 Qed.
@@ -756,6 +761,13 @@ Qed.
 Lemma s_sub1_sub {Γ Δ a} (f : Γ =[val]> Δ) (v : val Γ a) (s : state (Γ ▶ a))
   : s_subst (a_shift f) s /ₛ v_subst f a v = s_subst f (s /ₛ v) .
   unfold s_subst1; rewrite 2 s_sub_sub, sub1_sub; reflexivity.
+Qed.
+
+Lemma t_sub1_sub {Γ Δ a b} (f : Γ =[val]> Δ) (v : val Γ a) (t : term (Γ ▶ a) b)
+  : t_subst (a_shift f) b t /ₜ v_subst f a v = t_subst f b (t /ₜ v) .
+  unfold t_subst1; rewrite 2 t_sub_sub.
+  apply t_sub_eq; auto.
+  rewrite sub1_sub; reflexivity.
 Qed.
 
 Lemma emb_split {Γ : neg_ctx} {a} (v : val0 Γ a)
@@ -795,6 +807,11 @@ Definition play_split {Γ Δ : neg_ctx} (e : Γ =[val]> Δ)
 Defined.
 *)
 
+(*
+Lemma refold_lem {Γ Δ : neg_ctx} (n : nf Γ) (e : Γ =[val]> Δ) :
+  Cut' (t_of_v _ (e _ i)) (t_of_v _ (v_subst e _ v)) = (s_subst (a_comp e ([ Var , projT2 n ])) (emb (projT1 n))).
+*)
+
 Lemma refold_id {Γ : neg_ctx} (a : ty0) (v : val0 Γ a)
   : v0_subst (p_dom_of_v0 a v) a (v_of_p (p_of_v0 a v)) = v.
   induction a.
@@ -821,17 +838,51 @@ Definition one_step {Γ : neg_ctx} {a}
 Defined.
 *)
 
-Definition then_play {Γ Δ : neg_ctx} (e : Γ =[val]> Δ) (n : nf Γ) : delay (nf Δ) :=
-  let '(i , v) := refold n in
-  match eval_aux (Cut' (t_of_v _ (e _ i)) (t_of_v _ (v_subst e _ v))) with
-  | inl s => tau_delay (play s)
-  | inr n => ret_delay n
-  end .
+Definition eat_one_tau {I} {E : event I I} {X i} (t : itree E X i) : itree E X i :=
+  go (match t.(_observe) with
+      | RetF x => RetF x
+      | TauF t => t.(_observe)
+      | VisF q k => VisF q k
+      end) .
 
+(* the final version we would like to have in the hypothesis, in terms of [emb] *)
+Definition then_play1 {Γ Δ : neg_ctx} (e : Γ =[val]> Δ) (n : nf Γ) : delay (nf Δ)
+  := play (s_subst (a_comp e ([ Var , projT2 n ])) (emb (projT1 n))).
+
+(* the clean version with simplified substitutions we would like to have in the proof *)
+Definition then_play2 {Γ Δ : neg_ctx} (e : Γ =[val]> Δ) (n : nf Γ) : delay (nf Δ) :=
+  let '(i , v) := refold n in
+  play (Cut' (t_of_v _ (e _ i)) (t_of_v _ (v_subst e _ v))).
+
+(* both are the same thing up to substitution shenenigans *)
+Lemma then_play_eq {Γ Δ : neg_ctx} (e : Γ =[val]> Δ) (n : nf Γ) : then_play1 e n ≊ then_play2 e n.
+  unfold then_play1, then_play2, emb, refold.
+  destruct n as [ [ [] [i m] ] γ ]; cbn.
+  - change (([Var, γ]) ?x (r_concat_l ?x ?i)) with ((([Var,γ]) ⊛ᵣ r_concat_l) x i).
+    rewrite (s_eq_cat_l Var γ _ i); cbn.
+    rewrite t_sub_ren; unfold a_comp, s_ren.
+    change (([Var, γ]) ?x (r_concat_r ?x ?i)) with ((([Var,γ]) ⊛ᵣ r_concat_r) x i).
+    change (fun x : ty => v_subst e x ∘ (([Var, γ]) ⊛ᵣ r_concat_r) x) with (a_comp e ((([Var, γ]) ⊛ᵣ r_concat_r))).
+    rewrite <- t_sub_sub.
+    rewrite (t_sub_eq _ _ (s_eq_cat_r _ _) _ _ _ eq_refl).
+    reflexivity.
+  - change (([Var, γ]) ?x (r_concat_l ?x ?i)) with ((([Var,γ]) ⊛ᵣ r_concat_l) x i).
+    rewrite (s_eq_cat_l Var γ _ i); cbn.
+    rewrite v0_sub_ren; unfold a_comp, s_ren.
+    change (([Var, γ]) ?x (r_concat_r ?x ?i)) with ((([Var,γ]) ⊛ᵣ r_concat_r) x i).
+    change (fun x : ty => v_subst e x ∘ (([Var, γ]) ⊛ᵣ r_concat_r) x) with (a_comp e (([Var, γ]) ⊛ᵣ r_concat_r)).
+    rewrite <- v0_sub_sub.
+    rewrite (v0_sub_eq _ _ (s_eq_cat_r _ _) _ _ _ eq_refl).
+    reflexivity.
+Qed.
+
+(* we can prove the hypothesis:
+    eval (c / e) == eval c >>= λ n => eval (⌊ n ⌋ / e)
+
+  (here with the simple substitutions)
+*)
 Definition clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
-   : play (s_subst e c) ≊ bind_delay' (play c) (then_play e) .
-  Admitted.
-(*
+   : play (s_subst e c) ≊ bind_delay' (play c) (then_play2 e) .
   unfold bind_delay', iter_delay, it_eq, bind.
   revert Γ c e; coinduction R CIH; intros Γ c e.
   dependent elimination c.
@@ -842,20 +893,18 @@ Definition clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
     apply CIH.
   - dependent elimination t1.
     + rewrite s_subst_equation_1, t_subst_equation_3.
-      unfold play at 2; cbn -[play then_play].
-      unfold then_play.
-      cbn -[eval eval_aux].
-      rewrite refold_id.
-      cbn -[eval_aux].
-      destruct (eval_aux (Cut (Val (v0_subst e a2 v)) (e (t- a2) h))); econstructor; reflexivity.
-    + unfold play. cbn -[then_play]; change (iter _ T1_0 ?x) with (play x).
+      unfold play at 2; cbn -[play then_play2].
+      unfold then_play2.
+      cbn -[eval eval_aux]; rewrite refold_id.
+      cbv [observe]; destruct (_observe (play (Cut (Val (v0_subst e a2 v)) (e (t- a2) h)))); econstructor; reflexivity.
+    + unfold play. cbn -[then_play2]; change (iter _ T1_0 ?x) with (play x).
       change (v0_subst e a3 v) with (v_subst e (t+ a3) v); rewrite s_sub1_sub.
       econstructor; apply CIH.
     + dependent elimination v. (* Cut (Val _) ZerK *)
       pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
     + dependent elimination v. (* Cut (Val _) (App _ _)) *)
-      * unfold play at 2; cbn -[play then_play].
-        unfold then_play; cbn -[play eval_aux].
+      * unfold play at 2; cbn -[play then_play2].
+        unfold then_play2; cbn -[play eval_aux].
         rewrite v0_sub_ren.
         assert ((@s_append _ _ _ _ (t- b) (p_dom_of_v0 a4 v1) t0 ⊛ᵣ s_pop)
                 ≡ₐ p_dom_of_v0 a4 v1) by auto.
@@ -865,22 +914,43 @@ Definition clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
           econstructor;
           reflexivity.
       * cbn; econstructor; change (iter _ T1_0 ?x) with (play x).
-        unfold a_shift2.
-        unfold t_subst1 at 2.
-        change (Cut (t_subst ?f))
+        change (LamRec (t_subst (a_shift2 e) (t+ b2) t1)) with (v0_subst e (a2 → b2) (LamRec t1)).
+        unfold t_subst1 at 1 2.
         rewrite 2 t_sub_sub.
-        Check s_sub1_sub.
+        rewrite <- (t_sub_eq _ _ (a_comp_assoc _ _ _) (t+ b2) t1 t1 eq_refl).
+        rewrite <- t_sub_sub.
+        unfold v0_shift at 1; rewrite v0_ren_sub.
+        assert (a_comp (ass1 (v_subst (a_ren (s_pop (x:= (t+ (a2 → b2)))) e) (t+ a2) v1)) (a_shift2 e) ≡ₐ a_comp (a_shift e) (ass1 (v_shift (t+ _) v1))).
+        ** intros ? i; dependent elimination i as [ Ctx.top | Ctx.pop Ctx.top | Ctx.pop (Ctx.pop i) ]; cbn.
+           ++ rewrite v0_sub_ren; now apply v0_sub_eq.
+           ++ reflexivity.
+           ++ destruct x1; cbn.
+              rewrite v0_ren_ren, v0_sub_ren.
+              rewrite <- (v0_sub_id_l t (v0_rename s_pop t (e _ i))), v0_sub_ren.
+              now apply v0_sub_eq.
+              rewrite t_ren_ren, t_sub_ren.
+              rewrite <- (t_sub_id_l _ (t_rename s_pop _ (e _ i))), t_sub_ren.
+              now apply t_sub_eq.
+        ** rewrite (t_sub_eq _ _ H _ _ _ eq_refl).
+           rewrite t_sub_sub.
+        rewrite (t_sub_eq _ _ (a_comp_assoc _ _ _) (t+ b2) t1 t1 eq_refl).
+        rewrite <- t_sub_sub.
+        change (v0_subst e _ (LamRec t1)) with (v_subst e (t+ _) (LamRec t1)).
+        rewrite (t_sub_eq _ _ (sub1_sub (a:=t+ _) e (LamRec t1)) _ _ _ eq_refl).
+        rewrite <- t_sub_sub.
+        change (Cut (t_subst e _ ?a) (t_subst e _ t0)) with (s_subst e (Cut a t0)).
+        apply CIH.
     + dependent elimination v. (* Cut (Val _) Fst *)
-      * unfold play at 2; cbn -[play then_play].
-        unfold then_play; cbn -[play eval_aux].
+      * unfold play at 2; cbn -[play then_play2].
+        unfold then_play2; cbn -[play eval_aux].
         cbn -[eval_aux];
           destruct (eval_aux (Cut (Val (e _ h)) (Fst (t_subst e _ t1))));
           econstructor;
           reflexivity.
       * cbn; econstructor; apply CIH.
     + dependent elimination v. (* Cut (Val _) Snd *)
-      * unfold play at 2; cbn -[play then_play].
-        unfold then_play; cbn -[play eval_aux].
+      * unfold play at 2; cbn -[play then_play2].
+        unfold then_play2; cbn -[play eval_aux].
         cbn -[eval_aux];
           destruct (eval_aux (Cut (Val (e _ h)) (Snd (t_subst e _ t2))));
           econstructor;
@@ -894,14 +964,9 @@ Definition clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
       * cbn; econstructor; change (iter _ T1_0 ?x) with (play x).
         change (v0_subst e b0 v0) with (v_subst e (t+ b0) v0); rewrite s_sub1_sub.
         apply CIH.
-Admitted.
+Qed.
 
-        
-      
-
-        pose ()
-  Admitted.
-*)
+(** WIP
 
 From OGS.OGS Require Spec.
 
@@ -967,3 +1032,5 @@ Lemma the_hyp {Γ Δ}
   (e : Γ =[@Spec.val _ mu_machine]> Δ)
   : @Spec.eval_sub_1 _ mu_machine Γ Δ c e ≊ @Spec.eval_sub_2 _ mu_machine Γ Δ c e.
 Admitted.
+
+**)
