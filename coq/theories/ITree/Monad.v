@@ -122,6 +122,105 @@ Section monad.
   Definition kcomp {X Y Z} (f : X ⇒ᵢ itree E Y) (g : Y ⇒ᵢ itree E Z) : X ⇒ᵢ itree E Z :=
     fun i x => bind (f i x) g.
 
+  Definition eqn R X Y : Type := X ⇒ᵢ itree E (Y +ᵢ R) .
+  Definition apply_eqn {R X Y} (q : eqn R X Y) : itree E (X +ᵢ R) ⇒ᵢ itree E (Y +ᵢ R) :=
+    fun _ t => bind t
+              (fun _ r => match r with
+                        | inl x => q _ x
+                        | inr y => Ret' (inr y)
+                        end) .
+
+  Variant guarded' {X Y i} : itree' E (X +ᵢ Y) i -> Type :=
+  | GRet y : guarded' (RetF (inr y))
+  | GTau t : guarded' (TauF t)
+  | GVis e k : guarded' (VisF e k)
+  .
+  Definition guarded {X Y i} (t : itree E (X +ᵢ Y) i) := guarded' t.(_observe).
+  Definition eqn_guarded {R X Y} (e : eqn R X Y) : Type := forall i (x : X i), guarded (e i x) .
+
+  Definition apply_guardedL {R X Y} (e : eqn R X Y) {i} (t : itree E (X +ᵢ R) i)
+             : guarded t -> guarded (apply_eqn e _ t) .
+  intro H; unfold guarded in *; cbn in *.
+  destruct t.(_observe); dependent elimination H; cbn; econstructor.
+  Defined.
+
+  Definition apply_guardedR {R X Y} (e : eqn R X Y) (H : eqn_guarded e) {i} (t : itree E (X +ᵢ R) i)
+             : guarded (apply_eqn e _ t) .
+    unfold guarded in *; cbn in *.
+    destruct (_observe t) as [ [] | | ]; try econstructor.
+    exact (H _ x).
+  Defined.
+  
+  Definition iter_guarded_aux {R X} (e : eqn R X X) (H : eqn_guarded e) : itree E (X +ᵢ R) ⇒ᵢ itree E R :=
+    cofix CIH i t := go match t.(_observe) with
+                       | RetF (inl x) => match H i x with
+                                         | GRet y => RetF y
+                                         | GTau t => TauF (CIH _ t)
+                                         | GVis e k => VisF e (fun r => CIH _ (k r))
+                                        end
+                       | RetF (inr y) => RetF y
+                       | TauF t => TauF (CIH _ t)
+                       | VisF e k => VisF e (fun r => CIH _ (k r))
+                       end .
+
+  Definition iter_guarded {R X} (e : eqn R X X) (H : eqn_guarded e) : X ⇒ᵢ itree E R :=
+    fun _ x => iter_guarded_aux e H _ (e _ x) .
+
+  Inductive ev_guarded' {X Y} (e : X ⇒ᵢ itree E (X +ᵢ Y)) {i} : itree' E (X +ᵢ Y) i -> Type :=
+  | GHead {t} : guarded' t -> ev_guarded' e t
+  | GNext {x} : ev_guarded' e (e i x).(_observe) -> ev_guarded' e (RetF (inl x))
+  .
+
+  Definition ev_guarded {X Y} (e : eqn Y X X) {i} (t : itree E (X +ᵢ Y) i) := ev_guarded' e t.(_observe).
+  Definition eqn_ev_guarded {X Y} (e : eqn Y X X) : Type := forall i (x : X i), ev_guarded e (e i x) .
+  
+  Definition ev_guarded_unfold {X Y} (e : X ⇒ᵢ itree E (X +ᵢ Y)) (H : eqn_ev_guarded e) : eqn Y X X.
+    intros i x; induction (H i x).
+    - exact (go t).
+    - exact (apply_eqn e _ IHe0).
+  Defined.
+
+  Program Definition ev_guarded_unfold_guarded {X Y} (e : X ⇒ᵢ itree E (X +ᵢ Y)) (H : eqn_ev_guarded e)
+    : eqn_guarded (ev_guarded_unfold e H).
+  intros i x. pose (u := H i x); pose (uu := (e i x)). unfold ev_guarded_unfold. fold uu in u |- *.  fold u.
+  induction u; cbn; auto.
+  apply apply_guardedL; auto.
+  Defined.
+
+  Definition iter_ev_guarded {R X} (e : eqn R X X) (H : eqn_ev_guarded e) : X ⇒ᵢ itree E R :=
+    iter_guarded _ (ev_guarded_unfold_guarded e H) .
+
+  Lemma iter_guarded_unfold {X Y RY} {_ : Reflexiveᵢ RY} (f : X ⇒ᵢ itree E (X +ᵢ Y)) (H : eqn_guarded f) {i x}
+    : it_eq RY
+        (iter_guarded f H i x)
+        (bind (f i x) (fun _ r => match r with
+                                | inl x => iter_guarded f H _ x
+                                | inr y => Ret' y end)).
+    unfold iter_guarded; remember (f i x) as t; clear Heqt; clear x.
+    revert i t; unfold it_eq; coinduction R CIH; intros i t.
+    cbn; pose (ot := _observe t); fold ot; destruct ot as [ [] | | ]; cbn; auto.
+    pose (Hix := H i x); pose (fix_ := f i x); fold Hix; fold fix_ in Hix |- *.
+    destruct (Hix); auto.
+  Qed.
+
+  Lemma iter_guarded_lem {X Y RY} {_ : Equivalenceᵢ RY} (f : X ⇒ᵢ itree E (X +ᵢ Y)) (g : X ⇒ᵢ itree E Y)
+                 (H0 : eqn_guarded f)
+                 (H : forall i x, it_eq RY (g i x) (bind (f i x) (fun _ r => match r with
+                                                  | inl x => g _ x
+                                                  | inr y => Ret' y end)))
+                 : forall i x, it_eq RY (g i x) (iter_guarded f H0 i x).
+    unfold it_eq; coinduction R CIH; intros i x.
+    etransitivity; [ | symmetry; apply it_eq_t_bt, (iter_guarded_unfold f H0) ].
+    rewrite (H i x); cbn.
+    pose (a := (f i x).(_observe)); fold a.
+    pose (Ha := H0 i x); unfold guarded in Ha; fold a in Ha.
+    destruct Ha; cbn; econstructor; auto; [ | intro r ].
+    all: change (subst ?f _ ?t) with (bind t f).
+    all: eapply (tt_t (it_eq_map E RY)).
+    all: refine (it_eq_up2bind_t _ _ _ _ _ _ _); econstructor; eauto.
+    all: intros ? ? ? <-; destruct x1; auto.
+  Qed.
+
   Definition iter {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) : X ⇒ᵢ itree E Y :=
     cofix _iter _ x :=
       bind (f _ x) (fun _ r => go (match r with

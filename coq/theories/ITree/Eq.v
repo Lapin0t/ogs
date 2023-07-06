@@ -149,6 +149,21 @@ Concatenation, transitivity.
     - apply (fbt_bt it_eq_up2tra).
    Qed.
 
+  #[global] Instance it_eq_t_bt {RR} : Subrelationᵢ (it_eq RX) (it_eq_bt E RX RR).
+  intros ? ? ? r.
+  apply (gfp_fp (it_eq_map E RX)) in r.
+  cbn in *.
+  dependent induction r; simpl_depind; auto.
+  - econstructor; apply (gfp_t (it_eq_map E RX)); auto.
+  - econstructor; intro r; apply (gfp_t (it_eq_map E RX)); auto.
+    Qed.
+  (*
+  #[global] Instance it_eq_bt_t {RR} : Subrelationᵢ (it_eq_bt E RX RR) (it_eq_t E RX RR).
+  intros ? ? ? r.
+  apply (bt_t (it_eq_map E RX)); auto.
+  Qed.
+  *)
+
 End it_eq_facts.
 
 Section wbisim.
