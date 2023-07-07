@@ -1,6 +1,6 @@
 From OGS Require Import Prelude.
 From OGS.Game Require Import Event.
-From OGS.ITree Require Import ITree.
+From OGS.ITree Require Import ITree Structure.
 
 Definition delay (X : Type) : Type := itree ∅ₑ (fun _ => X) T1_0.
 
@@ -23,7 +23,6 @@ Definition subst_delay {I} {E : event I I} {X Y i} (f : X -> itree E Y i)
        end).  
 *)
 
-From OGS.ITree Require Import Monad.
 
 Definition ret_delay {X} : X -> delay X := fun x => Ret' x .
 

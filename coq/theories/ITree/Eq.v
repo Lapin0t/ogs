@@ -216,24 +216,19 @@ Reversal, symmetry.
     exact H.
   Qed.
 
-  Lemma it_wbisim_up2eq : const (it_eq RX) <= it_wbisim_t E RX.
-    apply leq_t; intros R i x y H1.
-    cbn in H1; apply it_eq_step in H1.
-    cbn in *; dependent destruction H1; simpl_depind; eauto.
-  Qed.
-
-  Lemma it_wbisim_up2eqF : it_eq_map E RX <= it_wbisim_t E RX.
-    apply Coinduction; intros R i x y H.
-    cbn in *; dependent destruction H; simpl_depind; econstructor; eauto; econstructor.
-    - apply (b_T (it_wbisim_map E RX)), t_rel.
-    - intro r; apply (b_T (it_wbisim_map E RX)), k_rel.
-  Qed.
-
   Lemma it_eq_wbisim : it_eq (E:=E) RX <= it_wbisim (E:=E) RX.
     unfold it_wbisim, leq; cbn. unfold Basics.impl.
     coinduction R CIH; intros i x y H.
     apply it_eq_step in H; cbn in *.
     dependent destruction H; simpl_depind; eauto.
+  Qed.
+
+  Lemma wbisim_unstep_l {R} {i x y} : it_wbisimF E RX R i x (observe y) -> it_wbisimF E RX R i x (TauF y).
+    intros []. exact (WBisim r1 (EatStep r2) rr).
+  Qed.
+
+  Lemma wbisim_unstep_r {R} {i x y} : it_wbisimF E RX R i (observe x) y -> it_wbisimF E RX R i (TauF x) y.
+    intros []. exact (WBisim (EatStep r1) r2 rr).
   Qed.
 
   Equations wbisim_step_l {i x y} : it_wbisim' E RX i x (TauF y) -> it_wbisim' E RX i x (observe y) :=
@@ -365,6 +360,37 @@ Concatenation, transitivity.
     exact H1.
     apply it_wbisim_unstep.
     econstructor; [ exact (EatStep EatRefl) | exact EatRefl | destruct (observe y); eauto ].
+  Qed.
+
+  Variant eq_clo (R : relᵢ (itree E X) (itree E X)) i (x y : itree E X i) : Prop :=
+    | EqClo {a b} : it_eq RX x a -> R i a b -> it_eq RX b y -> eq_clo R i x y
+  .  
+  #[global] Arguments EqClo {R i x y a b}.
+
+  Definition eq_clo_map : mon (relᵢ (itree E X) (itree E X)) :=
+    {| body R := eq_clo R ;
+       Hbody _ _ H _ _ _ '(EqClo p q r) := EqClo p (H _ _ _ q) r |}.
+
+  Lemma it_wbisim_up2eq {_ : Transitiveᵢ RX} : eq_clo_map <= it_wbisim_t E RX.
+    apply Coinduction; intros R i a b [ c d u [] w ].
+    apply it_eq_step in u, w; cbn in *.
+    remember (observe a) as oa; clear a Heqoa.
+    remember (observe b) as ob; clear b Heqob.
+    remember (observe c) as oc; clear c Heqoc.
+    remember (observe d) as od; clear d Heqod.
+    revert oa ob od x2 u r2 rr w; induction r1; intros oa ob od x2 u r2 rr w.
+    - revert oa ob u rr w; induction r2; intros oa ob u rr w.
+      * destruct rr; dependent elimination u; dependent elimination w;
+          refine (WBisim EatRefl EatRefl _); econstructor.
+        + transitivity r4; auto; transitivity r1; auto.
+        + apply (f_Tf (it_wbisim_map E RX)); exact (EqClo t_rel0 t_rel t_rel1).
+        + intro r; apply (f_Tf (it_wbisim_map E RX)); exact (EqClo (k_rel0 r) (k_rel r) (k_rel1 r)).
+      * dependent elimination w.
+        apply it_eq_step in t_rel.
+        apply wbisim_unstep_l, IHr2; auto.
+    - dependent elimination u.
+      apply it_eq_step in t_rel.
+      apply wbisim_unstep_r, (IHr1 (observe t3) ob od x2); auto.
   Qed.
 
 End wbisim_facts_hom.

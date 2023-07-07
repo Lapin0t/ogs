@@ -1,7 +1,7 @@
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel Ctx.
 From OGS.Game Require Import Event.
-From OGS.ITree Require Import ITree Monad Delay.
+From OGS.ITree Require Import ITree Eq Delay Structure Properties.
 Set Equations Transparent.
 
 Inductive ty0 : Type :=
@@ -826,24 +826,16 @@ Lemma refold_id {Γ : neg_ctx} (a : ty0) (v : val0 Γ a)
   - reflexivity.
 Qed.
 
-(*
-Definition one_step {Γ : neg_ctx} {a}
-  (v : val Γ a)
-  (p : pat (t_neg a))
-  (s : pat_dom p =[val]> Γ)
-  : delay (nf Γ).
-  destruct (eval_aux (Cut' (t_of_v _ v) (t_of_v _ (v_subst s _ (v_of_p p))))).
-  - exact (tau_delay (play s0)). 
-  - exact (ret_delay n).
-Defined.
-*)
-
-Definition eat_one_tau {I} {E : event I I} {X i} (t : itree E X i) : itree E X i :=
-  go (match t.(_observe) with
-      | RetF x => RetF x
-      | TauF t => t.(_observe)
-      | VisF q k => VisF q k
-      end) .
+Lemma emb_play_var {Γ : neg_ctx} {a} (p : pat (t_neg a)) (i : Γ ∋ a) : play (Γ:=_+▶ₛ_) (Cut' (t_of_v _ (Var _ (r_concat_l _ i))) (t_of_v _ (v_rename r_concat_r _ (v_of_p p))))
+         ≊ ret_delay ((a ,' (r_concat_l _ i , p)) ,' Var ⊛ᵣ r_concat_r).
+  destruct a; cbn in *.
+  - dependent elimination p.
+    + apply (gfp_fp (it_eq_map _ _)).
+      cbn; econstructor; cbn.
+      rewrite v0_ren_ren.
+      eassert (H : r_shift (r_cover_r cover_cat) ⊛ᵣ s_pop ≡ₐ _).
+      intros ? j. cbn.
+      by reflexivity.
 
 (* the final version we would like to have in the hypothesis, in terms of [emb] *)
 Definition then_play1 {Γ Δ : neg_ctx} (e : Γ =[val]> Δ) (n : nf Γ) : delay (nf Δ)
@@ -878,12 +870,15 @@ Qed.
 
 (* we can prove the hypothesis:
     eval (c / e) == eval c >>= λ n => eval (⌊ n ⌋ / e)
-
-  (here with the simple substitutions)
 *)
-Definition clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
-   : play (s_subst e c) ≊ bind_delay' (play c) (then_play2 e) .
-  unfold bind_delay', iter_delay, it_eq, bind.
+From Coinduction Require Import coinduction lattice rel tactics.
+Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
+   : play (s_subst e c) ≊ bind_delay' (play c) (then_play1 e) .
+  transitivity (bind_delay' (play c) (then_play2 e)); cycle 1.
+  apply (proj1 (t_gfp (it_eq_map ∅ₑ (eqᵢ _)) _ _ _)).
+  eapply (it_eq_up2bind_t (eqᵢ _)); econstructor; auto.
+  intros [] ? ? <-; symmetry; exact (then_play_eq e x1).
+  unfold iter_delay, it_eq, bind.
   revert Γ c e; coinduction R CIH; intros Γ c e.
   dependent elimination c.
   dependent elimination t0.

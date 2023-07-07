@@ -3,7 +3,7 @@ From Coinduction Require Import coinduction tactics.
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
-From OGS.ITree Require Import ITree Monad Eq Delay.
+From OGS.ITree Require Import ITree Eq Delay Structure Properties.
 
 Set Equations Transparent.
 
@@ -96,6 +96,25 @@ Renaming in environments
   Definition e_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
     := fun u v => (v_var ⊛ᵣ u) ⊛ v.
   Infix "ᵣ⊛" := e_ren (at level 14).
+
+  Require Import Coq.Logic.Decidable.
+
+  Variant is_var {Γ x} : val Γ x -> Type :=
+    | IsVar (i : Γ ∋ x) : is_var (v_var x i)
+  .  
+  
+  Hypothesis check_var : forall Γ x (v : val Γ x), is_var v + (is_var v -> False).
+
+
+  Hypothesis eval_emb_tau : forall Γ Δ (m : msg' Γ) (e : Γ ⇒ᵥ Δ),
+       eval ([ r_concat_l ᵣ⊛ e , v_var ⊛ᵣ r_concat_r ] ⊛ₜ emb m)
+     ≊ go match check_var Δ (projT1 m) (e (projT1 m) (fst (projT2 m))) with
+          | inl a =>
+              let '(IsVar i) := a in
+              RetF ((_ ,' (r_concat_l _ i , snd (projT2 m))) ,' v_var ⊛ᵣ r_concat_r )
+          | inr _ =>
+              TauF (eat_one_tau (eval ([r_concat_l ᵣ⊛ e, v_var ⊛ᵣ r_concat_r] ⊛ₜ emb m)))
+          end.
 
 (*|
 Renaming in configurations
@@ -268,11 +287,12 @@ Evaluate a configuration inside an environment (assignment), returning only the 
         | CRightV h => Ret' (inr ((_ ,' (h , snd (projT2 (projT1 u))))
                             ,' (snd x ▶ₑ⁻ projT2 u)))
         end .
+  Print r_concat3_1.
 
   Definition m_strat_resp {Δ Φ} (x : m_strat_pas Δ Φ)
     : h_pasv ogs_hg (m_strat_act Δ) Φ
     := fun m =>
-         ([ (r_concat3_1 ᵣ⊛ concat0 x) , (r_concat_r ⊛ᵣ r_concat_r) ᵣ⊛ v_var ] ⊛ₜ emb m ,
+         ([ (r_concat3_1 ᵣ⊛ concat0 x) , v_var ⊛ᵣ (r_concat_r ⊛ᵣ r_concat_r) ] ⊛ₜ emb m ,
           x ▶ₑ⁺).
 
   Definition m_strat {Δ} : m_strat_act Δ ⇒ᵢ ogs_act Δ :=
@@ -419,6 +439,31 @@ Evaluate a configuration inside an environment (assignment), returning only the 
               | inl r => RetF (inr r)
               | inr e => RetF (inl (_ ,' (m_strat_resp (snd (projT2 x)) (projT1 e) , (projT2 e))))
               end).
+
+  Definition compo_body_guarded {Δ} : eqn_ev_guarded (@compo_body Δ).
+  intros [] [ Γ [ u v ] ].
+  induction Γ.
+  - unfold ev_guarded; cbn -[cat_split].
+    pose (ev := _observe (eval (fst u))); change (_observe (eval (fst u))) with ev.
+    destruct ev; try now repeat econstructor.
+    destruct r as [ [ ? [ i m ] ] γ].
+    cbn [fst snd projT1 projT2].
+    unfold cat_split. cbn [cover_cat].
+    pose (s := cover_split cover_nil_r i).
+    change (cover_split cover_nil_r i) with s.
+    destruct s ; [ | inversion j ].
+    repeat econstructor.
+  - unfold ev_guarded; cbn -[cat_split].
+    pose (ev := _observe (eval (fst u))); change (_observe (eval (fst u))) with ev.
+    destruct ev; try now repeat econstructor.
+    destruct r as [ [ ? [ i m ] ] γ].
+    unfold dom' in γ; cbn [fst snd projT1 projT2] in *.
+    pose (s := cat_split i); change (cat_split i) with s.
+    destruct s; cbn; [ repeat econstructor | ].
+    apply (GNext compo_body).
+    cbn -[cat_split].
+    remember (eval_emb_tau _ _ (x0 ,' (j , m)) (concat0 v)) as H; clear HeqH.
+    assert (([r_concat_l ᵣ⊛ concat0 v, v_var ⊛ᵣ r_concat_r]) ≡ₐ ([r_concat3_1 ᵣ⊛ concat0 v, v_var ⊛ᵣ (r_concat_r ⊛ᵣ r_concat_r)])).
 
   Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
     := iter compo_body T1_0 (a ,' (u , v)).
