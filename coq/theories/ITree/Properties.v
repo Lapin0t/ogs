@@ -5,7 +5,7 @@ From OGS.Utils Require Import Rel.
 From OGS.Game Require Import Event.
 From OGS.ITree Require Import ITree Structure Eq.
 
-Module stuff.
+Section stuff.
   Context {I} {E : event I I}.
   
   #[global] Instance fmap_eq {X RX Y RY} {f : X ⇒ᵢ Y} {_ : forall i, Proper (@RX i ==> @RY i) (f i)} {i}
@@ -81,7 +81,7 @@ Module stuff.
         (v : forall i x1 x2, RX i x1 x2 -> S i (k1 i x1) (k2 i x2))
       : bindR RX R S i (t1 >>= k1) (t2 >>= k2).
   Arguments BindR {X1 X2 Y1 Y2 RX R S i t1 t2 k1 k2}.    
-  #[global] Hint Constructors bindR : core.
+  Hint Constructors bindR : core.
 
   Program Definition bindR_eq_map {X1 X2 Y1 Y2} (RX : relᵢ X1 X2) : mon (relᵢ (itree E Y1) (itree E Y2)) :=
     {| body S := bindR RX (@it_eq _ E _ _ RX) S ;

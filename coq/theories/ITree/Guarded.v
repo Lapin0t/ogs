@@ -3,9 +3,10 @@ From Coinduction Require Import coinduction tactics.
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Rel.
 From OGS.Game Require Import Event.
-From OGS.ITree Require Import ITree Structure Eq.
+From OGS.ITree Require Import ITree Structure Eq Properties.
+From OGS.ITree Require Import Properties.
 
-Module stuff.
+Section stuff.
   Context {I} {E : event I I}.
 
   Definition eqn R X Y : Type := X ⇒ᵢ itree E (Y +ᵢ R) .
@@ -64,7 +65,6 @@ Module stuff.
     destruct (Hix); auto.
   Qed.
 
-  (*
   Lemma iter_guarded_lem {X Y RY} {_ : Equivalenceᵢ RY} (f : eqn Y X X) (g : X ⇒ᵢ itree E Y)
                  (H0 : eqn_guarded f)
                  (H : forall i x, it_eq RY (g i x) (bind (f i x) (fun _ r => match r with
@@ -82,7 +82,6 @@ Module stuff.
     all: refine (it_eq_up2bind_t _ _ _ _ _ _ _); econstructor; eauto.
     all: intros ? ? ? <-; destruct x1; auto.
   Qed.
-*)
 
   (* eventually guarded equations *)
 
