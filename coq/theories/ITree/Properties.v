@@ -209,7 +209,7 @@ Section stuff.
     destruct r; eauto.
   Qed.
   
-  Lemma iter_lem {X Y RY} {_ : Equivalenceᵢ RY} (f : X ⇒ᵢ itree E (X +ᵢ Y)) (g : X ⇒ᵢ itree E Y)
+  Lemma iter_uniq {X Y RY} {_ : Equivalenceᵢ RY} (f : X ⇒ᵢ itree E (X +ᵢ Y)) (g : X ⇒ᵢ itree E Y)
                  (H : forall i x, it_eq RY (g i x) (bind (f i x) (fun _ r => go (match r with
                                                   | inl x => TauF (g _ x)
                                                   | inr y => RetF y end))))

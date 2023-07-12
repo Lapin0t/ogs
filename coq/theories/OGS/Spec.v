@@ -3,7 +3,7 @@ From Coinduction Require Import coinduction tactics.
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
-From OGS.ITree Require Import ITree Eq Delay Structure Properties.
+From OGS.ITree Require Import ITree Eq Delay Structure Properties Guarded.
 
 Set Equations Transparent.
 
@@ -106,6 +106,10 @@ Renaming in environments
   Hypothesis check_var : forall Γ x (v : val Γ x), is_var v + (is_var v -> False).
 
 
+  (* m = (i , p)
+     case e i
+       
+   *)
   Hypothesis eval_emb_tau : forall Γ Δ (m : msg' Γ) (e : Γ ⇒ᵥ Δ),
        eval ([ r_concat_l ᵣ⊛ e , v_var ⊛ᵣ r_concat_r ] ⊛ₜ emb m)
      ≊ go match check_var Δ (projT1 m) (e (projT1 m) (fst (projT2 m))) with
@@ -460,10 +464,7 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     unfold dom' in γ; cbn [fst snd projT1 projT2] in *.
     pose (s := cat_split i); change (cat_split i) with s.
     destruct s; cbn; [ repeat econstructor | ].
-    apply (GNext compo_body).
-    cbn -[cat_split].
-    remember (eval_emb_tau _ _ (x0 ,' (j , m)) (concat0 v)) as H; clear HeqH.
-    assert (([r_concat_l ᵣ⊛ concat0 v, v_var ⊛ᵣ r_concat_r]) ≡ₐ ([r_concat3_1 ᵣ⊛ concat0 v, v_var ⊛ᵣ (r_concat_r ⊛ᵣ r_concat_r)])).
+  Admitted.
 
   Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
     := iter compo_body T1_0 (a ,' (u , v)).
@@ -571,7 +572,7 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Lemma quatre_trois {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a)
     : reduce _ (_ ,' (c , e)) ≊ (c ∥ e) .
-    refine (iter_lem compo_body reduce _ _ (_ ,' (c , e))).
+    refine (iter_uniq compo_body reduce _ _ (_ ,' (c , e))).
     clear a c e; intros [] [ ? [ u v ] ].
     etransitivity; cycle 1.
     symmetry; apply quatre_trois_pre.
@@ -611,8 +612,8 @@ Evaluate a configuration inside an environment (assignment), returning only the 
           rewrite <- s_ren_comp, s_eq_cat_r.
           cbn; now rewrite s_ren_comp, s_eq_cat_r, s_eq_cat_l.
       * rewrite <- e_comp_ren_r.
-          rewrite s_eq_cat_r, <- e_comp_ren_l, v_sub_var.
-          cbn; now rewrite s_ren_comp, 2 s_eq_cat_r .
+        rewrite s_eq_cat_r, e_comp_ren_r, v_sub_var.
+        now rewrite s_ren_comp, 2 s_eq_cat_r .
    Qed.
 
   Lemma quatre_trois_app {Γ Δ}

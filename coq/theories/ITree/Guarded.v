@@ -122,7 +122,7 @@ Section stuff.
     destruct p; econstructor; [ now apply H0 | | intro r ]; apply iter_guarded_aux_unfold.
   Qed.
 
-  Lemma iter_guarded_lem {X Y RY} {_ : Equivalenceᵢ RY} (f : eqn Y X X) (g : X ⇒ᵢ itree E Y)
+  Lemma iter_guarded_uniq {X Y RY} {_ : Equivalenceᵢ RY} (f : eqn Y X X) (g : X ⇒ᵢ itree E Y)
                  (H0 : eqn_guarded f)
                  (H : forall i x, it_eq RY (g i x) (bind (f i x) (fun _ r => match r with
                                                   | inl x => g _ x
@@ -219,11 +219,9 @@ Section stuff.
     (H : it_eq' (eqᵢ _) s t) (g : ev_guarded' e s) : it_eq' (eqᵢ _) (evg_unroll' e s g) (evg_unroll' e t (ev_guarded_cong' e H g)).
     revert t H; induction g; intros u H.
     - destruct H.
-      * destruct r1; [ dependent elimination g | ].
-        destruct r2; [ inversion r_rel | ].
-        econstructor; auto.
-      * econstructor; auto.
-      * econstructor; auto.
+      destruct r1; [ dependent elimination g | ].
+      destruct r2; [ inversion r_rel | ].
+      all: now econstructor.
     - destruct u as [ [] | | ]; dependent elimination H.
       * apply IHg.
       * inversion r_rel.
@@ -242,7 +240,7 @@ Section stuff.
   Definition iter_ev_guarded {R X} (e : eqn R X X) (H : eqn_ev_guarded e) : X ⇒ᵢ itree E R :=
     fun _ x => iter_guarded _ (eqn_evg_unroll_guarded e H) _ x .
 
-  Lemma iter_evg_lem1 {X Y RY} {_ : Equivalenceᵢ RY} (f : eqn Y X X) (H : eqn_ev_guarded f) {i x1 x2}
+  Lemma iter_evg_unfold_lem {X Y RY} {_ : Equivalenceᵢ RY} (f : eqn Y X X) (H : eqn_ev_guarded f) {i x1 x2}
     (p : (f i x1).(_observe) = RetF (inl x2))
     : it_eq RY
         (iter_ev_guarded f H i x1)
@@ -272,32 +270,19 @@ Section stuff.
                             | inl x => iter_ev_guarded f H _ x
                             | inr y => Ret' y
                             end).
-  apply it_eq_unstep.
-  cbn -[iter_ev_guarded].
-  remember (H i x) as g; clear Heqg; unfold ev_guarded in g.
-  remember (_observe (f i x)).
-  destruct i0 as [ [] | | ].
-  - apply (it_eq_step _ (iter_ev_guarded f H i x) (iter_ev_guarded f H i x0)), iter_evg_lem1; auto.
-  - clear g; cbn.
-    unfold eqn_evg_unroll_guarded at 3, evg_unroll_guarded.
-    remember (H i x) as g'; clear Heqg'; unfold ev_guarded in g'.
-    revert g'; rewrite <- Heqi0; intro g'.
-    dependent elimination g'; econstructor; auto.
-  - clear g; cbn.
-    unfold eqn_evg_unroll_guarded at 3, evg_unroll_guarded.
-    remember (H i x) as g'; clear Heqg'; unfold ev_guarded in g'.
-    revert g'; rewrite <- Heqi0; intro g'.
-    dependent elimination g'; econstructor; auto.
-    exact (iter_guarded_aux_unfold _ _ _).
-  - clear g; cbn.
-    unfold eqn_evg_unroll_guarded at 3, evg_unroll_guarded.
-    remember (H i x) as g'; clear Heqg'; unfold ev_guarded in g'.
-    revert g'; rewrite <- Heqi0; intro g'.
-    dependent elimination g'; econstructor; auto.
-    intro r; exact (iter_guarded_aux_unfold _ _ _).
+    apply it_eq_unstep; cbn -[iter_ev_guarded].
+    remember (H i x) as g; clear Heqg; unfold ev_guarded in g.
+    remember (_observe (f i x)).
+    destruct i0 as [ [] | | ].
+      apply (it_eq_step _ (iter_ev_guarded f H i x) (iter_ev_guarded f H i x0)), iter_evg_unfold_lem; auto.
+    all: clear g; cbn; unfold eqn_evg_unroll_guarded at 3, evg_unroll_guarded.
+    all: remember (H i x) as g'; clear Heqg'; unfold ev_guarded in g'.
+    all: revert g'; rewrite <- Heqi0; intros g'.
+    all: dependent elimination g'; econstructor; auto; intros.
+    all: apply iter_guarded_aux_unfold.
   Qed.
 
-  Lemma iter_evg_lem {X Y RY} {_ : Equivalenceᵢ RY} (f : eqn Y X X) (g : X ⇒ᵢ itree E Y)
+  Lemma iter_evg_uniq {X Y RY} {_ : Equivalenceᵢ RY} (f : eqn Y X X) (g : X ⇒ᵢ itree E Y)
                  (H0 : eqn_ev_guarded f)
                  (H : forall i x, it_eq RY (g i x) (bind (f i x) (fun _ r => match r with
                                                   | inl x => g _ x
