@@ -148,6 +148,27 @@ Section stuff.
   Definition guarded_cong {X Y} {i} (s t : itree E (X +ᵢ Y) i) (H : s ≊ t) (g : guarded s) : guarded t
     := guarded_cong' s.(_observe) t.(_observe) (it_eq_step _ _ _ H) g .
 
+  Lemma iter_guarded_iter {X Y} (f : eqn Y X X) (H : eqn_guarded f) {i x}
+    : iter_guarded f H i x ≈ iter f i x .
+    revert i x; unfold it_wbisim; coinduction R CIH; intros i x.
+    eapply (@fbt_bt _ _ (it_wbisim_map E (eqᵢ Y)) _ it_wbisim_up2eq).
+    econstructor.
+    apply iter_guarded_unfold.
+    symmetry; apply iter_unfold.
+    remember (H _ x) as g; clear Heqg.
+    remember (f i x) as t; clear Heqt.
+    unfold guarded in g.
+    remember (_observe t) as ot.
+    destruct g; cbn ; rewrite <- Heqot; cbn.
+    econstructor; auto.
+    all: econstructor; auto; econstructor; intros.
+    all: eapply (tt_t (it_wbisim_map E (eqᵢ Y))).
+    all: refine (it_wbisim_up2bind_t _ _ _ _ _ _ _); econstructor; auto.
+    all: intros ? ? x2 ->; destruct x2; auto.
+    all: eapply (tt_t (it_wbisim_map E (eqᵢ Y))).
+    all: cbn; apply it_wbisim_up2eat; econstructor; [ exact EatRefl | exact (EatStep EatRefl) | apply CIH ].
+  Qed.
+
   Unset Elimination Schemes.
   Inductive ev_guarded' {X Y} (e : eqn Y X X) {i} : itree' E (X +ᵢ Y) i -> Prop :=
   | GHead t : guarded' t -> ev_guarded' e t
@@ -303,4 +324,39 @@ Section stuff.
       rewrite iter_evg_unfold, (H i x0).
       apply IHHa; auto.
   Qed.
+
+  Lemma iter_evg_iter {X Y} (f : eqn Y X X) (H : eqn_ev_guarded f) {i x}
+    : iter_ev_guarded f H i x ≈ iter f i x .
+    revert i x; unfold it_wbisim; coinduction R CIH; intros i x.
+    eapply (@fbt_bt _ _ (it_wbisim_map E (eqᵢ Y)) _ it_wbisim_up2eq).
+    econstructor.
+    apply iter_evg_unfold.
+    symmetry; apply iter_unfold.
+    remember (H _ x) as g; clear Heqg.
+    remember (f i x) as t; clear Heqt.
+    unfold ev_guarded in g.
+    remember (_observe t) as ot.
+    revert t Heqot; induction g; intros u Heqot.
+    - destruct g; cbn ; rewrite <- Heqot; cbn.
+      econstructor; auto.
+      all: econstructor; auto; econstructor; intros.
+      all: eapply (tt_t (it_wbisim_map E (eqᵢ Y))).
+      all: refine (it_wbisim_up2bind_t _ _ _ _ _ _ _); econstructor; auto.
+      all: intros ? ? x2 ->; destruct x2; auto.
+      all: eapply (tt_t (it_wbisim_map E (eqᵢ Y))).
+      all: cbn; apply it_wbisim_up2eat; econstructor; [ exact EatRefl | exact (EatStep EatRefl) | apply CIH ].
+    - cbn; rewrite <- Heqot.
+      change (it_wbisimF E (eqᵢ Y) _ _ (_observe ?a) (TauF ?b)) with
+        (it_wbisim_bt E (eqᵢ Y) R _ a (Tau' b)). 
+      eapply (@fbt_bt _ _ (it_wbisim_map E _)).
+      refine (it_wbisim_up2eat).
+      econstructor; [ exact EatRefl | exact (EatStep EatRefl) | ].
+      eapply (@fbt_bt _ _ (it_wbisim_map E _)).
+      apply (it_wbisim_up2eq).
+      econstructor.
+      apply iter_evg_unfold.
+      symmetry; apply iter_unfold.
+      now apply IHg.
+    Qed.
+
 End stuff.

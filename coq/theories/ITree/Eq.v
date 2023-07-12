@@ -203,6 +203,13 @@ Definition it_wbisim_unstep {I E X1 X2 RX}
   : @it_wbisim_map I E X1 X2 RX (it_wbisim RX) <= it_wbisim RX
   := fun i x y => proj2 (gfp_fp (it_wbisim_map E RX) i x y) .
 
+Lemma it_wbisim_up2eqF_t {I E X1 X2 RX} : @it_eq_map I E X1 X2 RX <= it_wbisim_t E RX.
+  apply Coinduction; intros R i x y H.
+  cbn in *; dependent destruction H; simpl_depind; econstructor; eauto; econstructor.
+  - apply (b_T (it_wbisim_map E RX)), t_rel.
+  - intro r; apply (b_T (it_wbisim_map E RX)), k_rel.
+Qed.
+
 
 Section wbisim_facts_het.
   Context {I : Type} {E : event I I} {X1 X2 : psh I} {RX : relᵢ X1 X2}.
@@ -315,6 +322,9 @@ Section wbisim_facts_hom.
   #[global] Instance it_wbisim_t_sym {_ : Symmetricᵢ RX} {RR} : Symmetricᵢ (it_wbisim_t E RX RR).
   Proof. apply build_symmetric, (ft_t it_wbisim_up2sym RR). Qed.
 
+  #[global] Instance it_wbisim_bt_sym {_ : Symmetricᵢ RX} {RR} : Symmetricᵢ (it_wbisim_bt E RX RR).
+  Proof. apply build_symmetric, (fbt_bt it_wbisim_up2sym RR). Qed.
+
 (*|
 Concatenation, transitivity.
 |*)
@@ -365,34 +375,53 @@ Concatenation, transitivity.
   Qed.
 
   Variant eq_clo (R : relᵢ (itree E X) (itree E X)) i (x y : itree E X i) : Prop :=
-    | EqClo {a b} : it_eq RX x a -> R i a b -> it_eq RX b y -> eq_clo R i x y
+    | EqClo {a b} : it_eq RX x a -> it_eq RX b y -> R i a b -> eq_clo R i x y
   .  
   #[global] Arguments EqClo {R i x y a b}.
 
   Definition eq_clo_map : mon (relᵢ (itree E X) (itree E X)) :=
     {| body R := eq_clo R ;
-       Hbody _ _ H _ _ _ '(EqClo p q r) := EqClo p (H _ _ _ q) r |}.
+       Hbody _ _ H _ _ _ '(EqClo p q r) := EqClo p q (H _ _ _ r) |}.
 
   Lemma it_wbisim_up2eq {_ : Transitiveᵢ RX} : eq_clo_map <= it_wbisim_t E RX.
-    apply Coinduction; intros R i a b [ c d u [] w ].
-    apply it_eq_step in u, w; cbn in *.
+    apply Coinduction; intros R i a b [ c d u v [] ].
+    apply it_eq_step in u, v; cbn in *.
     remember (observe a) as oa; clear a Heqoa.
     remember (observe b) as ob; clear b Heqob.
     remember (observe c) as oc; clear c Heqoc.
     remember (observe d) as od; clear d Heqod.
-    revert oa ob od x2 u r2 rr w; induction r1; intros oa ob od x2 u r2 rr w.
-    - revert oa ob u rr w; induction r2; intros oa ob u rr w.
-      * destruct rr; dependent elimination u; dependent elimination w;
+    revert oa ob od x2 u r2 v rr; induction r1; intros oa ob od x2 u r2 v rr.
+    - revert oa ob u v rr; induction r2; intros oa ob u v rr.
+      * destruct rr; dependent elimination u; dependent elimination v;
           refine (WBisim EatRefl EatRefl _); econstructor.
         + transitivity r4; auto; transitivity r1; auto.
-        + apply (f_Tf (it_wbisim_map E RX)); exact (EqClo t_rel0 t_rel t_rel1).
-        + intro r; apply (f_Tf (it_wbisim_map E RX)); exact (EqClo (k_rel0 r) (k_rel r) (k_rel1 r)).
-      * dependent elimination w.
+        + apply (f_Tf (it_wbisim_map E RX)); exact (EqClo t_rel0 t_rel1 t_rel).
+        + intro r; apply (f_Tf (it_wbisim_map E RX)); exact (EqClo (k_rel0 r) (k_rel1 r) (k_rel r)).
+      * dependent elimination v.
         apply it_eq_step in t_rel.
         apply wbisim_unstep_l, IHr2; auto.
     - dependent elimination u.
       apply it_eq_step in t_rel.
       apply wbisim_unstep_r, (IHr1 (observe t3) ob od x2); auto.
+  Qed.
+
+  Variant eat_clo (R : relᵢ (itree E X) (itree E X)) i (x y : itree E X i) : Prop :=
+    | EatClo {a b} : it_eat' i x a -> it_eat' i y b -> R i a b -> eat_clo R i x y
+  .  
+  #[global] Arguments EatClo {R i x y a b}.
+
+  Definition eat_clo_map : mon (relᵢ (itree E X) (itree E X)) :=
+    {| body R := eat_clo R ;
+       Hbody _ _ H _ _ _ '(EatClo p q r) := EatClo p q (H _ _ _ r) |}.
+
+  Lemma it_wbisim_up2eat {_ : Transitiveᵢ RX} : eat_clo_map <= it_wbisim_t E RX.
+    apply leq_t; intros R i a b [ c d u v [] ].
+    unfold it_eat' in u,v; cbn in *; unfold observe in *.
+    econstructor.
+    * etransitivity; [ exact u | exact r1 ].
+    * etransitivity; [ exact v | exact r2 ].
+    * revert rr; apply it_eqF_mon.
+      intros; econstructor; try econstructor; auto.
   Qed.
 
 End wbisim_facts_hom.
