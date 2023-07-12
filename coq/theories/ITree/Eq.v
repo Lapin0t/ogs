@@ -77,6 +77,8 @@ Definition it_eq {I E X1 X2} RX [i] := gfp (@it_eq_map I E X1 X2 RX) i.
 #[global] Notation it_eq_T E RX := (T (it_eq_map E RX)).
 #[global] Notation "a ≊ b" := (it_eq (eqᵢ _) a b) (at level 20).
 
+Definition it_eq' {I E X1 X2} RX [i] := @it_eqF I E X1 X2 RX (itree E X1) (itree E X2) (it_eq RX) i.
+
 Definition it_eq_step {I E X1 X2 RX} : it_eq RX <= @it_eq_map I E X1 X2 RX (it_eq RX)
   := fun i x y => proj1 (gfp_fp (it_eq_map E RX) i x y) .
 
