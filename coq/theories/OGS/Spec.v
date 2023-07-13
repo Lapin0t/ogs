@@ -97,28 +97,28 @@ Renaming in environments
     := fun u v => (v_var ⊛ᵣ u) ⊛ v.
   Infix "ᵣ⊛" := e_ren (at level 14).
 
-  Require Import Coq.Logic.Decidable.
+  (* Require Import Coq.Logic.Decidable. *)
 
-  Variant is_var {Γ x} : val Γ x -> Type :=
-    | IsVar (i : Γ ∋ x) : is_var (v_var x i)
-  .  
-  
-  Hypothesis check_var : forall Γ x (v : val Γ x), is_var v + (is_var v -> False).
+  (* Variant is_var {Γ x} : val Γ x -> Type := *)
+  (*   | IsVar (i : Γ ∋ x) : is_var (v_var x i) *)
+  (* . *)
+
+  (* Hypothesis check_var : forall Γ x (v : val Γ x), is_var v + (is_var v -> False). *)
 
 
-  (* m = (i , p)
-     case e i
-       
-   *)
-  Hypothesis eval_emb_tau : forall Γ Δ (m : msg' Γ) (e : Γ ⇒ᵥ Δ),
-       eval ([ r_concat_l ᵣ⊛ e , v_var ⊛ᵣ r_concat_r ] ⊛ₜ emb m)
-     ≊ go match check_var Δ (projT1 m) (e (projT1 m) (fst (projT2 m))) with
-          | inl a =>
-              let '(IsVar i) := a in
-              RetF ((_ ,' (r_concat_l _ i , snd (projT2 m))) ,' v_var ⊛ᵣ r_concat_r )
-          | inr _ =>
-              TauF (eat_one_tau (eval ([r_concat_l ᵣ⊛ e, v_var ⊛ᵣ r_concat_r] ⊛ₜ emb m)))
-          end.
+  (* (* m = (i , p) *)
+  (*    case e i *)
+
+  (*  *) *)
+  (* Hypothesis eval_emb_tau : forall Γ Δ (m : msg' Γ) (e : Γ ⇒ᵥ Δ), *)
+  (*      eval ([ r_concat_l ᵣ⊛ e , v_var ⊛ᵣ r_concat_r ] ⊛ₜ emb m) *)
+  (*    ≊ go match check_var Δ (projT1 m) (e (projT1 m) (fst (projT2 m))) with *)
+  (*         | inl a => *)
+  (*             let '(IsVar i) := a in *)
+  (*             RetF ((_ ,' (r_concat_l _ i , snd (projT2 m))) ,' v_var ⊛ᵣ r_concat_r ) *)
+  (*         | inr _ => *)
+  (*             TauF (eat_one_tau (eval ([r_concat_l ᵣ⊛ e, v_var ⊛ᵣ r_concat_r] ⊛ₜ emb m))) *)
+  (*         end. *)
 
 (*|
 Renaming in configurations
@@ -325,7 +325,7 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     cbn -[m_strat_play].
     destruct (_observe (m_strat_play x)) as [ [ | [] ] | | [] ]; eauto.
   Qed.
-      
+
   Definition m_stratp {Δ} : m_strat_pas Δ ⇒ᵢ ogs_pas Δ :=
     fun _ x m => m_strat _ (m_strat_resp x m).
 
@@ -438,7 +438,8 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Equations compo_body {Δ}
     : (fun (_ : T1) => reduce_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => reduce_t Δ + msg' Δ)%type :=
-  compo_body T1_0 x := m_strat_play (fst (projT2 x)) >>= fun _ r =>
+    compo_body T1_0 x :=
+      m_strat_play (fst (projT2 x)) >>= fun _ r =>
           go (match r with
               | inl r => RetF (inr r)
               | inr e => RetF (inl (_ ,' (m_strat_resp (snd (projT2 x)) (projT1 e) , (projT2 e))))
@@ -466,11 +467,13 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     destruct s; cbn; [ repeat econstructor | ].
   Admitted.
 
-  Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
-    := iter compo_body T1_0 (a ,' (u , v)).
+  Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a)
+    : delay (msg' Δ) :=
+    iter_ev_guarded compo_body compo_body_guarded T1_0 (a ,' (u , v)).
   Notation "u ∥ v" := (compo u v) (at level 40).
 
-  Lemma compo_compo0 {Δ} {x : reduce_t Δ} : iter compo0_body T1_0 (reduce_t_inj x) ≊ iter compo_body T1_0 x .
+  Lemma compo_compo0 {Δ} {x : reduce_t Δ} :
+    iter compo0_body T1_0 (reduce_t_inj x) ≊ iter compo_body T1_0 x .
     unshelve eapply (iter_cong_strong).
     - refine (fun _ a b => compo_t_eq_strong _ a (reduce_t_inj b)).
     - intros [] [? [u1 e1]] [? [u2 e2]] [A B].
@@ -522,18 +525,18 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Lemma quatre_trois_pre {Δ} (x : reduce_t Δ)
     :
-        (compo_body T1_0 x >>= fun _ r => go (match r with
-                                     | inl x' => TauF (reduce _ x')
-                                     | inr y => RetF (y : (fun _ => msg' _) _)
-                                     end))
+        (compo_body T1_0 x >>= fun _ r => match r with
+                                     | inl x' => reduce _ x'
+                                     | inr y => Ret' (y : (fun _ => msg' _) _)
+                                     end)
         ≊
       (eval (fst (fst (projT2 x))) >>=
                       fun _ u =>
-                        go (match cat_split (fst (projT2 (projT1 u))) with
-                            | CLeftV h => RetF (_ ,' (h, snd (projT2 (projT1 u))))
-                            | CRightV h => TauF (reduce _ (_ ,'
-                                                    (m_strat_resp (snd (projT2 x)) (_ ,' (h, snd (projT2 (projT1 u)))), EConF (snd (fst (projT2 x))) (projT2 u))))
-                            end)).
+                        match cat_split (fst (projT2 (projT1 u))) with
+                            | CLeftV h => Ret' (_ ,' (h, snd (projT2 (projT1 u))))
+                            | CRightV h => reduce _ (_ ,'
+                                                    (m_strat_resp (snd (projT2 x)) (_ ,' (h, snd (projT2 (projT1 u)))), EConF (snd (fst (projT2 x))) (projT2 u)))
+                            end).
   Proof.
     etransitivity.
     unfold compo_body; apply bind_bind_com.
@@ -545,23 +548,27 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     + destruct r as [[? [i m]] γ]; cbn.
       destruct (cat_split i).
       econstructor; reflexivity.
-      econstructor; reflexivity.
+      cbn.
+      match goal with
+      |- it_eqF _ _ _ _ ?a ?b => assert (a = b) by reflexivity
+      end.
+      admit.
     + econstructor. apply CIH.
     + destruct q.
-  Qed.
+  Admitted.
 
   Definition eval_sub_1 {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
              : delay { m : msg' Δ & dom' m ⇒ᵥ Δ } :=
         eval ([ v_var , e ] ⊛ₜ c) .
 
   Definition eval_sub_2 {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
-             : delay { m : msg' Δ & dom' m ⇒ᵥ Δ }.
+    : delay { m : msg' Δ & dom' m ⇒ᵥ Δ }.
     refine (eval c >>= fun 'T1_0 x =>
-               go (match cat_split (fst (projT2 (projT1 x))) with
-                   | CLeftV h => RetF ((_ ,' (h , snd (projT2 (projT1 x)))) ,'
-                                   [ v_var,  e ] ⊛ (projT2 x))
-                   | CRightV h => TauF _
-                   end)) .
+                match cat_split (fst (projT2 (projT1 x))) with
+                | CLeftV h => Ret'
+                               ((_ ,' (h , snd (projT2 (projT1 x)))) ,' [ v_var,  e ] ⊛ (projT2 x))
+                | CRightV h => _
+                end) .
     refine (eval ([ e , ([v_var , e ] ⊛ projT2 x) ] ⊛ₜ (emb (_ ,' (h , (snd (projT2 (projT1 x)))))))).
   Defined.
 
@@ -572,10 +579,11 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Lemma quatre_trois {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a)
     : reduce _ (_ ,' (c , e)) ≊ (c ∥ e) .
-    refine (iter_uniq compo_body reduce _ _ (_ ,' (c , e))).
+    refine (iter_evg_uniq compo_body reduce _ _ _ (_ ,' (c , e))).
     clear a c e; intros [] [ ? [ u v ] ].
     etransitivity; cycle 1.
-    symmetry; apply quatre_trois_pre.
+    symmetry.
+    apply quatre_trois_pre.
     unfold reduce at 1.
     etransitivity.
     apply fmap_eq, eval_hyp.
@@ -590,7 +598,8 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     cbn [fst snd projT2 projT1].
     destruct (cat_split (fst (projT2 m))).
     - cbn; econstructor. reflexivity.
-    - cbn; econstructor.
+    -
+      (* TODO WIP: fix this, should be true *)
       unfold reduce.
       fold (@fmap _ ∅ₑ _ _ (fun _ : T1 => projT1 (P:=fun m0 : msg' Δ => dom' m0 ⇒ᵥ Δ)) T1_0).
       change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)) bot T1_0 ?a ?b) with (it_eq (eqᵢ _) a b).

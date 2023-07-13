@@ -10,7 +10,7 @@ Section stuff.
   Context {I} {E : event I I}.
 
   Definition eqn R X Y : Type := X ⇒ᵢ itree E (Y +ᵢ R) .
- 
+
   Definition apply_eqn {R X Y} (q : eqn R X Y) : itree E (X +ᵢ R) ⇒ᵢ itree E (Y +ᵢ R) :=
     fun _ t => t >>= fun _ r => match r with
                             | inl x => q _ x
@@ -22,7 +22,7 @@ Section stuff.
   | GTau t : guarded' (TauF t)
   | GVis e k : guarded' (VisF e k)
   .
-  Definition guarded {X Y i} (t : itree E (X +ᵢ Y) i) := guarded' t.(_observe). 
+  Definition guarded {X Y i} (t : itree E (X +ᵢ Y) i) := guarded' t.(_observe).
   Definition eqn_guarded {R X Y} (e : eqn R X Y) : Prop := forall i (x : X i), guarded (e i x) .
 
   Equations apply_guarded_l' {R X Y} (e : eqn R X Y) {i} t : guarded' t -> guarded (apply_eqn e i (go t)) :=
@@ -31,7 +31,7 @@ Section stuff.
     apply_guarded_l' _ _ (GVis e k) := GVis _ _ .
 
   Definition apply_guarded_l {R X Y} (e : eqn R X Y) {i} t (p : guarded t) : guarded (apply_eqn e i t)
-    := apply_guarded_l' e t.(_observe) p. 
+    := apply_guarded_l' e t.(_observe) p.
 
   Equations apply_guarded_r' {R X Y} (e : eqn R X Y) (H : eqn_guarded e) {i} t : guarded (apply_eqn e i (go t)) :=
     apply_guarded_r' e H (RetF (inl x)) := H _ x ;
@@ -65,7 +65,7 @@ Section stuff.
                         end .
   *)
 
-  Equations elim_guarded {R X i x} : @guarded' R X i (RetF (inl x)) -> T0 := | ! .    
+  Equations elim_guarded {R X i x} : @guarded' R X i (RetF (inl x)) -> T0 := | ! .
 
   Definition iter_guarded_aux {R X} (e : eqn R X X) (H : eqn_guarded e) : itree E (X +ᵢ R) ⇒ᵢ itree E R :=
     cofix CIH i t := t >>= fun _ r => go match r with
@@ -108,7 +108,7 @@ Section stuff.
     all: apply (tt_t (it_eq_map E RY)); cbn; eapply it_eq_up2bind_t; econstructor; auto.
     all: intros ? ? x2 ->; destruct x2; auto.
   Qed.
-    
+
   Lemma iter_guarded_unfold {X Y RY} {_ : Reflexiveᵢ RY} (f : eqn Y X X) (H : eqn_guarded f) {i x}
     : it_eq RY
         (iter_guarded f H i x)
@@ -179,7 +179,7 @@ Section stuff.
 
   Scheme ev_guarded'_ind := Induction for ev_guarded' Sort Prop.
   Set Elimination Schemes.
-  
+
   Lemma ev_guarded'_irrelevant {R X e i t} (p q : @ev_guarded' R X e i t) : p = q .
     induction p.
     - destruct t as [ [] | | ]; [ dependent elimination g | | | ];
@@ -210,7 +210,7 @@ Section stuff.
 
   Definition evg_unroll {X Y} (e : eqn Y X X) {i} (t : itree E (X +ᵢ Y) i) (g : ev_guarded e t)
     : itree E (X +ᵢ Y) i := go (evg_unroll' e t.(_observe) g) .
-  
+
   Lemma evg_unroll_guarded' {X Y} (e : eqn Y X X) {i} (t : itree' E (X +ᵢ Y) i) (g : ev_guarded' e t)
     : guarded' (evg_unroll' e t g) .
     induction g; auto.
@@ -347,7 +347,7 @@ Section stuff.
       all: cbn; apply it_wbisim_up2eat; econstructor; [ exact EatRefl | exact (EatStep EatRefl) | apply CIH ].
     - cbn; rewrite <- Heqot.
       change (it_wbisimF E (eqᵢ Y) _ _ (_observe ?a) (TauF ?b)) with
-        (it_wbisim_bt E (eqᵢ Y) R _ a (Tau' b)). 
+        (it_wbisim_bt E (eqᵢ Y) R _ a (Tau' b)).
       eapply (@fbt_bt _ _ (it_wbisim_map E _)).
       refine (it_wbisim_up2eat).
       econstructor; [ exact EatRefl | exact (EatStep EatRefl) | ].

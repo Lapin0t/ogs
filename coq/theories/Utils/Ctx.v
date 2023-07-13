@@ -13,15 +13,15 @@ cat-nil : Γ ++ nil = Γ
 ⊆ : ctx -> ctx -> Type
 
 nil-lt : nil ⊆ Γ
-nil-gt : 
+nil-gt :
 
-cat⊆ : 
+cat⊆ :
 
 ---
 
 => : ctx -> ctx -> Type
 
-s-nil : nil => Γ 
+s-nil : nil => Γ
 s-cat : Γ1 => Δ -> Γ2 => Δ -> (Γ1 ++ Γ2) => Δ
 
 s-nil-eq : (u : nil => Γ) -> u ~~ s-nil
@@ -79,7 +79,7 @@ Lemma ccat_empty_r {X} {Γ : ctx X} : (Γ +▶ ∅)%ctx = Γ.
 Qed.
 
 Equations c_map {X Y} : (X -> Y) -> ctx X -> ctx Y :=
-  c_map f ∅ := ∅ ; 
+  c_map f ∅ := ∅ ;
   c_map f (Γ ▶ x) := c_map f Γ ▶ f x .
 
 Section lemma.
@@ -472,7 +472,7 @@ Qed.
 
 Section any.
   Context {X : Type}.
-  
+
 Variant any (P : X -> Type) (xs : ctx X) : Type :=
 | Any {x} : xs ∋ x -> P x -> any P xs
 .
@@ -588,4 +588,3 @@ End any.
 #[global] Notation "∅ₛ" := (snil) : ctx_scope.
 #[global] Notation "Γ ▶ₛ x" := (scon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
 #[global] Notation "Γ +▶ₛ Δ" := (scat Γ%ctx Δ%ctx) (at level 50, left associativity) : ctx_scope.
-
