@@ -8,8 +8,12 @@ Require Export Coq.Program.Equality.
 Export EqNotations.
 Require Export Coq.Logic.StrictProp.
 
-Axiom AxiomUIP : forall X : Type, UIP X.
-#[global] Existing Instance AxiomUIP.
+(* hook-up Equations' UIP class with Coq's axiom K *)
+Lemma YesUIP : forall X : Type, UIP X.
+  intro; apply EqdepFacts.eq_dep_eq__UIP, EqdepFacts.eq_rect_eq__eq_dep_eq.
+  exact (Eqdep.Eq_rect_eq.eq_rect_eq _).
+Qed.
+#[global] Existing Instance YesUIP.
 
 #[global] Notation endo T := (T -> T).
   

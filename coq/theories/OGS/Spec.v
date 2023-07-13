@@ -548,14 +548,13 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     + destruct r as [[? [i m]] γ]; cbn.
       destruct (cat_split i).
       econstructor; reflexivity.
-      cbn.
-      match goal with
-      |- it_eqF _ _ _ _ ?a ?b => assert (a = b) by reflexivity
-      end.
-      admit.
-    + econstructor. apply CIH.
+      cbn -[eval_in_env] .
+      change (it_eqF _ _ _ _ (_observe ?a) (_observe ?b))
+        with (it_eq_map  ∅ₑ (eqᵢ _) (it_eq_t _ (eqᵢ _) R) T1_0 a b).
+      reflexivity.
+    + econstructor; apply CIH.
     + destruct q.
-  Admitted.
+  Qed.
 
   Definition eval_sub_1 {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
              : delay { m : msg' Δ & dom' m ⇒ᵥ Δ } :=
@@ -598,14 +597,10 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     cbn [fst snd projT2 projT1].
     destruct (cat_split (fst (projT2 m))).
     - cbn; econstructor. reflexivity.
-    -
-      (* TODO WIP: fix this, should be true *)
-      unfold reduce.
-      fold (@fmap _ ∅ₑ _ _ (fun _ : T1 => projT1 (P:=fun m0 : msg' Δ => dom' m0 ⇒ᵥ Δ)) T1_0).
-      change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)) bot T1_0 ?a ?b) with (it_eq (eqᵢ _) a b).
+    - cbn -[it_eq_map fmap].
+      change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)) bot) with (it_eq (E:=∅ₑ) (eqᵢ (fun _ : T1 => msg' Δ))).
+      apply it_eq_step.
       apply fmap_eq.
-      unfold m_strat_resp.
-      cbn [fst snd projT1 projT2].
       rewrite c_sub_sub.
       unshelve rewrite c_sub_proper; try reflexivity.
       apply s_eq_cover_uniq.
@@ -651,11 +646,11 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Theorem ogs_correction {Γ} Δ (x y : conf Γ)
     : inj_init_act (Δ:=Δ) x ≈ₐ inj_init_act y -> ciu Δ x y.
-    intro H.
-    apply barb_correction.
-    intro e.
-    unfold compo; rewrite <- 2 compo_compo0.
-    apply compo0_proper. exact H. intro r; eauto.
+    intro H; apply barb_correction.
+    intro e; unfold compo; rewrite 2 iter_evg_iter.
+    rewrite <- 2 compo_compo0; apply compo0_proper; [ exact H | intro; auto ].
   Qed.
 
 End withInteractionSpec.
+
+Print Assumptions ogs_correction.

@@ -42,7 +42,7 @@ Section monad.
 
 End monad.
 
-#[global] Notation "f <$> x" := (fmap f x) (at level 30).
+#[global] Notation "f <$> x" := (fmap f _ x) (at level 30).
 #[global] Notation "x >>= f" := (bind x f) (at level 30).
 #[global] Notation "f =<< x" := (subst f _ x) (at level 30).
 #[global] Notation "f >=> g" := (kcomp f g) (at level 30).
