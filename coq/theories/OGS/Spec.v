@@ -5,8 +5,6 @@ From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
 From OGS.ITree Require Import ITree Eq Delay Structure Properties Guarded.
 
-Set Equations Transparent.
-
 Open Scope ctx_scope.
 
 (*|
@@ -65,7 +63,7 @@ Specifies the operational semantics of the language.
     conf : context -> Type ;
     val : context -> typ -> Type ;
     eval {Γ} : conf Γ -> delay { m : msg' Γ & dom' m =[val]> Γ } ;
-    emb {Γ} (m : msg' Γ) : conf (Γ +▶ dom' m) ;
+    app {Γ x} (v : val Γ x) (m : msg x) (r : S.(dom) m =[val]> Γ): conf Γ ;
     v_var {Γ} : Γ =[val]> Γ ; (*  Γ ∋ x -> val Γ x   *)
     v_sub {Γ Δ} : Γ =[val]> Δ -> val Γ ⇒ᵢ val Δ ;
     c_sub {Γ Δ} : Γ =[val]> Δ -> conf Γ -> conf Δ ;
@@ -77,11 +75,22 @@ Specifies the operational semantics of the language.
 
   Context {M : machine}.
 
+  Definition emb {Γ} (m : msg' Γ) : conf (Γ +▶ dom' m) :=
+    app (v_var _ (r_concat_l _ (fst (projT2 m)))) (snd (projT2 m)) (v_var ⊛ᵣ r_concat_r).
+
+  (*
+  Definition app' {Γ Δ} (e : Γ ⇒ᵥ Δ) (m : msg' Γ) : conf (Δ +▶ dom' m) :=
+    app (e (projT1 m) (fst (projT2 m))) (snd (projT2 m)) .
+  *)
+
+
+
 (*|
 Renaming in values, a particular case of value substitution.
 |*)
   Definition v_ren {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ :=
     fun u => v_sub (v_var ⊛ᵣ u) .
+  Notation "r ᵣ⊛ᵥ v" := (v_ren r _ v) (at level 14).
 
 (*|
 Composition of value assignments.
@@ -97,35 +106,17 @@ Renaming in environments
     := fun u v => (v_var ⊛ᵣ u) ⊛ v.
   Infix "ᵣ⊛" := e_ren (at level 14).
 
-  (* Require Import Coq.Logic.Decidable. *)
-
-  (* Variant is_var {Γ x} : val Γ x -> Type := *)
-  (*   | IsVar (i : Γ ∋ x) : is_var (v_var x i) *)
-  (* . *)
-
-  (* Hypothesis check_var : forall Γ x (v : val Γ x), is_var v + (is_var v -> False). *)
-
-
-  (* (* m = (i , p) *)
-  (*    case e i *)
-
-  (*  *) *)
-  (* Hypothesis eval_emb_tau : forall Γ Δ (m : msg' Γ) (e : Γ ⇒ᵥ Δ), *)
-  (*      eval ([ r_concat_l ᵣ⊛ e , v_var ⊛ᵣ r_concat_r ] ⊛ₜ emb m) *)
-  (*    ≊ go match check_var Δ (projT1 m) (e (projT1 m) (fst (projT2 m))) with *)
-  (*         | inl a => *)
-  (*             let '(IsVar i) := a in *)
-  (*             RetF ((_ ,' (r_concat_l _ i , snd (projT2 m))) ,' v_var ⊛ᵣ r_concat_r ) *)
-  (*         | inr _ => *)
-  (*             TauF (eat_one_tau (eval ([r_concat_l ᵣ⊛ e, v_var ⊛ᵣ r_concat_r] ⊛ₜ emb m))) *)
-  (*         end. *)
-
 (*|
 Renaming in configurations
 |*)
   Definition c_ren {Γ1 Γ2} : Γ1 ⊆ Γ2 -> conf Γ1 -> conf Γ2
     := fun u c => (v_var ⊛ᵣ u) ⊛ₜ c .
   Infix "ᵣ⊛ₜ" := c_ren (at level 14).
+
+  Definition is_var {Γ x} (v : val Γ x) : Type := { i : Γ ∋ x & v = v_var x i } .
+
+  Definition is_var_get {Γ x} {v : val Γ x} (p : is_var v) : Γ ∋ x := projT1 p .
+  Definition is_var_get_eq {Γ x} {v : val Γ x} (p : is_var v) : v = v_var x (is_var_get p) := projT2 p .
 
 (*|
 Operational machine: axiomatization
@@ -138,6 +129,12 @@ The machine comes with a battery of expected laws:
 - the embedding of variables is the unit substitution on terms
 - the composition o substitution on terms commutes with the composition of assignments
 |*)
+  Class machine_law_ty : Type := {
+    is_var_dec {Γ x} (v : val Γ x) : is_var v + (is_var v -> False) ;
+    is_var_ren {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var (e ᵣ⊛ᵥ v) -> is_var v ;
+  }.
+  Context {MHT : machine_law_ty}.
+                                    
   Class machine_law : Prop := {
     v_sub_proper {Γ Δ} :: Proper (ass_eq Γ Δ ==> forall_relation (fun i => eq ==> eq)) v_sub ;
     c_sub_proper {Γ Δ} :: Proper (ass_eq Γ Δ ==> eq ==> eq) c_sub ;
@@ -148,9 +145,40 @@ The machine comes with a battery of expected laws:
     c_var_sub {Γ} (c : conf Γ) : v_var ⊛ₜ c = c ;
     c_sub_sub {Γ1 Γ2 Γ3} (u : Γ2 ⇒ᵥ Γ3) (v : Γ1 ⇒ᵥ Γ2) {c}
       : u ⊛ₜ (v ⊛ₜ c) = (u ⊛ v) ⊛ₜ c ;
+    app_proper {Γ x v m} :: Proper (ass_eq (S.(dom) m) Γ ==> eq) (@app _ Γ x v m) ;
+    app_ren {Γ1 Γ2 x} (e : Γ1 ⇒ᵥ Γ2) (v : val Γ1 x) (m : msg x) (r : dom _ m ⇒ᵥ Γ1)
+      : e ⊛ₜ app v m r = app (e ⊛ᵥ v) m (e ⊛ r) ;
+    v_var_inj {Γ x} (i j : Γ ∋ x) : v_var x i = v_var x j -> i = j ;
   }.
-
   Context {MH : machine_law}.
+
+  Lemma is_var_irr {Γ x} {v : val Γ x} (p q : is_var v) : p = q .
+    destruct p as [i1 e1], q as [i2 e2].
+    destruct (v_var_inj _ _ (eq_trans (eq_sym e1) e2)).
+    f_equal; apply YesUIP.
+  Qed.
+
+  Definition ren_is_var {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var v -> is_var (e ᵣ⊛ᵥ v) .
+    intro p.
+    refine (e _ (is_var_get p) ,' _).
+    pose (i := is_var_get p); eassert (H : _) by exact (is_var_get_eq p); fold i in H |- *.
+    rewrite H; change (e ᵣ⊛ᵥ v_var x i) with ((e ᵣ⊛ v_var) x i).
+    unfold e_ren; rewrite v_sub_var; reflexivity.
+  Defined.
+
+  Lemma ren_is_var_get {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) (p : is_var v) :
+    is_var_get (ren_is_var v e p) = e _ (is_var_get p) .
+    reflexivity.
+  Qed.    
+
+  Variant is_var_ren_view {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var (e ᵣ⊛ᵥ v) -> Type :=
+  | IsVarRen (p : is_var v) : is_var_ren_view v e (ren_is_var v e p)
+  .
+  Arguments IsVarRen {Γ1 Γ2 x v e}.
+
+  Lemma view_is_var_ren {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) (p : is_var (e ᵣ⊛ᵥ v)) : is_var_ren_view v e p .
+    rewrite (is_var_irr p (ren_is_var v e (is_var_ren v e p))); econstructor.
+  Qed.
 
 (*|
 A couple derived properties on the constructed operations.
@@ -164,18 +192,19 @@ A couple derived properties on the constructed operations.
 
   #[global]
   Instance e_ren_proper {Γ1 Γ2 Γ3} : Proper (ass_eq Γ2 Γ3 ==> ass_eq Γ1 Γ2 ==> ass_eq Γ1 Γ3) e_ren.
-  Proof.
     intros ? ? H1 ? ? H2; unfold e_ren.
     apply e_comp_proper; eauto; now rewrite H1.
   Qed.
 
   Lemma e_comp_ren_r {Γ1 Γ2 Γ3 Γ4} (u : Γ3 ⇒ᵥ Γ4) (v : Γ2 ⇒ᵥ Γ3) (w : Γ1 ⊆ Γ2)
         : u ⊛ (v ⊛ᵣ w) ≡ₐ (u ⊛ v) ⊛ᵣ w .
-  Proof. reflexivity. Qed.
+    reflexivity.
+  Qed.
 
   Lemma e_comp_ren_l {Γ1 Γ2 Γ3 Γ4} (u : Γ3 ⇒ᵥ Γ4) (v : Γ2 ⊆ Γ3) (w : Γ1 ⇒ᵥ Γ2)
         : (u ⊛ᵣ v) ⊛ w ≡ₐ u ⊛ (v ᵣ⊛ w) .
-  Proof. unfold e_ren; now rewrite v_sub_sub, e_comp_ren_r, v_sub_var. Qed.
+    unfold e_ren; now rewrite v_sub_sub, e_comp_ren_r, v_sub_var.
+  Qed.
 
 (*|
 Evaluate a configuration inside an environment (assignment), returning only the message part (the "positive" or "static" part).
@@ -183,12 +212,8 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   Definition eval_in_env {Γ Δ} (e : Γ ⇒ᵥ Δ) (t : conf Γ) : delay (msg' Δ)
     := fmap (fun _ => @projT1 _ _) _ (eval (e ⊛ₜ t)).
 
-  #[global]
-  Instance eval_in_env_proper {Γ Δ}
-             : Proper (ass_eq Γ Δ ==> eq ==> eq) (@eval_in_env Γ Δ).
-  Proof.
-    intros ? ? H1 ? ? H2.
-    unfold eval_in_env.
+  #[global] Instance eval_in_env_proper {Γ Δ} : Proper (ass_eq Γ Δ ==> eq ==> eq) (@eval_in_env Γ Δ).
+    intros ? ? H1 ? ? H2; unfold eval_in_env.
     now rewrite H1, H2.
   Qed.
 
@@ -240,7 +265,6 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   Notation "u ▶ₑ⁺" := (EConT u) (at level 40).
   Notation "u ▶ₑ⁻ e" := (EConF u e) (at level 40).
 
-
   (* flattens an alternating environment into an unstructured one *)
   Equations concat0 {Δ b Φ} : alt_env Δ b Φ -> ↓[negb b]Φ ⇒ᵥ (Δ +▶ ↓[b]Φ) :=
     concat0 (εₑ)     := s_empty ;
@@ -258,7 +282,6 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   Lemma concat_fixpoint {Δ Φ} (u : alt_env Δ Ⓟ Φ) (v : alt_env Δ Ⓞ Φ)
     :  [ v_var , concat1 u v ] ⊛ concat0 u ≡ₐ concat1 v u
     /\ [ v_var , concat1 v u ] ⊛ concat0 v ≡ₐ concat1 u v .
-  Proof.
     induction Φ; dependent destruction u; dependent destruction v; cbn; split.
     - intros ? i; dependent elimination i.
     - intros ? i; dependent elimination i.
@@ -284,19 +307,18 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Definition m_strat_play {Δ Φ} (x : m_strat_act Δ Φ)
     : delay (msg' Δ + h_actv ogs_hg (m_strat_pas Δ) Φ)%type :=
-    eval (fst x) >>=
-      fun _ u =>
+      (fun _ u =>
         match cat_split (fst (projT2 (projT1 u))) with
-        | CLeftV h => Ret' (inl (_ ,' (h , snd (projT2 (projT1 u)))))
-        | CRightV h => Ret' (inr ((_ ,' (h , snd (projT2 (projT1 u))))
-                            ,' (snd x ▶ₑ⁻ projT2 u)))
-        end .
-  Print r_concat3_1.
+        | CLeftV h => inl (_ ,' (h , snd (projT2 (projT1 u))))
+        | CRightV h => inr ((_ ,' (h , snd (projT2 (projT1 u))))
+                            ,' (snd x ▶ₑ⁻ projT2 u))
+        end)
+        <$> eval (fst x) .
 
   Definition m_strat_resp {Δ Φ} (x : m_strat_pas Δ Φ)
-    : h_pasv ogs_hg (m_strat_act Δ) Φ
+    : h_pasv ogs_hg (m_strat_act Δ) Φ 
     := fun m =>
-         ([ (r_concat3_1 ᵣ⊛ concat0 x) , v_var ⊛ᵣ (r_concat_r ⊛ᵣ r_concat_r) ] ⊛ₜ emb m ,
+         ([ r_concat3_1 ᵣ⊛ concat0 x , v_var ⊛ᵣ (r_concat_r ⊛ᵣ r_concat_r) ] ⊛ₜ emb m ,
           x ▶ₑ⁺).
 
   Definition m_strat {Δ} : m_strat_act Δ ⇒ᵢ ogs_act Δ :=
@@ -320,7 +342,6 @@ Evaluate a configuration inside an environment (assignment), returning only the 
               | Fib (inr (x ,' p)) => VisF (x : ogs_e.(e_qry) _)
                                           (fun r => m_strat (g_next r) (m_strat_resp p r))
               end)).
-  Proof.
     apply it_eq_unstep.
     cbn -[m_strat_play].
     destruct (_observe (m_strat_play x)) as [ [ | [] ] | | [] ]; eauto.
@@ -343,113 +364,53 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   Definition inj_init_pas {Δ Γ} (γ : Γ ⇒ᵥ Δ) : m_strat_pas Δ (∅ ▶ Γ)
     := εₑ ▶ₑ⁻ (r_concat_l ᵣ⊛ γ).
 
-  Definition compo_t (Δ : context) : Type :=
-    ⦉ ogs_act Δ ×ᵢ ogs_pas Δ ⦊ᵢ .
-
-  Definition compo_t_eq (Δ : context) : relation (compo_t Δ) .
-    intros [a1 [u1 u2]] [a2 [v1 v2]].
-    refine (exists (p : a1 = a2), _).
-    rewrite p in *.
-    refine (u1 ≈ v1 /\ h_pasvR ogs_hg (it_wbisim (eqᵢ _)) _ u2 v2).
-  Defined.
-
-  Definition compo_t_eq_strong (Δ : context) : relation (compo_t Δ) .
-    intros [a1 [u1 u2]] [a2 [v1 v2]].
-    refine (exists (p : a1 = a2), _).
-    rewrite p in *.
-    refine (u1 ≊ v1 /\ h_pasvR ogs_hg (it_eq (eqᵢ _)) _ u2 v2).
-  Defined.
-
-  Equations compo0_body {Δ}
-            : (fun (_ : T1) => compo_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => compo_t Δ + msg' Δ)%type :=
-    compo0_body :=
-      cofix _compo_body T1_0 u :=
-        go (match (fst (projT2 u)).(_observe) with
-            | RetF r => RetF (inr r)
-            | TauF t => TauF (_compo_body T1_0 (_ ,' (t , (snd (projT2 u)))))
-            | VisF e k => RetF (inl (_ ,' (snd (projT2 u) e , k)))
-            end) .
-
-  Definition compo0 {Δ a} (u : ogs_act Δ a) (v : ogs_pas Δ a) : delay (msg' Δ)
-    := iter compo0_body T1_0 (a ,' (u , v)).
-
-  #[global] Instance compo0_proper {Δ a}
-    : Proper
-        (it_wbisim (eqᵢ _) a ==> h_pasvR ogs_hg (it_wbisim (eqᵢ _)) a ==> it_wbisim (eqᵢ _) T1_0)%signature
-        (@compo0 Δ a).
-  Proof.
-    intros ? ? H1 ? ? H2. unfold compo0.
-    unshelve eapply (@iter_weq _ _ _ _ (fun _ => compo_t_eq Δ) (eqᵢ _) compo0_body compo0_body _ T1_0 (a ,' (x , x0)) (a ,' (y , y0)) (ex_intro _ eq_refl (conj H1 H2))).
-    clear a x y H1 x0 y0 H2.
-    unfold dpointwise_relation, respectful.
-    intros [] [? []] [? []] []; destruct x1; cbn in H; destruct H.
-    unfold it_wbisim.
-    revert o o1 H.
-    coinduction R CIH.
-    intros o o1 H.
-    cbn.
-    apply it_wbisim_step in H.
-    cbn in H; unfold observe in H.
-    destruct H.
-    dependent destruction rr.
-    - unshelve econstructor.
-      * exact (RetF (inr r0)).
-      * exact (RetF (inr r3)).
-      * remember (_observe o) eqn:H; clear H.
-        remember (@RetF alt_ext ogs_e (fun _ => msg' Δ) (ogs_act Δ) x r0).
-        apply (fun u => rew <- [ fun v => it_eat _ _ v ] Heqi0 in u) in r1.
-        induction r1; [ now rewrite Heqi0 | eauto ].
-      * remember (_observe o1) eqn:H; clear H.
-        remember (@RetF alt_ext ogs_e (fun _ => msg' Δ) (ogs_act Δ) x r3).
-        apply (fun u => rew <- [ fun v => it_eat _ _ v ] Heqi0 in u) in r2.
-        induction r2; [ now rewrite Heqi0 | eauto ].
-      * now repeat econstructor.
-    - unshelve econstructor.
-      * exact (TauF (compo0_body T1_0 (x ,' (t1 , o0)))).
-      * exact (TauF (compo0_body T1_0 (x ,' (t2 , o2)))).
-      * remember (_observe o) eqn:H; clear H.
-        remember (TauF t1) eqn:H.
-        induction r1; [ now rewrite H | eauto ].
-      * remember (_observe o1) eqn:H; clear H.
-        remember (TauF t2) eqn:H.
-        induction r2; [ now rewrite H | eauto ].
-      * eauto.
-    - unshelve econstructor.
-      * exact (RetF (inl (_ ,' (o0 q , k1)))).
-      * exact (RetF (inl (_ ,' (o2 q , k2)))).
-      * remember (_observe o) eqn:H; clear H.
-        remember (VisF q k1) eqn:H.
-        induction r1; [ now rewrite H | eauto ].
-      * remember (_observe o1) eqn:H; clear H.
-        remember (VisF q k2) eqn:H.
-        induction r2; [ now rewrite H | eauto ].
-      * econstructor. econstructor. unshelve econstructor. reflexivity.
-        econstructor.
-        exact (H0 q).
-        exact k_rel.
-   Qed.
-
   Definition reduce_t (Δ : context) : Type :=
     ⦉ m_strat_act Δ ×ᵢ m_strat_pas Δ ⦊ᵢ .
 
-  Definition reduce_t_inj {Δ : context} : reduce_t Δ -> compo_t Δ.
-  intros [ ? [ a b ]]. refine (x ,' (m_strat _ a , m_stratp _ b)).
-  Defined.
-
   Equations compo_body {Δ}
-    : (fun (_ : T1) => reduce_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => reduce_t Δ + msg' Δ)%type :=
-    compo_body T1_0 x :=
+    : reduce_t Δ -> delay (reduce_t Δ + msg' Δ) :=
+    compo_body x :=
       m_strat_play (fst (projT2 x)) >>= fun _ r =>
-          go (match r with
-              | inl r => RetF (inr r)
-              | inr e => RetF (inl (_ ,' (m_strat_resp (snd (projT2 x)) (projT1 e) , (projT2 e))))
-              end).
+          match r with
+              | inl r => Ret' (inr r)
+              | inr e => Ret' (inl (_ ,' (m_strat_resp (snd (projT2 x)) (projT1 e) , (projT2 e))))
+              end.
 
-  Definition compo_body_guarded {Δ} : eqn_ev_guarded (@compo_body Δ).
-  intros [] [ Γ [ u v ] ].
-  induction Γ.
+  (* Now we prove guardedness of this equation. *)
+
+  Hypothesis eval_app_var : forall Γ x (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ)
+                              (p : is_var v),
+      eval (app v m e) ≊ Ret' ((x ,' (is_var_get p , m)) ,' e).
+
+  Variant is_tau' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
+    | IsTau {t : itree E X i} : is_tau' (TauF t) .
+
+  Definition is_tau {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_tau' t.(_observe).
+
+  Hypothesis eval_app_not_var : forall Γ x (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ)
+                                  (p : is_var v -> False), is_tau (eval (app v m e)) .
+
+  Lemma cat_split_l {X} {Γ1 Γ2} {x : X} (i : Γ1 ∋ x) : cat_split (r_concat_l (Δ:=Γ2) _ i) = CLeftV i .
+    pose (uu := cat_split (r_concat_l (Δ:=Γ2) x i)); fold uu.
+    dependent induction uu.
+    - apply r_cover_l_inj in x1; rewrite x1 in x.
+      dependent destruction x; simpl_depind; reflexivity.
+    - symmetry in x1; apply r_cover_disj in x1; destruct x1.
+  Qed.
+
+  Lemma cat_split_r {X} {Γ1 Γ2} {x : X} (i : Γ2 ∋ x) : cat_split (r_concat_r (Γ:=Γ1) _ i) = CRightV i .
+    pose (uu := cat_split (r_concat_r (Γ:=Γ1) x i)); fold uu.
+    dependent induction uu.
+    - apply r_cover_disj in x1; destruct x1.
+    - apply r_cover_r_inj in x1; rewrite x1 in x.
+      dependent destruction x; simpl_depind; reflexivity.
+  Qed.
+
+  Definition compo_body_guarded {Δ} : eqn_ev_guarded (fun 'T1_0 => @compo_body Δ).
+  intros [] [ Γ [ [c u] v ] ]; unfold m_strat_pas in v.
+  revert c u v; induction Γ; intros c u v.
   - unfold ev_guarded; cbn -[cat_split].
-    pose (ev := _observe (eval (fst u))); change (_observe (eval (fst u))) with ev.
+    pose (ev := _observe (eval c)); change (_observe (eval c)) with ev.
     destruct ev; try now repeat econstructor.
     destruct r as [ [ ? [ i m ] ] γ].
     cbn [fst snd projT1 projT2].
@@ -458,65 +419,67 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     change (cover_split cover_nil_r i) with s.
     destruct s ; [ | inversion j ].
     repeat econstructor.
-  - unfold ev_guarded; cbn -[cat_split].
-    pose (ev := _observe (eval (fst u))); change (_observe (eval (fst u))) with ev.
-    destruct ev; try now repeat econstructor.
-    destruct r as [ [ ? [ i m ] ] γ].
-    unfold dom' in γ; cbn [fst snd projT1 projT2] in *.
-    pose (s := cat_split i); change (cat_split i) with s.
-    destruct s; cbn; [ repeat econstructor | ].
+  - (* advance one step of composition *)
+    unfold ev_guarded.
+    cbn -[cat_split].
+    pose (ot := _observe (eval c)); change (_observe (eval c)) with ot.
+    destruct ot; try now repeat econstructor. (* some work done, hence guarded *)
+    pose (s := cat_split (fst (projT2 (projT1 r)))).
+    change (cat_split _) with s.
+    destruct s; try now repeat econstructor. (* final channel, hence guarded *)
+
+    refine (GNext _). (* we're not guarded here, but after one more step *)
+
+    dependent elimination u; dependent elimination v.
+    destruct r as [ [ x [ i m ] ] γ ].
+    unfold m_strat_resp, emb, dom'; cbn [fst snd projT1 projT2]; simp concat0.
+
+    (* start: cleanup *)
+
+    rewrite app_ren.
+
+    unshelve erewrite (app_proper _ _ _); [ shelve | | ].
+    rewrite e_comp_ren_r.
+    rewrite v_sub_var.
+    rewrite s_eq_cat_r.
+    reflexivity.
+
+    eassert (H : ([r_concat3_1 ᵣ⊛ ([concat0 a1, a2]), v_var ⊛ᵣ (r_concat_r ⊛ᵣ r_concat_r)]
+               ⊛ᵥ v_var x (r_concat_l x j)) = _); [ | rewrite H; clear H ].
+    change (?u ⊛ᵥ v_var x (r_concat_l x j)) with ((u ⊛ (v_var ⊛ᵣ r_concat_l)) x j).
+    rewrite e_comp_ren_r.
+    etransitivity.
+    apply s_ren_proper; [ apply v_sub_var | auto ].
+    rewrite s_eq_cat_l.
+    reflexivity.
+
+    (* end: cleanup *)
+    
+    assert (H :
+       compo_body
+          (Φ1,'
+           (app (([concat0 a1, a2]) x j) m (([v_var ⊛ᵣ r_concat_l, [concat0 a1, a2]]) ⊛ γ),
+             a1,
+             a))
+     ≊ compo_body
+          ((Φ1 ▶ Γ1 ▶ dom S m),'
+           (app ((r_concat3_1 ᵣ⊛ ([concat0 a1, a2])) x j) m (v_var ⊛ᵣ (r_concat_r ⊛ᵣ r_concat_r)),
+             (a1 ▶ₑ⁻ a2) ▶ₑ⁺,
+             (a ▶ₑ⁺) ▶ₑ⁻ γ))
+    ); [ | apply (ev_guarded_cong _ H); apply IHΓ ] .
+
+  (* wip here, does this hold? *)
+
   Admitted.
 
   Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a)
     : delay (msg' Δ) :=
-    iter_ev_guarded compo_body compo_body_guarded T1_0 (a ,' (u , v)).
+    iter_ev_guarded _ compo_body_guarded T1_0 (a ,' (u , v)).
   Notation "u ∥ v" := (compo u v) (at level 40).
 
-  Lemma compo_compo0 {Δ} {x : reduce_t Δ} :
-    iter compo0_body T1_0 (reduce_t_inj x) ≊ iter compo_body T1_0 x .
-    unshelve eapply (iter_cong_strong).
-    - refine (fun _ a b => compo_t_eq_strong _ a (reduce_t_inj b)).
-    - intros [] [? [u1 e1]] [? [u2 e2]] [A B].
-      dependent elimination A; cbn in B; destruct B as [H1 H2].
-      rewrite unfold_mstrat in H1.
-      unfold compo_body.
-      cbn [fst snd projT1 projT2].
-      remember (m_strat_play u2) eqn:Hu; clear Hu.
-      clear u2.
-      unfold it_eq.
-      revert u1 d H1.
-      coinduction R CIH.
-      intros u1 d H1.
-      (*
-      unfold m_strat in H1.
-      rewrite iter_unfold in H1.
-      fold (@m_strat Δ) in H1.
-      unfold m_strat_body in H1.
-      apply it_eq_step in H1.
-      unfold compo_body.
-      cbn -[bind] in H1; unfold observe in H1.
-      cbn [fst snd projT1 projT2].
-      unfold m_strat in H1.
-*)
-      apply it_eq_step in H1.
-      cbn in *; unfold observe in *.
-      destruct (_observe d).
-      + destruct r as [|[]]; destruct (_observe u1); dependent elimination H1;
-          econstructor; econstructor; eauto.
-        exists eq_refl; split; [ exact (H2 q0) | exact k_rel ].
-      + destruct (_observe u1); dependent elimination H1; eauto.
-      + destruct q.
-    - cbn; destruct (reduce_t_inj x) as [ ? [] ].
-      exists eq_refl; split; cbn. reflexivity. intro r. reflexivity.
-  Qed.
   (* guilhem: rename? *)
   Definition barb {Γ} Δ (x y : conf Γ) : Prop :=
     forall e : Γ ⇒ᵥ Δ, (inj_init_act x ∥ inj_init_pas e) ≈ (inj_init_act y ∥ inj_init_pas e).
-
-  (*
-  Definition reduce_t_eq (Δ : context) : relation (reduce_t Δ) :=
-    fun u v => compo_t_eq Δ (reduce_t_inj _ u) (reduce_t_inj _ v).
-*)
 
   Equations reduce {Δ} : (fun (_ : T1) => reduce_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => msg' Δ) :=
     reduce T1_0 u := eval_in_env
@@ -525,7 +488,7 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Lemma quatre_trois_pre {Δ} (x : reduce_t Δ)
     :
-        (compo_body T1_0 x >>= fun _ r => match r with
+        (compo_body x >>= fun _ r => match r with
                                      | inl x' => reduce _ x'
                                      | inr y => Ret' (y : (fun _ => msg' _) _)
                                      end)
@@ -537,11 +500,10 @@ Evaluate a configuration inside an environment (assignment), returning only the 
                             | CRightV h => reduce _ (_ ,'
                                                     (m_strat_resp (snd (projT2 x)) (_ ,' (h, snd (projT2 (projT1 u)))), EConF (snd (fst (projT2 x))) (projT2 u)))
                             end).
-  Proof.
     etransitivity.
     unfold compo_body; apply bind_bind_com.
     etransitivity.
-    unfold m_strat_play; apply bind_bind_com.
+    unfold m_strat_play. apply fmap_bind_com.
     remember (eval (fst (fst (projT2 x)))) as t eqn:H; clear H; revert t.
     unfold it_eq; coinduction R CIH; intros t.
     cbn; destruct (t.(_observe)).
@@ -556,11 +518,11 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     + destruct q.
   Qed.
 
-  Definition eval_sub_1 {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
+  Definition sub_eval {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
              : delay { m : msg' Δ & dom' m ⇒ᵥ Δ } :=
         eval ([ v_var , e ] ⊛ₜ c) .
 
-  Definition eval_sub_2 {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
+  Definition eval_sub {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
     : delay { m : msg' Δ & dom' m ⇒ᵥ Δ }.
     refine (eval c >>= fun 'T1_0 x =>
                 match cat_split (fst (projT2 (projT1 x))) with
@@ -574,11 +536,11 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   Hypothesis eval_hyp : forall {Γ Δ}
                           (c : conf (Δ +▶ Γ))
                           (e : Γ ⇒ᵥ Δ),
-                          eval_sub_1 c e ≊ eval_sub_2 c e .
+                          sub_eval c e ≊ eval_sub c e .
 
   Lemma quatre_trois {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a)
     : reduce _ (_ ,' (c , e)) ≊ (c ∥ e) .
-    refine (iter_evg_uniq compo_body reduce _ _ _ (_ ,' (c , e))).
+    apply iter_evg_uniq.
     clear a c e; intros [] [ ? [ u v ] ].
     etransitivity; cycle 1.
     symmetry.
@@ -623,7 +585,6 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   Lemma quatre_trois_app {Γ Δ}
     (c : conf Γ) (e : Γ ⇒ᵥ Δ)
     : eval_in_env e c ≊ (inj_init_act c ∥ inj_init_pas e).
-  Proof.
     rewrite <- quatre_trois.
     unfold reduce, inj_init_act, eval_in_env; cbn [fst snd projT1 projT2]; apply fmap_eq.
     cbv [inj_init_pas]; rewrite concat1_equation_2, 2 concat1_equation_1.
@@ -637,18 +598,127 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Theorem barb_correction {Γ} Δ (x y : conf Γ)
           : barb Δ x y -> ciu Δ x y.
-  Proof.
     intros H e.
     etransitivity; [ apply it_eq_wbisim, (quatre_trois_app x e) | ].
     etransitivity; [ apply (H e) | ].
     symmetry; apply it_eq_wbisim, (quatre_trois_app y e).
   Qed.
 
+  (* Alternative definition of the composition easier to prove
+  congruence (respecting weak bisimilarity). *)
+
+  Definition compo_alt_t (Δ : context) : Type :=
+    ⦉ ogs_act Δ ×ᵢ ogs_pas Δ ⦊ᵢ .
+
+  Notation "'RetD' x" := (RetF (x : (fun _ : T1 => _) T1_0)) (at level 40).
+  Notation "'TauD' t" := (TauF (t : itree ∅ₑ (fun _ : T1 => _) T1_0)) (at level 40).
+
+  Equations compo_alt_body {Δ} : compo_alt_t Δ -> delay (compo_alt_t Δ + msg' Δ) :=
+    compo_alt_body :=
+      cofix _compo_body u :=
+        go match (fst (projT2 u)).(_observe) with
+            | RetF r => RetD (inr r)
+            | TauF t => TauD (_compo_body (_ ,' (t , (snd (projT2 u)))))
+            | VisF e k => RetD (inl (_ ,' (snd (projT2 u) e , k)))
+            end .
+
+  Definition compo0 {Δ a} (u : ogs_act Δ a) (v : ogs_pas Δ a) : delay (msg' Δ)
+    := iter_delay compo_alt_body (a ,' (u , v)).
+
+  Definition compo_t_eq (Δ : context) : relation (compo_alt_t Δ) :=
+    fun x1 x2 =>
+     exists p : projT1 x1 = projT1 x2,
+       rew p in fst (projT2 x1) ≈ fst (projT2 x2)
+       /\ h_pasvR ogs_hg (it_wbisim (eqᵢ _)) _ (rew p in snd (projT2 x1)) (snd (projT2 x2)). 
+
+  Definition compo_t_eq_strong (Δ : context) : relation (compo_alt_t Δ) :=
+    fun x1 x2 =>
+     exists p : projT1 x1 = projT1 x2,
+       rew p in fst (projT2 x1) ≊ fst (projT2 x2)
+       /\ h_pasvR ogs_hg (it_eq (eqᵢ _)) _ (rew p in snd (projT2 x1)) (snd (projT2 x2)). 
+
+  #[global] Instance compo_alt_proper {Δ a}
+    : Proper (it_wbisim (eqᵢ _) a ==> h_pasvR ogs_hg (it_wbisim (eqᵢ _)) a ==> it_wbisim (eqᵢ _) T1_0)
+        (@compo0 Δ a).
+    intros x y H1 u v H2.
+    unshelve eapply (iter_weq (RX := fun _ => compo_t_eq Δ)); [ | exact (ex_intro _ eq_refl (conj H1 H2)) ].
+    clear a x y H1 u v H2; intros [] [ ? [ x u ]] [ ? [ y v ]] [ H1 H2 ].
+    cbn in H1; destruct H1; cbn in H2; destruct H2 as [ H1 H2 ].
+    unfold it_wbisim; revert x y H1; coinduction R CIH; intros x y H1.
+    apply it_wbisim_step in H1; cbn in *; unfold observe in H1; destruct H1 as [ ? ? r1 r2 rr ].
+    dependent destruction rr.
+    - unshelve econstructor.
+      * exact (RetF (inr r0)).
+      * exact (RetF (inr r3)).
+      * remember (_observe x) eqn:H; clear H.
+        remember (@RetF alt_ext ogs_e (fun _ => msg' Δ) (ogs_act Δ) x0 r0) eqn:H.
+        apply (fun u => rew <- [ fun v => it_eat _ _ v ] H in u) in r1.
+        induction r1; [ now rewrite H | eauto ].
+      * remember (_observe y) eqn:H; clear H.
+        remember (@RetF alt_ext ogs_e (fun _ => msg' Δ) (ogs_act Δ) x0 r3) eqn:H.
+        apply (fun u => rew <- [ fun v => it_eat _ _ v ] H in u) in r2.
+        induction r2; [ now rewrite H | auto ].
+      * now repeat econstructor.
+    - unshelve econstructor.
+      * exact (TauD (compo_alt_body (_ ,' (t1 , u)))).
+      * exact (TauD (compo_alt_body (_ ,' (t2 , v)))).
+      * remember (_observe x) eqn:H; clear H.
+        remember (TauF t1) eqn:H.
+        induction r1; [ now rewrite H | auto ].
+      * remember (_observe y) eqn:H; clear H.
+        remember (TauF t2) eqn:H.
+        induction r2; [ now rewrite H | auto ].
+      * auto.
+    - unshelve econstructor.
+      * exact (RetF (inl (_ ,' (u q , k1)))).
+      * exact (RetF (inl (_ ,' (v q , k2)))).
+      * remember (_observe x) eqn:H; clear H.
+        remember (VisF q k1) eqn:H.
+        induction r1; [ now rewrite H | auto ].
+      * remember (_observe y) eqn:H; clear H.
+        remember (VisF q k2) eqn:H.
+        induction r2; [ now rewrite H | auto ].
+      * unshelve (do 3 econstructor); [ exact eq_refl | exact (conj (H2 q) k_rel) ].
+   Qed.
+
+  Definition reduce_t_inj {Δ : context} (x : reduce_t Δ) : compo_alt_t Δ :=
+     (_ ,' (m_strat _ (fst (projT2 x)) , m_stratp _ (snd (projT2 x)))) .
+  
+  Lemma compo_compo_alt {Δ} {x : reduce_t Δ} :
+    iter_delay compo_alt_body (reduce_t_inj x) ≊ iter_delay compo_body x .
+    unshelve eapply (iter_cong_strong).
+    - refine (fun _ a b => compo_t_eq_strong _ a (reduce_t_inj b)).
+    - intros [] [? [u1 e1]] [? [u2 e2]] [A B].
+      dependent elimination A; cbn in B; destruct B as [H1 H2].
+      rewrite unfold_mstrat in H1.
+      unfold compo_body.
+      cbn [fst snd projT1 projT2].
+      remember (m_strat_play u2) eqn:Hu; clear Hu.
+      clear u2.
+      unfold it_eq.
+      revert u1 d H1.
+      coinduction R CIH.
+      intros u1 d H1.
+      apply it_eq_step in H1.
+      cbn in *; unfold observe in *.
+      destruct (_observe d).
+      + destruct r as [|[]]; destruct (_observe u1); dependent elimination H1;
+          econstructor; econstructor; eauto.
+        exists eq_refl; split; [ exact (H2 q0) | exact k_rel ].
+      + destruct (_observe u1); dependent elimination H1; eauto.
+      + destruct q.
+    - cbn; destruct (reduce_t_inj x) as [ ? [] ].
+      exists eq_refl; split; cbn. reflexivity. intro r. reflexivity.
+  Qed.
+
   Theorem ogs_correction {Γ} Δ (x y : conf Γ)
     : inj_init_act (Δ:=Δ) x ≈ₐ inj_init_act y -> ciu Δ x y.
     intro H; apply barb_correction.
-    intro e; unfold compo; rewrite 2 iter_evg_iter.
-    rewrite <- 2 compo_compo0; apply compo0_proper; [ exact H | intro; auto ].
+    intro e; unfold compo.
+    rewrite 2 iter_evg_iter.
+    change (iter _ T1_0 ?u) with (iter_delay compo_body u).
+    rewrite <- 2 compo_compo_alt.
+    apply compo_alt_proper; [ exact H | intro; reflexivity ].
   Qed.
 
 End withInteractionSpec.
