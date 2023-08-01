@@ -63,8 +63,8 @@ Specifies the operational semantics of the language.
     conf : context -> Type ;
     val : context -> typ -> Type ;
     eval {Γ} : conf Γ -> delay { m : msg' Γ & dom' m =[val]> Γ } ;
-    app {Γ x} (v : val Γ x) (m : msg x) (r : S.(dom) m =[val]> Γ): conf Γ ;
-    v_var {Γ} : Γ =[val]> Γ ; (*  Γ ∋ x -> val Γ x   *)
+    app {Γ x} (v : val Γ x) (m : msg x) (r : S.(dom) m =[val]> Γ) : conf Γ ;
+    v_var {Γ} : Γ =[val]> Γ ; (* Γ ∋ x -> val Γ x *)
     v_sub {Γ Δ} : Γ =[val]> Δ -> val Γ ⇒ᵢ val Δ ;
     c_sub {Γ Δ} : Γ =[val]> Δ -> conf Γ -> conf Δ ;
     }.
@@ -252,34 +252,66 @@ Evaluate a configuration inside an environment (assignment), returning only the 
      Env M Δ player es : environment part of the player (aka active at es) configuration at (Δ + es)
      Env M Δ opponent es : environment part of the opponent (aka passive at es) configuration at (Δ + es)
    *)
-  Inductive alt_env (Δ : context) : bool -> alt_ext -> Type :=
-  | ENil {b} : alt_env Δ b ∅
-  | EConT {Φ Γ} : alt_env Δ Ⓞ Φ -> alt_env Δ Ⓟ (Φ ▶ Γ)
-  | EConF {Φ Γ} : alt_env Δ Ⓟ Φ -> Γ ⇒ᵥ (Δ +▶ ↓⁺Φ) -> alt_env Δ Ⓞ (Φ ▶ Γ)
+  Inductive alt_env (Δ1 Δ2 : context) : bool -> alt_ext -> Type :=
+  | ENil {b} : alt_env Δ1 Δ2 b ∅
+  | EConT {Φ Γ} : alt_env Δ2 Δ1 Ⓞ Φ -> alt_env Δ1 Δ2 Ⓟ (Φ ▶ Γ)
+  | EConF {Φ Γ} : alt_env Δ2 Δ1 Ⓟ Φ -> Γ ⇒ᵥ (Δ1 +▶ ↓⁺Φ) -> alt_env Δ1 Δ2 Ⓞ (Φ ▶ Γ)
   .
-  Arguments ENil {Δ b}.
-  Arguments EConT {Δ Φ Γ}.
-  Arguments EConF {Δ Φ Γ}.
+  Arguments ENil {Δ1 Δ2 b}.
+  Arguments EConT {Δ1 Δ2 Φ Γ}.
+  Arguments EConF {Δ1 Δ2 Φ Γ}.
 
   Notation εₑ := (ENil) .
   Notation "u ▶ₑ⁺" := (EConT u) (at level 40).
   Notation "u ▶ₑ⁻ e" := (EConF u e) (at level 40).
 
+  Equations alt_env_prefix {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) {x} (i : ↓[negb b]Φ ∋ x) : context by struct u :=
+    alt_env_prefix (u ▶ₑ⁺)   i := alt_env_prefix u i ;
+    alt_env_prefix (v ▶ₑ⁻ γ) i with cat_split i := {
+      | CLeftV j  := alt_env_prefix v j ;
+      | CRightV j := Δ1 +▶ ↓⁺ Φ1 } .
+
+  Definition alt_env_prefix_ren {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) {x} (i : ↓[negb b]Φ ∋ x)
+      : alt_env_prefix u i ⊆ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) .
+    revert Δ1 Δ2 b u i; induction Φ; intros Δ1 Δ2 b u i.
+    - inversion i.
+    - dependent elimination u; cbn.
+      * exact (r_concat3_1 ⊛ᵣ IHΦ _ _ _ a i) .
+      * destruct (cat_split i).
+        + exact (IHΦ _ _ _ a0 i).
+        + exact r_id.
+  Defined.
+
+  Definition alt_env_get {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) {x} (i : ↓[negb b]Φ ∋ x)
+             : val (alt_env_prefix u i) x .
+    revert Δ1 Δ2 b u i; induction Φ; intros Δ1 Δ2 b u i.
+    - inversion i.
+    - dependent elimination u; cbn.
+      * exact (IHΦ _ _ _ a i).
+      * destruct (cat_split i).
+        + exact (IHΦ _ _ _ a0 i) .
+        + exact (a1 _ j).
+  Defined.
+
+  Definition concat0_alt {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ)
+    : ↓[negb b]Φ ⇒ᵥ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) :=
+    fun _ i => alt_env_prefix_ren u i ᵣ⊛ᵥ alt_env_get u i .
+
   (* flattens an alternating environment into an unstructured one *)
-  Equations concat0 {Δ b Φ} : alt_env Δ b Φ -> ↓[negb b]Φ ⇒ᵥ (Δ +▶ ↓[b]Φ) :=
+  Equations concat0 {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) : ↓[negb b]Φ ⇒ᵥ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) :=
     concat0 (εₑ)     := s_empty ;
     concat0 (u ▶ₑ⁺)   := r_concat3_1 ᵣ⊛ concat0 u ;
     concat0 (u ▶ₑ⁻ e) := [ concat0 u , e ] .
 
   (* Flattens a pair of alternating environments for resp. player and opponent into a "closed" substitution *)
-  Equations concat1 {Δ} Φ {b} : alt_env Δ b Φ -> alt_env Δ (negb b) Φ -> ↓[b]Φ ⇒ᵥ Δ :=
+  Equations concat1 {Δ} Φ {b} : alt_env Δ Δ b Φ -> alt_env Δ Δ (negb b) Φ -> ↓[b]Φ ⇒ᵥ Δ :=
     concat1 ∅       _       _         := s_empty ;
     concat1 (Φ ▶ _) (u ▶ₑ⁺)  (v ▶ₑ⁻ e) := [ concat1 Φ u v , [ v_var , concat1 Φ v u ] ⊛ e ] ;
     concat1 (Φ ▶ _) (u ▶ₑ⁻ e) (v ▶ₑ⁺)  := concat1 Φ u v .
   Arguments concat1 {Δ Φ b}.
 
   (* lem 4.6 *)
-  Lemma concat_fixpoint {Δ Φ} (u : alt_env Δ Ⓟ Φ) (v : alt_env Δ Ⓞ Φ)
+  Lemma concat_fixpoint {Δ Φ} (u : alt_env Δ Δ Ⓟ Φ) (v : alt_env Δ Δ Ⓞ Φ)
     :  [ v_var , concat1 u v ] ⊛ concat0 u ≡ₐ concat1 v u
     /\ [ v_var , concat1 v u ] ⊛ concat0 v ≡ₐ concat1 u v .
     induction Φ; dependent destruction u; dependent destruction v; cbn; split.
@@ -300,12 +332,12 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   Qed.
 
   Definition m_strat_act Δ : psh alt_ext :=
-    fun Φ => (conf (Δ +▶ ↓⁺Φ) * alt_env Δ Ⓟ Φ)%type.
+    fun Φ => (conf (Δ +▶ ↓⁺Φ) * alt_env Δ Δ Ⓟ Φ)%type.
 
   Definition m_strat_pas Δ : psh alt_ext :=
-    fun Φ => alt_env Δ Ⓞ Φ.
+    fun Φ => alt_env Δ Δ Ⓞ Φ.
 
-  Definition m_strat_wrap {Δ Φ} (x : alt_env Δ Ⓟ Φ)
+  Definition m_strat_wrap {Δ Φ} (x : alt_env Δ Δ Ⓟ Φ)
      : {m : msg' (Δ +▶ ↓⁺ Φ) & dom' m ⇒ᵥ (Δ +▶ ↓⁺ Φ)} -> (msg' Δ + h_actv ogs_hg (m_strat_pas Δ) Φ) :=
       fun u =>
         match cat_split (fst (projT2 (projT1 u))) with
@@ -339,16 +371,17 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     m_strat a x
     ≊ (emb_delay (m_strat_play x) >>=
         fun j (r : (_ @ a) j) =>
-          go (match r
-              in (fiber _ b) return (itree' ogs_e (fun _ : alt_ext => msg' Δ) b)
-              with
-              | Fib (inl m) => RetF (m : (fun _ : alt_ext => msg' Δ) a)
-              | Fib (inr (x ,' p)) => VisF (x : ogs_e.(e_qry) _)
-                                          (fun r => m_strat (g_next r) (m_strat_resp p r))
-              end)).
-    apply it_eq_unstep.
+          match r in (fiber _ b) return (itree ogs_e (fun _ : alt_ext => msg' Δ) b)
+          with
+          | Fib (inl m) => Ret' (m : (fun _ : alt_ext => msg' Δ) a)
+          | Fib (inr (x ,' p)) => Vis' (x : ogs_e.(e_qry) _)
+                                       (fun r => m_strat (g_next r) (m_strat_resp p r))
+          end).
+    revert a x; unfold it_eq; coinduction R CIH; intros a x.
     cbn -[m_strat_play].
-    destruct (_observe (m_strat_play x)) as [ [ | [] ] | | [] ]; eauto.
+    destruct (_observe (m_strat_play x)) as [ [ | [] ] | | [] ]; econstructor; auto.
+    eapply (ft_t (it_eq_up2bind_t _ _)); econstructor; [ reflexivity | ].
+    intros ? ? x2 ->; destruct x2 as [ [ | [] ] ]; auto.
   Qed.
 
   Definition m_stratp {Δ} : m_strat_pas Δ ⇒ᵢ ogs_pas Δ :=
@@ -371,24 +404,11 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   Definition reduce_t (Δ : context) : Type :=
     ⦉ m_strat_act Δ ×ᵢ m_strat_pas Δ ⦊ᵢ .
 
-  (*
-  Definition reduce_t_mk {Δ Φ} b (u : alt_env Δ b Φ) (v : alt_env Δ (negb b) Φ)
-                         {x} (j : ↓[b]Φ ∋ x) (m : msg x) (γ : dom S m ⇒ᵥ (Δ +▶ ↓[b]Φ))
-        : (m_strat_act Δ ×ᵢ m_strat_pas Δ) (Φ ▶ dom S m) .
-    destruct b.
-    - refine (m_strat_resp v (x,' (j, m)), u ▶ₑ⁻ γ).
-    - refine (m_strat_resp u (x,' (_, m)), v ▶ₑ⁻ γ).
-    - refine ((_ , u) , v).
-    exact 
-  Defined.
-*)
-
-  (*
-  Lemma reduce_t_mk_conf {Δ Φ} b (c : conf (Δ +▶ ↓⁺Φ)) (u : alt_env Δ b Φ) (v : alt_env Δ (negb b) Φ)
-                             : fst (fst (reduce_t_mk b c u v)) = c .
-    now destruct b.
-  Qed.
-*)
+  Equations reduce_t_mk {Δ Φ} b (u : alt_env Δ Δ b Φ) (v : alt_env Δ Δ (negb b) Φ)
+                         {x} (j : ↓⁺Φ ∋ x) (m : msg x) (γ : dom S m ⇒ᵥ (Δ +▶ ↓⁺Φ))
+            : (m_strat_act Δ ×ᵢ m_strat_pas Δ) (Φ ▶ dom S m) :=
+    reduce_t_mk true  u v j m γ := (m_strat_resp v (x,' (j, m)), u ▶ₑ⁻ γ) ;
+    reduce_t_mk false u v j m γ := (m_strat_resp u (x,' (j, m)), v ▶ₑ⁻ γ) .
 
   Equations compo_body {Δ}
     : reduce_t Δ -> delay (reduce_t Δ + msg' Δ) :=
@@ -401,29 +421,33 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   (* Now we prove guardedness of this equation. *)
 
-  Definition sub_eval {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
-             : delay { m : msg' Δ & dom' m ⇒ᵥ Δ } :=
-        eval ([ v_var , e ] ⊛ₜ c) .
+  Variant is_tau' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
+    | IsTau {t : itree E X i} : is_tau' (TauF t) .
 
-  Definition eval_sub {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ)
-    : delay { m : msg' Δ & dom' m ⇒ᵥ Δ }.
-    refine (eval c >>= fun 'T1_0 x =>
-                match cat_split (fst (projT2 (projT1 x))) with
-                | CLeftV h => Ret'
-                               ((_ ,' (h , snd (projT2 (projT1 x)))) ,' [ v_var,  e ] ⊛ (projT2 x))
-                | CRightV h => _
-                end) .
-    refine (eval ([ e , ([v_var , e ] ⊛ projT2 x) ] ⊛ₜ (emb (_ ,' (h , (snd (projT2 (projT1 x)))))))).
-  Defined.
+  Definition is_tau {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_tau' t.(_observe).
 
-  Hypothesis eval_hyp : forall {Γ Δ}
-                          (c : conf (Δ +▶ Γ))
-                          (e : Γ ⇒ᵥ Δ),
-                          sub_eval c e ≊ eval_sub c e .
+  Definition sub_eval {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : delay { m : msg' Δ & dom' m ⇒ᵥ Δ } :=
+    eval ([ v_var , e ] ⊛ₜ c) .
 
-  Hypothesis eval_app_var : forall Γ x (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ)
-                              (p : is_var v),
-      eval (app v m e) ≊ Ret' ((x ,' (is_var_get p , m)) ,' e).
+  Definition eval_sub {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : delay { m : msg' Δ & dom' m ⇒ᵥ Δ } :=
+    eval c >>= fun 'T1_0 x => match cat_split (fst (projT2 (projT1 x))) with
+                            | CLeftV h => Ret' ((_ ,' (h , _)) ,' [ v_var,  e ] ⊛ projT2 x)
+                            | CRightV h => eval (app (e _ h) _ ([v_var , e ] ⊛ projT2 x))
+                            end .
+
+  
+  Class machine_correction_hyp : Prop := {
+    eval_split {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) :
+      sub_eval c e ≊ eval_sub c e ;
+
+    eval_app_var {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) (p : is_var v) :
+      eval (app v m e) ≊ Ret' ((x ,' (is_var_get p , m)) ,' e) ;
+
+    eval_app_not_var {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) (p : is_var v -> False) :
+      is_tau (eval (app v m e)) ;
+  }.
+
+  Context {MCH : machine_correction_hyp}.
 
   Lemma app_simpl {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) :
     app v m e = [ v_var , e ] ⊛ₜ app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r) .    
@@ -455,59 +479,145 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   Lemma eval_app_simpl {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) :
     eval (app v m e) ≊ eval_sub (app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r)) e .
     rewrite app_simpl.
-    apply eval_hyp.
+    apply eval_split.
   Qed.
 
-  (*
-  Lemma m_strat_play_app_simpl {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) :
-    eval (app v m e) ≊ eval_sub (app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r)) e .
+  Equations c_length {X} (Γ : ctx X) : nat :=
+    c_length ∅%ctx := O ;
+    c_length (Γ ▶ _)%ctx := Datatypes.S (c_length Γ) .
 
-*)
-  
+  Equations var_depth (Ψ : alt_ext) b {x} (j : ↓[b] Ψ ∋ x) : nat by struct Ψ :=
+    var_depth ∅%ctx        _     (!) ;
+    var_depth (Ψ ▶ Γ)%ctx true  i := aux Γ i
+      where aux (Γ1 : context) {x1} (i : (↓⁻ Ψ +▶ Γ1) ∋ x1) : nat by struct Γ1 := {
+        aux ∅%ctx         i1           := Datatypes.S (var_depth Ψ _ i1) ;
+        aux (Γ1 ▶ _)%ctx (Ctx.top)    := Datatypes.O ;
+        aux (Γ1 ▶ _)%ctx (Ctx.pop i1) := aux Γ1 i1 
+      } ;
+    var_depth (Ψ ▶ Γ)%ctx false i := Datatypes.S (var_depth Ψ _ i) .
+  Arguments var_depth {Ψ b x} j.
 
-  Variant is_tau' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
-    | IsTau {t : itree E X i} : is_tau' (TauF t) .
+  Definition var_height {Ψ : alt_ext} {b x} (j : ↓[b] Ψ ∋ x) : nat :=
+    Nat.sub (c_length Ψ) (var_depth j) .
 
-  Definition is_tau {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_tau' t.(_observe).
-
-  Hypothesis eval_app_not_var : forall Γ x (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ)
-                                  (p : is_var v -> False), is_tau (eval (app v m e)) .
-
-  Lemma cat_split_l {X} {Γ1 Γ2} {x : X} (i : Γ1 ∋ x) : cat_split (r_concat_l (Δ:=Γ2) _ i) = CLeftV i .
-    pose (uu := cat_split (r_concat_l (Δ:=Γ2) x i)); fold uu.
-    dependent induction uu.
-    - apply r_cover_l_inj in x1; rewrite x1 in x.
-      dependent destruction x; simpl_depind; reflexivity.
-    - symmetry in x1; apply r_cover_disj in x1; destruct x1.
+  Lemma var_depth_le {Ψ : alt_ext} {b x} (j : ↓[b] Ψ ∋ x) : (var_depth j <= c_length Ψ)%nat.
+    revert b j; induction Ψ; intros b j.
+    - inversion j.
+    - destruct b; cbn in *.
+      * induction x0.
+        + apply le_n_S, IHΨ.
+        + dependent elimination j.
+          now apply le_0_n.
+          now apply IHx0.
+      * apply le_n_S, IHΨ.
   Qed.
 
-  Lemma cat_split_r {X} {Γ1 Γ2} {x : X} (i : Γ2 ∋ x) : cat_split (r_concat_r (Γ:=Γ1) _ i) = CRightV i .
-    pose (uu := cat_split (r_concat_r (Γ:=Γ1) x i)); fold uu.
-    dependent induction uu.
-    - apply r_cover_disj in x1; destruct x1.
-    - apply r_cover_r_inj in x1; rewrite x1 in x.
-      dependent destruction x; simpl_depind; reflexivity.
-  Qed.
+  Definition compo_body_guarded_aux {Δ Ψ} (u : alt_env Δ Δ Ⓟ Ψ) (v : alt_env Δ Δ Ⓞ Ψ)
+                                    {x} (m : msg x) (γ : dom S m ⇒ᵥ (Δ +▶ ↓⁺ Ψ)) (j : ↓⁺ Ψ ∋ x)
+    : ev_guarded (fun 'T1_0 => @compo_body Δ)
+          (compo_body ((Ψ ▶ dom S m),'
+           (app (r_concat3_1 ᵣ⊛ᵥ concat0 v x j) m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r), v ▶ₑ⁺, u ▶ₑ⁻ γ))) .
+  pose (h := lt_wf (var_height j)).
+  remember (var_height j) as n.
+  revert Ψ u v γ j Heqn; induction h; intros Ψ u v γ j Heqn. 
+
+  unfold ev_guarded.
+  cbn -[cat_split].
+
+  pose (vv := @r_concat3_1 typ Δ ↓⁻ Ψ (@dom S x m) ᵣ⊛ᵥ @concat0 Δ Δ Ⓞ Ψ v x j).
+  change (r_concat3_1 ᵣ⊛ᵥ _) with vv.
+  destruct (is_var_dec vv).
+
+  - eassert (H1 : _) by exact (eval_app_var vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r) i).
+    apply it_eq_step in H1.
+    cbn in H1. unfold observe in H1.
+    pose (ot := _observe (eval (app vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r)))); fold ot in H1 |- *.
+    dependent elimination H1.
+    rewrite r_rel; clear r1 r_rel.
+    unfold m_strat_wrap.
+    cbn [fst snd projT1 projT2].
+    pose (ii := cat_split (is_var_get i)); change (cat_split _) with ii.
+    destruct ii.
+    * now do 2 econstructor.
+    * (*destruct (view_is_var_ren (concat0 v x j) r_concat3_1 i).*)
+      unfold dom', m_strat_resp; cbn [fst snd projT1 projT2].
+      refine (GNext _).
+      eapply H0; [ | reflexivity ].
+      rewrite Heqn.
+      unfold var_height.
+      Search (Datatypes.S _ - _).
+      eassert (H2 : _) by exact (@var_depth_le (Ψ ▶ dom S m) true _ j0).
+      simpl c_length in *.
+      (* wip here *)
+
 
   Definition compo_body_guarded {Δ} : eqn_ev_guarded (fun 'T1_0 => @compo_body Δ).
   intros [] [ Γ [ [c u] v ] ]; unfold m_strat_pas in v.
   
-  unfold ev_guarded; cbn -[cat_split].
+  unfold ev_guarded. cbn -[cat_split].
   (*rewrite reduce_t_mk_conf.*)
   pose (ot := _observe (eval c)); change (_observe (eval c)) with ot.
   destruct ot; clear c; try now do 2 econstructor.
   unfold m_strat_wrap; pose (h := cat_split (fst (projT2 (projT1 r)))); change (cat_split _) with h.
   destruct r as [ [ ? [ i m ] ] γ]; unfold dom' in *; cbn in *.
   destruct h; try now do 2 econstructor.
-  cbn in *.
+  unfold m_strat_resp; cbn [fst snd projT1 projT2]. 
+  refine (GNext _).
+
+  induction Γ; [ inversion j | ].
+  (*
+  Check concat0 v.
+
+  dependent induction j
 
   (*
   pose (p := Ⓟ); change Ⓟ with p in u; change Ⓞ with (negb p) in v.
   change (↓⁺ Γ) with (↓[p] Γ) in γ,j.
   remember p as b.
-*)
-  
+  *)
+
   refine (GNext _).
+*)
+  dependent elimination u.
+  dependent elimination v.
+  unfold compo_body at 2, m_strat_play, m_strat_resp; cbn [fst snd projT1 projT2 concat0].
+  eapply ev_guarded_cong; [ symmetry; apply fmap_bind_com | ]; cbn.
+  unfold m_strat_wrap.
+  unfold dom'; cbn [fst snd projT1 projT2].
+  unfold ev_guarded.
+  cbn -[cat_split].
+  cbn in γ.
+  eapply ev_guarded_cong.
+  symmetry.
+  unshelve refine (ft_t (it_eq_up2bind_t _ _) _ _ _ _ (BindR _ _ _ _ _)).
+  5: reflexivity.
+  refine (
+fun (i : T1) (x : {m0 : msg' (Δ +▶ (↓⁻ Γ +▶ dom S m)) & dom' m0 ⇒ᵥ (Δ +▶ (↓⁻ Γ +▶ dom S m))}) =>
+      match cat_split (fst (projT2 (projT1 x))) with
+      | CRightV h => 
+          Ret'
+            (inl
+               ((Γ ▶ dom S m ▶ dom S (snd (projT2 (projT1 x)))),'
+                (app (r_concat3_1 ᵣ⊛ᵥ ([concat0 u, γ]) _ h)
+                   (snd (projT2 (projT1 x))) ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r), (u ▶ₑ⁻ γ) ▶ₑ⁺, 
+                 ((v ▶ₑ⁺) ▶ₑ⁻ projT2 x))))
+      | CLeftV h => Ret' (inr ((projT1 (projT1 x),' (h, snd (projT2 (projT1 x))))))
+      end ).
+  intros [] ? x2 ->. destruct x2 as [[ ? [ ? ? ] ] ? ]; cbn [fst snd projT1 projT2].
+  pose (xx := cat_split h); change (cat_split h) with xx; destruct xx; auto.
+  shelve.
+ (* wip *)
+  
+  destruct (cat_split h); eauto.
+
+  
+  cbn.
+  unfold m_strat_wrap.
+  cbn
+  change (ev_guarded')
+
+  unfold m_strat_wrap.
+
   
   revert u v x m γ j; induction Γ; intros u v ? m γ j; [ dependent elimination j | ].
   change (ev_guarded' ?e (_observe ?u)) with (ev_guarded e u) in IHΓ.
@@ -911,6 +1021,7 @@ Set Printing Implicit.
     (* does this hold? *)
 
   Admitted.
+*)
 
   Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a)
     : delay (msg' Δ) :=
@@ -921,15 +1032,25 @@ Set Printing Implicit.
   Definition barb {Γ} Δ (x y : conf Γ) : Prop :=
     forall e : Γ ⇒ᵥ Δ, (inj_init_act x ∥ inj_init_pas e) ≈ (inj_init_act y ∥ inj_init_pas e).
 
-  Equations reduce {Δ} : (fun (_ : T1) => reduce_t Δ) ⇒ᵢ itree ∅ₑ (fun _ => msg' Δ) :=
-    reduce T1_0 u := eval_in_env
+  Equations reduce {Δ} : reduce_t Δ -> delay (msg' Δ) :=
+    reduce u := eval_in_env
                        ([ v_var , concat1 (snd (fst (projT2 u))) (snd (projT2 u)) ])
                        (fst (fst (projT2 u))) .
+
+  Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => msg' Δ) i :=
+    fun 'T1_0 => reduce .
+
+  Definition reduce_t_eq (Δ : context) : relation (reduce_t Δ) :=
+    fun x1 x2 =>
+     exists p : projT1 x1 = projT1 x2,
+       rew p in
+       fst (projT2 x1) ≈ fst (projT2 x2)
+       /\ h_pasvR ogs_hg (it_wbisim (eqᵢ _)) _ (rew p in snd (projT2 x1)) (snd (projT2 x2)). 
 
   Lemma quatre_trois_pre {Δ} (x : reduce_t Δ)
     :
         (compo_body x >>= fun _ r => match r with
-                                     | inl x' => reduce _ x'
+                                     | inl x' => reduce' _ x'
                                      | inr y => Ret' (y : (fun _ => msg' _) _)
                                      end)
         ≊
@@ -937,37 +1058,35 @@ Set Printing Implicit.
                       fun _ u =>
                         match cat_split (fst (projT2 (projT1 u))) with
                             | CLeftV h => Ret' (_ ,' (h, snd (projT2 (projT1 u))))
-                            | CRightV h => reduce _ (_ ,'
+                            | CRightV h => reduce' _ (_ ,'
                                                     (m_strat_resp (snd (projT2 x)) (_ ,' (h, snd (projT2 (projT1 u)))), EConF (snd (fst (projT2 x))) (projT2 u)))
                             end).
     etransitivity.
     unfold compo_body; apply bind_bind_com.
     etransitivity.
-    unfold m_strat_play. apply fmap_bind_com.
+    unfold m_strat_play, m_strat_wrap. apply fmap_bind_com.
     remember (eval (fst (fst (projT2 x)))) as t eqn:H; clear H; revert t.
     unfold it_eq; coinduction R CIH; intros t.
-    cbn; destruct (t.(_observe)).
-    + destruct r as [[? [i m]] γ]; cbn.
-      destruct (cat_split i).
-      econstructor; reflexivity.
-      cbn -[eval_in_env] .
-      change (it_eqF _ _ _ _ (_observe ?a) (_observe ?b))
-        with (it_eq_map  ∅ₑ (eqᵢ _) (it_eq_t _ (eqᵢ _) R) T1_0 a b).
-      reflexivity.
+    cbn; destruct (t.(_observe)) as [ [ [ ? [ i ? ] ] ? ] | | [] ]; cbn.
+    + destruct (cat_split i).
+      * econstructor; reflexivity.
+      * cbn -[eval_in_env] .
+        change (it_eqF _ _ _ _ (_observe ?a) (_observe ?b))
+          with (it_eq_map  ∅ₑ (eqᵢ _) (it_eq_t _ (eqᵢ _) R) T1_0 a b).
+        reflexivity.
     + econstructor; apply CIH.
-    + destruct q.
   Qed.
 
   Lemma quatre_trois {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a)
-    : reduce _ (_ ,' (c , e)) ≊ (c ∥ e) .
-    apply iter_evg_uniq.
+    : reduce (_ ,' (c , e)) ≊ (c ∥ e) .
+    unshelve eapply (iter_evg_uniq (fun 'T1_0 u => compo_body u) (fun 'T1_0 u => reduce u) _ _ T1_0).
     clear a c e; intros [] [ ? [ u v ] ].
     etransitivity; cycle 1.
     symmetry.
     apply quatre_trois_pre.
     unfold reduce at 1.
     etransitivity.
-    apply fmap_eq, eval_hyp.
+    apply fmap_eq, eval_split.
     etransitivity.
     apply bind_fmap_com.
     unfold it_eq; cbn [fst snd projT2 projT1].
@@ -981,25 +1100,33 @@ Set Printing Implicit.
     - cbn; econstructor. reflexivity.
     - cbn -[it_eq_map fmap].
       change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)) bot) with (it_eq (E:=∅ₑ) (eqᵢ (fun _ : T1 => msg' Δ))).
-      apply it_eq_step.
-      apply fmap_eq.
-      rewrite c_sub_sub.
-      unshelve rewrite c_sub_proper; try reflexivity.
-      apply s_eq_cover_uniq.
-      * rewrite <- (proj2 (concat_fixpoint (snd u) v)).
-        rewrite <- e_comp_ren_r.
-        rewrite s_eq_cat_l.
-        rewrite <- e_comp_ren_l.
-        apply e_comp_proper; try reflexivity.
-        apply s_eq_cover_uniq.
-        + unfold r_concat3_1.
-          now rewrite <- s_ren_comp, 2 s_eq_cat_l.
-        + unfold r_concat3_1.
-          rewrite <- s_ren_comp, s_eq_cat_r.
-          cbn; now rewrite s_ren_comp, s_eq_cat_r, s_eq_cat_l.
-      * rewrite <- e_comp_ren_r.
-        rewrite s_eq_cat_r, e_comp_ren_r, v_sub_var.
-        now rewrite s_ren_comp, 2 s_eq_cat_r .
+      apply it_eq_step, fmap_eq.
+      unfold m_strat_resp.
+      cbn [fst snd projT1 projT2].
+      rewrite app_ren.
+      rewrite concat1_equation_2.
+
+      pose (xx := [@v_var _ Δ , [concat1 v (snd u), ([v_var, concat1 (snd u) v]) ⊛ γ]] ⊛ᵥ r_concat3_1 ᵣ⊛ᵥ concat0 v (projT1 m) j).
+      change ([ v_var , [ _ , _ ]] ⊛ᵥ _) with xx. 
+      assert (H : xx = concat1 (snd u) v (projT1 m) j); [ unfold xx; clear xx | rewrite H; clear H ].
+      change (?a ⊛ᵥ ?b ᵣ⊛ᵥ (concat0 v _ j)) with ((a ⊛ (b ᵣ⊛ concat0 v)) _ j).
+      unfold e_ren. rewrite v_sub_sub.
+      etransitivity; [ eapply e_comp_proper; [ | reflexivity ] | ].
+      rewrite e_comp_ren_r, v_sub_var.
+      unfold r_concat3_1.
+      etransitivity.
+      unfold s_ren at 1.
+      apply s_eq_cover_map.
+      change (s_map ?a ?b) with (s_ren a b); change (s_cover cover_cat ?a ?b) with ([ a , b ]).
+      rewrite s_eq_cat_l.
+      rewrite s_ren_comp, s_eq_cat_r, s_eq_cat_l.
+      reflexivity.
+      apply (proj2 (concat_fixpoint (snd u) v)).
+      erewrite app_proper; [ reflexivity | ].
+      rewrite 2 e_comp_ren_r.
+      rewrite v_sub_var.
+      rewrite 2 s_eq_cat_r.
+      reflexivity.
    Qed.
 
   Lemma quatre_trois_app {Γ Δ}
