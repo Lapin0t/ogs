@@ -206,6 +206,17 @@ A couple derived properties on the constructed operations.
     unfold e_ren; now rewrite v_sub_sub, e_comp_ren_r, v_sub_var.
   Qed.
 
+  Lemma v_sub_comp {Γ1 Γ2 Γ3} (u : Γ2 ⇒ᵥ Γ3) (v : Γ1 ⇒ᵥ Γ2) {x} (w : val Γ1 x) : u ⊛ᵥ (v ⊛ᵥ w) = (u ⊛ v) ⊛ᵥ w .
+    pose (w' := s_append s_empty w : (∅ ▶ x) ⇒ᵥ Γ1).
+    change w with (w' _ Ctx.top).
+    do 2 change (?u ⊛ᵥ ?v _ Ctx.top) with ((u ⊛ v) _ Ctx.top).
+    apply v_sub_sub.
+  Qed.
+
+  Lemma v_sub_id {Γ1 Γ2} (u : Γ1 ⇒ᵥ Γ2) {x} (i : Γ1 ∋ x) : u ⊛ᵥ (v_var x i) = u x i .
+    apply v_sub_var.
+  Qed.
+
 (*|
 Evaluate a configuration inside an environment (assignment), returning only the message part (the "positive" or "static" part).
 |*)
@@ -271,27 +282,19 @@ Evaluate a configuration inside an environment (assignment), returning only the 
       | CLeftV j  := alt_env_prefix v j ;
       | CRightV j := Δ1 +▶ ↓⁺ Φ1 } .
 
-  Definition alt_env_prefix_ren {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) {x} (i : ↓[negb b]Φ ∋ x)
-      : alt_env_prefix u i ⊆ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) .
-    revert Δ1 Δ2 b u i; induction Φ; intros Δ1 Δ2 b u i.
-    - inversion i.
-    - dependent elimination u; cbn.
-      * exact (r_concat3_1 ⊛ᵣ IHΦ _ _ _ a i) .
-      * destruct (cat_split i).
-        + exact (IHΦ _ _ _ a0 i).
-        + exact r_id.
-  Defined.
+  Equations alt_env_prefix_ren {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) {x} (i : ↓[negb b]Φ ∋ x)
+            : alt_env_prefix u i ⊆ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) :=
+    alt_env_prefix_ren (u ▶ₑ⁺)   i := r_concat3_1 ⊛ᵣ alt_env_prefix_ren u i ;
+    alt_env_prefix_ren (v ▶ₑ⁻ γ) i with cat_split i := {
+      | CLeftV j  := alt_env_prefix_ren v j ;
+      | CRightV j := r_id } .
 
-  Definition alt_env_get {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) {x} (i : ↓[negb b]Φ ∋ x)
-             : val (alt_env_prefix u i) x .
-    revert Δ1 Δ2 b u i; induction Φ; intros Δ1 Δ2 b u i.
-    - inversion i.
-    - dependent elimination u; cbn.
-      * exact (IHΦ _ _ _ a i).
-      * destruct (cat_split i).
-        + exact (IHΦ _ _ _ a0 i) .
-        + exact (a1 _ j).
-  Defined.
+  Equations alt_env_get {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) {x} (i : ↓[negb b]Φ ∋ x)
+            : val (alt_env_prefix u i) x :=
+    alt_env_get (u ▶ₑ⁺)   i := alt_env_get u i ;
+    alt_env_get (v ▶ₑ⁻ γ) i with cat_split i := {
+      | CLeftV j  := alt_env_get v j ;
+      | CRightV j := γ _ j } .
 
   Definition concat0_alt {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ)
     : ↓[negb b]Φ ⇒ᵥ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) :=
@@ -302,6 +305,22 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     concat0 (εₑ)     := s_empty ;
     concat0 (u ▶ₑ⁺)   := r_concat3_1 ᵣ⊛ concat0 u ;
     concat0 (u ▶ₑ⁻ e) := [ concat0 u , e ] .
+
+  Lemma concat0_alt_eq {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) : concat0 u ≡ₐ concat0_alt u .
+    intros ? i; unfold concat0_alt.
+    revert Δ1 Δ2 b u i; induction Φ; intros Δ1 Δ2 b u i.
+    - inversion i.
+    - dependent elimination u; cbn.
+      * unfold e_ren, e_comp, s_map, v_ren.
+        rewrite (IHΦ _ _ _ a0 i); unfold v_ren.
+        rewrite v_sub_comp, e_comp_ren_r, v_sub_var, s_ren_comp.
+        reflexivity.
+      * cbn in i; unfold s_cat, s_cover.
+        pose (ii := cat_split i); change (cover_split _ i) with ii; change (cat_split i) with ii.
+        destruct ii; cbn.
+        + exact (IHΦ _ _ _ a1 i).
+        + unfold v_ren; rewrite s_ren_id; symmetry; apply v_var_sub.
+  Qed.
 
   (* Flattens a pair of alternating environments for resp. player and opponent into a "closed" substitution *)
   Equations concat1 {Δ} Φ {b} : alt_env Δ Δ b Φ -> alt_env Δ Δ (negb b) Φ -> ↓[b]Φ ⇒ᵥ Δ :=
@@ -512,6 +531,113 @@ Evaluate a configuration inside an environment (assignment), returning only the 
       * apply le_n_S, IHΨ.
   Qed.
 
+  Lemma depth_increases {Δ Ψ b} (v : alt_env Δ Δ b Ψ) {x} (j : ↓[negb b] Ψ ∋ x) (k : ↓[b] Ψ ∋ x)
+    (H : concat0 v x j = v_var x (r_concat_r x k)) : var_depth j < var_depth k .
+    revert b v x j k H; induction Ψ; intros b v t j k H; [ inversion j | ].
+    destruct b; cbn in j,k|-*.
+    - pose (k' := k); change k with k' at 1.
+      pose (x' := x); change x with x' at 1; change x with x' in k'.
+      pose (t' := t); change t with t' at 2; change t with t' in k'.
+      remember k' as k_; clear Heqk_ k'.
+      remember x' as x_; clear Heqx_ x'.
+      remember t' as t_; clear Heqt_ t'.
+      revert x_ t_ k_; induction x; intros x_ t_ k_.
+      * apply le_n_S.
+        dependent elimination v.
+        refine (IHΨ _ a _ j k _).
+        assert (H2 : @r_concat3_1 typ Δ ↓⁻ Φ ∅ ≡ₐ r_id)
+          by (apply s_eq_cover_uniq; [ reflexivity | cbn; now rewrite r_cover_l_nil ]).
+        cbn in H; unfold e_ren in H.
+        unshelve erewrite (e_comp_proper) in H.
+        5: reflexivity.
+        all: cycle 2.
+        etransitivity.
+        apply s_ren_proper; [ reflexivity | exact H2 ].
+        apply s_ren_id.
+        rewrite v_var_sub in H.
+        exact H.
+      * dependent elimination k; cbn in *.
+        + dependent elimination v; cbn in *.
+          pose (H' := (_ ,' H) : is_var _).
+          assert (Heq : is_var_get H' = Ctx.top) by reflexivity.
+          remember H' as H1; clear H' H HeqH1.
+          change ((?u ᵣ⊛ concat0 a) x1 j) with (u ᵣ⊛ᵥ concat0 a x1 j) in H1.
+          destruct (view_is_var_ren (concat0 a x1 j) _ H1).
+          cbn in Heq.
+          destruct (cat_split (is_var_get p)).
+          ++ unfold r_concat3_1 in Heq.
+             change ([ ?u , ?v ] _ _) with (([ u , v ] ⊛ᵣ r_concat_l) _ i) in Heq.
+             rewrite s_eq_cat_l in Heq.
+             cbn in Heq; unfold s_ren, s_map, s_pop in Heq.
+             remember (r_cover_l cover_cat x1 i); inversion Heq.
+          ++ unfold r_concat3_1 in Heq.
+             change ([ ?u , ?v ] _ _) with (([ u , v ] ⊛ᵣ r_concat_r) _ j0) in Heq.
+             rewrite s_eq_cat_r in Heq.
+             cbn in Heq; unfold s_ren, s_map, s_pop in Heq.
+             remember (r_cover_l cover_cat x1 j0); inversion Heq.
+        + dependent elimination v.
+          apply (IHx (a ▶ₑ⁺) h).
+          cbn in *.
+          clear - H S M MHT MH MCH.
+          pose (H' := (_ ,' H) : is_var _).
+          assert (Heq : is_var_get H' = (s_pop ⊛ᵣ r_cover_r cover_cat) x2 h) by reflexivity.
+          remember H' as H1; clear H' H HeqH1.
+          change ((?u ᵣ⊛ concat0 a) x2 j) with (u ᵣ⊛ᵥ concat0 a x2 j) in H1.
+          destruct (view_is_var_ren (concat0 a x2 j) _ H1).
+          destruct p; cbn in *.
+          unfold e_ren, e_comp, s_map; rewrite e, v_sub_id; unfold s_ren, s_map.
+          destruct (cat_split x0).
+          ++ change (r_concat3_1 x2 _) with ((@r_concat3_1 typ Δ ↓⁻ Φ (x ▶ y) ⊛ᵣ r_concat_l) x2 i) in Heq.
+             unfold r_concat3_1 in Heq; rewrite s_eq_cat_l in Heq.
+             change (r_concat3_1 x2 _) with ((@r_concat3_1 typ Δ ↓⁻ Φ x ⊛ᵣ r_concat_l) x2 i).
+             unfold r_concat3_1; rewrite s_eq_cat_l; unfold r_concat_l.
+             cbn in Heq; unfold s_pop, s_ren, s_map in Heq.
+             remember (@r_cover_l typ Δ (↓⁻ Φ +▶ x) (Δ +▶ (↓⁻ Φ +▶ x)) (@cover_cat typ Δ (↓⁻ Φ +▶ x)) x2 i).
+             remember (@r_cover_r typ Δ (↓⁻ Φ +▶ x) (Δ +▶ (↓⁻ Φ +▶ x)) (@cover_cat typ Δ (↓⁻ Φ +▶ x)) x2 h).
+             clear Heqh0 Heqh1; now dependent induction Heq.
+          ++ change (r_concat3_1 x2 _) with ((@r_concat3_1 typ Δ ↓⁻ Φ (x ▶ y) ⊛ᵣ r_concat_r) x2 j0) in Heq.
+             unfold r_concat3_1 in Heq; rewrite s_eq_cat_r in Heq.
+             change (r_concat3_1 x2 _) with ((@r_concat3_1 typ Δ ↓⁻ Φ x ⊛ᵣ r_concat_r) x2 j0).
+             unfold r_concat3_1; rewrite s_eq_cat_r; unfold r_concat_l.
+             cbn in Heq; unfold s_pop, s_ren, s_map in Heq.
+             unfold s_ren, s_map, r_concat_r.
+             remember ((@r_cover_r typ Δ (↓⁻ Φ +▶ x) (Δ +▶ (↓⁻ Φ +▶ x)) (@cover_cat typ Δ (↓⁻ Φ +▶ x)) x2
+       (@r_cover_l typ ↓⁻ Φ x (↓⁻ Φ +▶ x) (@cover_cat typ ↓⁻ Φ x) x2 j0))).
+             remember ((@r_cover_r typ Δ (↓⁻ Φ +▶ x) (Δ +▶ (↓⁻ Φ +▶ x)) (@cover_cat typ Δ (↓⁻ Φ +▶ x)) x2
+       (@r_cover_l typ ↓⁻ Φ x (↓⁻ Φ +▶ x) (@cover_cat typ ↓⁻ Φ x) x2 j0))).
+             clear Heqh0 Heqh1; now dependent induction Heq.
+    - pose (j' := j); change j with j' at 1.
+      pose (x' := x); change x with x' at 1; change x with x' in j'.
+      pose (t' := t); change t with t' at 1; change t with t' in j'.
+      remember j' as j_; clear Heqj_ j'.
+      remember x' as x_; clear Heqx_ x'.
+      remember t' as t_; clear Heqt_ t'.
+      revert x_ t_ j_; induction x; intros x_ t_ j_.
+      * apply le_n_S.
+        dependent elimination v.
+        refine (IHΨ _ a0 _ j k _).
+        cbn in H. unfold s_cat in H.
+        unfold s_cover in H.
+        destruct (cover_split cover_cat j).
+        cbn; rewrite r_cover_l_nil; exact H.
+        inversion j.
+      * dependent elimination j; cbn.
+        + apply PeanoNat.Nat.lt_0_succ.
+        + dependent elimination v.
+          eapply (IHx (a0 ▶ₑ⁻ (a1 ⊛ᵣ s_pop))).
+          clear - H M MHT MH MCH.
+          cbn in *.
+          rewrite <- H.
+          change (([ ?u , a1 ]) x2 (pop h)) with (([ u , a1 ] ⊛ᵣ s_pop) x2 h).
+          apply s_eq_cover_uniq.
+          ++ rewrite <- s_ren_comp.
+             change (s_pop ⊛ᵣ r_cover_l cover_cat) with (@r_cover_l typ ↓⁻ Φ0 (x ▶ y) (↓⁻ Φ0 +▶ x ▶ y) (@cover_cat typ ↓⁻ Φ0 (x ▶ y))).
+             now rewrite s_eq_cat_l.
+          ++ rewrite <- s_ren_comp.
+             change (s_pop ⊛ᵣ r_cover_r cover_cat) with (@r_cover_r typ ↓⁻ Φ0 (x ▶ y) (↓⁻ Φ0 +▶ x ▶ y) (@cover_cat typ ↓⁻ Φ0 (x ▶ y)) ⊛ᵣ s_pop).
+             now rewrite s_ren_comp, s_eq_cat_r.
+  Qed.
+
   Definition compo_body_guarded_aux {Δ Ψ} (u : alt_env Δ Δ Ⓟ Ψ) (v : alt_env Δ Δ Ⓞ Ψ)
                                     {x} (m : msg x) (γ : dom S m ⇒ᵥ (Δ +▶ ↓⁺ Ψ)) (j : ↓⁺ Ψ ∋ x)
     : ev_guarded (fun 'T1_0 => @compo_body Δ)
@@ -536,11 +662,30 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     rewrite r_rel; clear r1 r_rel.
     unfold m_strat_wrap.
     cbn [fst snd projT1 projT2].
+
+    remember vv as v0; unfold vv in Heqv0.
+    rewrite (concat0_alt_eq v _ j) in Heqv0. 
+    unfold concat0_alt, v_ren in Heqv0.
+    rewrite v_sub_comp, e_comp_ren_r, v_sub_var, <- s_ren_comp in Heqv0.
+    change ((_ ⊛ᵣ ?r) ⊛ᵥ ?v) with (r ᵣ⊛ᵥ v) in Heqv0.
     pose (ii := cat_split (is_var_get i)); change (cat_split _) with ii.
+    revert i ii; rewrite Heqv0; intros i ii; clear vv v0 Heqv0.
+    destruct (view_is_var_ren (alt_env_get v j) _ i).
+    remember ii as ii'; clear ii Heqii'.
+    destruct ii'.
+    cbn in ii'.
+    unfold s_ren, s_map in ii'.
+    Check is_var_get p.
+
+
+    cbn -[cat_split] in *.
     destruct ii.
     * now do 2 econstructor.
-    * (*destruct (view_is_var_ren (concat0 v x j) r_concat3_1 i).*)
+    * 
       unfold dom', m_strat_resp; cbn [fst snd projT1 projT2].
+      
+      
+      
       refine (GNext _).
       eapply H0; [ | reflexivity ].
       rewrite Heqn.
@@ -548,6 +693,7 @@ Evaluate a configuration inside an environment (assignment), returning only the 
       Search (Datatypes.S _ - _).
       eassert (H2 : _) by exact (@var_depth_le (Ψ ▶ dom S m) true _ j0).
       simpl c_length in *.
+      Search (_ <= Datatypes.S _)%nat.
       (* wip here *)
 
 
