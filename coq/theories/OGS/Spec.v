@@ -501,10 +501,6 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     apply eval_split.
   Qed.
 
-  Equations c_length {X} (Γ : ctx X) : nat :=
-    c_length ∅%ctx := O ;
-    c_length (Γ ▶ _)%ctx := Datatypes.S (c_length Γ) .
-
   Equations var_depth (Ψ : alt_ext) b {x} (j : ↓[b] Ψ ∋ x) : nat by struct Ψ :=
     var_depth ∅%ctx        _     (!) ;
     var_depth (Ψ ▶ Γ)%ctx true  i := aux Γ i
@@ -525,31 +521,25 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     remember t' as t_; clear Heqt_ t'.
     remember x' as x_; clear Heqx_ x'.
     remember Γ' as Γ_; clear HeqΓ_ Γ'.
-    unfold r_concat_l.
-    revert x_ Γ_ t_; induction Γ; cbn; intros x_ Γ_ t_.
-    - now rewrite r_cover_l_nil.
-    - now apply IHΓ.
+    revert x_ Γ_ t_; induction Γ; intros x_ Γ_ t_; cbn.
+    now rewrite r_cover_l_nil.
+    now apply IHΓ.
   Qed.
 
   Definition var_height {Ψ : alt_ext} {b x} (j : ↓[b] Ψ ∋ x) : nat :=
     Nat.sub (c_length Ψ) (var_depth j) .
 
   Lemma var_depth_le {Ψ : alt_ext} {b x} (j : ↓[b] Ψ ∋ x) : (var_depth j <= c_length Ψ)%nat.
-    revert b j; induction Ψ; intros b j.
-    - inversion j.
-    - destruct b; cbn in *.
-      * induction x0.
-        + apply le_n_S, IHΨ.
-        + dependent elimination j.
-          now apply le_0_n.
-          now apply IHx0.
-      * apply le_n_S, IHΨ.
+    revert b j; induction Ψ; intros b j; [ inversion j | ].
+    destruct b; cbn in *; [ | apply le_n_S, IHΨ ].
+    induction x0; [ apply le_n_S, IHΨ | ].
+    dependent elimination j; [ now apply le_0_n | now apply IHx0 ].
   Qed.
 
   Lemma depth_increases {Δ Ψ b} (v : alt_env Δ Δ b Ψ) {x} (j : ↓[negb b] Ψ ∋ x) (k : ↓[b] Ψ ∋ x)
     (H : concat0 v x j = v_var x (r_concat_r x k)) : var_depth j < var_depth k .
     revert b v x j k H; induction Ψ; intros b v t j k H; [ inversion j | ].
-    destruct b; cbn in j,k|-*.
+    destruct b; cbn in *.
     - pose (k' := k); change k with k' at 1.
       pose (x' := x); change x with x' at 1; change x with x' in k'.
       pose (t' := t); change t with t' at 2; change t with t' in k'.
@@ -563,37 +553,23 @@ Evaluate a configuration inside an environment (assignment), returning only the 
         assert (H2 : @r_concat3_1 typ Δ ↓⁻ Φ ∅ ≡ₐ r_id)
           by (apply s_eq_cover_uniq; [ reflexivity | cbn; now rewrite r_cover_l_nil ]).
         cbn in H; unfold e_ren in H.
-        unshelve erewrite (e_comp_proper) in H.
-        5: reflexivity.
-        all: cycle 2.
-        etransitivity.
-        apply s_ren_proper; [ reflexivity | exact H2 ].
-        apply s_ren_id.
-        rewrite v_var_sub in H.
-        exact H.
-      * dependent elimination k; cbn in *.
-        + dependent elimination v; cbn in *.
-          pose (H' := (_ ,' H) : is_var _).
+        unshelve erewrite (e_comp_proper _ v_var _ _ (concat0 a)) in H;
+          [ | now rewrite v_var_sub in H | reflexivity ].
+        etransitivity; [ apply s_ren_proper | apply s_ren_id ]; auto.
+      * dependent elimination v; dependent elimination k; cbn in *.
+        + pose (H' := (_ ,' H) : is_var _).
           assert (Heq : is_var_get H' = Ctx.top) by reflexivity.
           remember H' as H1; clear H' H HeqH1.
           change ((?u ᵣ⊛ concat0 a) x1 j) with (u ᵣ⊛ᵥ concat0 a x1 j) in H1.
-          destruct (view_is_var_ren (concat0 a x1 j) _ H1).
-          cbn in Heq.
+          destruct (view_is_var_ren (concat0 a x1 j) _ H1); cbn in Heq.
           destruct (cat_split (is_var_get p)).
-          ++ unfold r_concat3_1 in Heq.
-             change ([ ?u , ?v ] _ _) with (([ u , v ] ⊛ᵣ r_concat_l) _ i) in Heq.
-             rewrite s_eq_cat_l in Heq.
-             cbn in Heq; unfold s_ren, s_map, s_pop in Heq.
-             remember (r_cover_l cover_cat x1 i); inversion Heq.
-          ++ unfold r_concat3_1 in Heq.
-             change ([ ?u , ?v ] _ _) with (([ u , v ] ⊛ᵣ r_concat_r) _ j0) in Heq.
-             rewrite s_eq_cat_r in Heq.
-             cbn in Heq; unfold s_ren, s_map, s_pop in Heq.
-             remember (r_cover_l cover_cat x1 j0); inversion Heq.
-        + dependent elimination v.
-          apply (IHx (a ▶ₑ⁺) h).
-          cbn in *.
-          clear - H S M MHT MH MCH.
+          ++ change (?u x1 _) with ((u ⊛ᵣ r_concat_l) _ i) in Heq.
+             unfold r_concat3_1 in Heq; rewrite s_eq_cat_l in Heq.
+             cbn in Heq; unfold s_ren, s_map, s_pop in Heq; inversion Heq.
+          ++ change (?u x1 _) with ((u ⊛ᵣ r_concat_r) _ j0) in Heq.
+             unfold r_concat3_1 in Heq; rewrite s_eq_cat_r in Heq.
+             cbn in Heq; unfold s_ren, s_map, s_pop in Heq; inversion Heq.
+        + apply (IHx (a ▶ₑ⁺) h); cbn.
           pose (H' := (_ ,' H) : is_var _).
           assert (Heq : is_var_get H' = (s_pop ⊛ᵣ r_cover_r cover_cat) x2 h) by reflexivity.
           remember H' as H1; clear H' H HeqH1.
@@ -602,24 +578,22 @@ Evaluate a configuration inside an environment (assignment), returning only the 
           destruct p; cbn in *.
           unfold e_ren, e_comp, s_map; rewrite e, v_sub_id; unfold s_ren, s_map.
           destruct (cat_split x0).
-          ++ change (r_concat3_1 x2 _) with ((@r_concat3_1 typ Δ ↓⁻ Φ (x ▶ y) ⊛ᵣ r_concat_l) x2 i) in Heq.
+          ++ change (r_concat3_1 x2 _) with ((@r_concat3_1 _ _ ↓⁻ Φ (x ▶ y) ⊛ᵣ r_concat_l) x2 i) in Heq.
              unfold r_concat3_1 in Heq; rewrite s_eq_cat_l in Heq.
-             change (r_concat3_1 x2 _) with ((@r_concat3_1 typ Δ ↓⁻ Φ x ⊛ᵣ r_concat_l) x2 i).
+             change (r_concat3_1 x2 _) with ((@r_concat3_1 _ _ ↓⁻ Φ x ⊛ᵣ r_concat_l) x2 i).
              unfold r_concat3_1; rewrite s_eq_cat_l; unfold r_concat_l.
              cbn in Heq; unfold s_pop, s_ren, s_map in Heq.
-             remember (@r_cover_l typ Δ (↓⁻ Φ +▶ x) (Δ +▶ (↓⁻ Φ +▶ x)) (@cover_cat typ Δ (↓⁻ Φ +▶ x)) x2 i).
-             remember (@r_cover_r typ Δ (↓⁻ Φ +▶ x) (Δ +▶ (↓⁻ Φ +▶ x)) (@cover_cat typ Δ (↓⁻ Φ +▶ x)) x2 h).
+             remember (@r_cover_l _ _ _ (Δ +▶ (↓⁻ Φ +▶ x)) cover_cat x2 i).
+             remember (@r_cover_r _ _ _ (Δ +▶ (↓⁻ Φ +▶ x)) cover_cat x2 h).
              clear Heqh0 Heqh1; now dependent induction Heq.
-          ++ change (r_concat3_1 x2 _) with ((@r_concat3_1 typ Δ ↓⁻ Φ (x ▶ y) ⊛ᵣ r_concat_r) x2 j0) in Heq.
+          ++ change (r_concat3_1 x2 _) with ((@r_concat3_1 _ Δ _ (x ▶ y) ⊛ᵣ r_concat_r) x2 j0) in Heq.
              unfold r_concat3_1 in Heq; rewrite s_eq_cat_r in Heq.
-             change (r_concat3_1 x2 _) with ((@r_concat3_1 typ Δ ↓⁻ Φ x ⊛ᵣ r_concat_r) x2 j0).
+             change (r_concat3_1 x2 _) with ((@r_concat3_1 _ Δ _ x ⊛ᵣ r_concat_r) x2 j0).
              unfold r_concat3_1; rewrite s_eq_cat_r; unfold r_concat_l.
              cbn in Heq; unfold s_pop, s_ren, s_map in Heq.
              unfold s_ren, s_map, r_concat_r.
-             remember ((@r_cover_r typ Δ (↓⁻ Φ +▶ x) (Δ +▶ (↓⁻ Φ +▶ x)) (@cover_cat typ Δ (↓⁻ Φ +▶ x)) x2
-       (@r_cover_l typ ↓⁻ Φ x (↓⁻ Φ +▶ x) (@cover_cat typ ↓⁻ Φ x) x2 j0))).
-             remember ((@r_cover_r typ Δ (↓⁻ Φ +▶ x) (Δ +▶ (↓⁻ Φ +▶ x)) (@cover_cat typ Δ (↓⁻ Φ +▶ x)) x2
-       (@r_cover_l typ ↓⁻ Φ x (↓⁻ Φ +▶ x) (@cover_cat typ ↓⁻ Φ x) x2 j0))).
+             remember ((@r_cover_r _ _ _ (Δ +▶ (↓⁻ Φ +▶ x)) cover_cat x2 (r_concat_l x2 j0))).
+             remember ((@r_cover_r _ _ _ (Δ +▶ (↓⁻ Φ +▶ x)) cover_cat x2 (@r_cover_l _ _ _ (↓⁻ Φ +▶ x) cover_cat x2 j0))).
              clear Heqh0 Heqh1; now dependent induction Heq.
     - pose (j' := j); change j with j' at 1.
       pose (x' := x); change x with x' at 1; change x with x' in j'.
@@ -631,140 +605,92 @@ Evaluate a configuration inside an environment (assignment), returning only the 
       * apply le_n_S.
         dependent elimination v.
         refine (IHΨ _ a0 _ j k _).
-        cbn in H. unfold s_cat in H.
-        unfold s_cover in H.
-        destruct (cover_split cover_cat j).
+        cbn in H; unfold s_cat, s_cover in H.
+        destruct (cover_split cover_cat j); [ | inversion j ].
         cbn; rewrite r_cover_l_nil; exact H.
-        inversion j.
-      * dependent elimination j; cbn.
-        + apply PeanoNat.Nat.lt_0_succ.
-        + dependent elimination v.
-          eapply (IHx (a0 ▶ₑ⁻ (a1 ⊛ᵣ s_pop))).
-          clear - H M MHT MH MCH.
-          cbn in *.
-          rewrite <- H.
-          change (([ ?u , a1 ]) x2 (pop h)) with (([ u , a1 ] ⊛ᵣ s_pop) x2 h).
-          apply s_eq_cover_uniq.
-          ++ rewrite <- s_ren_comp.
-             change (s_pop ⊛ᵣ r_cover_l cover_cat) with (@r_cover_l typ ↓⁻ Φ0 (x ▶ y) (↓⁻ Φ0 +▶ x ▶ y) (@cover_cat typ ↓⁻ Φ0 (x ▶ y))).
-             now rewrite s_eq_cat_l.
-          ++ rewrite <- s_ren_comp.
-             change (s_pop ⊛ᵣ r_cover_r cover_cat) with (@r_cover_r typ ↓⁻ Φ0 (x ▶ y) (↓⁻ Φ0 +▶ x ▶ y) (@cover_cat typ ↓⁻ Φ0 (x ▶ y)) ⊛ᵣ s_pop).
-             now rewrite s_ren_comp, s_eq_cat_r.
+      * dependent elimination j; [ apply PeanoNat.Nat.lt_0_succ | ].
+        dependent elimination v; cbn.
+        eapply (IHx (a0 ▶ₑ⁻ (a1 ⊛ᵣ s_pop))); cbn in *.
+        rewrite <- H.
+        change (([ ?u , a1 ]) x2 (pop h)) with (([ u , a1 ] ⊛ᵣ s_pop) x2 h).
+        apply s_eq_cover_uniq; rewrite <- s_ren_comp.
+        + change (s_pop ⊛ᵣ r_cover_l cover_cat) with (@r_cover_l _ _ _ (↓⁻ Φ0 +▶ x ▶ y) cover_cat).
+          now rewrite s_eq_cat_l.
+        + change (s_pop ⊛ᵣ r_cover_r cover_cat) with (@r_cover_r _ _ _ (↓⁻ Φ0 +▶ x ▶ y) cover_cat ⊛ᵣ s_pop).
+          now rewrite s_ren_comp, s_eq_cat_r.
   Qed.
 
-  Definition compo_body_guarded_aux {Δ Ψ} (u : alt_env Δ Δ Ⓟ Ψ) (v : alt_env Δ Δ Ⓞ Ψ)
+  Lemma compo_body_guarded_aux {Δ Ψ} (u : alt_env Δ Δ Ⓟ Ψ) (v : alt_env Δ Δ Ⓞ Ψ)
                                     {x} (m : msg x) (γ : dom S m ⇒ᵥ (Δ +▶ ↓⁺ Ψ)) (j : ↓⁺ Ψ ∋ x)
     : ev_guarded (fun 'T1_0 => @compo_body Δ)
           (compo_body ((Ψ ▶ dom S m),'
            (app (r_concat3_1 ᵣ⊛ᵥ concat0 v x j) m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r), v ▶ₑ⁺, u ▶ₑ⁻ γ))) .
-  pose (h := lt_wf (var_height j)).
-  remember (var_height j) as n.
-  revert Ψ u v γ j Heqn; induction h; intros Ψ u v γ j Heqn. 
 
-  unfold ev_guarded.
-  cbn -[cat_split].
+  pose (h := lt_wf (var_height j)); remember (var_height j) as n.
+  revert Ψ u v γ j Heqn; induction h; intros Ψ u v γ j Heqn.
+  unfold ev_guarded; cbn -[cat_split].
 
-  pose (vv := @r_concat3_1 typ Δ ↓⁻ Ψ (@dom S x m) ᵣ⊛ᵥ @concat0 Δ Δ Ⓞ Ψ v x j).
-  change (r_concat3_1 ᵣ⊛ᵥ _) with vv.
-  destruct (is_var_dec vv).
+  pose (vv := @r_concat3_1 typ Δ ↓⁻ Ψ (@dom S x m) ᵣ⊛ᵥ concat0 v x j).
+  change (r_concat3_1 ᵣ⊛ᵥ _) with vv; destruct (is_var_dec vv).
 
   - eassert (H1 : _) by exact (eval_app_var vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r) i).
-    apply it_eq_step in H1.
-    cbn in H1. unfold observe in H1.
+    apply it_eq_step in H1; cbn in H1; unfold observe in H1.
     pose (ot := _observe (eval (app vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r)))); fold ot in H1 |- *.
-    dependent elimination H1.
-    rewrite r_rel; clear r1 r_rel.
-    unfold m_strat_wrap.
-    cbn [fst snd projT1 projT2].
-
-    remember vv as v0; unfold vv in Heqv0.
-    (*rewrite (concat0_alt_eq v _ j) in Heqv0. 
-    unfold concat0_alt, v_ren in Heqv0.
-    rewrite v_sub_comp, e_comp_ren_r, v_sub_var, <- s_ren_comp in Heqv0.
-    change ((_ ⊛ᵣ ?r) ⊛ᵥ ?v) with (r ᵣ⊛ᵥ v) in Heqv0.*)
+    dependent elimination H1; rewrite r_rel; clear r1 r_rel.
+    unfold m_strat_wrap; cbn [fst snd projT1 projT2].    
+    destruct (view_is_var_ren (concat0 v x j) _ i); cbn -[cat_split].
     
-    pose (ii := cat_split (is_var_get i)); change (cat_split _) with ii.
-    revert i ii; rewrite Heqv0; intros i ii; clear vv v0 Heqv0.
-    destruct (view_is_var_ren (concat0 v x j) _ i).
-    cbn in ii.
-    remember (is_var_get p).
-    destruct (cat_split h).
-    * change (r_concat3_1 x _) with ((@r_concat3_1 typ Δ ↓⁻ Ψ (@dom S x m) ⊛ᵣ r_concat_l) x i) in ii.
-      unfold r_concat3_1 in ii. revert ii; rewrite s_eq_cat_l, cat_split_l; intro ii; unfold ii; cbn.
-      now do 2 econstructor.
-    * change (r_concat3_1 x _) with ((@r_concat3_1 typ Δ ↓⁻ Ψ (@dom S x m) ⊛ᵣ r_concat_r) x j0) in ii.
-      unfold r_concat3_1 in ii. revert ii; rewrite s_eq_cat_r. unfold s_ren, s_map; rewrite cat_split_r.
-      cbn.
+    remember (is_var_get p) as h; destruct (cat_split h).
+    * change (r_concat3_1 x _) with ((@r_concat3_1 typ Δ ↓⁻ Ψ (@dom S x m) ⊛ᵣ r_concat_l) x i).
+      unfold r_concat3_1; rewrite s_eq_cat_l, cat_split_l.
+      now do 2 econstructor.  
+    * change (r_concat3_1 x _) with ((@r_concat3_1 typ Δ ↓⁻ Ψ (@dom S x m) ⊛ᵣ r_concat_r) x j0).
+      unfold r_concat3_1; rewrite s_eq_cat_r; unfold s_ren, s_map; rewrite cat_split_r.
       unfold dom', m_strat_resp; cbn [fst snd projT1 projT2].      
-      refine (GNext _).
-      eapply H0; [ | reflexivity ].
-      rewrite Heqn.
-      unfold var_height.
-      destruct p.
-      cbn in Heqh.
-      rewrite <- Heqh in e.
-      eassert (H1 : _) by exact (@var_depth_le _ false _ j0).
-      eassert (H2 : _) by exact (@var_depth_le Ψ _ _ j).
-      eassert (H3 : _) by exact (depth_increases v j j0 e).
-      rewrite var_depth_ext. simpl c_length.
+      refine (GNext _); eapply H0; [ | reflexivity ].
+
+      destruct p; cbn in Heqh; rewrite <- Heqh in e.
+      rewrite Heqn; unfold var_height; rewrite var_depth_ext; simpl c_length.
       rewrite PeanoNat.Nat.sub_succ.
       apply (Plus.plus_lt_reg_l_stt _ _ (var_depth j0 + var_depth j)).
       rewrite PeanoNat.Nat.add_shuffle0.
-      rewrite Arith_prebase.le_plus_minus_r_stt; [ | exact H1 ].
+      rewrite Arith_prebase.le_plus_minus_r_stt; [ | exact (@var_depth_le _ false _ j0) ].
       rewrite <- PeanoNat.Nat.add_assoc.
-      rewrite Arith_prebase.le_plus_minus_r_stt; [ | exact H2 ].
+      rewrite Arith_prebase.le_plus_minus_r_stt; [ | exact (@var_depth_le Ψ _ _ j) ].
       rewrite PeanoNat.Nat.add_comm.
       apply Plus.plus_lt_compat_r_stt.
-      exact H3.
-  - eassert (H1 : _) by exact (eval_app_not_var vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r) f).
-    unfold is_tau in H1.
-    remember (_observe (eval (app vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r)))).
-    destruct H1.
-    now do 2 econstructor.
-  Qed.
+      exact (depth_increases v j j0 e).
 
+  - eassert (H1 : _) by exact (eval_app_not_var vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r) f).
+    unfold is_tau in H1; remember (_observe (eval (app vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r)))).
+    destruct H1; now do 2 econstructor.
+  Qed.
 
   Lemma compo_body_guarded {Δ} : eqn_ev_guarded (fun 'T1_0 => @compo_body Δ).
-  intros [] [ Γ [ [c u] v ] ]; unfold m_strat_pas in v.
-  
-  unfold ev_guarded. cbn -[cat_split].
-  (*rewrite reduce_t_mk_conf.*)
-  pose (ot := _observe (eval c)); change (_observe (eval c)) with ot.
-  destruct ot; clear c; try now do 2 econstructor.
-  unfold m_strat_wrap; pose (h := cat_split (fst (projT2 (projT1 r)))); change (cat_split _) with h.
-  destruct r as [ [ ? [ i m ] ] γ]; unfold dom' in *; cbn in *.
-  destruct h; try now do 2 econstructor.
-  unfold m_strat_resp; cbn [fst snd projT1 projT2]. 
-  refine (GNext _).
-  apply compo_body_guarded_aux.
+    intros [] [ Γ [ [c u] v ] ]; unfold m_strat_pas in v.
+    unfold ev_guarded; cbn -[cat_split].
+    pose (ot := _observe (eval c)); change (_observe (eval c)) with ot.
+    destruct ot; try now do 2 econstructor.
+    unfold m_strat_wrap; destruct r as [ [ ? [ i m ] ] γ]; cbn in *.
+    destruct (cat_split i); try now do 2 econstructor.
+    refine (GNext _); apply compo_body_guarded_aux.
   Qed.
 
-  Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a)
-    : delay (msg' Δ) :=
-    iter_ev_guarded _ compo_body_guarded T1_0 (a ,' (u , v)).
+  Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
+    := iter_ev_guarded _ compo_body_guarded T1_0 (a ,' (u , v)).
   Notation "u ∥ v" := (compo u v) (at level 40).
 
   (* guilhem: rename? *)
-  Definition barb {Γ} Δ (x y : conf Γ) : Prop :=
-    forall e : Γ ⇒ᵥ Δ, (inj_init_act x ∥ inj_init_pas e) ≈ (inj_init_act y ∥ inj_init_pas e).
+  Definition barb {Γ} Δ (x y : conf Γ) : Prop
+    := forall e : Γ ⇒ᵥ Δ, (inj_init_act x ∥ inj_init_pas e) ≈ (inj_init_act y ∥ inj_init_pas e).
 
   Equations reduce {Δ} : reduce_t Δ -> delay (msg' Δ) :=
     reduce u := eval_in_env
                        ([ v_var , concat1 (snd (fst (projT2 u))) (snd (projT2 u)) ])
                        (fst (fst (projT2 u))) .
 
-  Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => msg' Δ) i :=
-    fun 'T1_0 => reduce .
-
-  (*
-  Definition reduce_t_eq (Δ : context) : relation (reduce_t Δ) :=
-    fun x1 x2 =>
-     exists p : projT1 x1 = projT1 x2,
-       rew p in
-       fst (projT2 x1) ≈ fst (projT2 x2)
-       /\ h_pasvR ogs_hg (it_wbisim (eqᵢ _)) _ (rew p in snd (projT2 x1)) (snd (projT2 x2)). 
-*)
+  Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => msg' Δ) i
+    := fun 'T1_0 => reduce .
 
   Lemma quatre_trois_pre {Δ} (x : reduce_t Δ)
     :
@@ -780,10 +706,9 @@ Evaluate a configuration inside an environment (assignment), returning only the 
                             | CRightV h => reduce' _ (_ ,'
                                                     (m_strat_resp (snd (projT2 x)) (_ ,' (h, snd (projT2 (projT1 u)))), EConF (snd (fst (projT2 x))) (projT2 u)))
                             end).
-    etransitivity.
-    unfold compo_body; apply bind_bind_com.
-    etransitivity.
-    unfold m_strat_play, m_strat_wrap. apply fmap_bind_com.
+    etransitivity; [ now apply bind_bind_com | ].
+    etransitivity; [ now apply fmap_bind_com | ].
+    unfold m_strat_play, m_strat_wrap.
     remember (eval (fst (fst (projT2 x)))) as t eqn:H; clear H; revert t.
     unfold it_eq; coinduction R CIH; intros t.
     cbn; destruct (t.(_observe)) as [ [ [ ? [ i ? ] ] ? ] | | [] ]; cbn.
@@ -798,62 +723,48 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Lemma quatre_trois {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a)
     : reduce (_ ,' (c , e)) ≊ (c ∥ e) .
-    unshelve eapply (iter_evg_uniq (fun 'T1_0 u => compo_body u) (fun 'T1_0 u => reduce u) _ _ T1_0).
+    refine (iter_evg_uniq (fun 'T1_0 u => compo_body u) (fun 'T1_0 u => reduce u) _ _ T1_0 _).
     clear a c e; intros [] [ ? [ u v ] ].
-    etransitivity; cycle 1.
-    symmetry.
-    apply quatre_trois_pre.
+    etransitivity; [ | symmetry; apply quatre_trois_pre ].
     unfold reduce at 1.
-    etransitivity.
-    apply fmap_eq, eval_split.
-    etransitivity.
-    apply bind_fmap_com.
+    etransitivity; [ apply fmap_eq, eval_split | ].
+    etransitivity; [ apply bind_fmap_com | ].
     unfold it_eq; cbn [fst snd projT2 projT1].
     apply (tt_t (it_eq_map ∅ₑ (eqᵢ _))).
-    refine (@it_eq_up2bind_t _ ∅ₑ (fun _ => {m : msg' (Δ +▶ join_even x) & dom' m ⇒ᵥ (Δ +▶ _)}) _ _ _ (eqᵢ _) _ _ _ (eval (fst u) >>= _) (eval (fst u) >>= _) _).
-    econstructor; eauto.
+    refine (it_eq_up2bind_t _ _ _ _ (eval (fst u) >>= _) (eval (fst u) >>= _) _); econstructor; eauto.
     intros [] [m γ] ? <-.
     apply (bt_t (it_eq_map ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)))).
     cbn [fst snd projT2 projT1].
     destruct (cat_split (fst (projT2 m))).
-    - cbn; econstructor. reflexivity.
+    - cbn; econstructor; reflexivity.
     - cbn -[it_eq_map fmap].
       change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)) bot) with (it_eq (E:=∅ₑ) (eqᵢ (fun _ : T1 => msg' Δ))).
       apply it_eq_step, fmap_eq.
-      unfold m_strat_resp.
-      cbn [fst snd projT1 projT2].
-      rewrite app_ren.
-      rewrite concat1_equation_2.
+      unfold m_strat_resp; cbn [fst snd projT1 projT2].
+      rewrite app_ren, concat1_equation_2.
 
-      pose (xx := [@v_var _ Δ , [concat1 v (snd u), ([v_var, concat1 (snd u) v]) ⊛ γ]] ⊛ᵥ r_concat3_1 ᵣ⊛ᵥ concat0 v (projT1 m) j).
-      change ([ v_var , [ _ , _ ]] ⊛ᵥ _) with xx. 
-      assert (H : xx = concat1 (snd u) v (projT1 m) j); [ unfold xx; clear xx | rewrite H; clear H ].
-      change (?a ⊛ᵥ ?b ᵣ⊛ᵥ (concat0 v _ j)) with ((a ⊛ (b ᵣ⊛ concat0 v)) _ j).
-      unfold e_ren. rewrite v_sub_sub.
-      etransitivity; [ eapply e_comp_proper; [ | reflexivity ] | ].
-      rewrite e_comp_ren_r, v_sub_var.
-      unfold r_concat3_1.
-      etransitivity.
-      unfold s_ren at 1.
-      apply s_eq_cover_map.
-      change (s_map ?a ?b) with (s_ren a b); change (s_cover cover_cat ?a ?b) with ([ a , b ]).
-      rewrite s_eq_cat_l.
-      rewrite s_ren_comp, s_eq_cat_r, s_eq_cat_l.
-      reflexivity.
-      apply (proj2 (concat_fixpoint (snd u) v)).
-      erewrite app_proper; [ reflexivity | ].
-      rewrite 2 e_comp_ren_r.
-      rewrite v_sub_var.
-      rewrite 2 s_eq_cat_r.
-      reflexivity.
+      pose (xx := [ v_var , [concat1 v (snd u), ([v_var, concat1 (snd u) v]) ⊛ γ]] ⊛ᵥ r_concat3_1 ᵣ⊛ᵥ concat0 v (projT1 m) j).
+      change ([ v_var , [ _ , _ ]] ⊛ᵥ _) with xx.
+      assert (H : xx = concat1 (snd u) v (projT1 m) j); [ | rewrite H; clear H ].
+      + unfold xx; clear xx.
+        change (?a ⊛ᵥ ?b ᵣ⊛ᵥ (concat0 v _ j)) with ((a ⊛ (b ᵣ⊛ concat0 v)) _ j).
+        unfold e_ren; rewrite v_sub_sub.
+        etransitivity; [ | now apply (proj2 (concat_fixpoint (snd u) v)) ].
+        eapply e_comp_proper; [ | reflexivity ].
+        rewrite e_comp_ren_r, v_sub_var.
+        unfold r_concat3_1.
+        etransitivity; [ unfold s_ren at 1; apply s_eq_cover_map | ].
+        change (s_map ?a ?b) with (s_ren a b); change (s_cover cover_cat ?a ?b) with ([ a , b ]).
+        now rewrite s_eq_cat_l, s_ren_comp, s_eq_cat_r, s_eq_cat_l.
+      + erewrite app_proper; [ reflexivity | ].
+        now rewrite 2 e_comp_ren_r, v_sub_var, 2 s_eq_cat_r.
    Qed.
 
-  Lemma quatre_trois_app {Γ Δ}
-    (c : conf Γ) (e : Γ ⇒ᵥ Δ)
-    : eval_in_env e c ≊ (inj_init_act c ∥ inj_init_pas e).
+  Lemma quatre_trois_app {Γ Δ} (c : conf Γ) (e : Γ ⇒ᵥ Δ)
+        : eval_in_env e c ≊ (inj_init_act c ∥ inj_init_pas e).
     rewrite <- quatre_trois.
     unfold reduce, inj_init_act, eval_in_env; cbn [fst snd projT1 projT2]; apply fmap_eq.
-    cbv [inj_init_pas]; rewrite concat1_equation_2, 2 concat1_equation_1.
+    unfold inj_init_pas; rewrite concat1_equation_2, 2 concat1_equation_1.
     unfold c_ren; rewrite c_sub_sub, c_sub_proper ; try reflexivity.
     rewrite s_eq_cover_empty_r.
     rewrite e_comp_ren_r, v_sub_var.
@@ -862,8 +773,7 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     now rewrite 2 v_var_sub.
   Qed.
 
-  Theorem barb_correction {Γ} Δ (x y : conf Γ)
-          : barb Δ x y -> ciu Δ x y.
+  Theorem barb_correction {Γ} Δ (x y : conf Γ) : barb Δ x y -> ciu Δ x y.
     intros H e.
     etransitivity; [ apply it_eq_wbisim, (quatre_trois_app x e) | ].
     etransitivity; [ apply (H e) | ].
@@ -923,7 +833,7 @@ Evaluate a configuration inside an environment (assignment), returning only the 
       * remember (_observe y) eqn:H; clear H.
         remember (@RetF alt_ext ogs_e (fun _ => msg' Δ) (ogs_act Δ) x0 r3) eqn:H.
         apply (fun u => rew <- [ fun v => it_eat _ _ v ] H in u) in r2.
-        induction r2; [ now rewrite H | auto ].
+        induction r2; [ now rewrite H | eauto ].
       * now repeat econstructor.
     - unshelve econstructor.
       * exact (TauD (compo_alt_body (_ ,' (t1 , u)))).
@@ -947,34 +857,30 @@ Evaluate a configuration inside an environment (assignment), returning only the 
       * unshelve (do 3 econstructor); [ exact eq_refl | exact (conj (H2 q) k_rel) ].
    Qed.
 
-  Definition reduce_t_inj {Δ : context} (x : reduce_t Δ) : compo_alt_t Δ :=
-     (_ ,' (m_strat _ (fst (projT2 x)) , m_stratp _ (snd (projT2 x)))) .
+  Definition reduce_t_inj {Δ : context} (x : reduce_t Δ) : compo_alt_t Δ
+     := (_ ,' (m_strat _ (fst (projT2 x)) , m_stratp _ (snd (projT2 x)))) .
   
-  Lemma compo_compo_alt {Δ} {x : reduce_t Δ} :
-    iter_delay compo_alt_body (reduce_t_inj x) ≊ iter_delay compo_body x .
-    unshelve eapply (iter_cong_strong).
-    - refine (fun _ a b => compo_t_eq_strong _ a (reduce_t_inj b)).
-    - intros [] [? [u1 e1]] [? [u2 e2]] [A B].
-      dependent elimination A; cbn in B; destruct B as [H1 H2].
-      rewrite unfold_mstrat in H1.
-      unfold compo_body.
-      cbn [fst snd projT1 projT2].
-      remember (m_strat_play u2) eqn:Hu; clear Hu.
-      clear u2.
-      unfold it_eq.
-      revert u1 d H1.
-      coinduction R CIH.
-      intros u1 d H1.
-      apply it_eq_step in H1.
-      cbn in *; unfold observe in *.
-      destruct (_observe d).
-      + destruct r as [|[]]; destruct (_observe u1); dependent elimination H1;
-          econstructor; econstructor; eauto.
-        exists eq_refl; split; [ exact (H2 q0) | exact k_rel ].
-      + destruct (_observe u1); dependent elimination H1; eauto.
-      + destruct q.
-    - cbn; destruct (reduce_t_inj x) as [ ? [] ].
-      exists eq_refl; split; cbn. reflexivity. intro r. reflexivity.
+  Lemma compo_compo_alt {Δ} {x : reduce_t Δ}
+        : iter_delay compo_alt_body (reduce_t_inj x) ≊ iter_delay compo_body x .
+
+    apply (iter_cong_strong (RX := fun _ a b => compo_t_eq_strong _ a (reduce_t_inj b))); cycle 1.
+
+    cbn; destruct (reduce_t_inj x) as [ ? [] ].
+    exists eq_refl; split; cbn; [ | intro r ]; reflexivity.
+    
+    intros [] [? [u1 e1]] [? [u2 e2]] [A B].
+    dependent elimination A; cbn in B; destruct B as [H1 H2].
+    rewrite unfold_mstrat in H1.
+    unfold compo_body; cbn [fst snd projT1 projT2].
+    remember (m_strat_play u2) eqn:Hu; clear Hu.
+    clear u2; unfold it_eq; revert u1 d H1; coinduction R CIH; intros u1 d H1.
+    apply it_eq_step in H1; cbn in *; unfold observe in *.
+    destruct (_observe d).
+    + destruct r as [ | [] ]; destruct (_observe u1); dependent elimination H1;
+        econstructor; econstructor; eauto.
+      exists eq_refl; split; [ exact (H2 q0) | exact k_rel ].
+    + destruct (_observe u1); dependent elimination H1; eauto.
+    + destruct q.
   Qed.
 
   Theorem ogs_correction {Γ} Δ (x y : conf Γ)
@@ -988,4 +894,5 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   Qed.
 
 End withInteractionSpec.
+About ogs_correction.
 Print Assumptions ogs_correction.

@@ -59,13 +59,13 @@ Derive NoConfusion for ctx.
 #[global] Notation "∅" := (cnil) : ctx_scope.
 #[global] Notation "Γ ▶ x" := (ccon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
 
-(*|
-Concatenation of contexts, by induction on the second argument
-|*)
-Equations ccat {X} : ctx X -> ctx X -> ctx X :=
-  ccat Γ ∅       := Γ ;
-  ccat Γ (Δ ▶ x) := (ccat Γ Δ) ▶ x .
+Equations c_length {X} (Γ : ctx X) : nat :=
+  c_length ∅%ctx := O ;
+  c_length (Γ ▶ _)%ctx := Datatypes.S (c_length Γ) .
 
+Equations ccat {X} : ctx X -> ctx X -> ctx X :=
+  ccat Γ ∅        := Γ ;
+  ccat Γ (Δ ▶ x) := (ccat Γ Δ) ▶ x .
 #[global] Notation "Γ +▶ Δ" := (ccat Γ%ctx Δ%ctx) (at level 50, left associativity) : ctx_scope.
 
 Lemma ccat_empty_l {X} {Γ : ctx X} : (∅ +▶ Γ)%ctx = Γ.
@@ -84,9 +84,6 @@ Equations c_map {X Y} : (X -> Y) -> ctx X -> ctx Y :=
 Section lemma.
 Context {X : Type}.
 
-(*|
-Join over contexts
-|*)
 Equations join : ctx (ctx X) -> ctx X :=
   join (∅)       := ∅ ;
   join (Γ ▶ xs) := join Γ +▶ xs .
@@ -120,8 +117,7 @@ Inductive has : ctx X -> X -> Type :=
 | top {Γ x} : has (Γ ▶ x) x
 | pop {Γ x y} : has Γ x -> has (Γ ▶ y) x.
 Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
-Derive Signature for has.
-Derive NoConfusion for has.
+Derive Signature NoConfusion for has.
 
 (*|
 Assignment
@@ -230,7 +226,7 @@ Inductive cover : ctx X -> ctx X -> ctx X -> Type :=
 | CRight {x xs ys zs} : cover xs ys zs -> cover xs        (ys ▶ x) (zs ▶ x)
 .
 Notation "a ⊎ b ≡ c" := (cover a b c) (at level 30).
-Derive NoConfusion for cover.
+Derive Signature NoConfusion for cover.
 
 Equations cover_swap {Γ1 Γ2 Γ3} : Γ1 ⊎ Γ2 ≡ Γ3 -> Γ2 ⊎ Γ1 ≡ Γ3 :=
   cover_swap CNil       := CNil ;
