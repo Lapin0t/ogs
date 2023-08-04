@@ -494,7 +494,7 @@ Definition map_has {X Y} (f : X -> Y) (Γ : ctx X)
 Defined.
 
 Variant has_map_view {X Y} (f : X -> Y) Γ : forall y, has (c_map f Γ) y -> Type :=
-| MapV {x} (i : has Γ x) : has_map_view f Γ _ (map_has f Γ i)
+| MapV {x} (i : has Γ x) : has_map_view f Γ (f x) (map_has f Γ i)
 .
 #[global] Arguments MapV {X Y f Γ x}.
 
@@ -522,111 +522,232 @@ Qed.
 
 #[global] Infix "⊛ᵣ" := s_ren (at level 14).
 
-Section any.
-  Context {X : Type}.
-
-Variant any (P : X -> Type) (xs : ctx X) : Type :=
+Variant any {X} (P : X -> Type) (xs : ctx X) : Type :=
 | Any {x} : xs ∋ x -> P x -> any P xs
 .
-#[global] Arguments Any {P xs x} i p.
+#[global] Arguments Any {X P xs x} i p.
 Derive NoConfusion for any.
 
-Equations any_el {P xs} : any P xs -> X :=
-  any_el (@Any _ _ x _ _) := x .
+Equations any_el {X P xs} : @any X P xs -> X :=
+  any_el (@Any _ _ _ x _ _) := x .
 
-Equations any_coh {P xs} (a : any P xs) : P (any_el a) :=
+Equations any_coh {X P xs} (a : @any X P xs) : P (any_el a) :=
   any_coh (Any _ p) := p .
 
-Equations any_elim {P} {A : forall x, P x -> Type} (f : forall x p, A x p)
-          xs (a : any P xs) : A (any_el a) (any_coh a) :=
+Equations any_elim {X P} {A : forall x, P x -> Type} (f : forall x p, A x p)
+          xs (a : @any X P xs) : A (any_el a) (any_coh a) :=
   any_elim f xs (Any _ p) := f _ p .
 
-Definition allS (R : X -> SProp) (Γ : ctx X) : SProp := forall x, Γ ∋ x -> R x.
-Definition ctx_s (R : X -> SProp) : Type := sigS (allS R).
-Definition coe_ctx {R} : ctx_s R -> ctx X := sub_elt.
+Definition allS {X} (P : X -> SProp) (Γ : ctx X) : SProp := forall x, Γ ∋ x -> P x.
+Definition ctx_s {X} (P : X -> SProp) : Type := sigS (allS P).
+Definition coe_ctx {X P} : ctx_s P -> ctx X := sub_elt.
 #[global] Coercion coe_ctx : ctx_s >-> ctx.
 
-Program Definition snil {R} : ctx_s R := {| sub_elt := ∅%ctx |}.
-Next Obligation. intros ? i; inversion i. Qed.
+Section all.
+  Context {X : Type} {P : X -> SProp}.
 
-Program Definition scon {R} (Γ : ctx_s R) (x : sigS R) : ctx_s R := {| sub_elt := (Γ ▶ x.(sub_elt))%ctx |}.
-Next Obligation.
-  intros ? i; remember (Γ ▶ x.(sub_elt))%ctx as Δ.
-  destruct i; injection HeqΔ as -> ->.
-  exact x.(sub_prf).
-  exact (Γ.(sub_prf) _ i).
-Qed.
+  Program Definition snil : ctx_s P := {| sub_elt := ∅%ctx |}.
+  Next Obligation. intros ? i; inversion i. Qed.
+  Notation "∅ₛ" := (snil) : ctx_scope.
 
-Definition scat {R} (Γ Δ : ctx_s R) : ctx_s R :=
-  {| sub_prf := (fun x i => match cat_split i with
-                          | CLeftV i => Γ.(sub_prf) x i
-                          | CRightV j => Δ.(sub_prf) x j
-                          end) : allS R (Γ +▶ Δ) |} .
+  Program Definition scon (Γ : ctx_s P) (x : sigS P) : ctx_s P := {| sub_elt := (Γ ▶ x.(sub_elt))%ctx |}.
+  Next Obligation.
+    intros ? i; remember (Γ ▶ x.(sub_elt))%ctx as Δ.
+    destruct i; injection HeqΔ as -> ->.
+    exact x.(sub_prf).
+    exact (Γ.(sub_prf) _ i).
+  Qed.
+  Notation "Γ ▶ₛ x" := (scon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
 
-Definition s_elt_upg {R} {Γ : ctx_s R} {x : X} (i : Γ ∋ x) : sigS R :=
-  {| sub_prf := Γ.(sub_prf) x i |}.
+  Definition scat (Γ Δ : ctx_s P) : ctx_s P :=
+    {| sub_prf := (fun x i => match cat_split i with
+                            | CLeftV i => Γ.(sub_prf) x i
+                            | CRightV j => Δ.(sub_prf) x j
+                            end) : allS P (Γ +▶ Δ) |} .
+  Notation "Γ +▶ₛ Δ" := (scat Γ%ctx Δ%ctx) (at level 50, left associativity) : ctx_scope.
 
-Definition s_var_upg {R} {Γ : ctx_s R} {x : X} (i : Γ ∋ x) : Γ ∋ (s_elt_upg i).(sub_elt)
-  := i.
+  Definition s_elt_upg {Γ : ctx_s P} {x} (i : Γ ∋ x) : sigS P :=
+    {| sub_prf := Γ.(sub_prf) x i |}.
 
-Equations ctx_s_map' {Y} {R : X -> SProp} (f : sigS R -> Y) Γ (H : forall x, Γ ∋ x -> R x) : ctx Y :=
-  ctx_s_map' f (∅)      H := ∅ ;
-  ctx_s_map' f (Γ ▶ _) H := ctx_s_map' f Γ (fun _ i => H _ (pop i))
-                              ▶ f {| sub_prf := H _ top |} .
+  Definition s_var_upg {Γ : ctx_s P} {x : X} (i : Γ ∋ x) : Γ ∋ (s_elt_upg i).(sub_elt)
+    := i.
 
-Definition ctx_s_map {Y} {R : X -> SProp} (f : sigS R -> Y) (Γ : ctx_s R) : ctx Y :=
-  ctx_s_map' f Γ.(sub_elt) Γ.(sub_prf) .
+  Equations ctx_s_map' {Y} (f : sigS P -> Y) Γ (H : forall x, Γ ∋ x -> P x) : ctx Y :=
+    ctx_s_map' f (∅)      H := ∅ ;
+    ctx_s_map' f (Γ ▶ _) H := ctx_s_map' f Γ (fun _ i => H _ (pop i))
+                                ▶ f {| sub_prf := H _ top |} .
 
-Definition ctx_s_to_ctx {R : X -> SProp} (Γ : ctx_s R) : ctx (sigS R) :=
-  ctx_s_map (fun x => x) Γ.
+  Definition ctx_s_map {Y} (f : sigS P -> Y) (Γ : ctx_s P) : ctx Y :=
+    ctx_s_map' f Γ.(sub_elt) Γ.(sub_prf) .
 
-Equations s_map_has' {Y} {R : X -> SProp} (f : sigS R -> Y) Γ (H : forall x, Γ ∋ x -> R x)
-          {x} (i : Γ ∋ x) : ctx_s_map' f Γ H ∋ f {| sub_prf := H _ i |} :=
-  s_map_has' f (Γ ▶ _) H top     := top ;
-  s_map_has' f (Γ ▶ _) H (pop i) := pop (s_map_has' f Γ _ i) .
+  Definition ctx_s_to (Γ : ctx_s P) : ctx (sigS P) :=
+    ctx_s_map (fun x => x) Γ.
 
-Definition s_map_has {Y} {R : X -> SProp} (f : sigS R -> Y) (Γ : ctx_s R)
-  {x} (i : Γ ∋ x) : ctx_s_map f Γ ∋ f (s_elt_upg i) :=
-  s_map_has' f Γ.(sub_elt) Γ.(sub_prf) i.
+  Lemma ctx_s_to_inv (Γ : ctx (sigS P)) : fiber ctx_s_to Γ .
+    induction Γ.
+    - change ∅%ctx with (ctx_s_to ∅ₛ)%ctx; econstructor.
+    - destruct IHΓ.
+      change (ctx_s_to a ▶ x)%ctx with (ctx_s_to (a ▶ₛ x))%ctx; econstructor.
+  Qed.
 
-Variant s_has_map_view {Y R} (f : sigS R -> Y) Γ : forall y, ctx_s_map f Γ ∋ y -> Type :=
-| SMapV {x} (i : Γ ∋ x) : s_has_map_view f Γ _ (s_map_has f Γ i)
-.
-#[global] Arguments SMapV {Y R f Γ x}.
+  Lemma ctx_s_to_inj {Γ1 Γ2} (H : ctx_s_to Γ1 = ctx_s_to Γ2) : Γ1 = Γ2 .
+    destruct Γ1 as [ Γ1 P1 ], Γ2 as [ Γ2 P2 ].
+    apply sigS_eq; cbn in *.
+    revert Γ2 P2 H; induction Γ1; intros Γ2 P2 H; destruct Γ2; cbn in *; inversion H; auto.
+    f_equal; exact (IHΓ1 _ _ _ H1).
+  Qed.
 
-Definition view_s_has_map {Y R} (f : sigS R -> Y) Γ
-  [y] (i : ctx_s_map f Γ ∋ y) : s_has_map_view f Γ y i.
-destruct Γ as [ Γ H ].
-induction Γ; dependent elimination i.
-- exact (@SMapV _ _ _ {| sub_prf := H |} _ top).
-- destruct (IHΓ (fun _ i => H _ (pop i)) h).
-  exact (@SMapV _ _ _ {| sub_prf := H |} _ (pop i)).
-Defined.
+  Definition ctx_s_from (Γ : ctx (sigS P)) : ctx_s P := fib_extr (ctx_s_to_inv Γ) .
 
-Lemma ctx_s_to_ctx_eq {R : X -> SProp} (Γ : ctx_s R)
-      : (Γ : ctx X) = c_map sub_elt (ctx_s_to_ctx Γ).
-  destruct Γ as [ Γ H ].
-  induction Γ; [ reflexivity | ].
-  cbn; f_equal; apply IHΓ.
-Qed.
+  Lemma ctx_s_from_elt (Γ : ctx (sigS P)) : (ctx_s_from Γ : ctx X) = c_map sub_elt Γ .
+    unfold ctx_s_from; destruct (ctx_s_to_inv Γ) as [ [ Γ H ] ]; cbn.
+    induction Γ; [ | cbn; f_equal ]; auto.
+  Qed.
 
-Variant any_s {R : X -> SProp} (P : sigS R -> Type) (xs : ctx_s R) : Type :=
-| AnyS {x} : xs ∋ x.(sub_elt) -> P x -> any_s P xs
-.
-#[global] Arguments AnyS {R P xs x} i p.
-Derive NoConfusion for any_s.
+  Lemma ctx_s_to_from Γ : ctx_s_to (ctx_s_from Γ) = Γ .
+    unfold ctx_s_from; now destruct (ctx_s_to_inv Γ).
+  Qed.
 
-Equations any_s_el {R P xs} : @any_s R P xs -> sigS R :=
-  any_s_el (@AnyS _ _ _ x _ _) := x .
+  Lemma ctx_s_from_to Γ : ctx_s_from (ctx_s_to Γ) = Γ .
+    apply ctx_s_to_inj; now rewrite ctx_s_to_from.
+  Qed.
 
-Equations any_s_coh {R P xs} (a : @any_s R P xs) : P (any_s_el a) :=
-  any_s_coh (AnyS _ p) := p .
+  Lemma ctx_s_from_inv (Γ : ctx_s P) : fiber ctx_s_from Γ .
+    now rewrite <- ctx_s_from_to.
+  Qed.
 
-Equations any_s_elim {R P} {A : forall x, P x -> Type} (f : forall x p, A x p)
-          {xs} (a : @any_s R P xs) : A (any_s_el a) (any_s_coh a) :=
-  any_s_elim f (AnyS _ p) := f _ p .
+  Equations s_map_has' {Y} (f : sigS P -> Y) Γ (H : forall x, Γ ∋ x -> P x)
+            {x} (i : Γ ∋ x) : ctx_s_map' f Γ H ∋ f {| sub_prf := H _ i |} :=
+    s_map_has' f (Γ ▶ _) H top     := top ;
+    s_map_has' f (Γ ▶ _) H (pop i) := pop (s_map_has' f Γ _ i) .
 
-End any.
+  Definition s_map_has {Y} (f : sigS P -> Y) (Γ : ctx_s P)
+             {x} (i : Γ ∋ x) : ctx_s_map f Γ ∋ f (s_elt_upg i) :=
+    s_map_has' f Γ.(sub_elt) Γ.(sub_prf) i.
+
+  Lemma s_map_has_inj {Y} (f : sigS P -> Y) (Γ : ctx_s P) {x} (i j : Γ ∋ x)
+        (H : s_map_has f Γ i = s_map_has f Γ j) : i = j .
+    destruct Γ as [ Γ ΓP ]; cbn in *.
+    revert ΓP H; induction Γ; dependent elimination i; dependent elimination j; cbn; intros ΓP H.
+    - reflexivity.
+    - inversion H.
+    - inversion H.
+    - dependent induction H.
+      f_equal; apply (IHΓ _ _ _ x).
+  Qed.
+
+  Variant s_has_map_view' {Y} (f : sigS P -> Y) Γ ΓH : forall y, ctx_s_map' f Γ ΓH ∋ y -> Type :=
+  | SHasMapV' {x} (i : Γ ∋ x) : s_has_map_view' f Γ ΓH _ (s_map_has' f Γ ΓH i)
+  .
+  #[global] Arguments SHasMapV' {Y f Γ ΓH x}.
+
+  Variant s_has_map_view {Y} (f : sigS P -> Y) Γ : forall y, ctx_s_map f Γ ∋ y -> Type :=
+  | SHasMapV {x} (i : Γ ∋ x) : s_has_map_view f Γ _ (s_map_has f Γ i)
+  .
+  #[global] Arguments SHasMapV {Y f Γ x}.
+
+  (*
+  Definition s_has_map_view_ty {Y f Γ y i} : @s_has_map_view Y f Γ y i -> X .
+    intros []; exact x.
+  Defined.
+
+  Definition s_has_map_view_has {Y f Γ y i} (u : @s_has_map_view Y f Γ y i)
+                                : Γ ∋ s_has_map_view_ty u .
+    dependent elimination u; exact i0.
+  Defined.
+
+  Definition s_has_map_view_ty_eq {Y f Γ y i} (u : @s_has_map_view Y f Γ y i)
+             : f (s_elt_upg (s_has_map_view_has u)) = y .
+    dependent elimination u; reflexivity.
+  Defined.
+
+
+  Definition s_has_map_view_map {Y f Γ y i} (u : @s_has_map_view Y f Γ y i)
+             : s_map_has f Γ (s_has_map_view_has u)
+             = rew <- [fun x => has _ x ] s_has_map_view_ty_eq u in i .
+    dependent elimination u; reflexivity.
+  Defined.
+  *)
+
+  Equations view_s_has_map' {Y} (f : sigS P -> Y) Γ ΓH [y] (i : ctx_s_map' f Γ ΓH ∋ y)
+    : s_has_map_view' f Γ ΓH y i :=
+    view_s_has_map' f ∅%ctx        ΓH (!) ;
+    view_s_has_map' f (Γ ▶ _)%ctx ΓH top     := SHasMapV' top ;
+    view_s_has_map' f (Γ ▶ _)%ctx ΓH (pop i)
+      with view_s_has_map' f Γ (fun _ i => ΓH _ (pop i)) i := {
+      | SHasMapV' j := SHasMapV' (pop j)
+      } .
+
+  Equations view_s_has_map {Y} (f : sigS P -> Y) Γ [y] (i : ctx_s_map f Γ ∋ y)
+    : s_has_map_view f Γ y i :=
+    view_s_has_map f Γ i
+      with view_s_has_map' f Γ.(sub_elt) Γ.(sub_prf) i := {
+      | SHasMapV' j := SHasMapV j
+      } .
+
+  Lemma s_has_map_view_simpl' {Y f Γ ΓH x} {i : Γ ∋ x}
+        : @view_s_has_map' Y f Γ ΓH _ (s_map_has' f Γ ΓH i) = SHasMapV' i .
+    revert ΓH i; induction Γ; intros ΓH i; dependent elimination i; cbn.
+    - reflexivity.
+    - now rewrite (IHΓ (fun _ i => ΓH _ (pop i)) h).
+  Qed.
+
+  Lemma s_has_map_view_simpl {Y f} {Γ : ctx_s P} {x} {i : Γ ∋ x}
+        : @view_s_has_map Y f Γ _ (s_map_has f Γ i) = SHasMapV i .
+    unfold view_s_has_map, s_map_has at 3.
+    eassert (H : _) by exact (@s_has_map_view_simpl' _ f _ Γ.(sub_prf) _ i).
+    pose (u := (view_s_has_map' f _ Γ.(sub_prf) (s_map_has' _ _ _ i))).
+    change (view_s_has_map' _ _ _ _) with u in H |- *.
+    now rewrite H.
+  Qed.
+
+  (*
+  Lemma view_s_has_map {Y} (f : sigS P -> Y) Γ [y] (i : ctx_s_map f Γ ∋ y) : s_has_map_view f Γ y i .
+    destruct Γ as [ Γ H ].
+    induction Γ; dependent elimination i.
+    - exact (@SHasMapV _ _ {| sub_prf := H |} _ top).
+    - destruct (IHΓ (fun _ i => H _ (pop i)) h).
+      exact (@SHasMapV _ _ {| sub_prf := H |} _ (pop i)).
+  Qed.
+*)
+
+  (*
+    dependent elimination a.
+    eassert (Hb : _) by exact (s_has_map_view_map b).
+    remember (s_has_map_view_ty_eq b) as t_eq_b; clear Heqt_eq_b.
+    
+    dependent induction t_eq_b.
+    remember (s_has_map_view_ty_eq a) as t_eq_a; clear Heqt_eq_a.
+    remember (s_has_map_view_ty_eq b) as t_eq_b; clear Heqt_eq_b.
+
+    destruct t_eq_a.
+    dependent induction t_eq_a.
+    remember (s_has_map_view_map b).
+    eassert (H : s_has_map_view_ty_eq a = s_has_map_view_ty_eq b).
+    
+    rewrite 
+    
+    revert x i0; dependent elimination b.
+  *)
+
+  (*
+  Variant any_s {R : X -> SProp} (P : sigS R -> Type) (xs : ctx_s R) : Type :=
+  | AnyS {x} : xs ∋ x.(sub_elt) -> P x -> any_s P xs
+  .
+  #[global] Arguments AnyS {R P xs x} i p.
+  Derive NoConfusion for any_s.
+
+  Equations any_s_el {R P xs} : @any_s R P xs -> sigS R :=
+    any_s_el (@AnyS _ _ _ x _ _) := x .
+
+  Equations any_s_coh {R P xs} (a : @any_s R P xs) : P (any_s_el a) :=
+    any_s_coh (AnyS _ p) := p .
+
+  Equations any_s_elim {R P} {A : forall x, P x -> Type} (f : forall x p, A x p)
+            {xs} (a : @any_s R P xs) : A (any_s_el a) (any_s_coh a) :=
+    any_s_elim f (AnyS _ p) := f _ p .
+  *)
+End all.
 
 #[global] Notation "∅ₛ" := (snil) : ctx_scope.
 #[global] Notation "Γ ▶ₛ x" := (scon Γ%ctx x) (at level 40, left associativity) : ctx_scope.

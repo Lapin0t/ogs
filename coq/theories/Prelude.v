@@ -45,3 +45,9 @@ Definition ex_falso {A : Type} (bot : T0) : A := match bot with end.
 Record sigS {X : Type} (P : X -> SProp) := { sub_elt : X ; sub_prf : P sub_elt }.
 Arguments sub_elt {X P}.
 Arguments sub_prf {X P}.
+
+Lemma sigS_eq {X : Type} {P : X -> SProp} (a b : sigS P) : a.(sub_elt) = b.(sub_elt) -> a = b .
+  intro H; destruct a as [ e p ]; cbn in H.
+  revert p; rewrite H; intro p.
+  change p with b.(sub_prf); reflexivity.
+Qed.
