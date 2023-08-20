@@ -977,6 +977,24 @@ Lemma is_var_dec {Γ x} (v : val Γ x) : is_var v + (is_var v -> False) .
   all: apply inl; econstructor; auto.
 Qed.
 
+Lemma v_is_var_ren {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var (v_rename e _ v) -> is_var v .
+  intros [ i H ].
+  destruct x; cbn in *.
+  - dependent induction v; cbn in *; try now inversion H.
+    exact (h ,' eq_refl).
+  - dependent induction v; cbn in *; try now inversion H.
+    exact (h ,' eq_refl).
+Qed.
+
+Lemma v_is_var_sub {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var (v_subst (Var ⊛ᵣ e) _ v) -> is_var v .
+  intros [ i H ].
+  destruct x; cbn in *.
+  - dependent induction v; cbn in *; try now inversion H.
+    exact (h ,' eq_refl).
+  - dependent induction v; cbn in *; try now inversion H.
+    exact (h ,' eq_refl).
+Qed.
+
 From OGS.OGS Require Spec.
 
 (*
@@ -1184,7 +1202,6 @@ Lemma ugly_var_inj {Γ x} (i j : Γ ∋ x) : ugly_var x i = ugly_var x j -> i = 
   clear H'.
   fold is_neg in j.
   unfold s_elt_upg in *.
-  Set Printing Implicit.
 
   (* >> !!!! remember is borked *)
 
@@ -1311,54 +1328,81 @@ Definition mu_machine_law : @Spec.machine_law mu_spec mu_machine.
       rewrite v0_sub_sub.
       apply v0_sub_eq; [ | reflexivity ].
       now rewrite ugly_comp_weird.
-  - intros Γ x i j H.
-    unfold ugly_var in H.
-    apply var_inj in H.
-
-    revert i j H; rewrite <- (ctx_s_to_from Γ); unfold ctx_s_from; intros i j H.
-    destruct (ctx_s_to_inv Γ) as [ [ Γ ΓH ] ]; cbn in *.
-    induction Γ; cbn in *.
-    + inversion i.
-    + 
-    
-    cbn.
-    assert (H' :
-      match ctx_s_to_inv Γ as f in (fiber _ b) return (b ∋ x -> b ∋ x -> Prop) with
-      | Fib a =>
-          fun i : ctx_s_to a ∋ x =>
-          match
-            view_s_has_map (fun x : sigS is_neg => x) a i in (s_has_map_view _ _ y h) return (a ∋ sub_elt y)
-          with
-          | SHasMapV i0 => i0
-          end
-      end i =
-      match ctx_s_to_inv Γ as f in (fiber _ b) return (b ∋ x -> fib_extr f ∋ sub_elt x) with
-      | Fib a =>
-          fun i : ctx_s_to a ∋ x =>
-          match
-            view_s_has_map (fun x : sigS is_neg => x) a i in (s_has_map_view _ _ y h) return (a ∋ sub_elt y)
-          with
-          | SHasMapV i0 => i0
-          end
-      end j
-    pose (xx := ctx_s_to_inv Γ).
-    fold xx in H.
-    revert i j H.
-    
-    destruct xx.
-
-    admit. (* wip *)
-Admitted.
+  - exact @ugly_var_inj.
+Qed.
 
 Definition mu_machine_law_ty : @Spec.machine_law_ty mu_spec mu_machine.
   econstructor; unfold mu_spec, mu_machine in *.
   - intros Γ x v.
     cbv [Spec.typ Spec.val Spec.is_var Spec.v_var ] in *.
-    destruct (is_var_dec v); admit.
+    destruct (is_var_dec v); [ apply inl | apply inr ].
+    + unfold ugly_var, clean_var.
+      destruct i.
+      unfold val' in v.
+      unfold ctx_s_from in *.
+      unshelve econstructor.
+      * clear e. destruct (ctx_s_to_inv Γ).
+        cbn in x0.
+        exact (s_map_has _ _ x0).
+      * refine (eq_trans e _).
+        f_equal.
+        clear e.
+        destruct (ctx_s_to_inv Γ); cbn.
+        pose (xx := view_s_has_map (fun x1 : sigS is_neg => x1) a (s_map_has (fun x1 : sigS is_neg => x1) a x0)).
+        change (view_s_has_map _ _ _) with xx.
+        eassert (H : _) by exact (s_has_map_view_simpl (f := fun x : neg_ty => x) (i:=x0)).
+        change (view_s_has_map _ _ _) with xx in H.
+        rewrite H.
+        reflexivity.
+    + intros [].
+      unfold ugly_var in e.
+      pose (j := (match ctx_s_to_inv Γ as f in (fiber _ b) return (b ∋ x -> fib_extr f ∋ sub_elt x) with
+         | Fib a => fun i : ctx_s_to a ∋ x => clean_var i
+         end x0)).
+      change (v = Var _ _) with (v = Var _ j) in e.
+      apply f.
+      unshelve econstructor.
+      exact j.
+      exact e.
   - cbv [Spec.typ Spec.val Spec.is_var Spec.v_ren Spec.v_var Spec.v_sub ] in *.
-    intros Γ1 Γ2 x v e [ i H ]; unfold val' in v.
-    admit.
-Admitted.
+    intros Γ1 Γ2 x v e p; unfold val' in v.
+    destruct p as [ i H ].
+    destruct x as [ [ x | x ] p ]; cbn in *.
+    + dependent induction v; cbn in *; try now inversion H.
+      clear H e.
+      unfold ctx_s_from in h.
+      unshelve econstructor.
+      destruct (ctx_s_to_inv Γ1).
+      exact (s_map_has _ _ h).
+      f_equal.
+      unfold clean_var.
+      destruct (ctx_s_to_inv Γ1).
+      cbn -[ s_map_has].
+      eassert (H : _) by exact (s_has_map_view_simpl (f := fun x : neg_ty => x) (i := h)).
+      pose (xx := view_s_has_map (fun x : sigS is_neg => x) a0 (s_map_has (fun x : sigS is_neg => x) a0 h)).
+      change (view_s_has_map _ _ _) with xx in H |- *.
+      rewrite H.
+      reflexivity.
+    + dependent induction v; cbn in *; try now inversion H.
+      clear H e.
+      unfold ctx_s_from in h.
+      unshelve econstructor.
+      destruct (ctx_s_to_inv Γ1).
+      exact (s_map_has _ _ h).
+      f_equal.
+      unfold clean_var.
+      destruct (ctx_s_to_inv Γ1).
+      cbn -[ s_map_has].
+      eassert (H : _) by exact (s_has_map_view_simpl (f := fun x : neg_ty => x) (i := h)).
+      pose (xx := view_s_has_map (fun x : sigS is_neg => x) a (s_map_has (fun x : sigS is_neg => x) a h)).
+      change (view_s_has_map _ _ _) with xx in H |- *.
+      rewrite H.
+      reflexivity.
+Qed.
 
 Definition mu_machine_correction_hyp : @Spec.machine_correction_hyp mu_spec mu_machine .
+  econstructor.
+  - admit.
+  - admit.
+  - admit.
 Admitted.
