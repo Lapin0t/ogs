@@ -606,11 +606,11 @@ Section all.
 
   Lemma ctx_s_to_from Γ : ctx_s_to (ctx_s_from Γ) = Γ .
     unfold ctx_s_from; now destruct (ctx_s_to_inv Γ).
-  Qed.
+  Defined.
 
   Lemma ctx_s_from_to Γ : ctx_s_from (ctx_s_to Γ) = Γ .
     apply ctx_s_to_inj; now rewrite ctx_s_to_from.
-  Qed.
+  Defined.
 
   Lemma ctx_s_from_inv (Γ : ctx_s P) : fiber ctx_s_from Γ .
     now rewrite <- ctx_s_from_to.
@@ -642,9 +642,30 @@ Section all.
   #[global] Arguments SHasMapV' {Y f Γ ΓH x}.
 
   Variant s_has_map_view {Y} (f : sigS P -> Y) Γ : forall y, ctx_s_map f Γ ∋ y -> Type :=
-  | SHasMapV {x} (i : Γ ∋ x) : s_has_map_view f Γ _ (s_map_has f Γ i)
+  | SHasMapV {x} (i : Γ ∋ x) : s_has_map_view f Γ (f (s_elt_upg i)) (s_map_has f Γ i)
   .
   #[global] Arguments SHasMapV {Y f Γ x}.
+
+  (*
+  Lemma s_has_map_view_uniq {Y} (f : sigS P -> Y) Γ y (i : ctx_s_map f Γ ∋ y) (a b : s_has_map_view f Γ y i)
+    : a = b .
+    dependent induction a.
+    dependent induction b.
+    dependent induction x2.
+    rewrite x in b0.
+    revert b0 x2 x3
+    dependent induction x
+    rewrite <- x in b0.
+    simpl_depind_r.
+    unfold s_elt_upg in x2.
+    cbn in x2.
+    pose (i' := i).
+    fold i' in b.
+    remember i' as j.
+    destruct a.
+    remember (s_map_has f Γ i).
+    dependent elimination b.
+  *)
 
   (*
   Definition s_has_map_view_ty {Y f Γ y i} : @s_has_map_view Y f Γ y i -> X .
@@ -700,6 +721,13 @@ Section all.
     change (view_s_has_map' _ _ _ _) with u in H |- *.
     now rewrite H.
   Qed.
+
+  (*
+  Lemma s_has_map_eq {Y} (f : sigS P -> Y) (Γ : ctx_s P) [x] (i : Γ ∋ x) (j : ctx_s_map f Γ ∋ f (s_elt_upg i))
+        : view_s_has_map f Γ j = SHasMapV i -> s_map_has f _ i = j .
+    : s_has_map_view f Γ _ i = SHasMapV j .
+  *)
+
 
   (*
   Lemma view_s_has_map {Y} (f : sigS P -> Y) Γ [y] (i : ctx_s_map f Γ ∋ y) : s_has_map_view f Γ y i .

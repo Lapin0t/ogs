@@ -1004,6 +1004,12 @@ Definition unuglify1 {Γ1 : neg_ctx} {Γ2} (u : Γ1 =[val]> ctx_s_from Γ2) : ct
   intros ? i; destruct (view_s_has_map _ _ i); exact (u _ i).
 Defined.
 
+#[global] Instance unuglify1_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@unuglify1 Γ1 Γ2).
+  intros u1 u2 H ? i.
+  unfold unuglify1.
+  destruct (view_s_has_map _ _ i); exact (H _ i).
+Qed.
+
 Definition unuglify1_inv {Γ1 : neg_ctx} {Γ2} (u : ctx_s_to Γ1 =[val']> Γ2) : Γ1 =[val]> ctx_s_from Γ2 .
   intros ? i; exact (u _ (s_map_has _ _ i)).
 Defined.
@@ -1015,39 +1021,55 @@ Definition unuglify2 {Γ1 Γ2 : neg_ctx} (u : Γ1 =[val]> Γ2) : ctx_s_to Γ1 =[
 Defined.
 
 Definition unuglify3 {Γ1 Γ2} (u : ctx_s_from Γ1 =[val]> ctx_s_from Γ2) : Γ1 =[val']> Γ2.
-  apply unuglify1 in u.
-  unfold ctx_s_from in u; destruct (ctx_s_to_inv Γ1).
-  exact u.
+  intros ? i.
+  refine (unuglify1 u _ _).
+  clear u.
+  unfold ctx_s_from.
+  destruct (ctx_s_to_inv Γ1).
+  exact i.
 Defined.
 
+#[global] Instance unuglify3_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@unuglify3 Γ1 Γ2).
+  intros u1 u2 H ? i.
+  exact (unuglify1_proper _ _ H _ _).
+Qed.
+
 Definition unuglify4 {Γ1 Γ2} (u : Γ1 =[val']> Γ2) : ctx_s_from Γ1 =[val]> ctx_s_from Γ2 .
-  unfold ctx_s_from at 1; destruct (ctx_s_to_inv Γ1); cbn.
   intros ? i.
-  exact (u _ (s_map_has _ _ i) : val _ i0).
+  refine (u (s_elt_upg i) _); clear u.
+  unfold ctx_s_from in *; destruct (ctx_s_to_inv Γ1); cbn in *.
+  exact (s_map_has _ _ i).
 Defined.
-Print unuglify4.
 
 #[global] Instance unuglify4_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@unuglify4 Γ1 Γ2).
   intros u1 u2 H ? i.
-  unfold ctx_s_from, unuglify4 in *; destruct (ctx_s_to_inv Γ1).
-  exact (H _ (s_map_has _ _ i)).
+  exact (H (s_elt_upg i) _).
 Qed.
 
 Lemma unuglify34 {Γ1 Γ2} (u : Γ1 =[val']> Γ2) : unuglify3 (unuglify4 u) ≡ₐ u .
-  revert u; unfold unuglify3, unuglify4, unuglify1, ctx_s_from.
-  destruct (ctx_s_to_inv Γ1).
-  intros u ? i; cbn; destruct (view_s_has_map _ _ i); reflexivity.
+  intros ? i.
+  unfold unuglify4, unuglify3, unuglify1.
+  unfold ctx_s_from.
+  destruct (ctx_s_to_inv Γ1); cbn.
+  now destruct (view_s_has_map _ _ i).
 Qed.
 
 Lemma unuglify43 {Γ1 Γ2} (u : ctx_s_from Γ1 =[val]> ctx_s_from Γ2) : unuglify4 (unuglify3 u) ≡ₐ u .
   revert u; unfold unuglify3, unuglify4, unuglify1, ctx_s_from.
-  destruct (ctx_s_to_inv Γ1); simpl fib_extr.
   intros u ? i.
-  pose (xx := view_s_has_map (fun x => x) a (s_map_has _ _ i)).
-  eassert (H : _) by exact (@s_has_map_view_simpl _ _ _ (fun x => x) a _ i).
-  change (view_s_has_map _ _ _) with xx in H |- *.
-  now rewrite H.
+  destruct (ctx_s_to_inv Γ1); cbn in *.
+  pose (xx := view_s_has_map (fun x => x) a0 (s_map_has (fun x => x) a0 i)).
+  change (view_s_has_map _ a0 _) with xx.
+  remember xx; unfold xx in Heqs.
+  rewrite (eq_trans Heqs s_has_map_view_simpl).
+  reflexivity.
 Qed.
+
+(*
+Lemma unuglify4_inj {Γ1 Γ2} (u v : Γ1 =[val']> Γ2) : unuglify4 u ≡ₐ unuglify4 v -> u ≡ₐ v .
+  intro H.
+  apply unuglify3_
+*)
 
 
 (*
@@ -1084,11 +1106,15 @@ Definition ugly_emb Γ (m : Spec.msg' mu_spec Γ)
 Defined.
 *)
 
+Definition clean_var {Γ : neg_ctx} {t} (i : ctx_s_to Γ ∋ t) : Γ ∋ t.(sub_elt) :=
+  match view_s_has_map _ _ i in (s_has_map_view _ _ y h) return (Γ ∋ sub_elt y) with
+  | SHasMapV j => j
+  end .
+
 Definition ugly_var {Γ} : Γ =[val']> Γ .
   intros ? i; apply Var.
-  unfold ctx_s_from; destruct (ctx_s_to_inv Γ); cbn.
-  destruct (view_s_has_map _ _ i).
-  exact i.
+  unfold ctx_s_from; destruct (ctx_s_to_inv Γ); cbn in *.
+  exact (clean_var i).
 Defined.
 
 Lemma fib_inj_irr {X Y} (f : X -> Y) (H : forall x y, f x = f y -> x = y) {y} (a b : fiber f y) : a = b .
@@ -1104,18 +1130,101 @@ Lemma ctx_s_to_inv_simpl {Γ : neg_ctx} : ctx_s_to_inv (ctx_s_to Γ) = Fib Γ .
 Qed.
 
 Lemma ugly4_id {Γ} : unuglify4 (@ugly_var Γ) ≡ₐ Var .
-  unfold unuglify4, ugly_var, ctx_s_from in *.
-  assert (H : ctx_s_to (fib_extr (ctx_s_to_inv Γ)) = Γ) by now destruct (ctx_s_to_inv Γ).
-  rewrite <- H; clear H.
-  destruct (ctx_s_to_inv Γ).
-  change (fib_extr (Fib ?a)) with a in *.
-Admitted.
+  unfold unuglify4, unuglify3, unuglify1, ctx_s_from in *.
+  intros ? i.
+  unfold ugly_var, clean_var.
+  (*
+  unfold view_s_has_map.
+  unfold s_elt_upg.
+  cbn in *.
+  unfold view_s_has_map_clause_1.
+  unfold s_map_has.
+*)
+  f_equal.
+  destruct (ctx_s_to_inv Γ); cbn in *.
+  pose (xx := view_s_has_map (fun x => x) a0 (s_map_has (fun x => x) a0 i)).
+  change (view_s_has_map _ _ _) with xx.
+  remember xx; unfold xx in Heqs; clear xx.
+  rewrite (eq_trans Heqs s_has_map_view_simpl).
+  reflexivity.
+Qed.
+
+Lemma ugly_var_inj {Γ x} (i j : Γ ∋ x) : ugly_var x i = ugly_var x j -> i = j .
+  intro H.
+  unfold ugly_var, clean_var in H.
+  apply var_inj in H.
+  pose (xx := ctx_s_to_inv Γ).
+  fold xx in H.
+  dependent induction xx.
+  change (sigS _) with neg_ty in H. 
+  (* >> !!!! rewrite is borked *)
+  eassert (H' : _) by exact (@eq_ind (fiber ctx_s_to (ctx_s_to a)) (ctx_s_to_inv (ctx_s_to a))
+           (fun u =>
+  match u as f in (fiber _ b) return (b ∋ x0 -> fib_extr f ∋ sub_elt x0) with
+      | Fib a =>
+          fun i : ctx_s_to a ∋ x0 =>
+          match view_s_has_map (fun x : neg_ty => x) a i in (s_has_map_view _ _ y h) return (a ∋ sub_elt y) with
+          | SHasMapV j => j
+          end
+      end i =
+      match u as f in (fiber _ b) return (b ∋ x0 -> fib_extr f ∋ sub_elt x0) with
+      | Fib a =>
+          fun i : ctx_s_to a ∋ x0 =>
+          match view_s_has_map (fun x : neg_ty => x) a i in (s_has_map_view _ _ y h) return (a ∋ sub_elt y) with
+          | SHasMapV j => j
+          end
+      end j
+        ) H _ (eq_sym x)).
+  clear H x xx0; cbn in H'.
+  (* << !!!! rewrite is borked *)
+
+  destruct (view_s_has_map (fun x : neg_ty => x) _ i).
+
+  rewrite H'.
+  clear H'.
+  fold is_neg in j.
+  unfold s_elt_upg in *.
+  Set Printing Implicit.
+
+  (* >> !!!! remember is borked *)
+
+  revert j.
+  refine (((fun p => _) : forall (p : is_neg x) (j : @ctx_s_to ty is_neg a ∋ {| sub_elt := x; sub_prf := p |}),
+  @s_map_has ty is_neg neg_ty (fun x0 : neg_ty => x0) a x
+    match
+      @view_s_has_map ty is_neg neg_ty (fun x0 : neg_ty => x0) a
+        {| sub_elt := x; sub_prf := p |} j in (s_has_map_view _ _ y h)
+      return (a ∋ @sub_elt _ _ y)
+    with
+    | SHasMapV j0 => j0
+    end = j
+
+          ) (sub_prf a x i)).
+  cbn in *; clear i.
+  intro j.
+  pose (xx := view_s_has_map (fun x0 : neg_ty => x0) a j); fold xx.
+  dependent induction xx.
+  clear xx0.
+  pose (xx := view_s_has_map (fun x1 : neg_ty => x1) a (s_map_has (fun x1 : sigS is_neg => x1) a i)).
+  change (view_s_has_map _ _ _) with xx in x.
+  change (view_s_has_map _ _ _) with xx.
+
+  (* >> !!!! remember is borked *)
+
+  (* >> !!!! rewrite is still borked *)
+  exact (@eq_ind (s_has_map_view (fun x1 : neg_ty => x1) a (s_elt_upg i) (s_map_has (fun x1 : sigS is_neg => x1) a i)) (SHasMapV i) (fun uu =>
+  s_map_has (fun x1 : sigS is_neg => x1) a
+    match uu in (s_has_map_view _ _ y0 h) return (a ∋ sub_elt y0) with
+    | SHasMapV j => j
+    end = s_map_has (fun x1 : sigS is_neg => x1) a i) eq_refl _ x).
+  (* << !!!! rewrite is still borked *)
+  Qed.
 
 Lemma ugly4_comp {Γ1 Γ2 Γ3} (u : Γ2 =[ val' ]> Γ3) (v : Γ1 =[ val' ]> Γ2)
   : a_comp (unuglify4 u) (unuglify4 v)
       ≡ₐ unuglify4 (fun _ i => v_subst (unuglify4 u) _ (v _ i)) .
-  unfold a_comp; intros ? i.
-Admitted.
+  reflexivity.
+Qed.
 
 #[global] Instance ugly1_inv_proper {Γ1 : neg_ctx} {Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@unuglify1_inv Γ1 Γ2).
   intros u1 u2 H ? i.
@@ -1161,9 +1270,12 @@ Definition mu_machine_law : @Spec.machine_law mu_spec mu_machine.
     unfold s_map.
     etransitivity.
     unfold ugly_var; apply v_sub_id_r.
-    unfold unuglify4.
-    destruct (ctx_s_to_inv Γ1).
-    now destruct (view_s_has_map _ _ i).
+    unfold unuglify4, clean_var, s_elt_upg.
+    unfold ctx_s_from.
+    destruct (ctx_s_to_inv Γ1); cbn.
+    pose (xx := view_s_has_map (fun x : sigS is_neg => x) a0 i).
+    fold xx.
+    now destruct xx.
   - cbv [Spec.e_comp]; unfold s_map; cbn.
     intros Γ1 Γ2 u ? i.
     etransitivity.
@@ -1202,6 +1314,39 @@ Definition mu_machine_law : @Spec.machine_law mu_spec mu_machine.
   - intros Γ x i j H.
     unfold ugly_var in H.
     apply var_inj in H.
+
+    revert i j H; rewrite <- (ctx_s_to_from Γ); unfold ctx_s_from; intros i j H.
+    destruct (ctx_s_to_inv Γ) as [ [ Γ ΓH ] ]; cbn in *.
+    induction Γ; cbn in *.
+    + inversion i.
+    + 
+    
+    cbn.
+    assert (H' :
+      match ctx_s_to_inv Γ as f in (fiber _ b) return (b ∋ x -> b ∋ x -> Prop) with
+      | Fib a =>
+          fun i : ctx_s_to a ∋ x =>
+          match
+            view_s_has_map (fun x : sigS is_neg => x) a i in (s_has_map_view _ _ y h) return (a ∋ sub_elt y)
+          with
+          | SHasMapV i0 => i0
+          end
+      end i =
+      match ctx_s_to_inv Γ as f in (fiber _ b) return (b ∋ x -> fib_extr f ∋ sub_elt x) with
+      | Fib a =>
+          fun i : ctx_s_to a ∋ x =>
+          match
+            view_s_has_map (fun x : sigS is_neg => x) a i in (s_has_map_view _ _ y h) return (a ∋ sub_elt y)
+          with
+          | SHasMapV i0 => i0
+          end
+      end j
+    pose (xx := ctx_s_to_inv Γ).
+    fold xx in H.
+    revert i j H.
+    
+    destruct xx.
+
     admit. (* wip *)
 Admitted.
 
