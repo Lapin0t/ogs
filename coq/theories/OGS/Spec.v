@@ -75,6 +75,9 @@ Specifies the operational semantics of the language.
 
   Context {M : machine}.
 
+  Definition eq_nf {Γ} : relation { m : msg' Γ & dom' m =[val]> Γ } :=
+    fun v1 v2 => exists p : projT1 v1 = projT1 v2 , rew p in projT2 v1 ≡ₐ projT2 v2 .
+
   Definition emb {Γ} (m : msg' Γ) : conf (Γ +▶ dom' m) :=
     app (v_var _ (r_concat_l _ (fst (projT2 m)))) (snd (projT2 m)) (v_var ⊛ᵣ r_concat_r).
 
@@ -440,11 +443,6 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   (* Now we prove guardedness of this equation. *)
 
-  Variant is_tau' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
-    | IsTau {t : itree E X i} : is_tau' (TauF t) .
-
-  Definition is_tau {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_tau' t.(_observe).
-
   Definition sub_eval {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : delay { m : msg' Δ & dom' m ⇒ᵥ Δ } :=
     eval ([ v_var , e ] ⊛ₜ c) .
 
@@ -454,13 +452,26 @@ Evaluate a configuration inside an environment (assignment), returning only the 
                             | CRightV h => eval (app (e _ h) _ ([v_var , e ] ⊛ projT2 x))
                             end .
 
+  Variant is_tau' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
+    | IsTau {t : itree E X i} : is_tau' (TauF t) .
+  Definition is_tau {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_tau' t.(_observe).
+
+  Variant is_ret' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
+    | IsRet {x : X i} : is_ret' (RetF x) .
+  Definition is_ret {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_ret' t.(_observe).
+
+  Definition is_ret_get {I} {E : event I I} {X i} {t : itree E X i} : is_ret t -> X i .
+    unfold is_ret.
+    destruct (_observe t); intro p; try dependent elimination p.
+    exact r.
+  Defined.
   
   Class machine_correction_hyp : Prop := {
     eval_split {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) :
       sub_eval c e ≊ eval_sub c e ;
 
     eval_app_var {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) (p : is_var v) :
-      eval (app v m e) ≊ Ret' ((x ,' (is_var_get p , m)) ,' e) ;
+      it_eq (fun _ => eq_nf) (eval (app v m e)) (Ret' ((x ,' (is_var_get p , m)) ,' e)) ;
 
     eval_app_not_var {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) (p : is_var v -> False) :
       is_tau (eval (app v m e)) ;
@@ -494,6 +505,8 @@ Evaluate a configuration inside an environment (assignment), returning only the 
     apply app_proper.
     rewrite e_comp_ren_r, v_sub_var, s_eq_cat_r; reflexivity.
   Qed.
+
+  Check MCH.
 
   Lemma eval_app_simpl {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) :
     eval (app v m e) ≊ eval_sub (app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r)) e .
@@ -636,7 +649,13 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   - eassert (H1 : _) by exact (eval_app_var vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r) i).
     apply it_eq_step in H1; cbn in H1; unfold observe in H1.
     pose (ot := _observe (eval (app vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r)))); fold ot in H1 |- *.
-    dependent elimination H1; rewrite r_rel; clear r1 r_rel.
+    dependent elimination H1.
+    cbn in r1, r_rel.
+    destruct r_rel as [ p q ].
+    destruct r1. cbn in p, q.
+    revert q.
+    dependent induction p.
+    rewrite r_rel; clear r1 r_rel.
     unfold m_strat_wrap; cbn [fst snd projT1 projT2].    
     destruct (view_is_var_ren (concat0 v x j) _ i); cbn -[cat_split].
     

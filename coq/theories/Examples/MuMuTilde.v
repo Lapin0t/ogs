@@ -970,6 +970,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
 Qed.
 
 Definition is_var {Γ x} (v : val Γ x) : Type := { i : Γ ∋ x & v = Var x i } .
+Definition is_var_get {Γ x} {v : val Γ x} (p : is_var v) : Γ ∋ x := projT1 p .
 
 Lemma is_var_dec {Γ x} (v : val Γ x) : is_var v + (is_var v -> False) .
   destruct x; dependent elimination v.
@@ -977,6 +978,7 @@ Lemma is_var_dec {Γ x} (v : val Γ x) : is_var v + (is_var v -> False) .
   all: apply inl; econstructor; auto.
 Qed.
 
+(*
 Lemma v_is_var_ren {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var (v_rename e _ v) -> is_var v .
   intros [ i H ].
   destruct x; cbn in *.
@@ -994,6 +996,52 @@ Lemma v_is_var_sub {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var (v_sub
   - dependent induction v; cbn in *; try now inversion H.
     exact (h ,' eq_refl).
 Qed.
+*)
+
+Lemma eval_app_var {Γ : neg_ctx} {x} (v : val Γ x) (m : pat (t_neg x)) (e : pat_dom m =[val]> Γ) (p : is_var v) :
+      exists e', ((e' ≡ₐ e) * eval (p_app v m e) ≊ Ret' ((x ,' (is_var_get p , m)) ,' e'))%type .
+  unfold play, iter_delay.
+  (*
+  setoid_rewrite (iter_unfold ((fun pat0 : T1 =>
+        let
+        'T1_0 as x0 := pat0 return (state Γ -> itree ∅ₑ ((fun _ : T1 => state Γ) +ᵢ (fun _ : T1 => nf Γ)) x0) in
+         fun c : state Γ => Ret' (eval_aux c)))).
+  apply it_eq_unstep; cbn.
+*)
+  destruct p as [ i -> ].
+  unfold p_app; destruct x.
+  - dependent elimination m; cbn.
+    + (*econstructor; cbn in *.*)
+      rewrite v0_sub_ren.
+      pose (v := v0_subst (e ⊛ᵣ s_pop) a3 (v_of_p p1)).
+      change (v0_subst _ _ _) with v.
+      induction a3; dependent elimination p1; cbn in *.
+      * change ((e ⊛ᵣ s_pop) _ _) with v.
+        change (p_of_v0 One v) with POneI.
+        econstructor; econstructor; cycle 1.
+        rewrite iter_unfold; apply it_eq_unstep; cbn.
+        econstructor; cbn.
+        f_equal.
+        clear; intros ? i.
+        dependent elimination i; auto.
+        dependent elimination h; auto.
+        dependent elimination h.
+      * simpl p_of_v0.
+        destruct (p_of_v0_equation_2 Γ v).
+        unfold s_ren, s_map, s_pop.
+      * 
+      fold v.
+      About v_of_p.
+      remember ()
+      dependent induction p1.
+      simpl v_of_p.
+      simpl v0_rename.
+      cbn.
+      Search p_of_v0.
+    funelim (eval_aux (Cut (Val v) (t_of_v (t- t) (v_subst e (t- t) (v_of_p m))))).
+  unfold 
+  unfold p_app.
+  cbn.
 
 From OGS.OGS Require Spec.
 
@@ -1402,7 +1450,11 @@ Qed.
 
 Definition mu_machine_correction_hyp : @Spec.machine_correction_hyp mu_spec mu_machine .
   econstructor.
-  - admit.
+  - intros Γ Δ c e .
+    unfold mu_spec in *; cbn in *.
+    unfold Spec.eval_sub. cbn.
+    unfold mu_machine_obligation_1.
+    unfold Spec.e_comp; cbn.
   - admit.
   - admit.
 Admitted.
