@@ -270,21 +270,34 @@ Equations p_of_v0 {Γ : neg_ctx} a : val0 Γ a -> pat (t+ a) :=
   p_of_v0 (a → b) _ := PLam ;
   p_of_v0 (a × b) _ := PPair .
 
-Definition p_dom_of_v0 {Γ : neg_ctx} a (v : val0 Γ a)
-           : pat_dom (p_of_v0 a v) =[val]> Γ .
-  induction a.
-  + dependent elimination v.
-    pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
-  + exact (s_append s_empty v).
-  + exact (s_append s_empty v).
-  + dependent elimination v.
-    pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
-    - apply IHa1.
-    - apply IHa2.
-  + exact (s_append s_empty v).
-Defined.
+Equations p_dom_of_v0 {Γ : neg_ctx} a (v : val0 Γ a) : pat_dom (p_of_v0 a v) =[val]> Γ :=
+  p_dom_of_v0 (Zer)   (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
+  p_dom_of_v0 (a + b) (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
+  p_dom_of_v0 (a + b) (Inl v) := p_dom_of_v0 a v ;
+  p_dom_of_v0 (a + b) (Inr v) := p_dom_of_v0 b v ;
+  p_dom_of_v0 (One)    v := s_append s_empty v ;
+  p_dom_of_v0 (a → b) v := s_append s_empty v ;
+  p_dom_of_v0 (a × b)  v := s_append s_empty v .
 
 Definition nf (Γ : neg_ctx) : Type := { p : pat' Γ & pat_dom' Γ p =[val]> Γ }.
+Definition nf_eq (Γ : neg_ctx) : relation (nf Γ) :=
+    fun v1 v2 => exists p : projT1 v1 = projT1 v2 , rew p in projT2 v1 ≡ₐ projT2 v2 .
+#[global] Instance nf_eq_rfl {Γ} : Reflexiveᵢ (fun _ : T1 => nf_eq Γ) .
+  intros _ v1; unshelve econstructor; auto.
+Qed.
+#[global] Instance nf_eq_tra {Γ} : Transitiveᵢ (fun _ : T1 => nf_eq Γ) .
+  intros _ [ p1 e1 ] [ p2 e2 ] [ p3 e3 ] [ H1 H2 ] [ H3 H4 ]; cbn in *.
+  destruct H1; cbn in H2.
+  destruct H3; cbn in H4.
+  unshelve econstructor; auto.
+  now transitivity e2.
+Qed.
+#[global] Instance nf_eq_sym {Γ} : Symmetricᵢ (fun _ : T1 => nf_eq Γ) .
+  intros _ [ p1 e1 ] [ p2 e2 ] [ H1 H2 ]; cbn in *.
+  destruct H1; cbn in H2.
+  unshelve econstructor; auto.
+  now symmetry.
+Qed.
 
 Definition pre_redex (Γ : neg_ctx) : Type := { x : ty & val Γ x * pat x }%type.
 
@@ -998,50 +1011,64 @@ Lemma v_is_var_sub {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var (v_sub
 Qed.
 *)
 
-Lemma eval_app_var {Γ : neg_ctx} {x} (v : val Γ x) (m : pat (t_neg x)) (e : pat_dom m =[val]> Γ) (p : is_var v) :
-      exists e', ((e' ≡ₐ e) * eval (p_app v m e) ≊ Ret' ((x ,' (is_var_get p , m)) ,' e'))%type .
+Equations p_of_v_eq {Γ : neg_ctx} {t} (p : pat (t+ t)) (e : (pat_dom p) =[ val ]> Γ) 
+          : p_of_v0 t (v0_subst e t (v_of_p p)) = p :=
+  p_of_v_eq (PInl p) e := f_equal PInl (p_of_v_eq p e) ;
+  p_of_v_eq (PInr p) e := f_equal PInr (p_of_v_eq p e) ;
+  p_of_v_eq (POneI)  e := eq_refl ;
+  p_of_v_eq (PLam)   e := eq_refl ;
+  p_of_v_eq (PPair)  e := eq_refl .
+
+Lemma p_dom_of_v_eq {Γ : neg_ctx} {t} (p : pat (t+ t)) (e : (pat_dom p) =[ val ]> Γ)
+  : rew [fun p0 => pat_dom p0 =[ val ]> Γ] p_of_v_eq p e in p_dom_of_v0 t (v0_subst e t (v_of_p p)) ≡ₐ e .
+  induction t; dependent elimination p.
+  - intros ? h; repeat (dependent elimination h; auto).
+  - intros ? h; repeat (dependent elimination h; auto).
+  - cbn.
+    pose (xx := rew [fun p0 : pat (t+ (a + b)) => pat_dom p0 =[ val ]> Γ] f_equal PInl (p_of_v_eq p e) in
+  p_dom_of_v0 (a + b) (Inl (v0_subst e a (v_of_p p)))).
+    change (_ ≡ₐ e) with (xx ≡ₐ e).
+    remember xx as yy; unfold xx in Heqyy; clear xx.
+    rewrite (eq_trans Heqyy (eq_sym (rew_map (fun p0 => pat_dom p0 =[ val ]> Γ) PInl (p_of_v_eq p e) (p_dom_of_v0 (a + b) (Inl (v0_subst e a (v_of_p p))))))).
+    apply IHt1.
+  - cbn.
+    pose (xx := rew [fun p0 : pat (t+ (a0 + b0)) => pat_dom p0 =[ val ]> Γ] f_equal PInr (p_of_v_eq p0 e) in
+  p_dom_of_v0 (a0 + b0) (Inr (v0_subst e b0 (v_of_p p0)))).
+    change (_ ≡ₐ e) with (xx ≡ₐ e).
+    remember xx as yy; unfold xx in Heqyy; clear xx.
+    rewrite (eq_trans Heqyy (eq_sym (rew_map (fun p0 => pat_dom p0 =[ val ]> Γ) PInr (p_of_v_eq p0 e) (p_dom_of_v0 (a0 + b0) (Inr (v0_subst e b0 (v_of_p p0))))))).
+    apply IHt2.
+  - intros ? h; repeat (dependent elimination h; auto).
+Qed.
+
+Lemma eval_app_var {Γ : neg_ctx} {x} (v : val Γ x) (m : pat (t_neg x)) (e : pat_dom m =[val]> Γ) (p : is_var v)
+      : it_eq (fun _ => nf_eq _) (eval (p_app v m e)) (Ret' ((x ,' (is_var_get p , m) ,' e ))) .
   unfold play, iter_delay.
-  (*
-  setoid_rewrite (iter_unfold ((fun pat0 : T1 =>
-        let
-        'T1_0 as x0 := pat0 return (state Γ -> itree ∅ₑ ((fun _ : T1 => state Γ) +ᵢ (fun _ : T1 => nf Γ)) x0) in
-         fun c : state Γ => Ret' (eval_aux c)))).
+  rewrite iter_unfold.
   apply it_eq_unstep; cbn.
-*)
-  destruct p as [ i -> ].
-  unfold p_app; destruct x.
-  - dependent elimination m; cbn.
-    + (*econstructor; cbn in *.*)
-      rewrite v0_sub_ren.
-      pose (v := v0_subst (e ⊛ᵣ s_pop) a3 (v_of_p p1)).
-      change (v0_subst _ _ _) with v.
-      induction a3; dependent elimination p1; cbn in *.
-      * change ((e ⊛ᵣ s_pop) _ _) with v.
-        change (p_of_v0 One v) with POneI.
-        econstructor; econstructor; cycle 1.
-        rewrite iter_unfold; apply it_eq_unstep; cbn.
-        econstructor; cbn.
-        f_equal.
-        clear; intros ? i.
-        dependent elimination i; auto.
-        dependent elimination h; auto.
-        dependent elimination h.
-      * simpl p_of_v0.
-        destruct (p_of_v0_equation_2 Γ v).
-        unfold s_ren, s_map, s_pop.
-      * 
-      fold v.
-      About v_of_p.
-      remember ()
-      dependent induction p1.
-      simpl v_of_p.
-      simpl v0_rename.
-      cbn.
-      Search p_of_v0.
-    funelim (eval_aux (Cut (Val v) (t_of_v (t- t) (v_subst e (t- t) (v_of_p m))))).
-  unfold 
-  unfold p_app.
-  cbn.
+  destruct p as [ i -> ]; cbn.
+  change (iter _ T1_0 ?x) with (iter_delay (fun c : state Γ => Ret' (eval_aux c)) x).
+  destruct x; simpl t_neg in m; simpl p_app.
+  - funelim (v_of_p m); cbn; econstructor; cbn.
+    + rewrite v0_sub_ren.
+      pose (xx := p_of_v0 a4 (v0_subst (e ⊛ᵣ s_pop) a4 (v_of_p v))).
+      change (p_of_v0 _ _) with xx.
+      unshelve econstructor.
+      * apply (f_equal (fun u => (_ ,' (i , PApp u)))).
+        apply p_of_v_eq.
+      * pose (yy := rew [fun p : pat' Γ => pat_dom' Γ p =[ val ]> Γ]
+      f_equal (fun u : pat (t+ a4) => t+ (a4 → b3),' (i, PApp u)) (p_of_v_eq v (e ⊛ᵣ s_pop)) in
+  projT2
+    ((t+ (a4 → b3),' (i, PApp xx)),'
+     s_append (p_dom_of_v0 a4 (v0_subst (e ⊛ᵣ s_pop) a4 (v_of_p v))) (e (t- b3) Ctx.top))).
+        change (_ ≡ₐ ?u) with (yy ≡ₐ u).
+        remember yy as zz; unfold yy in Heqzz; clear yy.
+        rewrite (eq_trans Heqzz (eq_sym (rew_map (fun p : pat' Γ => pat_dom' Γ p =[ val ]> Γ) ((fun u : pat (t+ a4) => t+ (a4 → b3),' (i, PApp u))) _ _))).
+        simpl projT2.
+        cbn .
+        intros ? j.
+        dependent elimination j.
+        (* AAAAAAAAAAAA *)
 
 From OGS.OGS Require Spec.
 
