@@ -75,9 +75,6 @@ Specifies the operational semantics of the language.
 
   Context {M : machine}.
 
-  Definition eq_nf {Γ} : relation { m : msg' Γ & dom' m =[val]> Γ } :=
-    fun v1 v2 => exists p : projT1 v1 = projT1 v2 , rew p in projT2 v1 ≡ₐ projT2 v2 .
-
   Definition emb {Γ} (m : msg' Γ) : conf (Γ +▶ dom' m) :=
     app (v_var _ (r_concat_l _ (fst (projT2 m)))) (snd (projT2 m)) (v_var ⊛ᵣ r_concat_r).
 
@@ -471,7 +468,7 @@ Evaluate a configuration inside an environment (assignment), returning only the 
       sub_eval c e ≊ eval_sub c e ;
 
     eval_app_var {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) (p : is_var v) :
-      it_eq (fun _ => eq_nf) (eval (app v m e)) (Ret' ((x ,' (is_var_get p , m)) ,' e)) ;
+      ((fun _ u => projT1 u) <$> eval (app v m e)) ≊ Ret' (x ,' (is_var_get p , m)) ;
 
     eval_app_not_var {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) (p : is_var v -> False) :
       is_tau (eval (app v m e)) ;
@@ -649,16 +646,13 @@ Evaluate a configuration inside an environment (assignment), returning only the 
   - eassert (H1 : _) by exact (eval_app_var vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r) i).
     apply it_eq_step in H1; cbn in H1; unfold observe in H1.
     pose (ot := _observe (eval (app vv m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r)))); fold ot in H1 |- *.
-    dependent elimination H1.
-    cbn in r1, r_rel.
-    destruct r_rel as [ p q ].
-    destruct r1. cbn in p, q.
-    revert q.
-    dependent induction p.
-    rewrite r_rel; clear r1 r_rel.
-    unfold m_strat_wrap; cbn [fst snd projT1 projT2].    
+    destruct ot; dependent elimination H1.
+    cbn in r, r_rel |- * .
+    destruct r as [ [ x' [ i' m' ] ] a' ]; cbn [ fst snd projT1 projT2] in *.
+    revert a'; rewrite r_rel; intro a'.
+    clear r_rel x' i' m'.
+    unfold m_strat_wrap; unfold dom' in a'; cbn [ fst snd projT1 projT2] in *.
     destruct (view_is_var_ren (concat0 v x j) _ i); cbn -[cat_split].
-    
     remember (is_var_get p) as h; destruct (cat_split h).
     * change (r_concat3_1 x _) with ((@r_concat3_1 typ Δ ↓⁻ Ψ (@dom S x m) ⊛ᵣ r_concat_l) x i).
       unfold r_concat3_1; rewrite s_eq_cat_l, cat_split_l.
