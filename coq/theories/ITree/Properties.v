@@ -229,3 +229,17 @@ Section stuff.
   Qed.
 
 End stuff.
+
+Variant is_tau' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
+  | IsTau {t : itree E X i} : is_tau' (TauF t) .
+Definition is_tau {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_tau' t.(_observe).
+
+Variant is_ret' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
+  | IsRet {x : X i} : is_ret' (RetF x) .
+Definition is_ret {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_ret' t.(_observe).
+
+Definition is_ret_get {I} {E : event I I} {X i} {t : itree E X i} : is_ret t -> X i .
+  unfold is_ret.
+  destruct (_observe t); intro p; try dependent elimination p.
+  exact r.
+Defined.
