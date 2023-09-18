@@ -154,134 +154,14 @@ Additional assumptions on how variables behave.
         | CRightV h => eval (app (e _ h) (nf_msg' u) ([v_var , e ] ⊛ nf_val' u))
         end .
 
-  (*
-c : conf (Δ + Ψ+)  Ψ+ : var données par mon adv
-c = E[x v]
-
-x ∋ Ψ+
-m : msg x
-
-n = (x, app, v++[E])
-
-app v m (v_var ∘ ren)
-
-~> nf ...
-~> 
-
-γ[x] app v_var
-  
-  Δ + Ψ+
-~> Δ + Ψ- + dom m
-
-  (i , m, γ)
-  ~> eval (app v m ..):
-  - soit v = j alors: ~> ret (j , m, ..)  : ok on progresse sur j
-  - sinon alors: ~> ret (j , m', ..) 
-
-*)
   Variant head_inst_nostep (u : { x : typ & msg x }) : { x : typ & msg x } -> Prop :=
   | HeadInst {Γ y} (v : val Γ y) (m : msg y) (e : dom m ⇒ᵥ Γ) (p : is_var v -> False) (i : Γ ∋ projT1 u)
              : eval_to_msg (app v m e) ≊ ret_delay (projT1 u ,' (i , projT2 u)) -> head_inst_nostep u (y ,' m) .
 
-  (*
-
-      c = ⟨ λ.T | x ⟩
-~> ret(x, f)
-
-
-
-
-      (A -> B)-  i
-
-      v : val (A -> B)-
-      v = app(tt)
-
-      eval (app v i ..) ~> (i, app(tt), ..)
-
-      head_inst_nostep ((A->B)+ ,' app(tt)) ((A-> B)- ,' i)
-
-      
-      
-
-          
-       E[x v]  ~> app(x; (E,v))
-       γ{x} = y
-               ~> app(y; (..))
-               ~> app(z; (..))
-       γ{x} = w != var
-           app w m ..  ~> m'(i, (..))
-
-
-t = (A -> B)-
-m = ret(fresh-x)
-
-Δ + Ψ+
-            x1 : t ∈ Ψ+
-            call(x, m)
-                        Δ + Ψ- +  dom m
-            x2 : t ∈ Ψ-
-            call(x, m)
-Δ + Ψ+ + dom m
-            x3 : t ∈ Ψ+
-            call(x, m)
-                        Δ + Ψ- + dom m + dom m
-            x4 : t ∈ Ψ+
-            call(x, m)
-Δ + Ψ+ + dom m + dom m
-       
-   *)
-
-  (*
-  Variant head_inst_nostep (u : { Γ : context & nf' Γ}) : { Δ : context & nf' Δ } -> Prop :=
-    | HeadInst {Δ} (n : nf' Δ) (w : val Γ (nf_ty' n)) (H : is_var w -> False) (e : dom (nf_msg' n) ⊆ Γ)
-    : eval (app w (nf_msg' n) e) ≊ ret_delay u -> head_inst_nostep u n .
-
-    : eval (app w m' e) ≊ ret_delay (i, m, γ) -> head_inst_nostep (i, m, γ) (i', m', γ') .
-*)
-
-  (*
-
-⟨ term type negatif | var ⟩
-
-⟨ fresh | m;E ⟩
-call(fresh, m) k => E
-
-⟨ T | m;k ⟩
-
-step step step 
-
-call-app
-ret-lam
-ret-inl
-
-
-⟨ A = term typ neg | x | y | z ⟩   t typ      A : term t_1   x : Γ ∋ t_2       y : Γ ∋ t_3 
-cut(t, .. .. .. )
-
-
-⟨ λ.T | j ⟩
-
-⟨ x | y ⟩    x : (A -> B)+    y : (A -> B)-
-
-ret(y, f)       f => x
-
-⟨ f | app(tt);E ⟩
-
-call(f, k)      k => E
-
-⟨ 
-
-
-
-
-nouvelle (m) (m') := ∃ i, γ, i', γ' / ancienne (i, m, γ) (i', m', γ')
-
-   *)
-
-  Class machine_laws (M : machine) : Prop := {
+  Class machine_laws : Prop := {
     app_proper {Γ x v m} :: Proper (ass_eq (dom m) Γ ==> eq) (@app _ Γ x v m) ;
-    (*app_sub {Γ1 Γ2 x} (e : Γ1 ⇒ᵥ Γ2) (v : val Γ1 x) (m : msg x) (r : dom m ⇒ᵥ Γ1)
-      : e ⊛ₜ app v m r = app (e ⊛ᵥ v) m (e ⊛ r) ; *)
+    app_sub {Γ1 Γ2 x} (e : Γ1 ⇒ᵥ Γ2) (v : val Γ1 x) (m : msg x) (r : dom m ⇒ᵥ Γ1)
+      : e ⊛ₜ app v m r = app (e ⊛ᵥ v) m (e ⊛ r) ;
 
     eval_split {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) :
       sub_eval c e ≊ eval_sub c e ;
@@ -291,11 +171,9 @@ nouvelle (m) (m') := ∃ i, γ, i', γ' / ancienne (i, m, γ) (i', m', γ')
       ≊ ret_delay (msg_of_nf' _ u) ;
 
     eval_app_not_var : well_founded head_inst_nostep ;
-    (*eval_app_not_var {Γ x} (v : val Γ x) (m : msg x) (e : dom m ⇒ᵥ Γ) (p : is_var v -> False) :
-      is_tau (eval (app v m e)) ; *)
   } .      
 
-  Context {ML : machine_laws M} .
+  Context {ML : machine_laws} .
 
   Lemma is_var_irr {Γ x} {v : val Γ x} (p q : is_var v) : p = q .
     destruct p as [i1 e1], q as [i2 e2].
@@ -586,7 +464,11 @@ lem 4.6
               | inr e => Ret' (inl (_ ,' (m_strat_resp (snd (projT2 x)) (projT1 e) , (projT2 e))))
               end.
 
-  (*
+(*|
+Interesting facts but not used in the current proof...
+
+.. coq::
+
   Lemma app_simpl {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) :
     app v m e = [ v_var , e ] ⊛ₜ app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r) .    
     rewrite app_sub.
@@ -612,24 +494,14 @@ lem 4.6
     rewrite v_var_sub. exact H.
     apply app_proper.
     rewrite e_comp_ren_r, v_sub_var, s_eq_cat_r; reflexivity.
-  Qed.v
+  Qed.
 
   Lemma eval_app_simpl {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) :
     eval (app v m e) ≊ eval_sub (app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r)) e .
     rewrite app_simpl.
     apply eval_split.
   Qed.
-
-  E[x v]    ~> m = pos(v)   dom m = trous-négatifs(v)
-               γ : dom m => Γ    γ = neg(v)
-  ~> call(x, m)
-
-m = app()  m[e] = app(x1);k1
-
-  δ(x) | m[e]
-
-    eval (app v m e) ≊ eval (app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r) = C)  >>= 
-*)
+|*)
 
   Equations var_depth (Ψ : alt_ext) b {x} (j : ↓[b] Ψ ∋ x) : nat by struct Ψ :=
     var_depth ∅%ctx        _     (!) ;
@@ -881,29 +753,27 @@ app w m ...  où not (is_var w)
                        ([ v_var , concat1 (snd (fst (projT2 u))) (snd (projT2 u)) ])
                        (fst (fst (projT2 u))) .
 
-  Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => msg' Δ) i
-    := fun 'T1_0 => reduce .
+  Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => msg' Δ) i := fun 'T1_0 => reduce .
 
-  Lemma quatre_trois_pre {Δ} (x : reduce_t Δ)
-    :
-        (compo_body x >>= fun _ r => match r with
-                                     | inl x' => reduce' _ x'
-                                     | inr y => Ret' (y : (fun _ => msg' _) _)
-                                     end)
-        ≊
-      (eval (fst (fst (projT2 x))) >>=
-                      fun _ u =>
-                        match cat_split (fst (projT2 (projT1 u))) with
-                            | CLeftV h => Ret' (_ ,' (h, snd (projT2 (projT1 u))))
-                            | CRightV h => reduce' _ (_ ,'
-                                                    (m_strat_resp (snd (projT2 x)) (_ ,' (h, snd (projT2 (projT1 u)))), EConF (snd (fst (projT2 x))) (projT2 u)))
-                            end).
+  Lemma quatre_trois_pre {Δ} (x : reduce_t Δ) :
+    (compo_body x >>= fun _ r =>
+         match r with
+         | inl x' => reduce' _ x'
+         | inr y => Ret' (y : (fun _ => msg' _) _)
+         end)
+    ≊
+    (eval (fst (fst (projT2 x))) >>= fun _ u =>
+         match cat_split (nf_var' u) with
+         | CLeftV h => Ret' (_ ,' (h, nf_msg' u))
+         | CRightV h => reduce' _ (_ ,' (m_strat_resp (snd (projT2 x)) (_ ,' (h, nf_msg' u)) ,
+                                         snd (fst (projT2 x)) ▶ₑ⁻ nf_val' u))
+         end).
     etransitivity; [ now apply bind_bind_com | ].
     etransitivity; [ now apply fmap_bind_com | ].
     unfold m_strat_play, m_strat_wrap.
     remember (eval (fst (fst (projT2 x)))) as t eqn:H; clear H; revert t.
     unfold it_eq; coinduction R CIH; intros t.
-    cbn; destruct (t.(_observe)) as [ [ [ ? [ i ? ] ] ? ] | | [] ]; cbn.
+    cbn; destruct (t.(_observe)) as [ [ ? [ i [ ? ? ] ] ] | | [] ]; cbn.
     + destruct (cat_split i).
       * econstructor; reflexivity.
       * cbn -[eval_in_env] .
@@ -924,20 +794,20 @@ app w m ...  où not (is_var w)
     unfold it_eq; cbn [fst snd projT2 projT1].
     apply (tt_t (it_eq_map ∅ₑ (eqᵢ _))).
     refine (it_eq_up2bind_t _ _ _ _ (eval (fst u) >>= _) (eval (fst u) >>= _) _); econstructor; eauto.
-    intros [] [m γ] ? <-.
+    intros [] [ t [ i [ m γ ] ]] ? <-.
     apply (bt_t (it_eq_map ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)))).
-    cbn [fst snd projT2 projT1].
-    destruct (cat_split (fst (projT2 m))).
+    unfold nf_var'; cbn [fst snd projT1 projT2].
+    pose (xx := cat_split i); change (cat_split i) with xx; destruct xx.
     - cbn; econstructor; reflexivity.
     - cbn -[it_eq_map fmap].
       change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)) bot) with (it_eq (E:=∅ₑ) (eqᵢ (fun _ : T1 => msg' Δ))).
       apply it_eq_step, fmap_eq.
       unfold m_strat_resp; cbn [fst snd projT1 projT2].
-      rewrite app_ren, concat1_equation_2.
+      rewrite app_sub, concat1_equation_2.
 
-      pose (xx := [ v_var , [concat1 v (snd u), ([v_var, concat1 (snd u) v]) ⊛ γ]] ⊛ᵥ r_concat3_1 ᵣ⊛ᵥ concat0 v (projT1 m) j).
+      pose (xx := [ v_var , [concat1 v (snd u), ([v_var, concat1 (snd u) v]) ⊛ γ]] ⊛ᵥ r_concat3_1 ᵣ⊛ᵥ concat0 v t j).
       change ([ v_var , [ _ , _ ]] ⊛ᵥ _) with xx.
-      assert (H : xx = concat1 (snd u) v (projT1 m) j); [ | rewrite H; clear H ].
+      assert (H : xx = concat1 (snd u) v t j); [ | rewrite H; clear H ].
       + unfold xx; clear xx.
         change (?a ⊛ᵥ ?b ᵣ⊛ᵥ (concat0 v _ j)) with ((a ⊛ (b ᵣ⊛ concat0 v)) _ j).
         unfold e_ren; rewrite v_sub_sub.

@@ -279,47 +279,53 @@ Equations p_dom_of_v0 {Γ : neg_ctx} a (v : val0 Γ a) : pat_dom (p_of_v0 a v) =
   p_dom_of_v0 (a → b) v := s_append s_empty v ;
   p_dom_of_v0 (a × b)  v := s_append s_empty v .
 
-Definition nf (Γ : neg_ctx) : Type := { p : pat' Γ & pat_dom' Γ p =[val]> Γ }.
-Definition nf_eq (Γ : neg_ctx) : relation (nf Γ) :=
-    fun v1 v2 => exists p : projT1 v1 = projT1 v2 , rew p in projT2 v1 ≡ₐ projT2 v2 .
-#[global] Instance nf_eq_rfl {Γ} : Reflexiveᵢ (fun _ : T1 => nf_eq Γ) .
+Definition nf (Γ : neg_ctx) : Type :=
+  { a : ty & (Γ ∋ a * { p : pat (t_neg a) & pat_dom p =[val]> Γ })%type } .
+
+Definition pat_of_nf : nf ⇒ᵢ pat' :=
+  fun Γ u => (projT1 u ,' (fst (projT2 u) , projT1 (snd (projT2 u)))) .
+
+Definition pat_eq (Γ : neg_ctx) : relation (pat' Γ) :=
+    fun v1 v2 => exists p : projT1 v1 = projT1 v2 , rew p in projT2 v1 = projT2 v2 .
+#[global] Instance pat_eq_rfl {Γ} : Reflexiveᵢ (fun _ : T1 => pat_eq Γ) .
   intros _ v1; unshelve econstructor; auto.
 Qed.
-#[global] Instance nf_eq_tra {Γ} : Transitiveᵢ (fun _ : T1 => nf_eq Γ) .
-  intros _ [ p1 e1 ] [ p2 e2 ] [ p3 e3 ] [ H1 H2 ] [ H3 H4 ]; cbn in *.
+
+#[global] Instance pat_eq_tra {Γ} : Transitiveᵢ (fun _ : T1 => pat_eq Γ) .
+  intros _ [ a1 p1 ] [ a2 p2 ] [ a3 p3 ] [ H1 H2 ] [ H3 H4 ]; cbn in *.
   destruct H1; cbn in H2.
   destruct H3; cbn in H4.
   unshelve econstructor; auto.
-  now transitivity e2.
-Qed.
-#[global] Instance nf_eq_sym {Γ} : Symmetricᵢ (fun _ : T1 => nf_eq Γ) .
-  intros _ [ p1 e1 ] [ p2 e2 ] [ H1 H2 ]; cbn in *.
-  destruct H1; cbn in H2.
-  unshelve econstructor; auto.
-  now symmetry.
+  now transitivity p2.
 Qed.
 
-Definition pre_redex (Γ : neg_ctx) : Type := { x : ty & val Γ x * pat x }%type.
+#[global] Instance pat_eq_sym {Γ} : Symmetricᵢ (fun _ : T1 => pat_eq Γ) .
+  intros _ [ a1 p1 ] [ a2 p2 ] [ H1 H2 ]; cbn in *.
+  destruct H1; cbn in H2.
+  unshelve econstructor; auto.
+Qed.
+
+(*Definition pre_redex (Γ : neg_ctx) : Type := { x : ty & val Γ x * pat x }%type.*)
 
 Equations eval_aux {Γ : neg_ctx} : state Γ -> (state Γ + nf Γ) :=
   eval_aux (Cut (Mu c)           (k))     := inl (c /ₛ k) ;
   eval_aux (Cut (Val v)          (Mu' c)) := inl (c /ₛ v) ;
 
   eval_aux (Cut (Val v)          (VarN i)) :=
-    inr ((_ ,' (i , p_of_v0 _ v)) ,' p_dom_of_v0 _ v) ;
+    inr (_ ,' (i , (p_of_v0 _ v ,' p_dom_of_v0 _ v))) ;
 
   eval_aux (Cut (Val (VarP i))   (ZerK))
     with (s_elt_upg i).(sub_prf) := { | (!) } ;
 
   eval_aux (Cut (Val (VarP i))   (App v k)) :=
-    inr ((_ ,' (i , PApp (p_of_v0 _ v))) ,'
-         s_append (p_dom_of_v0 _ v) (k : val _ (t- _))) ;
+    inr (_ ,' (i , (PApp (p_of_v0 _ v) ,'
+         s_append (p_dom_of_v0 _ v) (k : val _ (t- _))))) ;
 
   eval_aux (Cut (Val (VarP i))   (Fst k)) :=
-    inr ((_ ,' (i , PFst)) ,' s_append s_empty k) ;
+    inr (_ ,' (i , (PFst ,' s_append s_empty k))) ;
 
   eval_aux (Cut (Val (VarP i))   (Snd k)) :=
-    inr ((_ ,' (i , PSnd)) ,' s_append s_empty k) ;
+    inr (_ ,' (i , (PSnd ,' s_append s_empty k))) ;
 
   eval_aux (Cut (Val (VarP i))   (Match c1 c2))
     with (s_elt_upg i).(sub_prf) := { | (!) } ;
@@ -356,8 +362,8 @@ Defined.
 *)
 
 Definition refold {Γ : neg_ctx} (p : nf Γ)
-  : (Γ ∋ (projT1 (projT1 p)) * val Γ (t_neg (projT1 (projT1 p))))%type.
-destruct p as [ [x [i p]] s]; cbn in *.
+  : (Γ ∋ (projT1 p) * val Γ (t_neg (projT1 p)))%type.
+destruct p as [x [i [ p s ]]]; cbn in *.
 exact (i , v_subst s _ (v_of_p p)).
 Defined.
 
@@ -850,7 +856,7 @@ Lemma emb_play_var {Γ : neg_ctx} {a} (p : pat (t_neg a)) (i : Γ ∋ a)
 *)
 
 Definition then_play1 {Γ Δ : neg_ctx} (e : Γ =[val]> Δ) (n : nf Γ) : delay (nf Δ)
-  := play (p_app (e _ (fst (projT2 (projT1 n)))) (snd (projT2 (projT1 n))) (a_comp e (projT2 n))) .
+  := play (p_app (e _ (fst (projT2 n))) (projT1 (snd (projT2 n))) (a_comp e (projT2 (snd (projT2 n))))) .
 
 (*
 (* the final version we would like to have in the hypothesis, in terms of [emb] *)
@@ -866,7 +872,7 @@ Definition then_play2 {Γ Δ : neg_ctx} (e : Γ =[val]> Δ) (n : nf Γ) : delay 
 (* both are the same thing up to substitution shenenigans *)
 Lemma then_play_eq {Γ Δ : neg_ctx} (e : Γ =[val]> Δ) (n : nf Γ) : then_play1 e n ≊ then_play2 e n.
   unfold then_play1, then_play2, p_app, refold.
-  destruct n as [ [ [] [i m] ] γ ]; cbn.
+  destruct n as [ [] [i [ m γ ]] ]; cbn.
   - now rewrite <- t_sub_sub.
   - now rewrite <- v0_sub_sub.
 Qed.
@@ -1041,34 +1047,49 @@ Lemma p_dom_of_v_eq {Γ : neg_ctx} {t} (p : pat (t+ t)) (e : (pat_dom p) =[ val 
   - intros ? h; repeat (dependent elimination h; auto).
 Qed.
 
-Lemma eval_app_var {Γ : neg_ctx} {x} (v : val Γ x) (m : pat (t_neg x)) (e : pat_dom m =[val]> Γ) (p : is_var v)
-      : it_eq (fun _ => nf_eq _) (eval (p_app v m e)) (Ret' ((x ,' (is_var_get p , m) ,' e ))) .
+Lemma eval_nf_ret {Γ : neg_ctx} (u : nf Γ) : fmap_delay (pat_of_nf Γ) (eval (p_app (Var _ (fst (projT2 u))) (projT1 (snd (projT2 u))) (projT2 (snd (projT2 u))))) ≊ ret_delay (pat_of_nf _ u) .
   unfold play, iter_delay.
   rewrite iter_unfold.
   apply it_eq_unstep; cbn.
-  destruct p as [ i -> ]; cbn.
   change (iter _ T1_0 ?x) with (iter_delay (fun c : state Γ => Ret' (eval_aux c)) x).
-  destruct x; simpl t_neg in m; simpl p_app.
-  - funelim (v_of_p m); cbn; econstructor; cbn.
-    + rewrite v0_sub_ren.
-      pose (xx := p_of_v0 a4 (v0_subst (e ⊛ᵣ s_pop) a4 (v_of_p v))).
-      change (p_of_v0 _ _) with xx.
-      unshelve econstructor.
-      * apply (f_equal (fun u => (_ ,' (i , PApp u)))).
-        apply p_of_v_eq.
-      * pose (yy := rew [fun p : pat' Γ => pat_dom' Γ p =[ val ]> Γ]
-      f_equal (fun u : pat (t+ a4) => t+ (a4 → b3),' (i, PApp u)) (p_of_v_eq v (e ⊛ᵣ s_pop)) in
-  projT2
-    ((t+ (a4 → b3),' (i, PApp xx)),'
-     s_append (p_dom_of_v0 a4 (v0_subst (e ⊛ᵣ s_pop) a4 (v_of_p v))) (e (t- b3) Ctx.top))).
-        change (_ ≡ₐ ?u) with (yy ≡ₐ u).
-        remember yy as zz; unfold yy in Heqzz; clear yy.
-        rewrite (eq_trans Heqzz (eq_sym (rew_map (fun p : pat' Γ => pat_dom' Γ p =[ val ]> Γ) ((fun u : pat (t+ a4) => t+ (a4 → b3),' (i, PApp u))) _ _))).
-        simpl projT2.
-        cbn .
-        intros ? j.
-        dependent elimination j.
-        (* AAAAAAAAAAAA *)
+  destruct u as [ [] [ i [ m γ ]]]; simpl t_neg in m; simpl p_app.
+  - funelim (v_of_p m); cbn; econstructor; cbn; auto.
+    unfold pat_of_nf; cbn.
+    now rewrite v0_sub_ren, p_of_v_eq.
+  - funelim (v_of_p m); cbn; econstructor; cbn; auto.
+    + unfold pat_of_nf; cbn.
+      change (p_of_v0 _ (Inl ?a)) with (PInl (b:=b) (p_of_v0 _ a)).
+      now rewrite p_of_v_eq.
+    + unfold pat_of_nf; cbn.
+      change (p_of_v0 _ (Inr ?a)) with (PInr (a:=a1) (p_of_v0 _ a)).
+      now rewrite p_of_v_eq.
+Qed.
+
+Variant head_inst_nostep (u : { x : ty & pat (t_neg x) }) : { x :ty & pat (t_neg x) } -> Prop :=
+| HeadInst {Γ : neg_ctx} {y} (v : val Γ y) (m : pat (t_neg y)) (e : pat_dom m =[val]> Γ) (p : is_var v -> False) (i : Γ ∋ (projT1 u : ty))
+           : fmap_delay (pat_of_nf Γ) (eval (p_app v m e)) ≊ ret_delay ((projT1 u : ty) ,' (i , projT2 u)) -> head_inst_nostep u (y ,' m) .
+
+Lemma eval_app_not_var : well_founded head_inst_nostep .
+  intros a; econstructor; intros b H.
+  dependent elimination H.
+  apply it_eq_step in i0; cbn - [ eval_aux ] in i0.
+  destruct y as [ t | t ]; simpl p_app in *; simpl t_neg in *.
+  - funelim (v_of_p m); cbn - [ eval_aux ] in i0.
+    all: try dependent elimination v0; try dependent elimination v; dependent elimination i0.
+    all: destruct (p (_ ,' eq_refl)).
+  - funelim (v_of_p m); cbn - [ eval_aux ] in i0.
+    all: dependent elimination v; try now destruct (p (_ ,' eq_refl)).
+    all: try now dependent elimination i0.
+    all: pose (v := (e (t+ _) Ctx.top)); change (e (t+ _) _) with v in i0.
+    all: remember v as v'; clear v Heqv'; dependent elimination v'; dependent elimination i0.
+    all: unfold pat_of_nf in r_rel; cbn in r_rel; inversion r_rel; clear r_rel.
+    all: clear i H1 p; destruct b as [ t p1 ]; cbn in *.
+    all: revert p1; rewrite <- H0; clear H0; intros p1; simpl in p1.
+    all: econstructor; intros c H; dependent elimination H; cbn in *.
+    all: apply it_eq_step in i0; cbn in i0.
+    all: dependent elimination m; dependent elimination v; dependent elimination i0.
+    all: destruct (p (_ ,' eq_refl)).
+Qed.
 
 From OGS.OGS Require Spec.
 
@@ -1329,87 +1350,72 @@ Lemma ugly_comp_weird {Γ1 : neg_ctx} {Γ2 Γ3} (u : Γ2 =[ val' ]> Γ3) (v : ct
   reflexivity.
 Qed.
 
-Program Definition mu_machine : Spec.machine mu_spec :=
-  {| Spec.conf := state' ;
-     Spec.val := val' ;
-     Spec.eval := _ ;
-     Spec.app := fun _ _ v m r => (p_app v m (unuglify1_inv r)) ;
-     Spec.v_var := fun _ => ugly_var ;
-     Spec.v_sub := fun _ _ a _ v => v_subst (unuglify4 a) _ v ;
-     Spec.c_sub := fun _ _ a s => s_subst (unuglify4 a) s ;
-  |}.
-Next Obligation.
-  unfold state' in X.
-  refine (fmap_delay _ (eval X)).
-  clear X.
-  intros [ [ x [ i p ] ] e ]; cbn in e.
-  refine ((s_elt_upg i ,' (_ , p)) ,' unuglify1 e).
+Definition ugly_nf {Γ} (u : nf (ctx_s_from Γ)) :
+  {t : neg_ty & (Γ ∋ t * {m : pat (t_neg t) & ctx_s_to (pat_dom m) =[ val' ]> Γ})%type} .
+  destruct u as [ x [ i [ p e ] ] ]; cbn in e.
+  refine (s_elt_upg i ,' (_ , (p ,' unuglify1 e))).
   unfold ctx_s_from in *.
   destruct (ctx_s_to_inv Γ); exact (s_map_has _ _ i).
 Defined.
 
-Definition mu_machine_law : @Spec.machine_law mu_spec mu_machine.
-  unfold mu_spec.
-  econstructor; cbn in *.
+Program Definition mu_val : @Spec.lang_monoid mu_spec :=
+  {| Spec.val := val' ;
+     Spec.v_var := fun _ => ugly_var ;
+     Spec.v_sub := fun _ _ a _ v => v_subst (unuglify4 a) _ v ;
+  |}.
+
+Program Definition mu_conf : @Spec.lang_module mu_spec mu_val :=
+  {| Spec.conf := state' ;
+     Spec.c_sub := fun _ _ a s => s_subst (unuglify4 a) s ;
+  |}.
+
+Program Definition mu_machine : @Spec.machine mu_spec mu_val mu_conf :=
+  {| Spec.eval := fun _ c => fmap_delay (@ugly_nf _) (play c) ;
+      Spec.app := fun _ _ v m r => (p_app v m (unuglify1_inv r)) |} .
+
+Lemma mu_val_laws : @Spec.lang_monoid_laws mu_spec mu_val .
+  unfold mu_spec, mu_val.
+  econstructor; unfold Spec.e_comp, s_map; cbn in *.
   - intros Γ Δ u1 u2 H1 i v1 v2 H2.
     apply v_sub_eq; auto.
     now rewrite H1.
-  - intros Γ Δ u1 u2 H1 s1 s2 H2.
-    apply s_sub_eq; auto.
-    now rewrite H1.
-  - cbv [Spec.e_comp]; cbn.
-    intros Γ1 Γ2 u ? i.
-    unfold s_map.
+  - intros Γ1 Γ2 u ? i.
     etransitivity.
     unfold ugly_var; apply v_sub_id_r.
-    unfold unuglify4, clean_var, s_elt_upg.
-    unfold ctx_s_from.
+    unfold unuglify4, clean_var, s_elt_upg, ctx_s_from.
     destruct (ctx_s_to_inv Γ1); cbn.
     pose (xx := view_s_has_map (fun x : sigS is_neg => x) a0 i).
-    fold xx.
-    now destruct xx.
-  - cbv [Spec.e_comp]; unfold s_map; cbn.
-    intros Γ1 Γ2 u ? i.
+    fold xx; now destruct xx.
+  - intros Γ1 Γ2 u ? i.
     etransitivity.
     apply v_sub_eq; [ apply ugly4_id | reflexivity ].
     apply v_sub_id_l.
-  - cbv [Spec.e_comp]; unfold s_map; cbn.
-    intros Γ1 Γ2 Γ3 Γ4 p q r ? i.
+  - intros Γ1 Γ2 Γ3 Γ4 p q r ? i.
     rewrite v_sub_sub.
     apply v_sub_eq; [ | reflexivity ].
     apply ugly4_comp.
-  - intros Γ c; cbn.
+Qed.
+
+Lemma mu_conf_laws : @Spec.lang_module_laws mu_spec mu_val mu_conf .
+  unfold mu_spec, mu_val, mu_conf.
+  econstructor; unfold Spec.e_comp, s_map; cbn in *.
+  - intros Γ Δ u1 u2 H1 s1 s2 H2.
+    apply s_sub_eq; auto.
+    now rewrite H1.
+  - intros Γ c.
     rewrite ugly4_id.
     apply s_sub_id_l.
   - intros Γ1 Γ2 Γ3 u v c; cbn.
-    cbv [Spec.e_comp]; unfold s_map; cbn.
     rewrite s_sub_sub.
     apply s_sub_eq; [ | reflexivity ].
     apply ugly4_comp.
-  - intros Γ x v m u1 u2 H.
-    destruct x as [ [t | t] neg]; cbn in *.
-    + f_equal. apply t_sub_eq; [ now rewrite H | reflexivity ].
-    + do 2 f_equal.
-      apply v0_sub_eq; [ | reflexivity ].
-      now rewrite H.
-  - intros Γ1 Γ2 x e v m r; cbn.
-    cbv [Spec.e_comp]; unfold s_map; cbn.
-    destruct x as [ [t | t] neg]; cbn in *.
-    + f_equal.
-      rewrite t_sub_sub.
-      apply t_sub_eq; [ | reflexivity ].
-      now rewrite ugly_comp_weird.
-    + do 2 f_equal.
-      rewrite v0_sub_sub.
-      apply v0_sub_eq; [ | reflexivity ].
-      now rewrite ugly_comp_weird.
-  - exact @ugly_var_inj.
 Qed.
 
-Definition mu_machine_law_ty : @Spec.machine_law_ty mu_spec mu_machine.
-  econstructor; unfold mu_spec, mu_machine in *.
+Lemma mu_var_laws : @Spec.var_assumptions mu_spec mu_val .
+  unfold mu_spec, mu_val.
+  econstructor; unfold Spec.is_var; cbn in *.
+  - exact @ugly_var_inj.
   - intros Γ x v.
-    cbv [Spec.typ Spec.val Spec.is_var Spec.v_var ] in *.
     destruct (is_var_dec v); [ apply inl | apply inr ].
     + unfold ugly_var, clean_var.
       destruct i.
@@ -1439,8 +1445,7 @@ Definition mu_machine_law_ty : @Spec.machine_law_ty mu_spec mu_machine.
       unshelve econstructor.
       exact j.
       exact e.
-  - cbv [Spec.typ Spec.val Spec.is_var Spec.v_ren Spec.v_var Spec.v_sub ] in *.
-    intros Γ1 Γ2 x v e p; unfold val' in v.
+  - intros Γ1 Γ2 x v e p; unfold val' in v.
     destruct p as [ i H ].
     destruct x as [ [ x | x ] p ]; cbn in *.
     + dependent induction v; cbn in *; try now inversion H.
@@ -1475,13 +1480,32 @@ Definition mu_machine_law_ty : @Spec.machine_law_ty mu_spec mu_machine.
       reflexivity.
 Qed.
 
-Definition mu_machine_correction_hyp : @Spec.machine_correction_hyp mu_spec mu_machine .
-  econstructor.
-  - intros Γ Δ c e .
-    unfold mu_spec in *; cbn in *.
-    unfold Spec.eval_sub. cbn.
-    unfold mu_machine_obligation_1.
-    unfold Spec.e_comp; cbn.
+Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machine.
+  unfold mu_spec, mu_val, mu_conf.
+  econstructor; unfold Spec.e_comp, s_map; cbn in *.
+  - intros Γ x v m u1 u2 H.
+    destruct x as [ [t | t] neg]; cbn in *.
+    + f_equal. apply t_sub_eq; [ now rewrite H | reflexivity ].
+    + do 2 f_equal.
+      apply v0_sub_eq; [ | reflexivity ].
+      now rewrite H.
+  - intros Γ1 Γ2 x e v m r; cbn.
+    destruct x as [ [t | t] neg]; cbn in *.
+    + f_equal.
+      rewrite t_sub_sub.
+      apply t_sub_eq; [ | reflexivity ].
+      now rewrite ugly_comp_weird.
+    + do 2 f_equal.
+      rewrite v0_sub_sub.
+      apply v0_sub_eq; [ | reflexivity ].
+      now rewrite ugly_comp_weird.
+  - admit.
   - admit.
   - admit.
 Admitted.
+
+(*
+Theorem mu_correction {Γ} Δ (x y : state Γ)
+    : inj_init_act (Δ:=Δ) x ≈ₐ inj_init_act y -> ciu Δ x y.
+
+*)
