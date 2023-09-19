@@ -1225,11 +1225,12 @@ Definition clean_var {Γ : neg_ctx} {t} (i : ctx_s_to Γ ∋ t) : Γ ∋ t.(sub_
   | SHasMapV j => j
   end .
 
-Definition ugly_var {Γ} : Γ =[val']> Γ .
-  intros ? i; apply Var.
+Definition ugly_has {Γ} (t : neg_ty) (i : Γ ∋ t) : ctx_s_from Γ ∋ sub_elt t .
   unfold ctx_s_from; destruct (ctx_s_to_inv Γ); cbn in *.
   exact (clean_var i).
 Defined.
+
+Definition ugly_var {Γ} : Γ =[val']> Γ := fun _ i => Var _ (ugly_has _ i) .
 
 Lemma fib_inj_irr {X Y} (f : X -> Y) (H : forall x y, f x = f y -> x = y) {y} (a b : fiber f y) : a = b .
   destruct b.
@@ -1246,7 +1247,7 @@ Qed.
 Lemma ugly4_id {Γ} : unuglify4 (@ugly_var Γ) ≡ₐ Var .
   unfold unuglify4, unuglify3, unuglify1, ctx_s_from in *.
   intros ? i.
-  unfold ugly_var, clean_var.
+  unfold ugly_var, ugly_has, clean_var.
   (*
   unfold view_s_has_map.
   unfold s_elt_upg.
@@ -1265,7 +1266,7 @@ Qed.
 
 Lemma ugly_var_inj {Γ x} (i j : Γ ∋ x) : ugly_var x i = ugly_var x j -> i = j .
   intro H.
-  unfold ugly_var, clean_var in H.
+  unfold ugly_var, ugly_has,clean_var in H.
   apply var_inj in H.
   pose (xx := ctx_s_to_inv Γ).
   fold xx in H.
@@ -1381,7 +1382,7 @@ Lemma mu_val_laws : @Spec.lang_monoid_laws mu_spec mu_val .
     now rewrite H1.
   - intros Γ1 Γ2 u ? i.
     etransitivity.
-    unfold ugly_var; apply v_sub_id_r.
+    unfold ugly_var, ugly_has; apply v_sub_id_r.
     unfold unuglify4, clean_var, s_elt_upg, ctx_s_from.
     destruct (ctx_s_to_inv Γ1); cbn.
     pose (xx := view_s_has_map (fun x : sigS is_neg => x) a0 i).
@@ -1417,7 +1418,7 @@ Lemma mu_var_laws : @Spec.var_assumptions mu_spec mu_val .
   - exact @ugly_var_inj.
   - intros Γ x v.
     destruct (is_var_dec v); [ apply inl | apply inr ].
-    + unfold ugly_var, clean_var.
+    + unfold ugly_var, ugly_has,clean_var.
       destruct i.
       unfold val' in v.
       unfold ctx_s_from in *.
@@ -1436,7 +1437,7 @@ Lemma mu_var_laws : @Spec.var_assumptions mu_spec mu_val .
         rewrite H.
         reflexivity.
     + intros [].
-      unfold ugly_var in e.
+      unfold ugly_var,ugly_has in e.
       pose (j := (match ctx_s_to_inv Γ as f in (fiber _ b) return (b ∋ x -> fib_extr f ∋ sub_elt x) with
          | Fib a => fun i : ctx_s_to a ∋ x => clean_var i
          end x0)).
@@ -1451,6 +1452,7 @@ Lemma mu_var_laws : @Spec.var_assumptions mu_spec mu_val .
     + dependent induction v; cbn in *; try now inversion H.
       clear H e.
       unfold ctx_s_from in h.
+      unfold ugly_has.
       unshelve econstructor.
       destruct (ctx_s_to_inv Γ1).
       exact (s_map_has _ _ h).
@@ -1466,6 +1468,7 @@ Lemma mu_var_laws : @Spec.var_assumptions mu_spec mu_val .
     + dependent induction v; cbn in *; try now inversion H.
       clear H e.
       unfold ctx_s_from in h.
+      unfold ugly_has.
       unshelve econstructor.
       destruct (ctx_s_to_inv Γ1).
       exact (s_map_has _ _ h).
@@ -1501,7 +1504,94 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
       now rewrite ugly_comp_weird.
   - admit.
   - admit.
-  - admit.
+  - intros [ [ t H ] p ]; simpl in p.
+    pose (u := (t ,' p) : { t : ty & pat (t_neg t) }); simpl in u.
+    change t with (projT1 u) in H |- *.
+    change p with (projT2 u).
+    revert H.
+    remember u; clear t p u Heqs.
+    induction (eval_app_not_var s).
+    intro H1.
+    econstructor. intros y H2.
+    eassert (H3 : _). refine (H0 ((projT1 y).(sub_elt) ,' projT2 y) _ ((projT1 y).(sub_prf))).
+    * dependent elimination H2.
+      cbn in *.
+      unfold Spec.eval_to_msg in i0.
+      destruct x as [ t m ]; cbn in *.
+      unshelve econstructor.
+      + clear - Γ ; exact (ctx_s_from Γ).
+      + clear - v ; exact v.
+      + clear - e ; exact (unuglify1_inv e).
+      + clear - i ; unfold ctx_s_from; destruct (ctx_s_to_inv Γ); exact (clean_var i).
+      + intros [].
+        apply p.
+        clear - e0 .
+        unfold val' in v.
+        unfold ctx_s_from in *; cbn in *.
+        unfold Spec.is_var.
+        cbn.
+        rewrite e0; clear e0.
+        unfold ugly_var; cbn.
+        pose (H2 := fun (U : SProp) (a b : U) => (eq_refl : a = b)); cbn in H2.
+        unfold ugly_has.
+        rewrite (H2 _ H1 ((fib_extr (ctx_s_to_inv Γ)).(sub_prf) _ x)).
+        unshelve econstructor.
+        ++ clear - x H2.
+           destruct (ctx_s_to_inv Γ); exact (s_map_has (fun x => x) _ x).
+        ++ unfold ugly_has, clean_var; f_equal; cbn.
+           destruct (ctx_s_to_inv Γ).
+           unfold view_s_has_map.
+           unfold view_s_has_map_clause_1.
+           pose (H3 := s_has_map_view_simpl' (f := fun x0 : sigS is_neg => x0) (ΓH := sub_prf a) (i := x)).
+           pose (xx := view_s_has_map' (fun x0 : sigS is_neg => x0) (sub_elt a) (sub_prf a)
+        (s_map_has' (fun x0 : sigS is_neg => x0) (sub_elt a) (sub_prf a) x)).
+           change (view_s_has_map' _ _ _ _) with xx in H3 |- *.
+           rewrite H3.
+           reflexivity.
+      + cbn in *.
+        clear - i0.
+        apply it_eq_step in i0.
+        apply it_eq_unstep.
+        cbn in *.
+        pose (xx := eval_aux (p_app v m (unuglify1_inv e))).
+        change (eval_aux (p_app v m (unuglify1_inv e))) with xx in i0 |- *.
+        destruct xx; dependent elimination i0.
+        econstructor.
+        clear - r_rel.
+        destruct n as [ x [ j [ m γ ] ] ] .
+        unfold Spec.msg_of_nf', Spec.nf_ty', Spec.nf_val', Spec.nf_var', Spec.nf_msg' in r_rel.
+        unfold ugly_nf in r_rel.
+        unfold pat_of_nf.
+        cbn in *.
+        destruct y as [ t m' ]; cbn in *.
+        inversion r_rel.
+        unfold s_elt_upg in *.
+        unfold ctx_s_from in *.
+        destruct (ctx_s_to_inv Γ).
+        cbn in *.
+        remember (sub_prf a x j); clear Heqi0.
+        eassert (H2 : _) by exact (f_equal (fun a => sub_elt a) H0); cbn in H2.
+        revert j m γ i0 r_rel H0 H1; rewrite H2; clear H2; intros j m γ i0 r_rel H0 H1.
+        clear H0.
+        f_equal.
+        inversion r_rel; clear r_rel H1.
+        f_equal.
+        ++ unfold clean_var.
+           dependent elimination H0.
+           unfold view_s_has_map.
+           unfold view_s_has_map_clause_1.
+           pose (H3 := s_has_map_view_simpl' (f := fun x0 : sigS is_neg => x0) (ΓH := sub_prf a) (i := j)).
+           pose (xx := view_s_has_map' (fun x0 : sigS is_neg => x0) (sub_elt a) (sub_prf a)
+        (s_map_has' (fun x0 : sigS is_neg => x0) (sub_elt a) (sub_prf a) j)).
+           change (view_s_has_map' _ _ _ _) with xx in H3 |- *.
+           rewrite H3.
+           reflexivity.
+        ++ clear - H2; dependent elimination H2. reflexivity.
+        *  clear - H3. cbn in H3.
+           change ({| sub_elt := sub_elt (projT1 y); sub_prf := sub_prf (projT1 y) |}) with (projT1 y) in H3.
+           assert (H4 : (projT1 y,' projT2 y) = y) ; [ | rewrite H4 in H3; exact H3 ].
+           clear; destruct y; cbn in *.
+           reflexivity.
 Admitted.
 
 (*
