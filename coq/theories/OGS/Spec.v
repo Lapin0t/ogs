@@ -110,7 +110,6 @@ Additional assumptions on how variables behave.
   Definition is_var_get {Γ x} {v : val Γ x} (p : is_var v) : Γ ∋ x := projT1 p .
   Definition is_var_get_eq {Γ x} {v : val Γ x} (p : is_var v) : v = v_var x (is_var_get p) := projT2 p .
 
-
   Class var_assumptions : Type := {
     v_var_inj {Γ x} (i j : Γ ∋ x) : v_var x i = v_var x j -> i = j ;
     is_var_dec {Γ x} (v : val Γ x) : is_var v + (is_var v -> False) ;
@@ -123,8 +122,21 @@ Additional assumptions on how variables behave.
 
   Definition nf_ty' {Γ} : nf' Γ -> typ := @projT1 _ _ .
   Definition nf_var' {Γ} (u : nf' Γ) : Γ ∋ (nf_ty' u) := fst (projT2 u) .
+  Definition nf_nf' {Γ} (u : nf' Γ) : nf Γ (nf_ty' u) := snd (projT2 u) .
   Definition nf_msg' {Γ} (u : nf' Γ) : msg (nf_ty' u) := projT1 (snd (projT2 u)) .
   Definition nf_val' {Γ} (u : nf' Γ) : dom (nf_msg' u) ⇒ᵥ Γ := projT2 (snd (projT2 u)) .
+
+  Definition nf_eq {Γ t} : relation (nf Γ t) :=
+    fun a b => exists H : projT1 a = projT1 b,
+        rew H in projT2 a ≡ₐ projT2 b .
+
+  Definition nf_eq' {Γ} : relation (nf' Γ) :=
+    fun a b => exists H : nf_ty' a = nf_ty' b,
+        (rew H in nf_var' a = nf_var' b) /\ (nf_eq (rew H in nf_nf' a) (nf_nf' b)) .
+
+  Definition comp_eq {Γ} : relation (delay (nf' Γ)) :=
+    it_eq (fun _ : T1 => nf_eq') (i := T1_0) .
+  Notation "u ≋ v" := (comp_eq u v) (at level 40) .
 
   Definition msg_of_nf' : nf' ⇒ᵢ msg' :=
     fun Γ u => (nf_ty' u ,' (nf_var' u , nf_msg' u)) .
@@ -144,31 +156,27 @@ Additional assumptions on how variables behave.
   Definition eval_to_msg {Γ} (t : conf Γ) : delay (msg' Γ) :=
     fmap_delay (msg_of_nf' Γ) (eval t) . 
 
-  Definition sub_eval {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : delay (nf' Δ) :=
-    eval ([ v_var , e ] ⊛ₜ c) .
-
-  Definition eval_sub {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : delay (nf' Δ) :=
-    eval c >>= fun 'T1_0 u =>
-        match cat_split (nf_var' u) with
-        | CLeftV h => Ret' (nf_ty' u ,' (h , (nf_msg' u ,' [ v_var,  e ] ⊛ nf_val' u)))
-        | CRightV h => eval (app (e _ h) (nf_msg' u) ([v_var , e ] ⊛ nf_val' u))
-        end .
-
   Variant head_inst_nostep (u : { x : typ & msg x }) : { x : typ & msg x } -> Prop :=
   | HeadInst {Γ y} (v : val Γ y) (m : msg y) (e : dom m ⇒ᵥ Γ) (p : is_var v -> False) (i : Γ ∋ projT1 u)
              : eval_to_msg (app v m e) ≊ ret_delay (projT1 u ,' (i , projT2 u)) -> head_inst_nostep u (y ,' m) .
+
 
   Class machine_laws : Prop := {
     app_proper {Γ x v m} :: Proper (ass_eq (dom m) Γ ==> eq) (@app _ Γ x v m) ;
     app_sub {Γ1 Γ2 x} (e : Γ1 ⇒ᵥ Γ2) (v : val Γ1 x) (m : msg x) (r : dom m ⇒ᵥ Γ1)
       : e ⊛ₜ app v m r = app (e ⊛ᵥ v) m (e ⊛ r) ;
 
-    eval_split {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) :
-      sub_eval c e ≊ eval_sub c e ;
+    eval_sub {Γ Δ} (c : conf Γ) (e : Γ ⇒ᵥ Δ)
+      : eval (e ⊛ₜ c)
+      ≋ bind_delay (eval c) (fun u => eval (app (e _ (nf_var' u)) (nf_msg' u) (e ⊛ nf_val' u))) ;
+
+    (*eval_nf_ret {Γ} (u : nf' Γ) :
+      eval_to_msg (app (v_var _ (nf_var' u)) (nf_msg' u) (nf_val' u))
+      ≊ ret_delay (msg_of_nf' _ u) ;*)
 
     eval_nf_ret {Γ} (u : nf' Γ) :
-      eval_to_msg (app (v_var _ (nf_var' u)) (nf_msg' u) (nf_val' u))
-      ≊ ret_delay (msg_of_nf' _ u) ;
+      eval (app (v_var _ (nf_var' u)) (nf_msg' u) (nf_val' u))
+      ≋ ret_delay u ;
 
     eval_app_not_var : well_founded head_inst_nostep ;
   } .      
@@ -464,6 +472,101 @@ lem 4.6
               | inr e => Ret' (inl (_ ,' (m_strat_resp (snd (projT2 x)) (projT1 e) , (projT2 e))))
               end.
 
+  Definition split_sub_eval {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : delay (nf' Δ) :=
+    eval ([ v_var , e ] ⊛ₜ c) .
+
+  Definition eval_split_sub {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : delay (nf' Δ) :=
+    eval c >>= fun 'T1_0 u =>
+        match cat_split (nf_var' u) with
+        | CLeftV h => Ret' (nf_ty' u ,' (h , (nf_msg' u ,' [ v_var,  e ] ⊛ nf_val' u)))
+        | CRightV h => eval (app (e _ h) (nf_msg' u) ([v_var , e ] ⊛ nf_val' u))
+        end .
+
+  #[global] Instance nf_eq_rfl {Γ t} : Reflexive (@nf_eq Γ t) .
+    intros a; exists eq_refl; auto.
+  Qed.
+  
+  #[global] Instance nf_eq_sym {Γ t} : Symmetric (@nf_eq Γ t) .
+    intros a b [ p q ].
+    unshelve econstructor.
+    - now symmetry.
+    - intros ? i.
+      destruct a as [ m a ] ; cbn in *.
+      revert a q i; rewrite p; clear p; intros a q i.
+      symmetry; apply q.
+  Qed.
+  
+  #[global] Instance nf_eq_tra {Γ t} : Transitive (@nf_eq Γ t) .
+    intros a b c [ p1 q1 ] [ p2 q2 ].
+    unfold nf_eq.
+    unshelve econstructor.
+    - now transitivity (projT1 b).
+    - transitivity (rew [fun m : msg t => dom m ⇒ᵥ Γ] p2 in projT2 b); auto.
+      now rewrite <- p2.
+  Qed.
+
+  #[global] Instance nf_eq_rfl' {Γ} : Reflexiveᵢ (fun _ : T1 => @nf_eq' Γ) .
+    intros _ [ x [ i n ] ].
+    unshelve econstructor; auto.
+  Qed.
+  
+  #[global] Instance nf_eq_sym' {Γ} : Symmetricᵢ (fun _ : T1 => @nf_eq' Γ) .
+    intros _ [ x1 [ i1 n1 ] ] [ x2 [ i2 n2 ] ] [ p [ q1 q2 ] ].
+    unshelve econstructor; [ | split ]; cbn in *.
+    - now symmetry.
+    - revert i1 q1; rewrite p; intros i1 q1; now symmetry.
+    - revert n1 q2; rewrite p; intros n1 q2; now symmetry.
+  Qed.
+
+  #[global] Instance nf_eq_tra' {Γ} : Transitiveᵢ (fun _ : T1 => @nf_eq' Γ) .
+    intros _ [ x1 [ i1 n1 ] ] [ x2 [ i2 n2 ] ] [ x3 [ i3 n3 ] ] [ p1 [ q1 r1 ] ] [ p2 [ q2 r2 ] ].
+    unshelve econstructor; [ | split ]; cbn in *.
+    - now transitivity x2.
+    - transitivity (rew [has Γ] p2 in i2); auto.
+      rewrite eq_trans_rew_distr.
+      now rewrite <- p2.
+    - transitivity (rew [nf Γ] p2 in n2); auto.
+      rewrite eq_trans_rew_distr.
+      now rewrite <- p2.
+  Qed.
+
+  Lemma eval_to_msg_eq {Γ} (a b : delay (nf' Γ)) (H : a ≋ b) :
+    fmap_delay (@msg_of_nf' Γ) a ≊ fmap_delay (@msg_of_nf' Γ) b . 
+    revert a b H; unfold it_eq; coinduction R CIH; intros a b H.
+    unfold comp_eq in H; apply it_eq_step in H.
+    cbn in *; unfold observe in H.
+    destruct (_observe a), (_observe b); dependent elimination H; econstructor.
+    - destruct r_rel as [ p [ q [ r _ ] ] ].
+      destruct r1 as [ x1 [ i1 [ m1 a1 ] ] ], r2 as [ x2 [ i2 [ m2 a2 ] ] ].
+      unfold msg_of_nf', nf_ty', nf_var', nf_msg' in *; cbn in *.
+      revert i1 m1 a1 q r; rewrite p; intros i1 m1 a1 q r.
+      now do 2 f_equal.
+    - now apply CIH.
+    - inversion q1.
+  Qed.
+
+  Lemma eval_split {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : split_sub_eval c e ≋ eval_split_sub c e .
+    unfold split_sub_eval, eval_split_sub.
+    rewrite (eval_sub c ([ v_var , e ])).
+    unfold bind_delay.
+    remember (eval c) as t; clear c Heqt.
+    revert t; unfold comp_eq,it_eq; coinduction R CIH; cbn; intro t.
+    destruct (_observe t); [ | econstructor; apply CIH | inversion q ].
+    destruct r as [ x [ i [ m γ ] ] ]; cbn in *.
+    destruct (cat_split i).
+    + change (?u x (r_cover_l cover_cat x i)) with ((u ⊛ᵣ r_concat_l) x i).
+      rewrite s_eq_cat_l.
+      eassert (H : _) by exact (eval_nf_ret (x ,' (i , (m ,' ([v_var, e]) ⊛ γ)))).
+      unfold comp_eq in H.
+      apply it_eq_step in H; cbn in *; unfold observe in H.
+      destruct (_observe (eval (app (v_var x i) m (([v_var, e]) ⊛ γ)))); dependent elimination H; auto.
+    + change (?u x (r_cover_r cover_cat x j)) with ((u ⊛ᵣ r_concat_r) x j).
+      rewrite s_eq_cat_r.
+      destruct (_observe (eval (app (e x j) m (([v_var, e]) ⊛ γ)))); econstructor; auto.
+      now apply nf_eq_rfl'.
+  Qed.
+
+
 (*|
 Interesting facts but not used in the current proof...
 
@@ -674,18 +777,20 @@ app w m ...  où not (is_var w)
     - destruct i as [ i eq ].
       rewrite eq.
       eassert (H3 : _) by exact (eval_nf_ret (_ ,' (i , (m ,' ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r))))).
+      unfold comp_eq in H3.
       apply it_eq_step in H3; cbn in H3; unfold observe in H3.
     pose (ot := _observe (eval (app (v_var x i) m ((v_var ⊛ᵣ r_concat_r) ⊛ᵣ r_concat_r)))); fold ot in H3 |- *.
     destruct ot; dependent elimination H3.
-    cbn in r, r_rel |- * .
-    destruct r as [ x' [ i' [ m' a' ] ] ].
+    cbn in r1, r_rel |- * .
+    destruct r1 as [ x' [ i' [ m' a' ] ] ].
+    destruct r_rel as [ p [ q r ] ]; cbn in *.
     unfold m_strat_wrap; unfold dom' in a'; unfold msg_of_nf', nf_ty', nf_var', nf_msg' in *; cbn [ fst snd projT1 projT2] in *.
-    inversion r_rel; clear r_rel.
-    revert i' m' a' H5 H6; rewrite H4; clear H4 x'; intros i' m' a' H5 H6.
-    dependent elimination H5. dependent elimination H6.
-    pose (i := (i' ,' eq) : is_var vv).
-    change i' with (is_var_get i).
-    remember i as ii; clear i Heqii i' eq.
+    revert i' m' a' q r; rewrite p; clear p x'; intros i' m' a' q [ r1 _ ]; cbn in q, r1.
+    rewrite q; clear q i'.
+    revert a'; rewrite r1; clear r1 m'; intros a'.
+    pose (i' := (i ,' eq) : is_var vv).
+    change i with (is_var_get i').
+    remember i' as ii; clear i i' Heqii eq.
     unfold vv in ii; destruct (view_is_var_ren _ _ ii).
     destruct p; simpl is_var_get.
     destruct (cat_split x1).
@@ -789,15 +894,19 @@ app w m ...  où not (is_var w)
     clear a c e; intros [] [ ? [ u v ] ].
     etransitivity; [ | symmetry; apply quatre_trois_pre ].
     unfold reduce at 1.
-    etransitivity; [ apply fmap_eq, eval_split | ].
+    etransitivity; [ apply eval_to_msg_eq, eval_split | ].
     etransitivity; [ apply bind_fmap_com | ].
     unfold it_eq; cbn [fst snd projT2 projT1].
     apply (tt_t (it_eq_map ∅ₑ (eqᵢ _))).
     refine (it_eq_up2bind_t _ _ _ _ (eval (fst u) >>= _) (eval (fst u) >>= _) _); econstructor; eauto.
-    intros [] [ t [ i [ m γ ] ]] ? <-.
+    intros [] [ t1 [ i1 [ m1 γ1 ] ]] [ t2 [ i2 [ m2 γ2 ] ]] [ p [ q r ] ].
+    cbn in *.
+    revert i1 m1 γ1 q r; rewrite p; clear p t1; intros i1 m1 γ1 q r; cbn in q,r.
+    rewrite q; clear q i1.
+    destruct r as [ p q ]; cbn in p,q.
+    revert γ1 q; rewrite p; clear p m1; intros γ1 q; cbn in q.
     apply (bt_t (it_eq_map ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)))).
-    unfold nf_var'; cbn [fst snd projT1 projT2].
-    pose (xx := cat_split i); change (cat_split i) with xx; destruct xx.
+    pose (xx := cat_split i2); change (cat_split i2) with xx; destruct xx.
     - cbn; econstructor; reflexivity.
     - cbn -[it_eq_map fmap].
       change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)) bot) with (it_eq (E:=∅ₑ) (eqᵢ (fun _ : T1 => msg' Δ))).
@@ -805,9 +914,9 @@ app w m ...  où not (is_var w)
       unfold m_strat_resp; cbn [fst snd projT1 projT2].
       rewrite app_sub, concat1_equation_2.
 
-      pose (xx := [ v_var , [concat1 v (snd u), ([v_var, concat1 (snd u) v]) ⊛ γ]] ⊛ᵥ r_concat3_1 ᵣ⊛ᵥ concat0 v t j).
+      pose (xx := [ v_var , [concat1 v (snd u), ([v_var, concat1 (snd u) v]) ⊛ γ2]] ⊛ᵥ r_concat3_1 ᵣ⊛ᵥ concat0 v t2 j).
       change ([ v_var , [ _ , _ ]] ⊛ᵥ _) with xx.
-      assert (H : xx = concat1 (snd u) v t j); [ | rewrite H; clear H ].
+      assert (H : xx = concat1 (snd u) v t2 j); [ | rewrite H; clear H ].
       + unfold xx; clear xx.
         change (?a ⊛ᵥ ?b ᵣ⊛ᵥ (concat0 v _ j)) with ((a ⊛ (b ᵣ⊛ concat0 v)) _ j).
         unfold e_ren; rewrite v_sub_sub.
@@ -819,7 +928,7 @@ app w m ...  où not (is_var w)
         change (s_map ?a ?b) with (s_ren a b); change (s_cover cover_cat ?a ?b) with ([ a , b ]).
         now rewrite s_eq_cat_l, s_ren_comp, s_eq_cat_r, s_eq_cat_l.
       + erewrite app_proper; [ reflexivity | ].
-        now rewrite 2 e_comp_ren_r, v_sub_var, 2 s_eq_cat_r.
+        now rewrite q, 2 e_comp_ren_r, v_sub_var, 2 s_eq_cat_r.
    Qed.
 
   Lemma quatre_trois_app {Γ Δ} (c : conf Γ) (e : Γ ⇒ᵥ Δ)
