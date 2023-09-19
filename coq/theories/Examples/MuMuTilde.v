@@ -1502,8 +1502,52 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
       rewrite v0_sub_sub.
       apply v0_sub_eq; [ | reflexivity ].
       now rewrite ugly_comp_weird.
-  - admit.
-  - admit.
+  - (*intros Γ Δ c e .
+    unfold Spec.eval_sub; cbn.
+    unfold fmap_delay.
+    rewrite fmap_bind_com.
+    eassert (H : _) by exact (clean_hyp c (unuglify4 ([ ugly_var , e]))).
+    apply it_eq_step in H.
+    apply it_eq_unstep.
+    cbn in *.
+    pose (xx := eval_aux (s_subst (unuglify4 ([ugly_var, e])) c)).
+    change (eval_aux (s_subst (unuglify4 ([ugly_var, e])) c)) with xx in H |- *.
+    pose (yy := eval_aux c); change (eval_aux c) with yy in H |- * .
+    destruct xx; destruct yy; cbn in *.
+    * dependent elimination H.
+      econstructor.
+      shelve.
+    * cbn in H.
+    dependent elimination H.*)
+    admit.
+  - intros Γ u .
+    unfold Spec.eval_to_msg, Spec.msg_of_nf', Spec.nf', Spec.nf_ty', Spec.nf_msg', Spec.nf_val', Spec.nf_var'.
+    destruct u as [ x [ j [ m γ ] ] ] ; cbn in *.
+    eassert (H : _) by exact (eval_nf_ret ((x : ty) ,' (ugly_has _ j , (m ,' unuglify1_inv γ)))).
+    cbn in *.
+    apply it_eq_step in H.
+    apply it_eq_unstep.
+    cbn in *.
+    change ((Var x (ugly_has x j))) with (ugly_var x j) in H.
+    pose (xx := eval_aux (p_app (ugly_var x j) m (unuglify1_inv γ))).
+    change (eval_aux (p_app _ _ _)) with xx in H |- *.
+    destruct xx; dependent elimination H.
+    econstructor.
+    destruct n as [ x' [ j' [ m' γ' ] ] ] ; cbn in *.
+    unfold pat_of_nf in r_rel; cbn in *.
+    unfold ctx_s_from in *.
+    unfold s_elt_upg.
+    inversion r_rel; clear r_rel.
+    revert j' m' γ' H1 H2; rewrite H0; intros j' m' γ' H1 H2.
+    f_equal.
+    f_equal.
+    + clear - H1. dependent elimination H1.
+      unfold ugly_has.
+      unfold clean_var.
+      destruct (ctx_s_to_inv Γ).
+      destruct (view_s_has_map (fun x0 : sigS is_neg => x0) a j).
+      reflexivity.
+    + now dependent elimination H2.
   - intros [ [ t H ] p ]; simpl in p.
     pose (u := (t ,' p) : { t : ty & pat (t_neg t) }); simpl in u.
     change t with (projT1 u) in H |- *.
