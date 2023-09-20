@@ -669,6 +669,14 @@ Qed.
 intros f1 f2 H1 [] v1 v2 H2; [ apply v0_sub_eq | apply t_sub_eq ]; auto.
 Qed.
 
+#[global] Instance a_comp_eq {Γ1 Γ2 Γ3} : Proper (ass_eq _ _ ==> ass_eq _ _ ==> ass_eq _ _) (@a_comp Γ1 Γ2 Γ3).
+  intros a b H1 c d H2.
+  intros ? i.
+  unfold a_comp.
+  apply v_sub_eq; auto.
+  apply H2.
+Qed.
+
 Definition t_ren_sub_P Γ1 a (t : term Γ1 a) : Prop :=
   forall Γ2 Γ3 (f1 : Γ2 ⊆ Γ3) (f2 : Γ1 =[val]> Γ2),
     t_rename f1 a (t_subst f2 a t)
@@ -1215,12 +1223,23 @@ Definition unuglify1_inv {Γ1 : neg_ctx} {Γ2} (u : ctx_s_to Γ1 =[val']> Γ2) :
   intros ? i; exact (u _ (s_map_has _ _ i)).
 Defined.
 
-Lemma unuglify11 {Γ1 : neg_ctx} {Γ2} (u : ctx_s_to Γ1 =[val']> Γ2) : unuglify1 (unuglify1_inv u) ≡ₐ u .
+Lemma unuglify11_inv {Γ1 : neg_ctx} {Γ2} (u : ctx_s_to Γ1 =[val']> Γ2) : unuglify1 (unuglify1_inv u) ≡ₐ u .
   intros ? i.
   unfold unuglify1, unuglify1_inv.
   pose (xx := view_s_has_map (fun x : sigS is_neg => x) Γ1 i).
   change (view_s_has_map (fun x : sigS is_neg => x) Γ1 i) with xx.
   now destruct xx.
+Qed.
+
+Lemma unuglify1_inv1 {Γ1 : neg_ctx} {Γ2} (u : Γ1 =[val]> ctx_s_from Γ2) : unuglify1_inv (unuglify1 u) ≡ₐ u.
+  intros ? i.
+  unfold unuglify1, unuglify1_inv.
+  unfold view_s_has_map, view_s_has_map_clause_1, s_map_has.
+  pose (xx := view_s_has_map' (fun x : sigS is_neg => x) (sub_elt Γ1) (sub_prf Γ1)
+        (s_map_has' (fun x : sigS is_neg => x) (sub_elt Γ1) (sub_prf Γ1) i)).
+  change (view_s_has_map' _ _ _ _) with xx.
+  remember xx.
+  now rewrite (eq_trans Heqs (s_has_map_view_simpl')).
 Qed.
 
 Definition unuglify2 {Γ1 Γ2 : neg_ctx} (u : Γ1 =[val]> Γ2) : ctx_s_to Γ1 =[val']> ctx_s_to Γ2 .
@@ -1579,6 +1598,17 @@ Lemma mu_var_laws : @Spec.var_assumptions mu_spec mu_val .
       reflexivity.
 Qed.
 
+
+Definition sigS_eq_refl {A : Type} (P : A -> SProp) (x : A) (p1 p2 : P x) :
+  {| sub_elt := x ; sub_prf := p1 |} = {| sub_elt := x ; sub_prf := p2 |} := eq_refl .
+
+Definition sigS_eq_subst {X : SProp} (P : X -> Type) (a b : X) : P a -> P b := fun p => p .
+(*
+Definition sprop_irr (U : SProp) (a b : U) : a = b .
+  exact eq_refl.
+Defined.
+*)
+
 Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machine.
   unfold mu_spec, mu_val, mu_conf.
   econstructor; unfold Spec.e_comp, s_map; cbn in *.
@@ -1599,23 +1629,49 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
       apply v0_sub_eq; [ | reflexivity ].
       now rewrite ugly_comp_weird.
   - intros Γ Δ c e .
-    eassert (H : _) by exact (clean_hyp c (unuglify4 e)).
-    Check (Spec.eval_to_msg_eq _ _ H).
+    unfold Spec.comp_eq, fmap_delay.
+    etransitivity.
+    unshelve eapply fmap_eq; [ | | | exact (clean_hyp c (unuglify4 e)) ].
+    intros ? u v ->; unshelve econstructor; auto.
+    unfold bind_delay'.
+    rewrite bind_fmap_com.
+    rewrite fmap_bind_com.
+    apply (proj1 (t_gfp (it_eq_map ∅ₑ (fun _ : T1 => Spec.nf_eq')) _ _ _)).
 
-    rewrite H.
-    rewrite H.
-    Search bind_delay.
-    unfold fmap_delay at 2, bind_delay.
-    rewrite 
-    unfold it_eq; revert c e H; coinduction R CIH; intros c e H.
-    apply it_eq_step in H.
-    cbn in *.
-    pose (xx := eval_aux (s_subst (unuglify4 e) c)).
-    change (eval_aux (s_subst (unuglify4 e) c)) with xx in H |- *.
-    pose (yy := eval_aux c); change (eval_aux c) with yy in H |- * .
-    destruct xx; destruct yy; cbn in *.
-    * dependent elimination H; econstructor.
-      econstructor.
+    eapply (it_eq_up2bind_t (eqᵢ _)); econstructor; auto.
+    intros [] u v ->.
+
+    change (gfp _ _ ?a ?b) with (it_eq (fun _ : T1 => Spec.nf_eq') a b).
+    unshelve eapply fmap_eq.
+
+    exact (fun _ => nf_eq).
+    intros [] [ x1 [ i1 [ m1 u1 ] ] ] [ x2 [ i2 [ m2 u2 ] ] ] [ p [ q r ] ]; cbn in *.
+    unfold Spec.nf_eq', Spec.nf_eq; cbn.
+    revert i1 m1 u1 q r; rewrite p; clear p x1; intros i1 m1 u1 q r; cbn in q,r.
+    rewrite q; clear q i1.
+    unshelve econstructor; auto; cbn.
+    split; auto.
+    destruct r as [ p q ]; cbn in *.
+    revert u1 q; rewrite p; clear p m1; intros u1 q; cbn in q.
+    unshelve econstructor; auto; cbn.
+    now rewrite q.
+
+    unfold then_play1.
+    destruct v as [ x [ i [ m u ] ] ]; cbn.
+
+    change (e (s_elt_upg i) _) with (unuglify4 e x i).
+
+    assert (H : (a_comp (unuglify4 e) u) ≡ₐ (unuglify1_inv (fun i0 : neg_ty => v_subst (unuglify4 e) (sub_elt i0) ∘ unuglify1 u i0))) by now rewrite <- (unuglify1_inv1 u), ugly_comp_weird.
+
+    destruct x; cbn.
+    + pose (uu := (t_subst (a_comp (unuglify4 e) u) (t- t) (v_of_p m))).
+      change (t_subst (a_comp _ _) _ _) with uu.
+      remember uu.
+      now rewrite (eq_trans Heqt0 (t_sub_eq _ _ H _ (v_of_p m) _ eq_refl)).
+    + pose (uu := (v0_subst (a_comp (unuglify4 e) u) t (v_of_p m))).
+      change (v0_subst (a_comp _ _) _ _) with uu.
+      remember uu.
+      now rewrite (eq_trans Heqv (v0_sub_eq _ _ H _ (v_of_p m) _ eq_refl)).
   - intros Γ u .
     unfold Spec.eval_to_msg, Spec.msg_of_nf', Spec.nf', Spec.nf_ty', Spec.nf_msg', Spec.nf_val', Spec.nf_var'.
     destruct u as [ x [ j [ m γ ] ] ] ; cbn in *.
@@ -1636,7 +1692,6 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
     rewrite q; clear q j'.
     destruct r as [ p q ]; cbn in p,q.
     revert γ' q; rewrite p; clear p m'; intros γ' q; cbn in q.
-    pose (H2 := fun (U : SProp) (a b : U) => (eq_refl : a = b)); cbn in H2.
     unshelve econstructor; [ | split ].
     + unfold s_elt_upg, ugly_has.
       change x with ({| sub_elt := sub_elt x ; sub_prf := sub_prf x |}) at 7.
@@ -1647,7 +1702,7 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
       destruct (ctx_s_to_inv Γ).
       now destruct (view_s_has_map (fun x0 : sigS is_neg => x0) a j).
     + unshelve econstructor; auto; cbn.
-      now rewrite q, unuglify11.
+      now rewrite q, unuglify11_inv.
   - intros [ [ t H ] p ]; simpl in p.
     pose (u := (t ,' p) : { t : ty & pat (t_neg t) }); simpl in u.
     change t with (projT1 u) in H |- *.
@@ -1676,22 +1731,20 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
         cbn.
         rewrite e0; clear e0.
         unfold ugly_var; cbn.
-        pose (H2 := fun (U : SProp) (a b : U) => (eq_refl : a = b)); cbn in H2.
-        unfold ugly_has.
-        rewrite (H2 _ H1 ((fib_extr (ctx_s_to_inv Γ)).(sub_prf) _ x)).
+        apply (sigS_eq_subst (fun p => {i : Γ ∋ {| sub_elt := t; sub_prf := p |} & Var t x = Var t (ugly_has {| sub_elt := t; sub_prf := p |} i)}) ((fib_extr (ctx_s_to_inv Γ)).(sub_prf) _ x) H1).
+        fold (s_elt_upg x).
         unshelve econstructor.
-        ++ clear - x H2.
-           destruct (ctx_s_to_inv Γ); exact (s_map_has (fun x => x) _ x).
-        ++ unfold ugly_has, clean_var; f_equal; cbn.
+        ++ destruct (ctx_s_to_inv Γ).
+           apply (s_map_has (fun t => t) _ x).
+        ++ f_equal.
+           unfold ugly_has, clean_var.
            destruct (ctx_s_to_inv Γ).
-           unfold view_s_has_map.
-           unfold view_s_has_map_clause_1.
+           unfold view_s_has_map, view_s_has_map_clause_1; cbn.
            pose (H3 := s_has_map_view_simpl' (f := fun x0 : sigS is_neg => x0) (ΓH := sub_prf a) (i := x)).
            pose (xx := view_s_has_map' (fun x0 : sigS is_neg => x0) (sub_elt a) (sub_prf a)
         (s_map_has' (fun x0 : sigS is_neg => x0) (sub_elt a) (sub_prf a) x)).
            change (view_s_has_map' _ _ _ _) with xx in H3 |- *.
-           rewrite H3.
-           reflexivity.
+           now rewrite H3.
       + cbn in *.
         clear - i0.
         apply it_eq_step in i0.
@@ -1713,9 +1766,8 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
         unfold ctx_s_from in *.
         destruct (ctx_s_to_inv Γ).
         cbn in *.
-        remember (sub_prf a x j); clear Heqi0.
         eassert (H2 : _) by exact (f_equal (fun a => sub_elt a) H0); cbn in H2.
-        revert j m γ i0 r_rel H0 H1; rewrite H2; clear H2; intros j m γ i0 r_rel H0 H1.
+        revert j m γ r_rel H0 H1; rewrite H2; clear H2; intros j m γ r_rel H0 H1.
         clear H0.
         f_equal.
         inversion r_rel; clear r_rel H1.
@@ -1736,8 +1788,7 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
            assert (H4 : (projT1 y,' projT2 y) = y) ; [ | rewrite H4 in H3; exact H3 ].
            clear; destruct y; cbn in *.
            reflexivity.
-Qed.
-Admitted.
+Fail Qed.
 
 (*
 Theorem mu_correction {Γ} Δ (x y : state Γ)

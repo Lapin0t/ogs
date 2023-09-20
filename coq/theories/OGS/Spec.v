@@ -168,7 +168,7 @@ Additional assumptions on how variables behave.
 
     eval_sub {Γ Δ} (c : conf Γ) (e : Γ ⇒ᵥ Δ)
       : eval (e ⊛ₜ c)
-      ≋ bind_delay (eval c) (fun u => eval (app (e _ (nf_var' u)) (nf_msg' u) (e ⊛ nf_val' u))) ;
+      ≋ bind_delay' (eval c) (fun u => eval (app (e _ (nf_var' u)) (nf_msg' u) (e ⊛ nf_val' u))) ;
 
     (*eval_nf_ret {Γ} (u : nf' Γ) :
       eval_to_msg (app (v_var _ (nf_var' u)) (nf_msg' u) (nf_val' u))
@@ -546,7 +546,7 @@ lem 4.6
   Lemma eval_split {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : split_sub_eval c e ≋ eval_split_sub c e .
     unfold split_sub_eval, eval_split_sub.
     rewrite (eval_sub c ([ v_var , e ])).
-    unfold bind_delay.
+    unfold bind_delay'.
     remember (eval c) as t; clear c Heqt.
     revert t; unfold comp_eq,it_eq; coinduction R CIH; cbn; intro t.
     destruct (_observe t); [ | econstructor; apply CIH | inversion q ].
