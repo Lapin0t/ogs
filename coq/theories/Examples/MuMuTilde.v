@@ -1598,16 +1598,7 @@ Lemma mu_var_laws : @Spec.var_assumptions mu_spec mu_val .
       reflexivity.
 Qed.
 
-
-Definition sigS_eq_refl {A : Type} (P : A -> SProp) (x : A) (p1 p2 : P x) :
-  {| sub_elt := x ; sub_prf := p1 |} = {| sub_elt := x ; sub_prf := p2 |} := eq_refl .
-
-Definition sigS_eq_subst {X : SProp} (P : X -> Type) (a b : X) : P a -> P b := fun p => p .
-(*
-Definition sprop_irr (U : SProp) (a b : U) : a = b .
-  exact eq_refl.
-Defined.
-*)
+Definition substS {X : SProp} (P : X -> Type) (a b : X) : P a -> P b := fun p => p .
 
 Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machine.
   unfold mu_spec, mu_val, mu_conf.
@@ -1692,10 +1683,7 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
     rewrite q; clear q j'.
     destruct r as [ p q ]; cbn in p,q.
     revert γ' q; rewrite p; clear p m'; intros γ' q; cbn in q.
-    unshelve econstructor; [ | split ].
-    + unfold s_elt_upg, ugly_has.
-      change x with ({| sub_elt := sub_elt x ; sub_prf := sub_prf x |}) at 7.
-      f_equal.
+    unshelve econstructor; [ reflexivity | split ].
     + cbn.
       unfold ugly_has, clean_var.
       clear .
@@ -1731,7 +1719,7 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
         cbn.
         rewrite e0; clear e0.
         unfold ugly_var; cbn.
-        apply (sigS_eq_subst (fun p => {i : Γ ∋ {| sub_elt := t; sub_prf := p |} & Var t x = Var t (ugly_has {| sub_elt := t; sub_prf := p |} i)}) ((fib_extr (ctx_s_to_inv Γ)).(sub_prf) _ x) H1).
+        apply (substS (fun p => {i : Γ ∋ {| sub_elt := t; sub_prf := p |} & Var t x = Var t (ugly_has {| sub_elt := t; sub_prf := p |} i)}) ((fib_extr (ctx_s_to_inv Γ)).(sub_prf) _ x) H1).
         fold (s_elt_upg x).
         unshelve econstructor.
         ++ destruct (ctx_s_to_inv Γ).
@@ -1788,10 +1776,10 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
            assert (H4 : (projT1 y,' projT2 y) = y) ; [ | rewrite H4 in H3; exact H3 ].
            clear; destruct y; cbn in *.
            reflexivity.
-Fail Qed.
+Qed.
 
 (*
 Theorem mu_correction {Γ} Δ (x y : state Γ)
-    : inj_init_act (Δ:=Δ) x ≈ₐ inj_init_act y -> ciu Δ x y.
+    : Spec.inj_init_act (Δ:=Δ) x ≈ₐ Spec.inj_init_act y -> ciu Δ x y.
 
 *)
