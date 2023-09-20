@@ -195,6 +195,12 @@ Equations s_append {Γ Δ : ctx X} {F : ctx X -> X -> Type} {a}
   intros f g H1 x y H2 u i; dependent elimination i; [ exact H2 | apply H1 ].
 Qed.
 
+Lemma rew_s_append {F} {Γ1 Γ2 Δ : ctx X} {x} (a : Γ1 =[F]> Δ) (b : F Δ x) (H : Γ1 = Γ2)
+  : rew [fun xs => (xs ▶ x) =[F]> Δ] H in s_append a b
+  ≡ₐ s_append (rew [fun xs => xs =[F]> Δ] H in a) b .
+  revert a; now rewrite H.
+Qed.
+
 Definition r_shift {Γ Δ : ctx X} {a} (f : Γ ⊆ Δ) : (Γ ▶ a) ⊆ (Δ ▶ a)
   := s_append (s_ren s_pop f) top.
 

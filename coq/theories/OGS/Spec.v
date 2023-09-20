@@ -523,10 +523,8 @@ lem 4.6
     unshelve econstructor; [ | split ]; cbn in *.
     - now transitivity x2.
     - transitivity (rew [has Γ] p2 in i2); auto.
-      rewrite eq_trans_rew_distr.
       now rewrite <- p2.
     - transitivity (rew [nf Γ] p2 in n2); auto.
-      rewrite eq_trans_rew_distr.
       now rewrite <- p2.
   Qed.
 
