@@ -8,14 +8,17 @@ From OGS.ITree Require Import ITree Structure Eq.
 Section stuff.
   Context {I} {E : event I I}.
   
-  #[global] Instance fmap_eq {X RX Y RY} {f : X ⇒ᵢ Y} {_ : forall i, Proper (@RX i ==> @RY i) (f i)} {i}
-            : Proper (it_eq RX (i:=i) ==> it_eq RY (i:=i)) (fmap (E:=E) f i).
+  #[global] Instance fmap_eq {X RX Y RY}
+    : Proper (dpointwise_relation (fun i => RX i ==> RY i)
+                ==> dpointwise_relation (fun i => it_eq RX (i:=i) ==> it_eq RY (i:=i)))
+        (@fmap I E X Y).
   Proof.
-    unfold Proper, respectful, it_eq.
-    revert i; coinduction R CIH; intros i x y h.
+    intros f g H1.
+    unfold respectful, dpointwise_relation, it_eq.
+    coinduction R CIH; intros i x y h.
     apply (gfp_fp (it_eq_map E RX)) in h.
     cbn in *; cbv [observe] in h; dependent destruction h; simpl_depind; eauto.
-    econstructor; now apply H.
+    econstructor; now apply H1.
   Qed.
 
   #[global] Instance subst_eq {X Y} {RX : relᵢ X X} {RY : relᵢ Y Y}
@@ -33,6 +36,12 @@ Section stuff.
     dependent destruction h3; simpl_depind; econstructor; eauto.
     2: intro.
     all: now apply (gfp_t (it_eq_map E RY)).
+  Qed.
+
+  Lemma bind_ret {X Y} {RX : relᵢ Y Y} {_ : Reflexiveᵢ RX} (f : X ⇒ᵢ Y) {i} (t : itree E X i)
+    : it_eq RX (fmap f i t) (bind t (fun i x => Ret' (f i x))).
+    revert i t; unfold it_eq; coinduction R CIH; intros i t.
+    cbn; destruct (_observe t); auto.
   Qed.
   
   #[global] Instance subst_eat {X Y} (f : X ⇒ᵢ itree E Y) {i}

@@ -908,7 +908,8 @@ app w m ...  où not (is_var w)
     - cbn; econstructor; reflexivity.
     - cbn -[it_eq_map fmap].
       change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)) bot) with (it_eq (E:=∅ₑ) (eqᵢ (fun _ : T1 => msg' Δ))).
-      apply it_eq_step, fmap_eq.
+      apply it_eq_step, (fmap_eq (RX := eqᵢ _)).
+      intros ? ? ? ->; auto.
       unfold m_strat_resp; cbn [fst snd projT1 projT2].
       rewrite app_sub, concat1_equation_2.
 
@@ -932,7 +933,8 @@ app w m ...  où not (is_var w)
   Lemma quatre_trois_app {Γ Δ} (c : conf Γ) (e : Γ ⇒ᵥ Δ)
         : eval_in_env e c ≊ (inj_init_act c ∥ inj_init_pas e).
     rewrite <- quatre_trois.
-    unfold reduce, inj_init_act, eval_in_env; cbn [fst snd projT1 projT2]; apply fmap_eq.
+    unfold reduce, inj_init_act, eval_in_env; cbn [fst snd projT1 projT2]; apply (fmap_eq (RX:=eqᵢ _)).
+    intros ? ? ? ->; auto.
     unfold inj_init_pas; rewrite concat1_equation_2, 2 concat1_equation_1.
     unfold c_ren; rewrite c_sub_sub, c_sub_proper ; try reflexivity.
     rewrite s_eq_cover_empty_r.
