@@ -62,6 +62,13 @@ Section stuff.
     destruct ((g i r0).(_observe)); eauto.
   Qed.
 
+  Lemma fmap_fmap_com {X Y Z RZ} {_ : Reflexiveᵢ RZ} {f : X ⇒ᵢ Y} {g : Y ⇒ᵢ Z} {i} {x : itree E X i}
+    : it_eq RZ (fmap g i (fmap f i x)) (fmap (fun i x => g i (f i x)) i x).
+  Proof.
+    revert i x; unfold it_eq; coinduction R CIH; intros i x.
+    cbn; destruct (x.(_observe)); eauto.
+  Qed.
+
   Lemma fmap_bind_com {X Y Z RZ} {_ : Reflexiveᵢ RZ} {f : X ⇒ᵢ Y} {g : Y ⇒ᵢ itree E Z} {i} {x : itree E X i}
     : it_eq RZ (bind (fmap f _ x) g) (bind x (fun i x => g i (f i x))).
   Proof.

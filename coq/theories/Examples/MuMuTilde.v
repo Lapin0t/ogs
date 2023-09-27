@@ -137,6 +137,54 @@ Definition LEM {a} : term ∅ (t+ (a + (a → Zer))) :=
                                      (VarN (pop (pop (pop top)))))))))
            (VarN top)) .
 
+Definition App' {Γ a b} (f : term Γ (t+ (a → b))) (x : val0 Γ a) : term Γ (t+ b) :=
+  Mu (Cut (t_shift _ f) (App (v_shift (t+ _) x) (VarN top))) .
+
+(*
+Definition App'' {Γ a b} (f : term Γ (t+ (a → b))) (x : term Γ (t+ a)) : state Γ .
+  refine (Cut x (Mu' (Cut (t_shift _ f) (App (VarP top) _)))).
+*)
+
+(*  λ fun arg => μα.⟨ arg ∥ μ`x. ⟨ fun ∥ app x α ⟩ ⟩ *)
+Definition App'' {Γ a b} (f : term Γ (t+ (a → b))) (x : term Γ (t+ a)) : term Γ (t+ b) :=
+  Mu (Cut (t_shift _ x) (Mu' (Cut (t_shift _ (t_shift _ f)) (App (VarP top) (VarN (pop top)))))) .
+
+Definition Lam' {Γ a b} (u : term (Γ ▶ t+ a) (t+ b)) : val0 Γ (a → b) :=
+  LamRec (t_rename (r_shift s_pop) (t+ _) u) . 
+
+Definition ty_nat (a : ty0) : ty0 := (a → ((a → a) → a)) .
+Definition nat_ze {a} : term ∅ (t+ ty_nat a) :=
+  Val (LamRec (Val (LamRec (Val (VarP (pop (pop top))))))) .
+Definition nat_su {a} : term ∅ (t+ ty_nat a) :=
+  Val (Lam' (Val (Lam' (App' (Val (VarP top)) (VarP (pop top)))))).
+
+Definition nat_sum {a} : term ∅ (t+ (ty_nat a → (ty_nat a → ty_nat a))) .
+  do 4 refine (Val (Lam' _)).
+  refine (App' _ (VarP (top))).
+  refine (App'' (Val (VarP (pop (pop (pop top))))) _).
+  refine (App' _ (VarP (top))).
+  refine (App' (Val (VarP (pop (pop top)))) _).
+  exact (VarP (pop top)).
+Defined.
+
+(* λ f n => (f ((f n) n)) n *)
+Definition example1 {a} : term ∅ (t+ ((ty_nat a → (ty_nat a → ty_nat a))
+                                      → (ty_nat a → ty_nat a))) .
+  do 2 refine (Val (Lam' _)).
+  epose (f := Val (VarP (pop top))).
+  epose (n := VarP top).
+  exact (App' (App'' f (App' (App' f n) n)) n).
+Defined.
+
+(* λ f n => ((f n) ((f n) n)) *)  
+Definition example2 {a} : term ∅ (t+ ((ty_nat a → (ty_nat a → ty_nat a))
+                                      → (ty_nat a → ty_nat a))) .
+  do 2 refine (Val (Lam' _)).
+  epose (f := Val (VarP (pop top))).
+  epose (n := VarP top).
+  exact (App'' (App' f n) (App' (App' f n) n)) .
+Defined.
+
 Equations t_subst {Γ Δ} : Γ =[val]> Δ -> term Γ ⇒ᵢ term Δ :=
   t_subst f _ (Mu c)    := Mu (s_subst (a_shift f) c) ;
   t_subst f _ (Val v)   := Val (v0_subst f _ v) ;
@@ -995,6 +1043,20 @@ Qed.
 
 From Coinduction Require Import coinduction lattice rel tactics.
 
+Lemma fmap_comp_eq {Γ} {u v : delay (nf Γ)} : u ≋ v -> fmap_delay (pat_of_nf Γ) u ≊ fmap_delay (pat_of_nf Γ) v .
+  intro H.
+  unfold it_eq; revert u v H; coinduction R CIH; intros u v H.
+  unfold comp_eq in H; apply it_eq_step in H; cbn in *; unfold observe in H.
+  remember (_observe u) as ou; remember (_observe v) as ov; clear Heqou u Heqov v.
+  dependent elimination H; cbn; econstructor; auto.
+  destruct r1 as [ x1 [ i1 [ m1 e1 ] ] ].
+  destruct r2 as [ x2 [ i2 [ m2 e2 ] ] ].
+  destruct r_rel as [ H1 [ H2 [ H3 _ ] ] ]; cbn in *.
+  unfold pat_of_nf; cbn.
+  revert i1 m1 e1 H2 H3; rewrite H1; clear x1 H1; intros i1 m1 e1 H2 H3; cbn in H2,H3.
+  now rewrite H2,H3.
+  destruct q.
+Qed.
 (*
 Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ ⊆ Δ)
    : play (s_rename e c) ≊ fmap_delay (n_rename e) (play c) .
@@ -1430,6 +1492,22 @@ Definition foo' {Γ : ctx neg_ty} : Γ =[ val' ]> ctx_s_to (ctx_s_from Γ) .
   intros ? i. unfold val'.
   rewrite ctx_s_to_from.
   rew <- [fun xs : neg_ctx => _=[_]>xs] ctx_s_from_to Γ in Var .
+*)
+
+(*
+to_FF : Γ =[val]> Δ           -> to Γ =[val']> to Δ
+to_FB : Γ =[val]> from Δ      -> to Γ =[val']> Δ
+to_BF : from Γ =[val]> Δ      -> Γ =[val']> to Δ
+to_BB : from Γ =[val]> from Δ -> Γ =[val']> Δ 
+
+e : Γ =[val]> Δ
+from_BB (to_FF e) : from (to Γ) =[val]> from (to Δ)
+
+u : Γ ⊆ from (to Γ)
+
+u . e : Γ =[val]> from (to Δ)
+
+rew <- [fun xs => xs =[val]> from (to Δ) ] (from_to_eq Γ) in u . e : from (to Γ) =[val]> from (to Δ)
 *)
 
 Definition unuglify2 {Γ1 Γ2 : neg_ctx} (u : Γ1 =[val]> Γ2) : ctx_s_to Γ1 =[val']> ctx_s_to Γ2 .
@@ -2019,6 +2097,31 @@ Lemma foobar {Γ1 Γ2 Δ : neg_ctx} (c : state Γ1) (e : Γ1 =[val]> Δ) (H : Γ
   now rewrite H.
   Qed.
 
+(*
+ogs_typ := stlc_typ + stlc_typ
+
+conf Γ := {
+    t : stlc_typ
+    Γ' : list stlc_typ 
+    ctx_in_ctx : map inj1 Γ' ⊆ Γ
+    ret_in_ctx : inj2 t ∈ Γ
+    term : stlc_term Γ' t
+}
+Inductive conf : list ogs_typ -> Type :=
+| A {Γ Δ t} (u : stlc_term (Γ + Δ) t) -> conf (map inj1 Γ + inj2 t + map inj1 Δ)
+
+CTX := list stlc_typ × opt (stlc_typ)
+conf (Γ , Some t) := term Γ t
+conf (Γ , None) := False
+
+(Γ , t1) ++ (Δ , Some t2) = (Γ + Δ , t2)
+(u , t0) (Γ , t1) ++ (Δ , None) = (Γ + Δ , t1)
+
+
+c : conf (foobar_complique a b c d)
+*)
+    
+
 Theorem mu_correction (Δ : neg_ctx) {Γ : neg_ctx} (x y : state Γ)
   : ⟦ x ⟧ₐ ≈[ Δ ]≈ ⟦ y ⟧ₐ -> ciu_eq Δ x y .
   intros H e.
@@ -2029,7 +2132,8 @@ Theorem mu_correction (Δ : neg_ctx) {Γ : neg_ctx} (x y : state Γ)
                  (rew <- [state ∘ coe_ctx] (ctx_s_from_to Γ) in x)
                  (rew <- [state ∘ coe_ctx] (ctx_s_from_to Γ) in y)) in H.
   specialize (H (unuglify2 e)).
-  unfold Spec.eval_in_env, Spec.eval_to_msg in H; cbn in H.
+  
+  unfold Spec.eval_in_env, Spec.eval_to_msg in H ; cbn in H.
 
   unshelve epose (u := _ : Δ ⊆ ctx_s_from (ctx_s_to Δ) ).
   intros ? i; now rewrite ctx_s_from_to.
@@ -2058,6 +2162,17 @@ Theorem mu_correction (Δ : neg_ctx) {Γ : neg_ctx} (x y : state Γ)
   admit.
   rewrite 2 (s_sub_eq _ _ H1 _ _ eq_refl) in H; clear H1.
   rewrite (ctx_s_from_to Γ) in H; cbn in H.
+  unfold eval_to_msg.
   rewrite <- 2 s_ren_sub in H.
-  Check (clean_hyp_ren (s_subst e x) u).
+  pose proof (fmap_comp_eq (clean_hyp_ren (s_subst e x) u)).
+  About clean_hyp_ren.
+  About fmap_delay.
+  About fmap.
+  unfold fmap_delay in H.
+  rewrite 2 fmap_fmap_com in H.
+  fold fmap_delay in H.
+  eapply fmap_eq in H.
+  unfold Spec.msg_of_nf', Spec.nf', Spec.nf, Spec.nf_ty', Spec.nf_var', Spec.nf_msg' in H; cbn in H.
+  unfold ugly_nf.
+  cbn in H.
 Admitted.
