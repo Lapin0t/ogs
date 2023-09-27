@@ -614,6 +614,12 @@ Qed.
 intros f1 f2 H1 [] v1 v2 H2; [ apply v0_ren_eq | apply t_ren_eq ]; auto.
 Qed.
 
+#[global] Instance a_ren_eq {Γ1 Γ2 Γ3}
+  : Proper (ass_eq _ _ ==> ass_eq _ _ ==> ass_eq _ _) (@a_ren Γ1 Γ2 Γ3).
+  intros r1 r2 H1 a1 a2 H2 ? i; unfold a_ren; cbn.
+  apply (v_ren_eq _ _ H1), H2.
+Qed.
+
 Definition t_ren_ren_P Γ1 a (t : term Γ1 a) : Prop :=
   forall Γ2 Γ3 (f1 : Γ2 ⊆ Γ3) (f2 : Γ1 ⊆ Γ2),
     t_rename f1 a (t_rename f2 a t) = t_rename (s_ren f1 f2) a t.
@@ -1445,207 +1451,141 @@ Definition mu_spec : Spec.interaction_spec :=
 Definition state' (Γ : ctx neg_ty) : Type := state (ctx_s_from Γ).
 Definition val' (Γ : ctx neg_ty) (a : neg_ty) : Type := val (ctx_s_from Γ) a.(sub_elt).
 
-Definition unuglify1 {Γ1 : neg_ctx} {Γ2} (u : Γ1 =[val]> ctx_s_from Γ2) : ctx_s_to Γ1 =[val']> Γ2 .
+Definition r_from_to_l {Γ : neg_ctx} : ctx_s_from (ctx_s_to Γ) ⊆ Γ.
+  rewrite ctx_s_from_to; exact r_id.
+Defined.
+
+Definition r_from_to_r {Γ : neg_ctx} : Γ ⊆ ctx_s_from (ctx_s_to Γ) .
+  rewrite ctx_s_from_to; exact r_id.
+Defined.
+
+Lemma r_from_to_lr {Γ : neg_ctx} : r_from_to_l ⊛ᵣ r_from_to_r ≡ₐ @r_id _ Γ .
+  unfold r_from_to_l, r_from_to_r; now rewrite (ctx_s_from_to Γ).
+Qed.
+
+Lemma r_from_to_rl {Γ : neg_ctx} : r_from_to_r ⊛ᵣ r_from_to_l ≡ₐ @r_id _ (ctx_s_from (ctx_s_to Γ)) .
+  unfold r_from_to_l, r_from_to_r; now rewrite (ctx_s_from_to Γ).
+Qed.
+
+Definition r_to_from_l {Γ : ctx neg_ty} : ctx_s_to (ctx_s_from Γ) ⊆ Γ .
+  unfold ctx_s_from; destruct (ctx_s_to_inv Γ); exact r_id.
+Defined.
+
+Definition r_to_from_r {Γ : ctx neg_ty} : Γ ⊆ ctx_s_to (ctx_s_from Γ) .
+  unfold ctx_s_from; destruct (ctx_s_to_inv Γ); exact r_id.
+Defined.
+
+Lemma r_to_from_lr {Γ : ctx neg_ty} : r_to_from_l ⊛ᵣ r_to_from_r ≡ₐ @r_id _ Γ .
+  intros ? i; unfold r_to_from_l, r_to_from_r, s_ren, s_map; cbn.
+  now destruct (ctx_s_to_inv Γ).
+Qed.
+
+Lemma r_to_from_rl {Γ : ctx neg_ty} : r_to_from_r ⊛ᵣ r_to_from_l ≡ₐ @r_id _ (ctx_s_to (ctx_s_from Γ)) .
+  intros ? i; unfold r_to_from_l, r_to_from_r, s_ren, s_map; cbn.
+  unfold ctx_s_from in *.
+  now destruct (ctx_s_to_inv Γ).
+Qed.
+
+Definition to_FB {Γ1 : neg_ctx} {Γ2} (u : Γ1 =[val]> ctx_s_from Γ2) : ctx_s_to Γ1 =[val']> Γ2 .
   intros ? i; destruct (view_s_has_map _ _ i); exact (u _ i).
 Defined.
 
-#[global] Instance unuglify1_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@unuglify1 Γ1 Γ2).
-  intros u1 u2 H ? i; unfold unuglify1.
+#[global] Instance to_FB_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@to_FB Γ1 Γ2).
+  intros u1 u2 H ? i; unfold to_FB.
   destruct (view_s_has_map _ _ i); exact (H _ i).
 Qed.
 
-Definition unuglify1_inv {Γ1 : neg_ctx} {Γ2} (u : ctx_s_to Γ1 =[val']> Γ2) : Γ1 =[val]> ctx_s_from Γ2 .
+Definition from_FB {Γ1 : neg_ctx} {Γ2} (u : ctx_s_to Γ1 =[val']> Γ2) : Γ1 =[val]> ctx_s_from Γ2 .
   intros ? i; exact (u _ (s_map_has _ _ i)).
 Defined.
 
-Lemma unuglify11_inv {Γ1 : neg_ctx} {Γ2} (u : ctx_s_to Γ1 =[val']> Γ2) : unuglify1 (unuglify1_inv u) ≡ₐ u .
-  intros ? i.
-  unfold unuglify1, unuglify1_inv.
+#[global] Instance from_FB_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@from_FB Γ1 Γ2).
+  intros u1 u2 H ? i; unfold from_FB.
+  exact (H _ (s_map_has _ _ i)).
+Qed.
+
+Lemma to_from_FB {Γ1 : neg_ctx} {Γ2} (u : ctx_s_to Γ1 =[val']> Γ2) : to_FB (from_FB u) ≡ₐ u .
+  intros ? i; unfold to_FB, from_FB.
   pose (xx := view_s_has_map (fun x : sigS is_neg => x) Γ1 i).
   change (view_s_has_map (fun x : sigS is_neg => x) Γ1 i) with xx.
   now destruct xx.
 Qed.
 
-Lemma unuglify1_inv1 {Γ1 : neg_ctx} {Γ2} (u : Γ1 =[val]> ctx_s_from Γ2) : unuglify1_inv (unuglify1 u) ≡ₐ u.
-  intros ? i.
-  unfold unuglify1, unuglify1_inv.
-  unfold view_s_has_map, view_s_has_map_clause_1, s_map_has.
-  pose (xx := view_s_has_map' (fun x : sigS is_neg => x) (sub_elt Γ1) (sub_prf Γ1)
-        (s_map_has' (fun x : sigS is_neg => x) (sub_elt Γ1) (sub_prf Γ1) i)).
-  change (view_s_has_map' _ _ _ _) with xx.
-  remember xx.
-  now rewrite (eq_trans Heqs (s_has_map_view_simpl')).
+Lemma from_to_FB {Γ1 : neg_ctx} {Γ2} (u : Γ1 =[val]> ctx_s_from Γ2) : from_FB (to_FB u) ≡ₐ u.
+  intros ? i; unfold to_FB, from_FB.
+  pose (xx := view_s_has_map (fun x : sigS is_neg => x) Γ1 (s_map_has (fun x : sigS is_neg => x) Γ1 i)).
+  pose proof (s_has_map_view_simpl (f := fun x : neg_ty => x) (Γ := Γ1) (i := i)).
+  change (view_s_has_map _ _ _) with xx in H |- *.
+  now rewrite H.
 Qed.
 
-(*
-Definition foo {Γ : neg_ctx} : Γ =[ val ]> ctx_s_from (ctx_s_to Γ) :=
-  rew <- [fun xs : neg_ctx => _=[_]>xs] ctx_s_from_to Γ in Var .
+Definition to_FF {Γ1 Γ2 : neg_ctx} (u : Γ1 =[val]> Γ2) : ctx_s_to Γ1 =[val']> ctx_s_to Γ2 := 
+  to_FB (a_ren r_from_to_r u).
 
-Definition bar {Γ : neg_ctx} : ctx_s_from (ctx_s_to Γ) =[val]> Γ :=
-  rew <- [fun xs : neg_ctx => xs=[_]>_] ctx_s_from_to Γ in Var .
-*)
-
-(*
-Definition foo' {Γ : ctx neg_ty} : Γ =[ val' ]> ctx_s_to (ctx_s_from Γ) .
-  unfold val', assignment.
-  rewrite ctx_s_from_to. exact (unuglify1 Var).
-  intros ? i. unfold val'.
-  rewrite ctx_s_to_from.
-  rew <- [fun xs : neg_ctx => _=[_]>xs] ctx_s_from_to Γ in Var .
-*)
-
-(*
-to_FF : Γ =[val]> Δ           -> to Γ =[val']> to Δ
-to_FB : Γ =[val]> from Δ      -> to Γ =[val']> Δ
-to_BF : from Γ =[val]> Δ      -> Γ =[val']> to Δ
-to_BB : from Γ =[val]> from Δ -> Γ =[val']> Δ 
-
-e : Γ =[val]> Δ
-from_BB (to_FF e) : from (to Γ) =[val]> from (to Δ)
-
-u : Γ ⊆ from (to Γ)
-
-u . e : Γ =[val]> from (to Δ)
-
-rew <- [fun xs => xs =[val]> from (to Δ) ] (from_to_eq Γ) in u . e : from (to Γ) =[val]> from (to Δ)
-*)
-
-Definition unuglify2 {Γ1 Γ2 : neg_ctx} (u : Γ1 =[val]> Γ2) : ctx_s_to Γ1 =[val']> ctx_s_to Γ2 .
-  (*apply unuglify1.
-  refine (a_comp _ u).*)
-  intros ? i; destruct (view_s_has_map _ _ i).
-  unfold val'; rewrite ctx_s_from_to.
-  exact (u _ i).
-Defined.
-
-Definition unuglify3 {Γ1 Γ2} (u : ctx_s_from Γ1 =[val]> ctx_s_from Γ2) : Γ1 =[val']> Γ2.
-  intros ? i.
-  refine (unuglify1 u _ _).
-  clear u.
-  unfold ctx_s_from.
-  destruct (ctx_s_to_inv Γ1).
-  exact i.
-Defined.
-
-#[global] Instance unuglify3_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@unuglify3 Γ1 Γ2).
-  intros u1 u2 H ? i.
-  exact (unuglify1_proper _ _ H _ _).
+#[global] Instance to_FF_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@to_FF Γ1 Γ2).
+  intros u1 u2 H ? i; unfold to_FF.
+  apply to_FB_proper.
+  now rewrite H.
 Qed.
 
-Definition unuglify4 {Γ1 Γ2} (u : Γ1 =[val']> Γ2) : ctx_s_from Γ1 =[val]> ctx_s_from Γ2 .
-  intros ? i.
-  refine (u (s_elt_upg i) _); clear u.
-  unfold ctx_s_from in *; destruct (ctx_s_to_inv Γ1); cbn in *.
-  exact (s_map_has _ _ i).
-Defined.
+Definition from_FF {Γ1 Γ2 : neg_ctx} (u : ctx_s_to Γ1 =[val']> ctx_s_to Γ2) : Γ1 =[val]> Γ2 :=
+  a_ren r_from_to_l (from_FB u) .
 
-#[global] Instance unuglify4_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@unuglify4 Γ1 Γ2).
-  intros u1 u2 H ? i.
-  exact (H (s_elt_upg i) _).
+#[global] Instance from_FF_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@from_FF Γ1 Γ2).
+  intros u1 u2 H ? i; unfold from_FF.
+  apply a_ren_eq; auto.
+  now apply from_FB_proper.
 Qed.
 
-Lemma unuglify34 {Γ1 Γ2} (u : Γ1 =[val']> Γ2) : unuglify3 (unuglify4 u) ≡ₐ u .
-  intros ? i.
-  unfold unuglify4, unuglify3, unuglify1.
-  unfold ctx_s_from.
-  destruct (ctx_s_to_inv Γ1); cbn.
-  now destruct (view_s_has_map _ _ i).
+Definition to_BB {Γ1 Γ2} (u : ctx_s_from Γ1 =[val]> ctx_s_from Γ2) : Γ1 =[val']> Γ2 :=
+  to_FB u ⊛ᵣ r_to_from_r .
+
+#[global] Instance to_BB_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@to_BB Γ1 Γ2).
+  intros u1 u2 H ? i; exact (to_FB_proper _ _ H _ _).
 Qed.
 
-Lemma unuglify43 {Γ1 Γ2} (u : ctx_s_from Γ1 =[val]> ctx_s_from Γ2) : unuglify4 (unuglify3 u) ≡ₐ u .
-  revert u; unfold unuglify3, unuglify4, unuglify1, ctx_s_from.
-  intros u ? i.
-  destruct (ctx_s_to_inv Γ1); cbn in *.
-  pose (xx := view_s_has_map (fun x => x) a0 (s_map_has (fun x => x) a0 i)).
-  change (view_s_has_map _ a0 _) with xx.
-  remember xx; unfold xx in Heqs.
-  rewrite (eq_trans Heqs s_has_map_view_simpl).
-  reflexivity.
+Definition from_BB {Γ1 Γ2} (u : Γ1 =[val']> Γ2) : ctx_s_from Γ1 =[val]> ctx_s_from Γ2 :=
+  from_FB (u ⊛ᵣ r_to_from_l) .
+
+#[global] Instance from_BB_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@from_BB Γ1 Γ2).
+  intros u1 u2 H ? i; exact (H (s_elt_upg i) _).
 Qed.
 
-(*
-Lemma unuglify4_inj {Γ1 Γ2} (u v : Γ1 =[val']> Γ2) : unuglify4 u ≡ₐ unuglify4 v -> u ≡ₐ v .
-  intro H.
-  apply unuglify3_
-*)
+Lemma to_from_BB {Γ1 Γ2} (u : Γ1 =[val']> Γ2) : to_BB (from_BB u) ≡ₐ u .
+  unfold to_BB, from_BB; rewrite to_from_FB.
+  change ((?a ⊛ᵣ ?b) ⊛ᵣ ?c) with (a ⊛ᵣ (b ⊛ᵣ c)).
+  now rewrite r_to_from_lr.
+Qed.
 
+Lemma from_to_BB {Γ1 Γ2} (u : ctx_s_from Γ1 =[val]> ctx_s_from Γ2) : from_BB (to_BB u) ≡ₐ u .
+  unfold to_BB, from_BB.
+  change ((?a ⊛ᵣ ?b) ⊛ᵣ ?c) with (a ⊛ᵣ (b ⊛ᵣ c)).
+  rewrite r_to_from_rl.
+  change (?a ⊛ᵣ r_id) with a.
+  apply from_to_FB.
+Qed.
 
-(*
-Definition unuglify2 {Γ1 : neg_ctx} {Γ2} (u : Γ1 =[val]> ctx_from Γ2) : ctx_to Γ1 =[val']> Γ2 .
-  intros ? i; destruct (view_s_has_map _ _ i); exact (u _ i).
-Defined.
-
-Definition ugly_ass_1 {Γ} {x : neg_ty} (m : pat (t_neg (sub_elt x)))
-          (s : pat_dom m =[ val ]> ctx_from Γ)
-          : Spec.dom mu_spec m =[ val' ]> Γ .
-  intros ? j; destruct (view_s_has_map _ _ j); exact (s _ i).
-Defined.
-
-Definition ugly_ass_2 {Γ Δ : ctx neg_ty} (s : Γ =[ val' ]> Δ)
-  : ctx_to_s Γ =[ val ]> ctx_to_s Δ.
-  intros ? j.
-  destruct (view_has_map _ _ j); exact (s _ i).
-Defined.
-
-Definition ugly_play {Γ}
-  (u : { m : pat' (ctx_to_s Γ) & pat_dom' _ m =[val]> ctx_to_s Γ })
-  : {m : Spec.msg' mu_spec Γ & Spec.dom' mu_spec m =[val']> Γ }.
-  destruct u as [ [ a [ i m ] ] s ].
-  destruct (view_has_map sub_elt Γ i).
-  unshelve refine ((x ,' (i , m)) ,' ugly_ass_1 m s).
-Defined.
-
-Definition ugly_emb Γ (m : Spec.msg' mu_spec Γ)
-  : state' (Γ +▶ Spec.dom' mu_spec m).
-  destruct m as [ a [ i m ]].
-  unfold state'; cbn -[ctx_s_map].
-  rewrite map_cat, <- ctx_s_to_ctx_eq.
-  exact (emb (_ ,' (map_has _ _ i , m))).
-Defined.
-*)
-
-Definition clean_var {Γ : neg_ctx} {t} (i : ctx_s_to Γ ∋ t) : Γ ∋ t.(sub_elt) :=
+Definition from_has {Γ : neg_ctx} {t} (i : ctx_s_to Γ ∋ t) : Γ ∋ t.(sub_elt) :=
   match view_s_has_map _ _ i in (s_has_map_view _ _ y h) return (Γ ∋ sub_elt y) with
   | SHasMapV j => j
   end .
 
-Definition ugly_has {Γ} (t : neg_ty) (i : Γ ∋ t) : ctx_s_from Γ ∋ sub_elt t .
+Definition to_has {Γ} (t : neg_ty) (i : Γ ∋ t) : ctx_s_from Γ ∋ t.(sub_elt) .
   unfold ctx_s_from; destruct (ctx_s_to_inv Γ); cbn in *.
-  exact (clean_var i).
+  exact (from_has i).
 Defined.
 
-Definition ugly_var {Γ} : Γ =[val']> Γ := fun _ i => Var _ (ugly_has _ i) .
+Definition ugly_var {Γ} : Γ =[val']> Γ := fun _ i => Var _ (to_has _ i) .
 
-Lemma fib_inj_irr {X Y} (f : X -> Y) (H : forall x y, f x = f y -> x = y) {y} (a b : fiber f y) : a = b .
-  destruct b.
-  dependent induction a.
-  apply H in x0; rewrite x0 in x.
-  apply (JMeq_eq_dep _ eq_refl) in x.
-  now dependent induction x.
-Qed.
-
-Lemma ctx_s_to_inv_simpl {Γ : neg_ctx} : ctx_s_to_inv (ctx_s_to Γ) = Fib Γ .
-  apply (fib_inj_irr _ (@ctx_s_to_inj _ _)).
-Qed.
-
-Lemma ugly4_id {Γ} : unuglify4 (@ugly_var Γ) ≡ₐ Var .
-  unfold unuglify4, unuglify3, unuglify1, ctx_s_from in *.
-  intros ? i.
-  unfold ugly_var, ugly_has, clean_var.
-  (*
-  unfold view_s_has_map.
-  unfold s_elt_upg.
-  cbn in *.
-  unfold view_s_has_map_clause_1.
-  unfold s_map_has.
-*)
-  f_equal.
+Lemma from_BB_var {Γ} : from_BB (@ugly_var Γ) ≡ₐ Var .
+  unfold from_BB, from_FB, ugly_var, ctx_s_from, s_ren, s_map, to_has, r_to_from_l, s_elt_upg.
+  intros ? i; f_equal.
   destruct (ctx_s_to_inv Γ); cbn in *.
-  pose (xx := view_s_has_map (fun x => x) a0 (s_map_has (fun x => x) a0 i)).
-  change (view_s_has_map _ _ _) with xx.
-  remember xx; unfold xx in Heqs; clear xx.
-  rewrite (eq_trans Heqs s_has_map_view_simpl).
-  reflexivity.
+  unfold from_has; change (s_map_has' ?a _ _ i) with (s_map_has a a0 i).
+  pose proof (s_has_map_view_simpl (f := fun x : neg_ty => x) (Γ := a0) (i := i)).
+  pose (x := view_s_has_map (fun x => x) a0 (s_map_has (fun x => x) a0 i)).
+  change (view_s_has_map _ _ _) with x in H |- *.
+  now rewrite H.
 Qed.
 
 Lemma ugly_var_inj {Γ x} (i j : Γ ∋ x) : ugly_var x i = ugly_var x j -> i = j .
