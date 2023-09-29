@@ -38,7 +38,7 @@ Definition bind_delay' {X Y}
   := fun x f => bind x (fun 'T1_0 y => f y).
 
 Definition fmap_delay {X Y} (f : X -> Y) : delay X -> delay Y :=
-  fmap (fun 'T1_0 => f) T1_0 .
+  fmap (fun _ => f) T1_0 .
 
 Definition iter_delay {X Y} : (X -> delay (X + Y)) -> X -> delay Y :=
   fun f => iter (fun 'T1_0 => f) T1_0 .
