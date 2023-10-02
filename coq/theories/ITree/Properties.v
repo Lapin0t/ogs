@@ -21,6 +21,52 @@ Section stuff.
     econstructor; now apply H1.
   Qed.
 
+  #[global] Instance fmap_weq {X RX Y RY}
+    : Proper (dpointwise_relation (fun i => RX i ==> RY i)
+                ==> dpointwise_relation (fun i => it_wbisim RX i ==> it_wbisim RY i))
+        (@fmap I E X Y).
+  Proof.
+    intros f g H1.
+    unfold respectful, dpointwise_relation, it_wbisim.
+    coinduction R CIH; intros i x y h.
+    apply (gfp_fp (it_wbisim_map E RX)) in h.
+    cbn in *; cbv [observe] in h. destruct h.
+    dependent destruction rr.
+    - unshelve econstructor.
+      + exact (RetF (f i r0)).
+      + exact (RetF (g i r3)).
+      + clear - r1; remember (_observe x) as ot; clear Heqot x.
+        dependent induction r1; econstructor.
+        exact (IHr1 Y f r0 eq_refl).
+      + clear - r2; remember (_observe y) as ot; clear Heqot y.
+        dependent induction r2; econstructor.
+        exact (IHr2 Y g r3 eq_refl).
+      + econstructor.
+        now apply H1.
+    - unshelve econstructor.
+      + exact (TauF (f <$> t1)).
+      + exact (TauF (g <$> t2)).
+      + clear - r1; remember (_observe x) as ot; clear Heqot x.
+        dependent induction r1; econstructor.
+        exact (IHr1 Y f t1 eq_refl).
+      + clear - r2; remember (_observe y) as ot; clear Heqot y.
+        dependent induction r2; econstructor.
+        exact (IHr2 Y g t2 eq_refl).
+      + econstructor.
+        now apply CIH.
+    - unshelve econstructor.
+      + exact (VisF q (fun r => f <$> k1 r)).
+      + exact (VisF q (fun r => g <$> k2 r)).
+      + clear - r1; remember (_observe x) as ot; clear Heqot x.
+        dependent induction r1; econstructor.
+        exact (IHr1 Y f q k1 eq_refl).
+      + clear - r2; remember (_observe y) as ot; clear Heqot y.
+        dependent induction r2; econstructor.
+        exact (IHr2 Y g q k2 eq_refl).
+      + econstructor.
+        intro r; now apply CIH.
+  Qed.
+
   #[global] Instance subst_eq {X Y} {RX : relᵢ X X} {RY : relᵢ Y Y}
     : Proper (dpointwise_relation (fun i => RX i ==> it_eq RY (i:=i))
               ==> dpointwise_relation (fun i => it_eq RX (i:=i) ==> it_eq RY (i:=i)))
