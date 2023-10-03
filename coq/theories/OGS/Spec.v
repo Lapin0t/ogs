@@ -154,7 +154,7 @@ Additional assumptions on how variables behave.
     app (u _ (nf_var' v)) (nf_msg' v) (u ⊛ nf_val' v) .
 
   Definition eval_to_msg {Γ} (t : conf Γ) : delay (msg' Γ) :=
-    fmap_delay (msg_of_nf' Γ) (eval t) . 
+    fmap_delay (msg_of_nf' Γ) (eval t) .
 
   Variant head_inst_nostep (u : { x : typ & msg x }) : { x : typ & msg x } -> Prop :=
   | HeadInst {Γ y} (v : val Γ y) (m : msg y) (e : dom m ⇒ᵥ Γ) (p : is_var v -> False) (i : Γ ∋ projT1 u)
@@ -179,7 +179,7 @@ Additional assumptions on how variables behave.
       ≋ ret_delay u ;
 
     eval_app_not_var : well_founded head_inst_nostep ;
-  } .      
+  } .
 
   Context {ML : machine_laws} .
 
@@ -200,7 +200,7 @@ Additional assumptions on how variables behave.
   Lemma ren_is_var_get {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) (p : is_var v) :
     is_var_get (ren_is_var v e p) = e _ (is_var_get p) .
     reflexivity.
-  Qed.    
+  Qed.
 
   Variant is_var_ren_view {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var (e ᵣ⊛ᵥ v) -> Type :=
   | IsVarRen (p : is_var v) : is_var_ren_view v e (ren_is_var v e p)
@@ -401,10 +401,10 @@ lem 4.6
 
   Definition m_strat_play {Δ Φ} (x : m_strat_act Δ Φ)
     : delay (msg' Δ + h_actv ogs_hg (m_strat_pas Δ) Φ)
-    := (fun _ => m_strat_wrap (snd x)) <$> eval (fst x).      
+    := (fun _ => m_strat_wrap (snd x)) <$> eval (fst x).
 
   Definition m_strat_resp {Δ Φ} (x : m_strat_pas Δ Φ)
-    : h_pasv ogs_hg (m_strat_act Δ) Φ 
+    : h_pasv ogs_hg (m_strat_act Δ) Φ
     := fun m => (app (r_concat3_1 ᵣ⊛ᵥ concat0 x _ (fst (projT2 m)))
                    (snd (projT2 m))
                    (v_var ⊛ᵣ r_concat_r ⊛ᵣ r_concat_r) ,
@@ -485,7 +485,7 @@ lem 4.6
   #[global] Instance nf_eq_rfl {Γ t} : Reflexive (@nf_eq Γ t) .
     intros a; exists eq_refl; auto.
   Qed.
-  
+
   #[global] Instance nf_eq_sym {Γ t} : Symmetric (@nf_eq Γ t) .
     intros a b [ p q ].
     unshelve econstructor.
@@ -495,7 +495,7 @@ lem 4.6
       revert a q i; rewrite p; clear p; intros a q i.
       symmetry; apply q.
   Qed.
-  
+
   #[global] Instance nf_eq_tra {Γ t} : Transitive (@nf_eq Γ t) .
     intros a b c [ p1 q1 ] [ p2 q2 ].
     unfold nf_eq.
@@ -509,7 +509,7 @@ lem 4.6
     intros _ [ x [ i n ] ].
     unshelve econstructor; auto.
   Qed.
-  
+
   #[global] Instance nf_eq_sym' {Γ} : Symmetricᵢ (fun _ : T1 => @nf_eq' Γ) .
     intros _ [ x1 [ i1 n1 ] ] [ x2 [ i2 n2 ] ] [ p [ q1 q2 ] ].
     unshelve econstructor; [ | split ]; cbn in *.
@@ -529,7 +529,7 @@ lem 4.6
   Qed.
 
   Lemma eval_to_msg_eq {Γ} (a b : delay (nf' Γ)) (H : a ≋ b) :
-    fmap_delay (@msg_of_nf' Γ) a ≊ fmap_delay (@msg_of_nf' Γ) b . 
+    fmap_delay (@msg_of_nf' Γ) a ≊ fmap_delay (@msg_of_nf' Γ) b .
     revert a b H; unfold it_eq; coinduction R CIH; intros a b H.
     unfold comp_eq in H; apply it_eq_step in H.
     cbn in *; unfold observe in H.
@@ -571,7 +571,7 @@ Interesting facts but not used in the current proof...
 .. coq::
 
   Lemma app_simpl {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) :
-    app v m e = [ v_var , e ] ⊛ₜ app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r) .    
+    app v m e = [ v_var , e ] ⊛ₜ app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r) .
     rewrite app_sub.
     assert (H : v = ([v_var, e] ⊛ᵥ r_concat_l ᵣ⊛ᵥ v)); [ | rewrite <- H; clear H ].
     unfold v_ren.
@@ -610,7 +610,7 @@ Interesting facts but not used in the current proof...
       where aux (Γ1 : context) {x1} (i : (↓⁻ Ψ +▶ Γ1) ∋ x1) : nat by struct Γ1 := {
         aux ∅%ctx         i1           := Datatypes.S (var_depth Ψ _ i1) ;
         aux (Γ1 ▶ _)%ctx (Ctx.top)    := Datatypes.O ;
-        aux (Γ1 ▶ _)%ctx (Ctx.pop i1) := aux Γ1 i1 
+        aux (Γ1 ▶ _)%ctx (Ctx.pop i1) := aux Γ1 i1
       } ;
     var_depth (Ψ ▶ Γ)%ctx false i := Datatypes.S (var_depth Ψ _ i) .
   Arguments var_depth {Ψ b x} j.
@@ -733,7 +733,7 @@ app v m ...
 app w m ...  où not (is_var w)
 
  thm:
-  
+
   - 1 coup lemme zig-zag
   on est dans le cas où w != var
   n: nf sur laquelle on bloque
@@ -766,7 +766,7 @@ app w m ...  où not (is_var w)
 
     pose (h := lt_wf (var_height j)); remember (var_height j) as n.
     revert Ψ u v γ j Heqn; induction h; intros Ψ u v γ j Heqn.
-    
+
     unfold ev_guarded; cbn -[cat_split].
 
   pose (vv := @r_concat3_1 typ Δ ↓⁻ Ψ (@dom S x m) ᵣ⊛ᵥ concat0 v x j).
@@ -976,13 +976,13 @@ app w m ...  où not (is_var w)
     fun x1 x2 =>
      exists p : projT1 x1 = projT1 x2,
        rew p in fst (projT2 x1) ≈ fst (projT2 x2)
-       /\ h_pasvR ogs_hg (it_wbisim (eqᵢ _)) _ (rew p in snd (projT2 x1)) (snd (projT2 x2)). 
+       /\ h_pasvR ogs_hg (it_wbisim (eqᵢ _)) _ (rew p in snd (projT2 x1)) (snd (projT2 x2)).
 
   Definition compo_t_eq_strong (Δ : context) : relation (compo_alt_t Δ) :=
     fun x1 x2 =>
      exists p : projT1 x1 = projT1 x2,
        rew p in fst (projT2 x1) ≊ fst (projT2 x2)
-       /\ h_pasvR ogs_hg (it_eq (eqᵢ _)) _ (rew p in snd (projT2 x1)) (snd (projT2 x2)). 
+       /\ h_pasvR ogs_hg (it_eq (eqᵢ _)) _ (rew p in snd (projT2 x1)) (snd (projT2 x2)).
 
   #[global] Instance compo_alt_proper {Δ a}
     : Proper (it_wbisim (eqᵢ _) a ==> h_pasvR ogs_hg (it_wbisim (eqᵢ _)) a ==> it_wbisim (eqᵢ _) T1_0)
@@ -1030,7 +1030,7 @@ app w m ...  où not (is_var w)
 
   Definition reduce_t_inj {Δ : context} (x : reduce_t Δ) : compo_alt_t Δ
      := (_ ,' (m_strat _ (fst (projT2 x)) , m_stratp _ (snd (projT2 x)))) .
-  
+
   Lemma compo_compo_alt {Δ} {x : reduce_t Δ}
         : iter_delay compo_alt_body (reduce_t_inj x) ≊ iter_delay compo_body x .
 
@@ -1038,7 +1038,7 @@ app w m ...  où not (is_var w)
 
     cbn; destruct (reduce_t_inj x) as [ ? [] ].
     exists eq_refl; split; cbn; [ | intro r ]; reflexivity.
-    
+
     intros [] [? [u1 e1]] [? [u2 e2]] [A B].
     dependent elimination A; cbn in B; destruct B as [H1 H2].
     rewrite unfold_mstrat in H1.
