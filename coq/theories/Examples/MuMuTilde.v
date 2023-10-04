@@ -1664,6 +1664,11 @@ Definition from_BF {Γ1 : ctx neg_ty} {Γ2 : neg_ctx} (u : Γ1 =[val']> ctx_s_to
   apply from_FF_proper; now rewrite H.
 Qed.
 
+Lemma from_BB_to_FF {Δ Γ : neg_ctx} (e : Γ =[ val ]> Δ) : a_ren r_from_to_l (from_BB (to_FF e)) ≡ₐ e ⊛ᵣ r_from_to_l .
+  unfold from_BB, to_FF, to_FB, a_ren, s_map; cbn; intros ? i.
+  now rewrite v_ren_ren, r_from_to_lr, v_ren_id_l.
+Qed.
+
 (*
 Lemma to_from_BF {Γ1 : ctx neg_ty} {Γ2 : neg_ctx} (u : Γ1 =[val']> ctx_s_to Γ2) : to_BF (from_BF u) ≡ₐ u .
   intros ? i; unfold to_BF, from_BF.
@@ -1877,6 +1882,11 @@ Definition from_pat_F {Γ : neg_ctx} : { x : neg_ty & (ctx_s_to Γ ∋ x * pat (
 Definition to_pat {Γ : ctx neg_ty} : pat' (ctx_s_from Γ) -> { x : neg_ty & (Γ ∋ x * pat (t_neg x))%type } :=
   fun u => (_ ,' (to_has_R (fst (projT2 u)) , snd (projT2 u))) .
         
+Lemma from_to_pat_F {Γ : neg_ctx} (x y : nf (ctx_s_from (ctx_s_to Γ))) (H : x = y)
+  : from_pat_F (@Spec.msg_of_nf' mu_spec mu_val _ (to_nf x)) = pat_of_nf _ (n_rename r_from_to_l y) .
+  now rewrite H.
+Qed.
+
 
 Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machine.
   unfold mu_spec, mu_val, mu_conf.
@@ -1985,55 +1995,55 @@ Definition interp_act {Δ Γ : neg_ctx} (c : state Γ) : sem_act Δ Γ :=
 Definition from_to_state {Γ : neg_ctx} (c : state Γ) : state (ctx_s_from (ctx_s_to Γ)) :=
   s_rename r_from_to_r c .
 
-Definition interp_act {Δ Γ : neg_ctx} (c : state Γ) : sem_act Δ Γ :=
+Definition interp_act_c {Δ Γ : neg_ctx} (c : state Γ) : sem_act Δ Γ :=
   @Spec.m_strat mu_spec mu_val mu_conf mu_machine (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx
     (@Spec.inj_init_act mu_spec mu_val mu_conf (ctx_s_to Δ) (ctx_s_to Γ) (from_to_state c)) .
 
-Definition interp_pas {Δ Γ : neg_ctx} (e : Γ =[val]> Δ) : sem_pas Δ Γ :=
-  @Spec.m_stratp mu_spec mu_val mu_conf mu_machine (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx
-    (@Spec.inj_init_pas mu_spec mu_val (ctx_s_to Δ) (ctx_s_to Γ)
-      (to_FF e)) .
+Definition c_of_t {Γ : neg_ctx} {x} (t : term Γ (t+ x)) : state (Γ ▶ₛ {| sub_elt := t- x ; sub_prf := stt |}) :=
+  Cut (t_shift _ t) (VarN Ctx.top) .
 
-Notation "⟦ c ⟧ₐ" := (interp_act c) .
-Notation "⟦ e ⟧ₚ" := (interp_pas e) .
+Definition a_of_sk {Γ Δ : neg_ctx} {x} (s : Γ =[val]> Δ) (k : term Δ (t- x))
+  : (Γ ▶ₛ {| sub_elt := t- x ; sub_prf := stt |}) =[val]> Δ :=
+  s_append s (k : val Δ (t- x)) .
+
+Lemma sub_csk {Γ Δ : neg_ctx} {x} (t : term Γ (t+ x)) (s : Γ =[val]> Δ) (k : term Δ (t- x))
+              : Cut (t_subst s _ t) k = s_subst (a_of_sk s k) (c_of_t t) .
+  cbn; f_equal.
+  unfold t_shift; rewrite t_sub_ren.
+  now apply t_sub_eq.
+Qed.
+
+Definition interp_act {Δ Γ : neg_ctx} {x} (t : term Γ (t+ x))
+  : sem_act Δ (Γ ▶ₛ {| sub_elt := t- x ; sub_prf := stt |})
+  := interp_act_c (c_of_t t) .
+Notation "⟦ t ⟧" := (interp_act t) .
 
 Definition ogs_weq_act Δ {Γ} : relation (sem_act Δ Γ) := fun u v => u ≈ v .
-Definition ogs_weq_pas {Δ Γ} : relation (sem_pas Δ Γ) := fun u v => forall m, u m ≈ v m .
-
-Definition ogs_eq_act Δ {Γ} : relation (sem_act Δ Γ) := fun u v => u ≊ v .
-Definition ogs_eq_pas {Δ Γ} : relation (sem_pas Δ Γ) := fun u v => forall m, u m ≊ v m .
-
 Notation "u ≈[ Δ ]≈ v" := (ogs_weq_act Δ u v) (at level 40).
-Notation "u ≈ₚ v" := (ogs_weq_pas u v) (at level 40).
-Notation "u ≊[ Δ ]≈ v" := (ogs_eq_act Δ u v) (at level 40).
-Notation "u ≊ₚ v" := (ogs_eq_pas u v) (at level 40).
 
 Definition eval_to_msg {Γ : neg_ctx} (c : state Γ) : delay (pat' Γ) :=
   fmap_delay (pat_of_nf Γ) (eval c) .
 
-Definition ciu_eq (Δ : neg_ctx) {Γ} : relation (state Γ) :=
-  fun u v => forall e : Γ =[val]> Δ, eval_to_msg (s_subst e u) ≈ eval_to_msg (s_subst e v) .
+Definition ciu_eq (Δ : neg_ctx) {Γ x} : relation (term Γ (t+ x)) :=
+  fun u v => forall (σ : Γ =[val]> Δ) (k : term Δ (t- x)),
+      eval_to_msg (Cut (t_subst σ _ u) k) ≈ eval_to_msg (Cut (t_subst σ _ v) k) .
 
-Lemma from_to_pat_F {Γ : neg_ctx} (x y : nf (ctx_s_from (ctx_s_to Γ))) (H : x = y)
-  : from_pat_F (@Spec.msg_of_nf' mu_spec mu_val _ (to_nf x)) = pat_of_nf _ (n_rename r_from_to_l y) .
-  now rewrite H.
-Qed.
-
-Lemma weird {Δ Γ : neg_ctx} (e : Γ =[ val ]> Δ) : a_ren r_from_to_l (from_BB (to_FF e)) ≡ₐ e ⊛ᵣ r_from_to_l .
-  unfold from_BB, to_FF, to_FB, a_ren, s_map; cbn; intros ? i.
-  now rewrite v_ren_ren, r_from_to_lr, v_ren_id_l.
-Qed.
-
-Theorem mu_correction (Δ : neg_ctx) {Γ : neg_ctx} (x y : state Γ)
-  : ⟦ x ⟧ₐ ≈[ Δ ]≈ ⟦ y ⟧ₐ -> ciu_eq Δ x y .
-  intros H e.
+Theorem mu_correction (Δ : neg_ctx) {Γ : neg_ctx} {t} (x y : term Γ (t+ t))
+  : ⟦ x ⟧ ≈[ Δ ]≈ ⟦ y ⟧ -> ciu_eq Δ x y .
+  intros H σ k.
+  pose (Γ' := (Γ ▶ₛ {| sub_elt := t- t ; sub_prf := stt |})%ctx).
   apply (@Spec.ogs_correction mu_spec mu_val mu_val_laws mu_conf mu_conf_laws
                  mu_var_laws mu_machine mu_machine_laws
-                 (ctx_s_to Γ)
+                 (ctx_s_to Γ')
                  (ctx_s_to Δ)
-                 (from_to_state x)
-                 (from_to_state y)) in H.
-  specialize (H (to_FF e)).
+                 (from_to_state (c_of_t x))
+                 (from_to_state (c_of_t y))) in H.
+  specialize (H (to_FF (a_of_sk σ k))).
+  rewrite 2 sub_csk.
+  remember (c_of_t x) as x'; clear x Heqx'.
+  remember (c_of_t y) as y'; clear y Heqy'.
+  remember (a_of_sk σ k) as e; clear σ k Heqe.
+
   unfold Spec.eval_in_env, Spec.eval_to_msg in H ; cbn in H.
   unfold it_wbisim in H.
   unfold Spec.msg' in H.
@@ -2047,7 +2057,7 @@ Theorem mu_correction (Δ : neg_ctx) {Γ : neg_ctx} (x y : state Γ)
   fold (fmap_delay (n_rename (Δ := Δ) r_from_to_l)) in H.
   rewrite <- 2 (fmap_comp_eq (clean_hyp_ren _ _)) in H.
   rewrite 2 s_ren_sub in H.
-  rewrite 2 (s_sub_eq _ _ (weird e) _ _ eq_refl) in H.
+  rewrite 2 (s_sub_eq _ _ (from_BB_to_FF e) _ _ eq_refl) in H.
   unfold from_to_state in H.
   rewrite <- 2 s_sub_ren, 2 s_ren_ren in H.
   rewrite 2 (s_ren_eq _ _ (r_from_to_lr) _ _ eq_refl) in H.
