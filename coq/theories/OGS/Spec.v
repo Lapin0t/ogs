@@ -10,10 +10,14 @@ Open Scope ctx_scope.
 (*|
 Operational signature
 =====================
+
 Specifies the interactions player and opponent communicate over.
-- typ : a set of types (meta [t])
-- msg : maps a typ to messages (meta [m])
-- dom : maps messages to the context extension they entails --- think the free variables of the message
+- `typ`: a set of types (meta `t`)
+- `msg`: messages, indexed by their type (meta `m`)
+- `dom`: maps messages to the context extension they entails --- think the free variables of the message
+
+In a typical language `typ` will be the "opaque" types and messages `m : msg t` will be patterns destructing
+the type `t`.
 |*)
 Class interaction_spec : Type := {
   typ : Type ;
@@ -26,7 +30,8 @@ Section withInteractionSpec.
   Context {S : interaction_spec}.
 
 (*|
-Lifting messages and domain to contexts.
+Messages have been defined as indexed by a type, we can lift this notion to contexts. A message indexed by
+a context `Γ` will be a triplet of some type `t`, a variable of type `t` in `Γ` and a message `msg t`.
 |*)
   Notation context := (ctx typ).
   Definition msg' (Γ : context) : Type := { t : typ & Γ ∋ t * msg t }%type.
@@ -39,14 +44,10 @@ Lifting messages and domain to contexts.
 (*|
 Operational machine
 =====================
-Specifies the operational semantics of the language.
-- [conf Γ]: the configurations (meta [c]), or active states, with open variables in Γ
-- [v :::= val Γ τ]: the values (meta [v]), or elementary passive states, with open variables in Γ and of type τ
-- [eval c]: the evaluation function for configurations, evaluating down to a message and an assignment. This evaluation is partial, partiality which we embed in the delay monad.
-- [emb m]: embeds messages into configurations
-- [v_var]: well-scoped embedding of variables into values
-- [v_sub]: performs over values the substitution associated to an assignment
-- [c_sub]: performs over configurations the substitution associated to an assignment
+
+The specification of an evaluator will be separated in several steps. First we will ask for a family of values,
+ie objects that can be substituted for variables. We formalize well-typed well-scoped substitutions in the
+monoidal style of Fiore et al and Allais et al.
 |*)
   Class lang_monoid : Type := {
     val : context -> typ -> Type ;
@@ -57,6 +58,9 @@ Specifies the operational semantics of the language.
   Notation "u ⊛ᵥ v" := (v_sub u _ v) (at level 30).
   Notation "Γ ⇒ᵥ Δ" := (Γ =[val]> Δ) (at level 30).
 
+(*|
+Next we ask for a module over the monoid of values, to represent the configurations of the machine.
+|*)
   Class lang_module (V : lang_monoid) : Type := {
     conf : context -> Type ;
     c_sub {Γ Δ} : Γ ⇒ᵥ Δ -> conf Γ -> conf Δ ;
@@ -64,12 +68,17 @@ Specifies the operational semantics of the language.
   Notation "u ⊛ₜ c" := (c_sub u c) (at level 30).
 
 (*|
-Derived notion: composition of value assignments.
+From the definition of substitution on values we can deduce a composition operation between assignments.
+This will be used in the following laws for monoids and modules.
 |*)
   Definition e_comp {_ : lang_monoid} {Γ1 Γ2 Γ3} : Γ2 ⇒ᵥ Γ3 -> Γ1 ⇒ᵥ Γ2 -> Γ1 ⇒ᵥ Γ3
     := fun u v => s_map (v_sub u) v.
   Infix "⊛" := e_comp (at level 14).
 
+(*|
+The laws for monoids and modules are pretty straitforward. A specificity is that assignments are represented
+by functions from variables to values, as such their well-behaved equality is 
+|*)
   Class lang_monoid_laws (V : lang_monoid) : Prop := {
     v_sub_proper {Γ Δ} :: Proper (ass_eq Γ Δ ==> forall_relation (fun i => eq ==> eq)) v_sub ;
     v_sub_var {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : p ⊛ v_var ≡ₐ p ;
@@ -170,10 +179,6 @@ Additional assumptions on how variables behave.
       : eval (e ⊛ₜ c)
       ≋ bind_delay' (eval c) (fun u => eval (app (e _ (nf_var' u)) (nf_msg' u) (e ⊛ nf_val' u))) ;
 
-    (*eval_nf_ret {Γ} (u : nf' Γ) :
-      eval_to_msg (app (v_var _ (nf_var' u)) (nf_msg' u) (nf_val' u))
-      ≊ ret_delay (msg_of_nf' _ u) ;*)
-
     eval_nf_ret {Γ} (u : nf' Γ) :
       eval (app (v_var _ (nf_var' u)) (nf_msg' u) (nf_val' u))
       ≋ ret_delay u ;
@@ -196,11 +201,6 @@ Additional assumptions on how variables behave.
     rewrite H; change (e ᵣ⊛ᵥ v_var x i) with ((e ᵣ⊛ v_var) x i).
     unfold e_ren; rewrite v_sub_var; reflexivity.
   Defined.
-
-  Lemma ren_is_var_get {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) (p : is_var v) :
-    is_var_get (ren_is_var v e p) = e _ (is_var_get p) .
-    reflexivity.
-  Qed.
 
   Variant is_var_ren_view {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var (e ᵣ⊛ᵥ v) -> Type :=
   | IsVarRen (p : is_var v) : is_var_ren_view v e (ren_is_var v e p)
@@ -260,6 +260,7 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Definition ciu {Γ} Δ (x y : conf Γ) : Prop
     := forall e : Γ ⇒ᵥ Δ, eval_in_env e x ≈ eval_in_env e y.
+  Notation "x ≈⟦ciu Δ ⟧≈ y" := (ciu Δ x y) (at level 50).
 
 (*|
 Section 3: game definition
@@ -448,20 +449,18 @@ lem 4.6
     fun i x y => forall m, m_strat_resp x m ≈ₐ m_strat_resp y m .
   Notation "x ≈ₚ y" := (m_strat_pas_eqv _ x y) (at level 50).
 
-  Definition inj_init_act {Δ Γ} (c : conf Γ) : m_strat_act Δ (∅ ▶ Γ)
+  Definition inj_init_act Δ {Γ} (c : conf Γ) : m_strat_act Δ (∅ ▶ Γ)
     := ((r_concat_r ⊛ᵣ r_concat_r) ᵣ⊛ₜ c , εₑ ▶ₑ⁺).
 
   Definition inj_init_pas {Δ Γ} (γ : Γ ⇒ᵥ Δ) : m_strat_pas Δ (∅ ▶ Γ)
     := εₑ ▶ₑ⁻ (r_concat_l ᵣ⊛ γ).
 
+  Definition m_conf_eqv Δ : relᵢ conf conf :=
+    fun Γ u v => inj_init_act Δ u ≈ₐ inj_init_act Δ v .
+  Notation "x ≈⟦ogs Δ ⟧≈ y" := (m_conf_eqv Δ _ x y) (at level 50).
+
   Definition reduce_t (Δ : context) : Type :=
     ⦉ m_strat_act Δ ×ᵢ m_strat_pas Δ ⦊ᵢ .
-
-  Equations reduce_t_mk {Δ Φ} b (u : alt_env Δ Δ b Φ) (v : alt_env Δ Δ (negb b) Φ)
-                         {x} (j : ↓⁺Φ ∋ x) (m : msg x) (γ : dom m ⇒ᵥ (Δ +▶ ↓⁺Φ))
-            : (m_strat_act Δ ×ᵢ m_strat_pas Δ) (Φ ▶ dom m) :=
-    reduce_t_mk true  u v j m γ := (m_strat_resp v (x,' (j, m)), u ▶ₑ⁻ γ) ;
-    reduce_t_mk false u v j m γ := (m_strat_resp u (x,' (j, m)), v ▶ₑ⁻ γ) .
 
   Equations compo_body {Δ}
     : reduce_t Δ -> delay (reduce_t Δ + msg' Δ) :=
@@ -603,6 +602,50 @@ Interesting facts but not used in the current proof...
     apply eval_split.
   Qed.
 |*)
+
+  Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
+    := iter_delay compo_body (a ,' (u , v)).
+  Notation "u ∥ v" := (compo u v) (at level 40).
+
+  (* guilhem: rename? *)
+  Definition barb {Γ} Δ (x y : conf Γ) : Prop
+    := forall e : Γ ⇒ᵥ Δ, (inj_init_act Δ x ∥ inj_init_pas e) ≈ (inj_init_act Δ y ∥ inj_init_pas e).
+  Notation "x ≈⟦barb Δ ⟧≈ y" := (barb Δ x y) (at level 50).
+
+  Equations reduce {Δ} : reduce_t Δ -> delay (msg' Δ) :=
+    reduce u := eval_in_env
+                       ([ v_var , concat1 (snd (fst (projT2 u))) (snd (projT2 u)) ])
+                       (fst (fst (projT2 u))) .
+
+  Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => msg' Δ) i := fun 'T1_0 => reduce .
+
+  Lemma quatre_trois_pre {Δ} (x : reduce_t Δ) :
+    (compo_body x >>= fun _ r =>
+         match r with
+         | inl x' => reduce' _ x'
+         | inr y => Ret' (y : (fun _ => msg' _) _)
+         end)
+    ≊
+    (eval (fst (fst (projT2 x))) >>= fun _ u =>
+         match cat_split (nf_var' u) with
+         | CLeftV h => Ret' (_ ,' (h, nf_msg' u))
+         | CRightV h => reduce' _ (_ ,' (m_strat_resp (snd (projT2 x)) (_ ,' (h, nf_msg' u)) ,
+                                         snd (fst (projT2 x)) ▶ₑ⁻ nf_val' u))
+         end).
+    etransitivity; [ now apply bind_bind_com | ].
+    etransitivity; [ now apply fmap_bind_com | ].
+    unfold m_strat_play, m_strat_wrap.
+    remember (eval (fst (fst (projT2 x)))) as t eqn:H; clear H; revert t.
+    unfold it_eq; coinduction R CIH; intros t.
+    cbn; destruct (t.(_observe)) as [ [ ? [ i [ ? ? ] ] ] | | [] ]; cbn.
+    + destruct (cat_split i).
+      * econstructor; reflexivity.
+      * cbn -[eval_in_env] .
+        change (it_eqF _ _ _ _ (_observe ?a) (_observe ?b))
+          with (it_eq_map  ∅ₑ (eqᵢ _) (it_eq_t _ (eqᵢ _) R) T1_0 a b).
+        reflexivity.
+    + econstructor; apply CIH.
+  Qed.
 
   Equations var_depth (Ψ : alt_ext) b {x} (j : ↓[b] Ψ ∋ x) : nat by struct Ψ :=
     var_depth ∅%ctx        _     (!) ;
@@ -843,51 +886,13 @@ app w m ...  où not (is_var w)
     apply compo_body_guarded_aux.
   Qed.
 
-  Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
+  Definition compo_ev_guarded {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
     := iter_ev_guarded _ compo_body_guarded T1_0 (a ,' (u , v)).
-  Notation "u ∥ v" := (compo u v) (at level 40).
+  Notation "u ∥g v" := (compo_ev_guarded u v) (at level 40).
 
-  (* guilhem: rename? *)
-  Definition barb {Γ} Δ (x y : conf Γ) : Prop
-    := forall e : Γ ⇒ᵥ Δ, (inj_init_act x ∥ inj_init_pas e) ≈ (inj_init_act y ∥ inj_init_pas e).
-
-  Equations reduce {Δ} : reduce_t Δ -> delay (msg' Δ) :=
-    reduce u := eval_in_env
-                       ([ v_var , concat1 (snd (fst (projT2 u))) (snd (projT2 u)) ])
-                       (fst (fst (projT2 u))) .
-
-  Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => msg' Δ) i := fun 'T1_0 => reduce .
-
-  Lemma quatre_trois_pre {Δ} (x : reduce_t Δ) :
-    (compo_body x >>= fun _ r =>
-         match r with
-         | inl x' => reduce' _ x'
-         | inr y => Ret' (y : (fun _ => msg' _) _)
-         end)
-    ≊
-    (eval (fst (fst (projT2 x))) >>= fun _ u =>
-         match cat_split (nf_var' u) with
-         | CLeftV h => Ret' (_ ,' (h, nf_msg' u))
-         | CRightV h => reduce' _ (_ ,' (m_strat_resp (snd (projT2 x)) (_ ,' (h, nf_msg' u)) ,
-                                         snd (fst (projT2 x)) ▶ₑ⁻ nf_val' u))
-         end).
-    etransitivity; [ now apply bind_bind_com | ].
-    etransitivity; [ now apply fmap_bind_com | ].
-    unfold m_strat_play, m_strat_wrap.
-    remember (eval (fst (fst (projT2 x)))) as t eqn:H; clear H; revert t.
-    unfold it_eq; coinduction R CIH; intros t.
-    cbn; destruct (t.(_observe)) as [ [ ? [ i [ ? ? ] ] ] | | [] ]; cbn.
-    + destruct (cat_split i).
-      * econstructor; reflexivity.
-      * cbn -[eval_in_env] .
-        change (it_eqF _ _ _ _ (_observe ?a) (_observe ?b))
-          with (it_eq_map  ∅ₑ (eqᵢ _) (it_eq_t _ (eqᵢ _) R) T1_0 a b).
-        reflexivity.
-    + econstructor; apply CIH.
-  Qed.
 
   Lemma quatre_trois {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a)
-    : reduce (_ ,' (c , e)) ≊ (c ∥ e) .
+    : reduce (_ ,' (c , e)) ≊ (c ∥g e) .
     refine (iter_evg_uniq (fun 'T1_0 u => compo_body u) (fun 'T1_0 u => reduce u) _ _ T1_0 _).
     clear a c e; intros [] [ ? [ u v ] ].
     etransitivity; [ | symmetry; apply quatre_trois_pre ].
@@ -931,8 +936,8 @@ app w m ...  où not (is_var w)
    Qed.
 
   Lemma quatre_trois_app {Γ Δ} (c : conf Γ) (e : Γ ⇒ᵥ Δ)
-        : eval_in_env e c ≊ (inj_init_act c ∥ inj_init_pas e).
-    rewrite <- quatre_trois.
+        : eval_in_env e c ≊ (inj_init_act Δ c ∥g inj_init_pas e).
+    etransitivity; [ | apply quatre_trois ].
     unfold reduce, inj_init_act, eval_in_env; cbn [fst snd projT1 projT2]; apply (fmap_eq (RX:=eqᵢ _)).
     intros ? ? ? ->; auto.
     unfold inj_init_pas; rewrite concat1_equation_2, 2 concat1_equation_1.
@@ -944,11 +949,14 @@ app w m ...  où not (is_var w)
     now rewrite 2 v_var_sub.
   Qed.
 
-  Theorem barb_correction {Γ} Δ (x y : conf Γ) : barb Δ x y -> ciu Δ x y.
+  Theorem barb_correction {Γ} Δ (x y : conf Γ) : x ≈⟦barb Δ ⟧≈ y -> x ≈⟦ciu Δ ⟧≈ y.
     intros H e.
     etransitivity; [ apply it_eq_wbisim, (quatre_trois_app x e) | ].
-    etransitivity; [ apply (H e) | ].
-    symmetry; apply it_eq_wbisim, (quatre_trois_app y e).
+    etransitivity; [ apply iter_evg_iter | ].
+    etransitivity; [ apply (H e) | symmetry ].
+    etransitivity; [ apply it_eq_wbisim, (quatre_trois_app y e) | ].
+    etransitivity; [ apply iter_evg_iter | ].
+    reflexivity.
   Qed.
 
   (* Alternative definition of the composition easier to prove
@@ -1054,15 +1062,40 @@ app w m ...  où not (is_var w)
     + destruct q.
   Qed.
 
-  Theorem ogs_correction {Γ} Δ (x y : conf Γ)
-    : inj_init_act (Δ:=Δ) x ≈ₐ inj_init_act y -> ciu Δ x y.
+  Theorem ogs_correction {Γ} Δ (x y : conf Γ) : x ≈⟦ogs Δ ⟧≈ y -> x ≈⟦ciu Δ ⟧≈ y.
     intro H; apply barb_correction.
     intro e; unfold compo.
-    rewrite 2 iter_evg_iter.
-    change (iter _ T1_0 ?u) with (iter_delay compo_body u).
-    rewrite <- 2 compo_compo_alt.
+    change (iter _ T1_0 ?u) with (iter_delay compo_body u); rewrite <- 2 compo_compo_alt.
     apply compo_alt_proper; [ exact H | intro; reflexivity ].
   Qed.
+
+(* WIP
+  Definition nf_eqT {Δ} (R : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ)) {t} : relation (nf Δ t) :=
+    fun a b => exists H : projT1 a = projT1 b, R _ (rew H in projT2 a) (projT2 b) .
+
+  Definition nf_eqT' {Δ} (R : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ)) : relation (nf' Δ) :=
+    fun a b => exists H : nf_ty' a = nf_ty' b,
+        (rew H in nf_var' a = nf_var' b) /\ (nf_eqT R (rew H in nf_nf' a) (nf_nf' b)) .
+
+  Definition ciu_gen_pas {Δ} (R : relᵢ conf conf) : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ) :=
+    fun Γ u v => forall x : conf Γ, it_wbisim (fun _ => nf_eqT' ) eval (u ⊛ₜ x) ≈ eval (v ⊛ₜ x) .
+
+  Definition sub_R_act {Δ} (R : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ)) : relᵢ conf conf :=
+    fun Γ u v => forall γ : Γ ⇒ᵥ Δ, it_wbisim (fun _ => nf_eqT' R) T1_0 (eval (γ ⊛ₜ u)) (eval (γ ⊛ₜ v)) .
+
+  Definition sub_R_pas {Δ} (R : relᵢ conf conf) : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ) :=
+    fun Γ γ1 γ2 => forall u : conf Γ, R Δ (γ1 ⊛ₜ u) (γ2 ⊛ₜ u) .
+
+  Theorem ogs_substitutive {Δ} : sub_R_act (Δ:=Δ) (sub_R_pas (m_conf_eqv Δ)) <= m_conf_eqv Δ .
+    intros Γ u v H. unfold sub_R_act in H.
+    unfold m_conf_eqv.
+    Check (H v_var).
+    apply ogs_correction.  
+
+  Definition ciu_gen_pas {Δ} (R : relᵢ conf conf) : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ)) :=
+    fun Γ u v => forall x i, ciu_gen_act 
+*)
+
 
 End withInteractionSpec.
 About ogs_correction.
