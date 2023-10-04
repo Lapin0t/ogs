@@ -56,7 +56,7 @@ with val0 : t_ctx -> ty0 -> Type :=
 | Inr {Γ a b} : val0 Γ b -> val0 Γ (a + b)
 | OneI {Γ} : val0 Γ One
 | LamRec {Γ a b} : state (Γ ▶ t+ (a → b) ▶ t+ a ▶ t- b) -> val0 Γ (a → b)
-| Pair {Γ a b} : term Γ (t+ a) -> term Γ (t+ b) -> val0 Γ (a × b)
+| Pair {Γ a b} : state (Γ ▶ t- a) -> state (Γ ▶ t- b) -> val0 Γ (a × b)
 with state : t_ctx -> Type :=
 | Cut {Γ a} : term Γ (t+ a) -> term Γ (t- a) -> state Γ
 .
@@ -87,7 +87,7 @@ with v0_rename {Γ Δ} : Γ ⊆ Δ -> val0 Γ ⇒ᵢ val0 Δ :=
   v0_rename f _ (VarP i)   := VarP (f _ i) ;
   v0_rename f _ (OneI)     := OneI ;
   v0_rename f _ (LamRec u) := LamRec (s_rename (r_shift3 f) u) ;
-  v0_rename f _ (Pair u v) := Pair (t_rename f _ u) (t_rename f _ v) ;
+  v0_rename f _ (Pair u v) := Pair (s_rename (r_shift f) u) (s_rename (r_shift f) v) ;
   v0_rename f _ (Inl u)    := Inl (v0_rename f _ u) ;
   v0_rename f _ (Inr u)    := Inr (v0_rename f _ u)
 with s_rename {Γ Δ} : Γ ⊆ Δ -> state Γ -> state Δ :=
@@ -210,7 +210,7 @@ with v0_subst {Γ Δ} : Γ =[val]> Δ -> val0 Γ ⇒ᵢ val0 Δ :=
   v0_subst f _ (VarP i)   := f _ i ;
   v0_subst f _ (OneI)     := OneI ;
   v0_subst f _ (LamRec u) := LamRec (s_subst (a_shift3 f) u) ;
-  v0_subst f _ (Pair u v) := Pair (t_subst f _ u) (t_subst f _ v) ;
+  v0_subst f _ (Pair c1 c2) := Pair (s_subst (a_shift f) c1) (s_subst (a_shift f) c2) ;
   v0_subst f _ (Inl u)    := Inl (v0_subst f _ u) ;
   v0_subst f _ (Inr u)    := Inr (v0_subst f _ u)
 with s_subst {Γ Δ} : Γ =[val]> Δ -> state Γ -> state Δ :=
@@ -433,33 +433,33 @@ Qed.
 (*Definition pre_redex (Γ : neg_ctx) : Type := { x : ty & val Γ x * pat x }%type.*)
 
 Equations eval_aux {Γ : neg_ctx} : state Γ -> (state Γ + nf Γ) :=
-  eval_aux (Cut (Mu c)           (k))     := inl (c /ₛ k) ;
-  eval_aux (Cut (Val v)          (Mu' c)) := inl (c /ₛ v) ;
+  eval_aux (Cut (Mu c)             (k))     := inl (c /ₛ k) ;
+  eval_aux (Cut (Val v)            (Mu' c)) := inl (c /ₛ v) ;
 
-  eval_aux (Cut (Val v)          (VarN i)) :=
+  eval_aux (Cut (Val v)            (VarN i)) :=
     inr (_ ,' (i , (p_of_v0 _ v ,' p_dom_of_v0 _ v))) ;
 
-  eval_aux (Cut (Val (VarP i))   (ZerK))
+  eval_aux (Cut (Val (VarP i))     (ZerK))
     with (s_elt_upg i).(sub_prf) := { | (!) } ;
 
-  eval_aux (Cut (Val (VarP i))   (App v k)) :=
+  eval_aux (Cut (Val (VarP i))     (App v k)) :=
     inr (_ ,' (i , (PApp (p_of_v0 _ v) ,'
          s_append (p_dom_of_v0 _ v) (k : val _ (t- _))))) ;
 
-  eval_aux (Cut (Val (VarP i))   (Fst k)) :=
+  eval_aux (Cut (Val (VarP i))     (Fst k)) :=
     inr (_ ,' (i , (PFst ,' s_append s_empty k))) ;
 
-  eval_aux (Cut (Val (VarP i))   (Snd k)) :=
+  eval_aux (Cut (Val (VarP i))     (Snd k)) :=
     inr (_ ,' (i , (PSnd ,' s_append s_empty k))) ;
 
-  eval_aux (Cut (Val (VarP i))   (Match c1 c2))
+  eval_aux (Cut (Val (VarP i))     (Match c1 c2))
     with (s_elt_upg i).(sub_prf) := { | (!) } ;
 
-  eval_aux (Cut (Val (LamRec u)) (App v k))     := inl (u /ₛ[ LamRec u , v , k ]) ;
-  eval_aux (Cut (Val (Pair u v)) (Fst k))       := inl (Cut u k) ;
-  eval_aux (Cut (Val (Pair u v)) (Snd k))       := inl (Cut v k) ;
-  eval_aux (Cut (Val (Inl u))    (Match c1 c2)) := inl (c1 /ₛ u) ;
-  eval_aux (Cut (Val (Inr u))    (Match c1 c2)) := inl (c2 /ₛ u) .
+  eval_aux (Cut (Val (LamRec c))   (App v k))     := inl (c /ₛ[ LamRec c , v , k ]) ;
+  eval_aux (Cut (Val (Pair c1 c2)) (Fst k))       := inl (c1 /ₛ k) ;
+  eval_aux (Cut (Val (Pair c1 c2)) (Snd k))       := inl (c2 /ₛ k) ;
+  eval_aux (Cut (Val (Inl u))      (Match c1 c2)) := inl (c1 /ₛ u) ;
+  eval_aux (Cut (Val (Inr u))      (Match c1 c2)) := inl (c2 /ₛ u) .
 
 Definition eval {Γ : neg_ctx} : state Γ -> delay (nf Γ)
   := iter_delay (fun c => Ret' (eval_aux c)).
@@ -578,9 +578,9 @@ Record syn_ind_args (P : forall (t : t_ctx) (t0 : ty), term t t0 -> Prop)
     ind_s_onei : forall Γ : t_ctx, P0 Γ One OneI ;
     ind_s_lam : forall (Γ : ctx ty) (a b : ty0) (t : state (Γ ▶ t+ (a → b) ▶ t+ a ▶ t- b)),
         P1 (Γ ▶ t+ (a → b) ▶ t+ a ▶ t- b)%ctx t -> P0 Γ (a → b) (LamRec t) ;
-    ind_s_pair : forall (Γ : t_ctx) (a b : ty0) (t : term Γ (t+ a)),
-        P Γ (t+ a) t ->
-        forall t0 : term Γ (t+ b), P Γ (t+ b) t0 -> P0 Γ (a × b) (Pair t t0) ;
+    ind_s_pair : forall (Γ : t_ctx) (a b : ty0) (t : state (Γ ▶ t- a)),
+        P1 (Γ ▶ t- a)%ctx t ->
+        forall t0 : state (Γ ▶ t- b), P1 (Γ ▶ t- b)%ctx t0 -> P0 Γ (a × b) (Pair t t0) ;
     ind_s_cut : forall (Γ : t_ctx) (a : ty0) (t : term Γ (t+ a)),
       P Γ (t+ a) t -> forall t0 : term Γ (t- a), P Γ (t- a) t0 -> P1 Γ (Cut t t0)
 } .
@@ -1275,12 +1275,18 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
       * unfold play at 2; cbn -[play then_play2].
         unfold then_play2; cbn -[play eval_aux].
         cbn -[eval_aux]; destruct (eval_aux (Cut (Val (e _ h)) (Fst (t_subst e _ t1)))); now econstructor.
-      * cbn; econstructor; apply CIH.
+      * cbn; econstructor.
+        change (t_subst e (t- a3) t1) with (v_subst e (t- a3) t1).
+        rewrite s_sub1_sub.
+        apply CIH.
     + dependent elimination v. (* Cut (Val _) Snd *)
       * unfold play at 2; cbn -[play then_play2].
         unfold then_play2; cbn -[play eval_aux].
         cbn -[eval_aux]; destruct (eval_aux (Cut (Val (e _ h)) (Snd (t_subst e _ t2)))); now econstructor.
-      * cbn; econstructor; apply CIH.
+      * cbn; econstructor.
+        change (t_subst e (t- b3) t2) with (v_subst e (t- b3) t2).
+        rewrite s_sub1_sub.
+        apply CIH.
     + dependent elimination v. (* Cut (Val _) (Match _ _) *)
       * pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
       * cbn; econstructor; change (iter _ T1_0 ?x) with (play x).
