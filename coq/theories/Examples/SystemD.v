@@ -86,8 +86,8 @@ with whn : t_ctx -> ty -> Type :=
 | AndL1 {Γ A B} : whn Γ (t- A) -> whn Γ (t- (A & B))
 | AndL2 {Γ A B} : whn Γ (t- B) -> whn Γ (t- (A & B))
 | ShiftPR {Γ A} : term Γ (t+ A) -> whn Γ (t+ (↓ A))
-| ShiftPL {Γ A} : state (Γ ▶ t+ A) -> whn Γ (t- (↓ A))
-| ShiftNR {Γ A} : state (Γ ▶ t- A) -> whn Γ (t+ (↑ A))
+| ShiftPL {Γ A} : state (Γ ▶ t- (↓ A) ▶ t+ A) -> whn Γ (t- (↓ A))
+| ShiftNR {Γ A} : state (Γ ▶ t+ (↑ A) ▶ t- A) -> whn Γ (t+ (↑ A))
 | ShiftNL {Γ A} : term Γ (t- A) -> whn Γ (t- (↑ A))
 | NegPR {Γ A} : whn Γ (t- A) -> whn Γ (t+ (⊖ A))
 | NegPL {Γ A} : state (Γ ▶ t- A) -> whn Γ (t- (⊖ A))
@@ -133,8 +133,8 @@ with w_rename {Γ Δ} : Γ ⊆ Δ -> whn Γ ⇒ᵢ whn Δ :=
   w_rename f _ (AndL1 k)     := AndL1 (w_rename f _ k) ;
   w_rename f _ (AndL2 k)     := AndL2 (w_rename f _ k) ;
   w_rename f _ (ShiftPR t)   := ShiftPR (t_rename f _ t) ;
-  w_rename f _ (ShiftPL c)   := ShiftPL (s_rename (r_shift f) c) ;
-  w_rename f _ (ShiftNR c)   := ShiftNR (s_rename (r_shift f) c) ;
+  w_rename f _ (ShiftPL c)   := ShiftPL (s_rename (r_shift2 f) c) ;
+  w_rename f _ (ShiftNR c)   := ShiftNR (s_rename (r_shift2 f) c) ;
   w_rename f _ (ShiftNL t)   := ShiftNL (t_rename f _ t) ;
   w_rename f _ (NegPR k)     := NegPR (w_rename f _ k) ;
   w_rename f _ (NegPL c)     := NegPL (s_rename (r_shift f) c) ;
@@ -283,8 +283,8 @@ with w_subst {Γ Δ} : Γ =[val]> Δ -> whn Γ ⇒ᵢ val Δ :=
   w_subst f _ (AndL1 k)    := AndL1 (w_subst f _ k) ;
   w_subst f _ (AndL2 k)    := AndL2 (w_subst f _ k) ;
   w_subst f _ (ShiftPR t)  := ShiftPR (t_subst f _ t) ;
-  w_subst f _ (ShiftPL c)  := Whn (ShiftPL (s_subst (a_shift f) c)) ;
-  w_subst f _ (ShiftNR c)  := Whn (ShiftNR (s_subst (a_shift f) c)) ;
+  w_subst f _ (ShiftPL c)  := Whn (ShiftPL (s_subst (a_shift2 f) c)) ;
+  w_subst f _ (ShiftNR c)  := Whn (ShiftNR (s_subst (a_shift2 f) c)) ;
   w_subst f _ (ShiftNL t)  := ShiftNL (t_subst f _ t) ;
   w_subst f _ (NegPR k)    := NegPR (w_subst f _ k) ;
   w_subst f _ (NegPL c)    := Whn (NegPL (s_subst (a_shift f) c)) ;
@@ -573,8 +573,8 @@ Equations eval_aux {Γ : neg_ctx} : state Γ -> (state Γ + nf Γ) :=
   eval_aux (Cut pos (Whn (OrR2 v))     (Whn (OrL c1 c2)))  := inl (c2 ₛ/[ v ]) ;
   eval_aux (Cut neg (Whn (AndR c1 c2)) (Whn (AndL1 k)))    := inl (c1 ₛ/[ k ]) ;
   eval_aux (Cut neg (Whn (AndR c1 c2)) (Whn (AndL2 k)))    := inl (c2 ₛ/[ k ]) ;
-  eval_aux (Cut pos (Whn (ShiftPR x))  (Whn (ShiftPL c)))  := inl (c ₛ/[ x ]) ;
-  eval_aux (Cut neg (Whn (ShiftNR c))  (Whn (ShiftNL x)))  := inl (c ₛ/[ x ]) ;
+  eval_aux (Cut pos (Whn (ShiftPR x))  (Whn (ShiftPL c)))  := inl (c ₛ/[ Whn (ShiftPL c) , x ]) ;
+  eval_aux (Cut neg (Whn (ShiftNR c))  (Whn (ShiftNL x)))  := inl (c ₛ/[ Whn (ShiftNR c) , x ]) ;
   eval_aux (Cut pos (Whn (NegPR k))    (Whn (NegPL c)))    := inl (c ₛ/[ k ]) ;
   eval_aux (Cut neg (Whn (NegNR c))    (Whn (NegNL v)))    := inl (c ₛ/[ v ]) .
 
@@ -1502,8 +1502,9 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
               rewrite (refold_id_aux (↓ A11)).
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
-              change (t_subst ?f (t+ ?A) ?w) with (v_subst f (t+ A) w).
-              rewrite s_sub1_sub; apply CIH.
+              change (Whn (ShiftPL (s_subst _ _))) with (t_subst e (t- _) (Whn (ShiftPL s7))).
+              change (t_subst ?f ?A ?w) with (v_subst f A w).
+              rewrite s_sub2_sub; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
               unfold then_eval2; cbn -[eval eval_aux].
@@ -1560,8 +1561,9 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
               unfold then_eval2; cbn -[eval eval_aux].
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
-              change (t_subst ?f (t- ?A) ?w) with (v_subst f (t- A) w).
-              rewrite s_sub1_sub; apply CIH.
+              change (Whn (ShiftNR (s_subst _ _))) with (t_subst e (t+ _) (Whn (ShiftNR s8))).
+              change (t_subst ?f ?A ?w) with (v_subst f A w).
+              rewrite s_sub2_sub; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
               unfold then_eval2; cbn -[eval eval_aux].
