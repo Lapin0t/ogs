@@ -51,3 +51,9 @@ Lemma sigS_eq {X : Type} {P : X -> SProp} (a b : sigS P) : a.(sub_elt) = b.(sub_
   revert p; rewrite H; intro p.
   change p with b.(sub_prf); reflexivity.
 Qed.
+
+Definition substS {X : SProp} (P : X -> Type) (a b : X) : P a -> P b := fun p => p .
+
+Lemma eq_refl_map2_distr [A B C : Type] (x : A) (y : B) (f : A -> B -> C) : f_equal2 f (@eq_refl _ x) (@eq_refl _ y) = eq_refl .
+  apply YesUIP.
+Qed.
