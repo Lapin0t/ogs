@@ -164,6 +164,7 @@ Qed.
 
 Equations s_empty {F Γ} : ∅ =[F]> Γ :=
   s_empty x (!).
+Notation "∅ₐ" := (s_empty).
 
 (*|
 The identity inclusion, whose renaming is the identity.
@@ -189,6 +190,7 @@ Equations s_append {Γ Δ : ctx X} {F : ctx X -> X -> Type} {a}
   : Γ =[F]> Δ -> F Δ a -> (Γ ▶ a) =[F]> Δ :=
   s_append s z _ top     := z ;
   s_append s z _ (pop i) := s _ i .
+Notation "s ▶ₐ z" := (s_append s z) (at level 40).
 
 #[global] Instance s_append_eq {Γ Δ : ctx X} {F : ctx X -> X -> Type} {a}
           : Proper (ass_eq _ _ ==> eq ==> ass_eq _ _) (@s_append Γ Δ F a).
@@ -496,6 +498,8 @@ Lemma r_assoc_lr {Γ1 Γ2 Γ3 : ctx X} : @r_assoc_l Γ1 Γ2 Γ3 ⊛ᵣ @r_assoc_
 Qed.
 
 End lemma.
+#[global] Notation "∅ₐ" := (s_empty).
+#[global] Notation "s ▶ₐ z" := (s_append s z) (at level 40).
 
 Definition map_has {X Y} (f : X -> Y) (Γ : ctx X)
   {x} (i : has Γ x) : has (c_map f Γ) (f x).

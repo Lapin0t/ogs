@@ -31,6 +31,8 @@ Definition curry {A B} {C : A -> B -> Type} (f : forall i, C (fst i) (snd i)) a 
 #[global] Notation curry' := (fun f a b => f (a ,' b)).
 #[global] Notation uncurry' := (fun f x => f (projT1 x) (projT2 x)).
 
+#[global] Notation "A × B" := (prod A%type B%type) (at level 20).
+
 Variant T0 : Type := .
 Variant T1 : Type := T1_0.
 Variant T2 : Type := T2_0 | T2_1.
