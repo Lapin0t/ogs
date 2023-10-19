@@ -1316,13 +1316,13 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
         -- pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               rewrite (refold_id_aux 1).
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               rewrite (refold_id_aux (A1 ⊗ B0)).
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
@@ -1330,7 +1330,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
               rewrite s_sub2_sub; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               rewrite (refold_id_aux (A5 ⊕ B4)).
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
@@ -1338,7 +1338,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
               rewrite s_sub1_sub; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               rewrite (refold_id_aux (A6 ⊕ B5)).
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
@@ -1346,7 +1346,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
               rewrite s_sub1_sub; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               rewrite (refold_id_aux (↓ A11)).
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
@@ -1355,7 +1355,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
               rewrite s_sub2_sub; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               rewrite (refold_id_aux (⊖ A15)).
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
@@ -1373,12 +1373,12 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
         -- pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               rewrite 2 w_sub_ren.
               erewrite (w_sub_eq _ _ (s_eq_cat_l _ _)); auto.
               erewrite (w_sub_eq _ _ (s_eq_cat_r _ _)); auto.
@@ -1390,7 +1390,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
               rewrite s_sub2_sub; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               rewrite (refold_id_aux A9).
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
@@ -1398,7 +1398,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
               rewrite s_sub1_sub; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               rewrite (refold_id_aux B9).
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
@@ -1406,7 +1406,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
               rewrite s_sub1_sub; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
               change (Whn (ShiftNR (s_subst _ _))) with (t_subst e (t+ _) (Whn (ShiftNR s8))).
@@ -1414,7 +1414,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
               rewrite s_sub2_sub; apply CIH.
         -- dependent elimination w0.
            ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; cbn -[eval eval_aux].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
               rewrite (refold_id_aux A18).
               now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
            ++ cbn; econstructor.
@@ -1795,7 +1795,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
        | _ => idtac
        end.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -1808,7 +1808,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w1.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -1821,7 +1821,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -1834,7 +1834,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -1847,7 +1847,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -1860,91 +1860,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -1963,7 +1879,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
   - apply it_eq_step in H; now inversion H.
   - apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -1976,7 +1892,91 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
+      dependent elimination H; cbn in r_rel.
+      inversion_sigma r_rel as [ H1 H2 ].
+      revert m i H2; rewrite <- H1; intros m i H2.
+      inversion_clear H2; cbn; clear.
+      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
+      dependent elimination v.
+      + apply it_eq_step in H; now inversion H.
+      + dependent elimination w.
+        now destruct (p0 (_ ,' eq_refl)).
+        apply it_eq_step in H; now inversion H.
+    * apply it_eq_step in H; now inversion H.
+  - dependent elimination w.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
+      dependent elimination H; cbn in r_rel.
+      inversion_sigma r_rel as [ H1 H2 ].
+      revert m i H2; rewrite <- H1; intros m i H2.
+      inversion_clear H2; cbn; clear.
+      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
+      dependent elimination v.
+      + apply it_eq_step in H; now inversion H.
+      + dependent elimination w.
+        now destruct (p0 (_ ,' eq_refl)).
+        apply it_eq_step in H; now inversion H.
+    * apply it_eq_step in H; now inversion H.
+  - dependent elimination w.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
+      dependent elimination H; cbn in r_rel.
+      inversion_sigma r_rel as [ H1 H2 ].
+      revert m i H2; rewrite <- H1; intros m i H2.
+      inversion_clear H2; cbn; clear.
+      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
+      dependent elimination v.
+      + apply it_eq_step in H; now inversion H.
+      + dependent elimination w.
+        now destruct (p0 (_ ,' eq_refl)).
+        apply it_eq_step in H; now inversion H.
+    * apply it_eq_step in H; now inversion H.
+  - dependent elimination w.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
+      dependent elimination H; cbn in r_rel.
+      inversion_sigma r_rel as [ H1 H2 ].
+      revert m i H2; rewrite <- H1; intros m i H2.
+      inversion_clear H2; cbn; clear.
+      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
+      dependent elimination v.
+      + apply it_eq_step in H; now inversion H.
+      + dependent elimination w.
+        now destruct (p0 (_ ,' eq_refl)).
+        apply it_eq_step in H; now inversion H.
+    * apply it_eq_step in H; now inversion H.
+  - dependent elimination w.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
+      dependent elimination H; cbn in r_rel.
+      inversion_sigma r_rel as [ H1 H2 ].
+      revert m i H2; rewrite <- H1; intros m i H2.
+      inversion_clear H2; cbn; clear.
+      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
+      dependent elimination v.
+      + apply it_eq_step in H; now inversion H.
+      + dependent elimination w.
+        now destruct (p0 (_ ,' eq_refl)).
+        apply it_eq_step in H; now inversion H.
+    * apply it_eq_step in H; now inversion H.
+  - apply it_eq_step in H; now inversion H.
+  - apply it_eq_step in H; now inversion H.
+  - apply it_eq_step in H; now inversion H.
+  - apply it_eq_step in H; now inversion H.
+  - apply it_eq_step in H; now inversion H.
+  - apply it_eq_step in H; now inversion H.
+  - dependent elimination w.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
+      dependent elimination H; cbn in r_rel.
+      inversion_sigma r_rel as [ H1 H2 ].
+      revert m i H2; rewrite <- H1; intros m i H2.
+      inversion_clear H2; cbn; clear.
+      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
+      dependent elimination v.
+      + apply it_eq_step in H; now inversion H.
+      + dependent elimination w.
+        now destruct (p0 (_ ,' eq_refl)).
+        apply it_eq_step in H; now inversion H.
+    * apply it_eq_step in H; now inversion H.
+  - dependent elimination w.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -1989,7 +1989,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -2002,7 +2002,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -2015,7 +2015,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -2028,7 +2028,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -2041,7 +2041,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -2054,7 +2054,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -2067,7 +2067,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -2080,7 +2080,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -2093,7 +2093,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
@@ -2106,7 +2106,7 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
         apply it_eq_step in H; now inversion H.
     * apply it_eq_step in H; now inversion H.
   - dependent elimination w.
-    * apply it_eq_step in H; cbn in H.
+    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
       dependent elimination H; cbn in r_rel.
       inversion_sigma r_rel as [ H1 H2 ].
       revert m i H2; rewrite <- H1; intros m i H2.
