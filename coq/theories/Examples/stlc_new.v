@@ -2,12 +2,14 @@
 A Minimal Example: Call-by-Value Simply Typed Lambda Calculus
 =============================================================
 
-We demonstrate how to instantiate our framework to define the OGS associated to
-the CBV λ-calculus. With the instance comes the proof that bisimilarity of the OGS
-entails substitution equivalence, which coincides with CIU-equivalence.
+We demonstrate how to instantiate our framework to define the OGS associated
+to the CBV λ-calculus. With the instance comes the proof that bisimilarity of
+the OGS entails substitution equivalence, which coincides with
+CIU-equivalence.
 
-.. note:: This example is designed to be minimal, hiding by nature some difficulties.
-   In particular it has no positive types, which simplifies the development a lot.
+.. note:: This example is designed to be minimal, hiding by nature some
+   difficulties. In particular it has no positive types, which simplifies the
+   development a lot.
 
 .. coq:: none
 |*)
@@ -21,19 +23,18 @@ Syntax
 Types
 ^^^^^
 
-As discussed in the paper, our framework applies not really to a language but more
-to an abstract machine. In order to ease this instanciation, we will focus directly
-on a CBV machine and define evaluation
-contexts early on. Working with intrinsically typed syntax, we need to give types
-to these contexts: we will type them by the "formal negation" of the type of their
-hole. In order to do so we first define the usual types `ty0` of STLC with functions
-and a ground type.
+As discussed in the paper, our framework applies not really to a language but
+more to an abstract machine. In order to ease this instanciation, we will
+focus directly on a CBV machine and define evaluation contexts early on.
+Working with intrinsically typed syntax, we need to give types to these
+contexts: we will type them by the "formal negation" of the type of their
+hole. In order to do so we first define the usual types `ty0` of STLC with
+functions and a ground type.
 |*)
 Inductive ty0 : Type :=
 | ι : ty0
 | Arr : ty0 -> ty0 -> ty0
 .
-Notation "A → B" := (Arr A B) (at level 40) : ty_scope .
 (*|
 .. coq:: none
 |*)
@@ -42,8 +43,12 @@ Declare Scope ty_scope .
 Delimit Scope ty_scope with ty .
 Bind Scope ty_scope with ty0 .
 (*|
-We then define "tagged types", where `t+ a` will be the type of terms of type `a`, and `t- a` the
-type of evaluation contexts of hole `a`.
+.. coq::
+|*)
+Notation "A → B" := (Arr A B) (at level 40) : ty_scope .
+(*|
+We then define "tagged types", where `t+ a` will be the type of terms of type
+`a`, and `t- a` the type of evaluation contexts of hole `a`.
 |*)
 Variant ty : Type :=
 | VTy : ty0 -> ty
@@ -62,14 +67,18 @@ Coercion VTy : ty0 >-> ty .
 Typing Contexts
 ^^^^^^^^^^^^^^^
 
-Typing contexts are now simply defined as lists of tagged types. This is perhaps the
-slightly surprising part: contexts will now contain "continuation variables". Rest assured
-terms will make no use of them. These are solely needed for evaluation contexts: as they are only
-typed with their hole, we are missing the type of their outside. We fix this problem by *naming*
-the outside and make evaluation contexts end with a continuation variable.
+Typing contexts are now simply defined as lists of tagged types. This is
+perhaps the slightly surprising part: contexts will now contain "continuation
+variables". Rest assured terms will make no use of them. These are solely
+needed for evaluation contexts: as they are only typed with their hole, we are
+missing the type of their outside. We fix this problem by *naming* the outside
+and make evaluation contexts end with a continuation variable.
 
-.. note:: Our choices make a bit more sense if we realize that what we are writing is exactly the subset
-   of λμ-calculus that is the image of the CBV translation from λ-calculus.
+.. note:: Our choices make a bit more sense if we realize that what we are
+   writing is exactly the subset of λμ-calculus that is the image of the CBV
+   translation from λ-calculus.
+
+..
 |*)
 Definition t_ctx : Type := Ctx.ctx ty .
 (*|
@@ -80,12 +89,13 @@ Bind Scope ctx_scope with t_ctx .
 Terms and Values and ...
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-We now have all that is needed to define terms, which we define mutually with values. As discussed
-above, they are are indexed by a list of tagged types (of which they only care about the non-negated
-elements) and by an untagged type.
+We now have all that is needed to define terms, which we define mutually with
+values. As discussed above, they are are indexed by a list of tagged types (of
+which they only care about the non-negated elements) and by an untagged type.
 
-The only fanciness is the recursive lambda abstraction, which we include to safeguard ourselves from
-accidentally using the fact that the language is strongly normalizing.
+The only fanciness is the recursive lambda abstraction, which we include to
+safeguard ourselves from accidentally using the fact that the language is
+strongly normalizing.
 |*)
 Inductive term (Γ : t_ctx) : ty0 -> Type :=
 | Val {a} : val Γ a -> term Γ a
@@ -102,8 +112,9 @@ Arguments App {Γ a b} t1 t2 .
 Arguments Var {Γ a} i .
 Arguments LamRec {Γ a b} t .
 (*|
-Evaluation contexts follow. As discussed, there is a "covariable" case, to "end" the context.
-The other cases are usual: evaluating the argument of an application and evaluating the function.
+Evaluation contexts follow. As discussed, there is a "covariable" case, to
+"end" the context. The other cases are usual: evaluating the argument of an
+application and evaluating the function.
 |*)
 Inductive ev_ctx (Γ : t_ctx) : ty0 -> Type :=
 | K0 {a} : Γ ∋ ¬ a -> ev_ctx Γ a
@@ -117,9 +128,10 @@ Arguments K0 {Γ a} i .
 Arguments K1 {Γ a b} t π .
 Arguments K2 {Γ a b} v π .
 (*|
-Next are the machine states. They consist of an explicit cut and represent a term in the process
-of being executed in some context. Notice how states they are only indexed by a typing context:
-these are proper "diverging programs".
+Next are the machine states. They consist of an explicit cut and represent
+a term in the process of being executed in some context. Notice how states
+they are only indexed by a typing context: these are proper "diverging
+programs".
 |*)
 Variant state (Γ : t_ctx) : Type :=
 | Cut {a} : term Γ a -> ev_ctx Γ a -> state Γ
@@ -129,25 +141,24 @@ Variant state (Γ : t_ctx) : Type :=
 |*)
 Arguments Cut {Γ a} t π.
 (*|
-Finally the last of syntactic categories: "machine values". This category is typed with a tagged type and
-encompasses both values (for non-negated types) and evaluation contexts (for negated types). The primary
-use-case for this category is to denote "things by which we can substitute (tagged) variables".
+Finally the last of syntactic categories: "machine values". This category is
+typed with a tagged type and encompasses both values (for non-negated types)
+and evaluation contexts (for negated types). The primary use-case for this
+category is to denote "things by which we can substitute (tagged) variables".
 
-In fact when working with intrinsically-typed syntax, substitution is modelled as a monoidal multiplication
-(see [AACMM21]_ and [FS22]_). We will prove later that `val_m Γ` is indeed a monoid relative to `has Γ` and
-that contexts and assignments form a category.
-
-.. [AACMM21] Guillaume Allais et al, "A type- and scope-safe universe of syntaxes with binding: their
-   semantics and proofs", 2021.
-.. [FS22] Marcelo Fiore & Dmitrij Szamozvancev, "Formal Metatheory of Second-Order Abstract Syntax", 2022.
+In fact when working with intrinsically-typed syntax, substitution is modelled
+as a monoidal multiplication (see [AACMM21]_ and [FS22]_). We will prove later
+that `val_m Γ` is indeed a monoid relative to `has Γ` and that contexts and
+assignments form a category.
 |*)
 Equations val_m : t_ctx -> ty -> Type :=
   val_m Γ (+ a) := val Γ a ;
   val_m Γ (¬ a) := ev_ctx Γ a .
 (*|
-Together with machine values we define a smart constructor for "machine var", embedding tagged variables into
-these generalized values. It conveniently serves as the identity assignment, a fact we use to give it this
-mysterious point-free style type, which desugars to `forall a, Γ ∋ a -> val_m Γ a`.
+Together with machine values we define a smart constructor for "machine var",
+embedding tagged variables into these generalized values. It conveniently
+serves as the identity assignment, a fact we use to give it this mysterious
+point-free style type, which desugars to `forall a, Γ ∋ a -> val_m Γ a`.
 |*)
 Equations a_id {Γ} : Γ =[val_m]> Γ :=
   a_id (+ _) i := Var i ;
@@ -156,15 +167,17 @@ Equations a_id {Γ} : Γ =[val_m]> Γ :=
 Substitution and Renaming
 -------------------------
 
-In order to define substitution we first need to dance the intrinsically-typed dance and define renamings,
-from which we will derive weakenings and then only define substitution.
+In order to define substitution we first need to dance the intrinsically-typed
+dance and define renamings, from which we will derive weakenings and then only
+define substitution.
 
 Renaming
 ^^^^^^^^
 
-Lets write intrinsically-typed parallel renaming for all of our syntactic categories! If you have never
-seen such intrinsically-typed definitions you might be surprised by the absence of error-prone de-bruijn
-index manipulation. Enjoy this beautiful syntax traversal!
+Lets write intrinsically-typed parallel renaming for all of our syntactic
+categories! If you have never seen such intrinsically-typed definitions you
+might be surprised by the absence of error-prone de-bruijn index manipulation.
+Enjoy this beautiful syntax traversal!
 |*)
 Equations t_rename {Γ Δ} : Γ ⊆ Δ -> term Γ ⇒ᵢ term Δ :=
   t_rename f _ (Val v)     := Val (v_rename f _ v) ;
@@ -185,8 +198,8 @@ Equations m_rename {Γ Δ} : Γ ⊆ Δ -> val_m Γ ⇒ᵢ val_m Δ :=
   m_rename f (+ _) v := v_rename f _ v ;
   m_rename f (¬ _) π := e_rename f _ π .
 (*|
-We can recast `m_rename` as an operator on assigments, more precisely as renaming an assigment
-on the left.
+We can recast `m_rename` as an operator on assigments, more precisely as
+renaming an assigment on the left.
 |*)
 Definition a_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 =[val_m]> Γ2 -> Γ1 =[val_m]> Γ3 :=
   fun f g _ i => m_rename f _ (g _ i) .
@@ -200,8 +213,8 @@ Notation "f ᵣ⊛ₘ v" := (m_rename f _ v) (at level 30, right associativity).
 Notation "f ᵣ⊛ₛ s" := (s_rename f s) (at level 30, right associativity).
 Notation "f ᵣ⊛ g" := (a_ren f g) (at level 30, right associativity).
 (*|
-As discussed above, we can now obtain our precious weakenings. Here are the three
-we will need.
+As discussed above, we can now obtain our precious weakenings. Here are the
+three we will need.
 |*)
 Definition t_shift {Γ a} := @t_rename Γ (Γ ▶ a) s_pop.
 Definition m_shift2 {Γ a b} := @m_rename Γ (Γ ▶ a ▶ b) (s_pop ⊛ᵣ s_pop).
@@ -211,10 +224,11 @@ Definition a_shift2 {Γ Δ a b} (f : Γ =[val_m]> Δ) :=
 Substitutions
 ^^^^^^^^^^^^^
 
-With weakenings in place we are now equipped to define substitutions. This goes pretty much like
-renaming. We have abstained from defining generic syntax traversal tools like Allais et al's "Kits"
-to keep our example minimal... And incidentally showcase the intrinsically-typed style with Matthieu
-Sozeau's Equations.
+With weakenings in place we are now equipped to define substitutions. This
+goes pretty much like renaming. We have abstained from defining generic syntax
+traversal tools like Allais et al's "Kits" to keep our example minimal... And
+incidentally showcase the intrinsically-typed style with Matthieu Sozeau's
+Equations.
 |*)
 Equations t_subst {Γ Δ} : Γ =[val_m]> Δ -> term Γ ⇒ᵢ term Δ :=
   t_subst f _ (Val v)     := Val (v_subst f _ v) ;
@@ -259,80 +273,88 @@ Notation "t /[ v1 , v2 ]" := (t_subst2 t v1 v2) (at level 50, left associativity
 An Evaluator
 ------------
 
-As motivated earlier, the evaluator will be a defined as a state-machine, the core
-definition being a state-transition function. To stick to the intrinsic style, we wish
-that this state-machine stops only at *evidently* normal forms, instead of stoping at
-states which happen to be in normal form. Perhaps more simply said, we want to type
-the transition function as `state Γ → (state Γ + nf Γ)`, where returning in the right
-component means stoping and outputing a normal form.
+As motivated earlier, the evaluator will be a defined as a state-machine, the
+core definition being a state-transition function. To stick to the intrinsic
+style, we wish that this state-machine stops only at *evidently* normal forms,
+instead of stoping at states which happen to be in normal form. Perhaps more
+simply said, we want to type the transition function as `state Γ → (state
+Γ + nf Γ)`, where returning in the right component means stoping and outputing
+a normal form.
 
-In order to do this we first need to define normal forms! But instead of defining an
-inductive definition of normal forms as is customary, we will take an other route
-more tailored to OGS based on ultimate patterns.
+In order to do this we first need to define normal forms! But instead of
+defining an inductive definition of normal forms as is customary, we will take
+an other route more tailored to OGS based on ultimate patterns.
 
 Patterns and Observations
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-As discussed in the paper, a central aspect of OGS is to circumvent the problem of naive
-trace semantics for higher-order languages by mean of a notion of "abstract values", or
-more commonly *ultimate patterns*, which define the "shareable part" of a value. For clarity
-reasons, instead of patterns we here take the dual point of view of "observations", which can be
-seen as patterns at the dual type (dual in the sense of swapping the tag). For our basic
-λ-calculus, all types are negative -- that is, unsheareble -- hence the observations
-are pretty simple:
+As discussed in the paper, a central aspect of OGS is to circumvent the
+problem of naive trace semantics for higher-order languages by mean of
+a notion of "abstract values", or more commonly *ultimate patterns*, which
+define the "shareable part" of a value. For clarity reasons, instead of
+patterns we here take the dual point of view of "observations", which can be
+seen as patterns at the dual type (dual in the sense of swapping the tag). For
+our basic λ-calculus, all types are negative -- that is, unsheareble -- hence
+the observations are pretty simple:
 
-- Observing a continuation of type `¬ a` means returning a (hidden) value to it. In
-  terms of pattern this corresponds to the "fresh variable" pattern `Var x`.
+- Observing a continuation of type `¬ a` means returning a (hidden) value to
+  it. In terms of pattern this corresponds to the "fresh variable" pattern
+  `Var x`.
 
-- Observing a function of type `a → b` means giving it a hidden value and a hidden
-  continuation. In terms of patterns this corresponds to the "application" co-pattern
-  `K2 (Var x) (K0 y)`.
+- Observing a function of type `a → b` means giving it a hidden value and
+  a hidden continuation. In terms of patterns this corresponds to the
+  "application" co-pattern `K2 (Var x) (K0 y)`.
 |*)
 Variant obs : ty -> Type :=
 | ORet {a} : obs (¬ a)
 | OApp {a b} : obs (a → b)
 .
 (*|
-As observations correspond to a subset of (machine) values where all the variables are "fresh",
-these variables have no counter-part in de-bruijn notation (there is no meaningful notion of freshness).
-As such we have not indexed `obs` by any typing context, but to complete the definition we now need to
-define a projection into typing contexts denoting the "domain", "support" or more accurately "set of
-nameless fresh variables" of an observation.
+As observations correspond to a subset of (machine) values where all the
+variables are "fresh", these variables have no counter-part in de-bruijn
+notation (there is no meaningful notion of freshness). As such we have not
+indexed `obs` by any typing context, but to complete the definition we now
+need to define a projection into typing contexts denoting the "domain",
+"support" or more accurately "set of nameless fresh variables" of an
+observation.
 |*)
 Equations obs_dom {a} : obs a -> t_ctx :=
   obs_dom (@ORet a)   := ∅ ▶ + a ;
   obs_dom (@OApp a b) := ∅ ▶ + a ▶ ¬ b .
 (*|
-Given a value, an observation on its type and a value for each fresh variable of the observation, we can
-"refold" everything and form a new state which will indeed observe this value.
+Given a value, an observation on its type and a value for each fresh variable
+of the observation, we can "refold" everything and form a new state which will
+indeed observe this value.
 |*)
 Equations obs_app {Γ a} (v : val_m Γ a) (p : obs a) (γ : obs_dom p =[val_m]> Γ) : state Γ :=
-  @obs_app _ (+ (a → b)) v (OApp) γ := Cut (Val v) (K2 (γ a (pop top)) (γ (¬ b) top)) ;
-  @obs_app _ (¬ a)        π (ORet) γ := Cut (Val (γ a top)) π .
+  obs_app v (OApp) γ := Cut (Val v) (K2 (γ _ (pop top)) (γ _ top)) ;
+  obs_app π (ORet) γ := Cut (Val (γ _ top)) π .
 (*|
 Normal forms
 ^^^^^^^^^^^^
 
-Normal forms for CBV λ-calculus can be characterized as either a value `v` or a stuck application in
-evaluation context `E[x v]` (see "eager-normal forms" in [L05]_). Now it doesn't take much squinting
-to see that in our setting, this corresponds respectively to states of the form `⟨ v | K0 x ⟩` and
-`⟨ Var x | K2 v π ⟩`. Squinting a bit more, we can reap the benefits of our unified treatment of
-terms and contexts and see that both of these cases work in the same way: normal states are states
-given by a variable facing an observation whose fresh variables have been substituted with values.
+Normal forms for CBV λ-calculus can be characterized as either a value `v` or
+a stuck application in evaluation context `E[x v]` (see "eager-normal forms"
+in [L05]_). Now it doesn't take much squinting to see that in our setting,
+this corresponds respectively to states of the form `⟨ v | K0 x ⟩` and `⟨ Var
+x | K2 v π ⟩`. Squinting a bit more, we can reap the benefits of our unified
+treatment of terms and contexts and see that both of these cases work in the
+same way: normal states are states given by a variable facing an observation
+whose fresh variables have been substituted with values.
 
-.. [L05] Soren Lassen, "Eager Normal Form Bisimulation", 2005.
-
-Having already defined observation and their set of fresh variables, an observation stuffed with values
-in typing context `Γ` can be represented simply by a formal substitution of an observation `o` and
-an assigment `obs_dom o =[val]> Γ`. This "split" definition of normal forms is the one we will take.
+Having already defined observation and their set of fresh variables, an
+observation stuffed with values in typing context `Γ` can be represented
+simply by a formal substitution of an observation `o` and an assigment
+`obs_dom o =[val]> Γ`. This "split" definition of normal forms is the one we
+will take.
 |*)
 Definition nf  (Γ : t_ctx) : Type := { a : ty & (Γ ∋ a) × { o : obs a & obs_dom o =[val_m]> Γ } } .
 (*|
 The CBV Machine
 ^^^^^^^^^^^^^^^
 
-Everything is now in place to define our state transition function. The reduction rules should come
-to no surprise:
+Everything is now in place to define our state transition function. The
+reduction rules should come to no surprise:
 
 (1) `⟨ t1 t2 | π ⟩ → ⟨ t2 | t1 ⋅₁ π ⟩`
 
@@ -344,7 +366,8 @@ to no surprise:
 
 (5) `⟨ λfx.t | v ⋅₂ π ⟩ → ⟨ t[f↦λfx.t; x↦v] |  π ⟩`
 
-Rules 1,3,5 step to a new configuration, while cases 2,4 are stuck on normal forms.
+Rules 1,3,5 step to a new configuration, while cases 2,4 are stuck on normal
+forms.
 |*)
 Equations eval_aux {Γ : t_ctx} : state Γ -> (state Γ + nf Γ) :=
   eval_aux (Cut (App t1 t2)      (π))      := inl (Cut t2 (K1 t1 π)) ;
@@ -353,8 +376,9 @@ Equations eval_aux {Γ : t_ctx} : state Γ -> (state Γ + nf Γ) :=
   eval_aux (Cut (Val (Var i))    (K2 v π)) := inr (_,' (i, (OApp ,' (∅ₐ ▶ₐ v ▶ₐ π)))) ;
   eval_aux (Cut (Val (LamRec t)) (K2 v π)) := inl (Cut (t /[ LamRec t , v ]) π) .
 (*|
-Having defined the transition function, we can now iterate it inside the delay monad. This
-constructs a possibly non-terminating computation ending with a normal form.
+Having defined the transition function, we can now iterate it inside the delay
+monad. This constructs a possibly non-terminating computation ending with
+a normal form.
 |*)
 Definition eval {Γ : t_ctx} : state Γ -> delay (nf Γ)
   := iter_delay (ret_delay ∘ eval_aux).
@@ -362,23 +386,26 @@ Definition eval {Γ : t_ctx} : state Γ -> delay (nf Γ)
 Properties
 ----------
 
-We have now finished all the computational parts of the instanciation, but all the proofs are
-left to be done. Before attacking the OGS-specific hypotheses, we will need to prove the usual
-standard lemmata on renaming and substitution.
+We have now finished all the computational parts of the instanciation, but all
+the proofs are left to be done. Before attacking the OGS-specific hypotheses,
+we will need to prove the usual standard lemmata on renaming and substitution.
 
-There will be a stack of lemmata which will all pretty much be simple inductions on the syntax,
-so we start by introducing some helpers for this. In fact it is not completely direct to do
-since terms and values are mutually defined: we will need to derive a mutual induction principle.
+There will be a stack of lemmata which will all pretty much be simple
+inductions on the syntax, so we start by introducing some helpers for this. In
+fact it is not completely direct to do since terms and values are mutually
+defined: we will need to derive a mutual induction principle.
 |*)
 Scheme term_mut := Induction for term Sort Prop
    with val_mut := Induction for val Sort Prop .
 (*|
-Annoyingly, Coq treats this mutual induction principle as two separate induction principles. They
-both have the exact same premises but differ in their conclusion. Thus we define a datatype for
-these premises, to avoid duplicating the proofs. Additionally, evaluation contexts are not
-defined mutually with terms and values, but it doesn't hurt to prove their properties
-simultaneously too, so `syn_ind_args` is in fact closer to the premises of a three-way mutual
-induction principle between terms, values and evaluation contexts.
+Annoyingly, Coq treats this mutual induction principle as two separate
+induction principles. They both have the exact same premises but differ in
+their conclusion. Thus we define a datatype for these premises, to avoid
+duplicating the proofs. Additionally, evaluation contexts are not defined
+mutually with terms and values, but it doesn't hurt to prove their properties
+simultaneously too, so `syn_ind_args` is in fact closer to the premises of
+a three-way mutual induction principle between terms, values and evaluation
+contexts.
 |*)
 Record syn_ind_args (P_t : forall Γ A, term Γ A -> Prop)
                     (P_v : forall Γ A, val Γ A -> Prop)
@@ -408,16 +435,23 @@ Lemma ctx_ind_mut P_t P_v P_e (H : syn_ind_args P_t P_v P_e) Γ a π : P_e Γ a 
   - apply (ind_karg _ _ _ H); auto; apply (val_ind_mut _ _ _ H).
 Qed.
 (*|
-Now equipped we can start with the first lemma: renaming respects pointwise equality of assignments.
-As discussed, we will prove this by mutual induction on our three "base" syntactic categories of terms, values
-and evaluation contexts, and then we will also deduce it for the three "derived" notions of machine values,
-states and assigments. Sometimes some of the derived notions will be omitted if it is not needed later on.
+Now equipped we can start with the first lemma: renaming respects pointwise
+equality of assignments. As discussed, we will prove this by mutual induction
+on our three "base" syntactic categories of terms, values and evaluation
+contexts, and then we will also deduce it for the three "derived" notions of
+machine values, states and assigments. Sometimes some of the derived notions
+will be omitted if it is not needed later on.
 
-This proof, like all the following ones will follow a simple pattern: a simplification; an application of congruence; a fixup for the two-time shifted assigment in the case of λ; finally a call to the induction
+This proof, like all the following ones will follow a simple pattern:
+a simplification; an application of congruence; a fixup for the two-time
+shifted assigment in the case of λ; finally a call to the induction
 hypothesis.
 
-.. note:: Here is definitely where the generic syntax traversal kit of Guillaume Allais et al would shine.
-   Indeed the proof pattern i outlined can really be formalized into a generic proof.
+.. note:: Here is definitely where the generic syntax traversal kit of
+   Guillaume Allais et al would shine. Indeed the proof pattern i outlined can
+   really be formalized into a generic proof.
+
+..
 |*)
 Definition t_ren_proper_P Γ a (t : term Γ a) : Prop :=
   forall Δ (f1 f2 : Γ ⊆ Δ), f1 ≡ₐ f2 -> f1 ᵣ⊛ₜ t = f2 ᵣ⊛ₜ t .
@@ -463,8 +497,9 @@ Qed.
   unfold s_map; now rewrite H.
 Qed.
 (*|
-Lemma 2: renaming-renaming assocativity. I say "associativity" because it definitely looks like associativity if
-we disregard the subscripts. More precisely it could be described as the composition law a right action.
+Lemma 2: renaming-renaming assocativity. I say "associativity" because it
+definitely looks like associativity if we disregard the subscripts. More
+precisely it could be described as the composition law a right action.
 |*)
 Definition t_ren_ren_P Γ1 a (t : term Γ1 a) : Prop :=
   forall Γ2 Γ3 (f1 : Γ2 ⊆ Γ3) (f2 : Γ1 ⊆ Γ2),
@@ -532,9 +567,9 @@ Lemma s_ren_id_l {Γ} (s : state Γ) : r_id ᵣ⊛ₛ s = s .
   destruct s; apply (f_equal2 Cut); [ now apply t_ren_id_l | now apply e_ren_id_l ].
 Qed.
 (*|
-Lemma 4: right identity law of renaming. This one basically holds definitionally, it only needs
-a case split for some of the derived notions. We will also prove a consequence on weakenings:
-identity law.
+Lemma 4: right identity law of renaming. This one basically holds
+definitionally, it only needs a case split for some of the derived notions. We
+will also prove a consequence on weakenings: identity law.
 |*)
 Lemma m_ren_id_r {Γ Δ} (f : Γ ⊆ Δ) {a} (i : Γ ∋ a) : f ᵣ⊛ₘ a_id a i = a_id a (f a i) .
   now destruct a.
@@ -709,7 +744,8 @@ Lemma a_comp_id_l {Γ1 Γ2} (a : Γ1 =[val_m]> Γ2) : a_id ⊛ a ≡ₐ a .
   intros ? ?; now apply m_sub_id_l.
 Qed.
 (*|
-Lemma 9: right identity law of substitution. As for renaming, this one is mostly by definition.
+Lemma 9: right identity law of substitution. As for renaming, this one is
+mostly by definition.
 |*)
 Lemma m_sub_id_r {Γ1 Γ2} (f : Γ1 =[val_m]> Γ2) {a} (i : Γ1 ∋ a) : f ⊛ₘ a_id a i = f a i.
   now destruct a.
@@ -947,3 +983,11 @@ Theorem stlc_ciu_correct Δ {Γ a} (x y : term Γ a) : ⟦ x ⟧ₜ ≈[ogs Δ ]
   intros H σ k; rewrite 2 sub_csk_p.
   now apply stlc_subst_correct.
 Qed.
+(*|
+.. [AACMM21] Guillaume Allais et al, "A type- and scope-safe universe of
+   syntaxes with binding: their semantics and proofs", 2021.
+.. [FS22] Marcelo Fiore & Dmitrij Szamozvancev, "Formal Metatheory of
+   Second-Order Abstract Syntax", 2022.
+.. [L05] Soren Lassen, "Eager Normal Form Bisimulation", 2005.
+
+|*)
