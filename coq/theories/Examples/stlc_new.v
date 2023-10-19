@@ -818,22 +818,24 @@ Qed.
 The Actual Instance
 -------------------
 
-Having proved all the basic syntactic properties of STLC, we are now ready to instanciate
-our framework!
+Having proved all the basic syntactic properties of STLC, we are now ready to
+instanciate our framework!
 |*)
 From OGS.OGS Require Import Spec.
 (*|
-As we only have negative types, we instanciate the interaction specification with types and observations.
-Beware that in more involved cases, the notion of "types" we give to the interaction specification does not
-coincide with the "language types": you should only give the "non-shareable types".
+As we only have negative types, we instanciate the interaction specification
+with types and observations. Beware that in more involved cases, the notion of
+"types" we give to the interaction specification does not coincide with the
+"language types": you should only give the "non-shareable types".
 |*)
 Definition stlc_spec : interaction_spec :=
   {| typ := ty ;
      msg := obs ;
      dom := @obs_dom |} .
 (*|
-As hinted at the beginning, we instanciate the abstract value notion with our "machine values". They form
-a suitable monoid, which means we get a category of assigments.
+As hinted at the beginning, we instanciate the abstract value notion with our
+"machine values". They form a suitable monoid, which means we get a category
+of assigments.
 |*)
 Program Definition stlc_val : @lang_monoid stlc_spec :=
   {| val := val_m ;
@@ -846,8 +848,8 @@ Program Definition stlc_val_laws : @lang_monoid_laws stlc_spec stlc_val :=
      v_var_sub := @a_comp_id_l ;
      v_sub_sub := @a_comp_assoc |} .
 (*|
-Configurations are instanciated with our states, and what we have proved earlier amounts to showing they are
-a right-module on values.
+Configurations are instanciated with our states, and what we have proved
+earlier amounts to showing they are a right-module on values.
 |*)
 Program Definition stlc_conf : @lang_module stlc_spec stlc_val :=
   {| conf := state ;
@@ -858,9 +860,13 @@ Program Definition stlc_conf_laws : @lang_module_laws stlc_spec stlc_val stlc_co
      c_var_sub := @s_sub_id_l ;
      c_sub_sub := @s_sub_sub |} .
 (*|
-In our generic theorem, there is a finicky lemma that is the counter-part to the exclusion of any "infinite chit-chat" that one finds in other accounts of OGS and other game semantics. The way we have proved it
-requires a little bit more structure on values. Specifically, we need to show that the predicate "is_var" (that is, the fibers of `a_id`) is decidable, contractible and lifts from under renamings. These technicalities
-are easily shown by induction on values.
+In our generic theorem, there is a finicky lemma that is the counter-part to
+the exclusion of any "infinite chit-chat" that one finds in other accounts of
+OGS and other game semantics. The way we have proved it requires a little bit
+more structure on values. Specifically, we need to show that `a_id` is
+injective and that its fibers are decidable and invert renamings. These
+technicalities are easily shown by induction on values but help us to
+distinguish conveniently between values which are variables and others.
 |*)
 Definition stlc_var_laws : @var_assumptions stlc_spec stlc_val .
   econstructor; intros.
@@ -872,17 +878,21 @@ Definition stlc_var_laws : @var_assumptions stlc_spec stlc_val .
     all: refine (h ,' eq_refl).
 Defined.
 (*|
-We now instanciate the machine with `stlc_eval` as the active step ("compute the next observable action") and `obs_app` as the passive step ("resume from a stuck state").
+We now instanciate the machine with `stlc_eval` as the active step ("compute
+the next observable action") and `obs_app` as the passive step ("resume from
+a stuck state").
 |*)
 Program Definition stlc_machine : @machine stlc_spec stlc_val stlc_conf :=
   {| Spec.eval := @stlc_eval ;
      Spec.app := @obs_app |} .
 (*|
-All that is left is to prove our theorem-specific hypotheses. All but another technical lemma for the chit-chat
-problem are again coherence conditions between `eval` and `app` and the monoidal structure of values and
+All that is left is to prove our theorem-specific hypotheses. All but another
+technical lemma for the chit-chat problem are again coherence conditions
+between `eval` and `app` and the monoidal structure of values and
 configurations.
 
-As some proofs will concern the evaluator we pull in some tooling for coinductive reasoning on the delay monad.
+As some proofs will concern the evaluator we pull in some tooling for
+coinductive reasoning on the delay monad.
 |*)
 From Coinduction Require Import coinduction lattice rel tactics.
 From OGS.ITree Require Import Eq.
@@ -899,11 +909,12 @@ The second one proves a commutation law of `obs_app` with renamings.
   - destruct x; dependent elimination m; cbn; f_equal.
 (*|
 The meat of our abstract proof is this next one. We need to prove that our
-evaluator respects substitution in a suitable sense: evaluating a substituted configuration
-must be the same thing as evaluating the configuration, then "substituting" the normal form and continuing the evaluation.
+evaluator respects substitution in a suitable sense: evaluating a substituted
+configuration must be the same thing as evaluating the configuration, then
+"substituting" the normal form and continuing the evaluation.
 
-While potentially scary, the proof is direct and this actually amount to checking that indeed,
-when unrolling our evaluator, this is what happens.
+While potentially scary, the proof is direct and this actually amount to
+checking that indeed, when unrolling our evaluator, this is what happens.
 |*)
   - revert c e; unfold comp_eq, it_eq; coinduction R CIH; intros c e.
     destruct c. cbn in e0.
@@ -930,8 +941,9 @@ when unrolling our evaluator, this is what happens.
     * cbn; econstructor.
       exact (CIH (Cut t1 (K1 t0 e0)) e).
 (*|
-Just like the above proof had the flavor of a composition law of module, this one has the flavor of an identity
-law. It states that evaluating a normal form is the identity computation.
+Just like the above proof had the flavor of a composition law of module, this
+one has the flavor of an identity law. It states that evaluating a normal form
+is the identity computation.
 |*)
   - destruct u as [ a [ i [ p γ ] ]].
     unfold nf_ty', nf_var', nf_val', a_id; cbn in *.
@@ -940,16 +952,20 @@ law. It states that evaluating a normal form is the identity computation.
     all: do 3 (unshelve econstructor; auto; cbn).
     all: intros ? h; do 3 (dependent elimination h; auto).
 (*|
-This last proof is the technical condition we hinted at. It is a proof of well-foundedness of some relation,
-and what it amounts to is that if we repeatedly instantiate the head variable of a normal form by a value which
-is not a variable, after a finite number of times doing so we will eventually reach something that is not
-a normal form.
+This last proof is the technical condition we hinted at. It is a proof of
+well-foundedness of some relation, and what it amounts to is that if we
+repeatedly instantiate the head variable of a normal form by a value which is
+not a variable, after a finite number of times doing so we will eventually
+reach something that is not a normal form.
 
-For our calculus this number is at most 2, the pathological state being `⟨ x | y ⟩`, which starts by being stuck
-on `y`, but when instanciating by some non-variable `π`, `⟨ x | π ⟩` is still stuck, this time on `x`. After
-another step it will definitely be unstuck and evaluation will be able to do a reduction step.
+For our calculus this number is at most 2, the pathological state being
+`⟨ x | y ⟩`, which starts by being stuck on `y`, but when instanciating by
+some non-variable `π`, `⟨ x | π ⟩` is still stuck, this time on `x`. After
+another step it will definitely be unstuck and evaluation will be able to do
+a reduction step.
 
-It is slightly tedious to prove but amount again to a "proof by case splitting".
+It is slightly tedious to prove but amount again to a "proof by case
+splitting".
 |*)
   - intros [ x p ].
     destruct x; dependent elimination p; econstructor.
@@ -983,35 +999,40 @@ It is slightly tedious to prove but amount again to a "proof by case splitting".
         inversion_sigma r_rel; inversion r_rel1.
 Qed.
 (*|
-At this point we have finished all the hard work! We already enjoy the generic correctness theorem but
-don't know it yet! Lets define some shorthands for some generic notions applied to our case, to make it a
-welcoming nest.
+At this point we have finished all the hard work! We already enjoy the generic
+correctness theorem but don't know it yet! Lets define some shorthands for
+some generic notions applied to our case, to make it a welcoming nest.
 
-The whole semantic is parametrized by typing scope `Δ` of "final channels". Typically this can be
-instanciated with the singleton `[ ¬ ans ]` for some chosen type `ans`, which will correspond with the
-outside type of the testing-contexts from CIU-equivalence. Usually this answer type is taken among the
-positive (or shareable) types of our language, but in fact using our observation machinery we can
-project the value of any type onto its "shareable part". This is why our generic proof abstracts over
-this answer type and even allows several of them at the same time (that is, `Δ`). In our case, as all
-types in our language are unshareable, the positive part of any value is pretty useless: it is always a
-singleton. Yet our notion of testing still distinguishes terminating from non-terminating programs.
+The whole semantic is parametrized by typing scope `Δ` of "final channels".
+Typically this can be instanciated with the singleton `[ ¬ ans ]` for some
+chosen type `ans`, which will correspond with the outside type of the
+testing-contexts from CIU-equivalence. Usually this answer type is taken among
+the positive (or shareable) types of our language, but in fact using our
+observation machinery we can project the value of any type onto its "shareable
+part". This is why our generic proof abstracts over this answer type and even
+allows several of them at the same time (that is, `Δ`). In our case, as all
+types in our language are unshareable, the positive part of any value is
+pretty useless: it is always a singleton. Yet our notion of testing still
+distinguishes terminating from non-terminating programs.
 
-Our first shorthand is this generic `eval_to_msg`, which postcomposes the evaluation with projection
-onto the observation.
+Our first shorthand is this generic `eval_to_msg`, which postcomposes the
+evaluation with projection onto the observation.
 |*)
 Definition eval_to_obs {Γ : t_ctx} : state Γ -> delay (@msg' stlc_spec Γ) :=
   @eval_to_msg stlc_spec stlc_val stlc_conf stlc_machine Γ .
 (*|
-As discussed in the paper, the "native output" of the generic theorem is correctness with respect to
-an equivalence we call "substitution equivalence". We will recover a more standard CIU later on.
+As discussed in the paper, the "native output" of the generic theorem is
+correctness with respect to an equivalence we call "substitution equivalence".
+We will recover a more standard CIU later on.
 |*)
 Definition subst_eq Δ {Γ} : relation (state Γ) :=
   fun u v => forall σ : Γ =[val_m]> Δ, eval_to_obs (σ ⊛ₛ u) ≈ eval_to_obs (σ ⊛ₛ v) .
 Notation "x ≈[sub Δ ]≈ y" := (subst_eq Δ x y) (at level 10).
 (*|
-Our semantic objects live in what is defined in the generic construction as `ogs_act`, that is active strategies
-for the OGS game. They come with their own notion of equivalence, weak bisimilarity and we get to interpret
-states into semantic objects.
+Our semantic objects live in what is defined in the generic construction as
+`ogs_act`, that is active strategies for the OGS game. They come with their
+own notion of equivalence, weak bisimilarity and we get to interpret states
+into semantic objects.
 |*)
 Definition sem_act Δ Γ := @ogs_act stlc_spec Δ (∅ ▶ Γ) .
 
@@ -1035,23 +1056,25 @@ Qed.
 Recovering CIU-equivalence
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-CIU-equivalence more usually defined as a relation on terms (and not some states), and involves an evaluation
-context. In our formalism it amounts to the following definition.
+CIU-equivalence more usually defined as a relation on terms (and not some
+states), and involves an evaluation context. In our formalism it amounts to
+the following definition.
 |*)
 Definition ciu_eq Δ {Γ a} : relation (term Γ a) :=
   fun u v => forall (σ : Γ =[val_m]> Δ) (π : ev_ctx Δ a),
       eval_to_obs (Cut (σ ⊛ₜ u) π) ≈ eval_to_obs (Cut (σ ⊛ₜ v) π) .
 Notation "x ≈[ciu Δ ]≈ y" := (ciu_eq Δ x y) (at level 10).
 (*|
-Now from a term we can always construct a state by naming it, that is, placing the term opposite of a fresh
-context variable.
+Now from a term we can always construct a state by naming it, that is, placing
+the term opposite of a fresh context variable.
 |*)
 Definition c_init {Γ a} (t : term Γ a) : state (Γ ▶ ¬ a)
   := Cut (t_shift _ t) (K0 Ctx.top) .
 Notation "⟦ t ⟧ₜ" := (⟦ c_init t ⟧ₛ) .
 (*|
-Similarly, from an evaluation context and a substitution, we can form an extended substitution. Without
-surprise these two constructions simplify well in terms of substitution.
+Similarly, from an evaluation context and a substitution, we can form an
+extended substitution. Without surprise these two constructions simplify well
+in terms of substitution.
 |*)
 Definition a_of_sk {Γ Δ a} (σ : Γ =[val_m]> Δ) (π : ev_ctx Δ a)
   : (Γ ▶ ¬ a) =[val_m]> Δ := σ ▶ₐ (π : val_m _ (¬ _)) .
@@ -1061,9 +1084,9 @@ Lemma sub_init {Γ Δ a} (t : term Γ a) (σ : Γ =[val_m]> Δ) (π : ev_ctx Δ 
   cbn; unfold t_shift; now rewrite t_sub_ren.
 Qed.
 (*|
-We can now obtain a correctness theorem with respect to standard CIU-equivalence by embedding terms into
-states. Proving that CIU-equivalence entails our substitution equivalence is left to the
-reader!
+We can now obtain a correctness theorem with respect to standard
+CIU-equivalence by embedding terms into states. Proving that CIU-equivalence
+entails our substitution equivalence is left to the reader!
 |*)
 Theorem stlc_ciu_correct Δ {Γ a} (x y : term Γ a)
   : ⟦ x ⟧ₜ ≈[ogs Δ ]≈ ⟦ y ⟧ₜ -> x ≈[ciu Δ ]≈ y .
