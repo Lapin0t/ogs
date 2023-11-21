@@ -13,7 +13,6 @@
 **.cmx
 **.null
 **/_build
-*~
 **.v~
 **.log
 **.aux
@@ -24,4 +23,7 @@
 **.lia.cache
 **.out
 **.DS_Store
+**.run.xml
+**.bcf
+**.pdf
 *auto
