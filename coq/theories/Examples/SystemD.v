@@ -24,6 +24,7 @@ Inductive ty0 : pol -> Type :=
 | ShiftN : ty0 pos -> ty0 neg
 | NegP : ty0 neg -> ty0 pos
 | NegN : ty0 pos -> ty0 neg
+| List : ty0 pos -> ty0 pos
 .
 
 (*| .. coq:: none |*)
@@ -93,6 +94,9 @@ with whn : t_ctx -> ty -> Type :=
 | NegPL {Γ A} : state (Γ ▶ t- A) -> whn Γ (t- (⊖ A))
 | NegNR {Γ A} : state (Γ ▶ t+ A) -> whn Γ (t+ (¬ A))
 | NegNL {Γ A} : whn Γ (t+ A) -> whn Γ (t- (¬ A))
+| ListR1 {Γ A} : whn Γ (t+ (List A))
+| ListR2 {Γ A} : whn Γ (t+ A) -> whn Γ (t+ (List A)) -> whn Γ (t+ (List A))
+| ListL {Γ A} : state Γ -> state (Γ ▶ t+ A ▶ t+ (List A)) -> whn Γ (t- (List A))
 with state : t_ctx -> Type :=
 | Cut {Γ} p {A : ty0 p} : term Γ (t+ A) -> term Γ (t- A) -> state Γ
 .
@@ -141,6 +145,9 @@ with w_rename {Γ Δ} : Γ ⊆ Δ -> whn Γ ⇒ᵢ whn Δ :=
   w_rename f _ (NegPL c)     := NegPL (s_rename (r_shift f) c) ;
   w_rename f _ (NegNR c)     := NegNR (s_rename (r_shift f) c) ;
   w_rename f _ (NegNL v)     := NegNL (w_rename f _ v) ;
+  w_rename f _ (ListR1)      := ListR1 ;
+  w_rename f _ (ListR2 x xs) := ListR2 (w_rename f _ x) (w_rename f _ xs) ;
+  w_rename f _ (ListL c1 c2) := ListL (s_rename f c1) (s_rename (r_shift2 f) c2) ;
 with s_rename {Γ Δ} : Γ ⊆ Δ -> state Γ -> state Δ :=
    s_rename f (Cut _ v k) := Cut _ (t_rename f _ v) (t_rename f _ k) .
 
@@ -201,7 +208,31 @@ Equations t_of_v {Γ} : val Γ ⇒ᵢ term Γ :=
   t_of_v (@VTy neg _) u := u ;
   t_of_v (@KTy neg _) k := Whn k .
 
+
+Definition rev_append_core {A} : state (∅ ▶ t+ (List A) ▶ t+ (List A) ▶ t- (List A)) .
+  refine (Cut _ (Whn (Var (pop top))) _).
+  refine (Whn (ListL _ _)).
+  eapply Cut.
 (*  μx. ⟨ inr ( λy. μz. ⟨ inl z | x ⟩ ) | x ⟩    *)
+
+(*
+Definition LEM {a} : term ∅ (t+ (a ⊕ ↓ (¬ a))) .
+  refine (Mu (Cut _ _ _)); cycle 1.
+  exact (Whn (Var top)).
+  cbn.
+  apply Whn.
+  apply (OrR2 _).
+  - shelve.
+    - 
+  (Whn (Var top)))).
+  cbn.
+  refine Cut.
+
+  Mu (Cut (Val (Inr (RamLec (Cut (Val (Inl (VarP (pop top))))
+                                     (VarN (pop (pop (pop top))))))))
+           (Var top)) .
+*)
+
 (*
 Definition REM {a} : term ∅ (t+ (a + (a → Zer))) :=
   Mu (Cut (Val (Inr (RamLec (Cut (Val (Inl (VarP (pop top))))
@@ -290,6 +321,9 @@ with w_subst {Γ Δ} : Γ =[val]> Δ -> whn Γ ⇒ᵢ val Δ :=
   w_subst f _ (NegPL c)    := Whn (NegPL (s_subst (a_shift f) c)) ;
   w_subst f _ (NegNR c)    := Whn (NegNR (s_subst (a_shift f) c)) ;
   w_subst f _ (NegNL v)    := NegNL (w_subst f _ v) ;
+  w_subst f _ (ListR1)      := ListR1 ;
+  w_subst f _ (ListR2 x xs) := ListR2 (w_subst f _ x) (w_subst f _ xs) ;
+  w_subst f _ (ListL c1 c2) := Whn (ListL (s_subst f c1) (s_subst (a_shift2 f) c2)) ;
 with s_subst {Γ Δ} : Γ =[val]> Δ -> state Γ -> state Δ :=
    s_subst f (Cut p v k) := Cut p (t_subst f _ v) (t_subst f _ k) .
 
@@ -362,6 +396,8 @@ Inductive pat : ty -> Type :=
 | PShiftN A : pat (t- (↑ A))
 | PNegP {A} : pat (t- A) -> pat (t+ (⊖ A))
 | PNegN {A} : pat (t+ A) -> pat (t- (¬ A))
+| PList1 {A} : pat (t+ (List A))
+| PList2 {A} : pat (t+ A) -> pat (t+ (List A)) -> pat (t+ (List A))
 .
 
 Equations p_dom {t} : pat t -> neg_ctx :=  
@@ -378,7 +414,9 @@ Equations p_dom {t} : pat t -> neg_ctx :=
   p_dom (PShiftP A)  := ∅ₛ ▶ₛ {| sub_elt := t+ A ; sub_prf := stt |} ;
   p_dom (PShiftN A)  := ∅ₛ ▶ₛ {| sub_elt := t- A ; sub_prf := stt |} ;
   p_dom (PNegP p)    := p_dom p ;
-  p_dom (PNegN p)    := p_dom p .
+  p_dom (PNegN p)    := p_dom p ;
+  p_dom (PList1)     := ∅ₛ ;
+  p_dom (PList2 p1 p2) := p_dom p1 +▶ₛ p_dom p2 .
 
 Definition pat' (Γ : t_ctx) : Type := sigT (fun A => prod (Γ ∋ A) (pat (t_neg A))).
 Definition p_dom' Γ : pat' Γ -> neg_ctx := fun p => p_dom (snd (projT2 p)).
@@ -397,7 +435,9 @@ Equations w_of_p {a} (p : pat a) : whn (p_dom p) a :=
   w_of_p (PShiftP _)  := ShiftPR (Whn (Var top)) ;
   w_of_p (PShiftN _)  := ShiftNL (Whn (Var top)) ;
   w_of_p (PNegP p)    := NegPR (w_of_p p) ;
-  w_of_p (PNegN p)    := NegNL (w_of_p p) .
+  w_of_p (PNegN p)    := NegNL (w_of_p p) ;
+  w_of_p (PList1)     := ListR1 ;
+  w_of_p (PList2 p1 p2) := ListR2 (w_rename r_concat_l _ (w_of_p p1)) (w_rename r_concat_r _ (w_of_p p2)) .
 
 #[derive(eliminator=no)]
 Equations p_of_w_0p {Γ : neg_ctx} (A : ty0 pos) : whn Γ (t+ A) -> pat (t+ A) :=
@@ -407,12 +447,15 @@ Equations p_of_w_0p {Γ : neg_ctx} (A : ty0 pos) : whn Γ (t+ A) -> pat (t+ A) :
   p_of_w_0p (A ⊕ B) (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_of_w_0p (↓ A)  (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_of_w_0p (⊖ A)   (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
+  p_of_w_0p (List A) (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_of_w_0p (1)     (OneR)       := POne ;
   p_of_w_0p (A ⊗ B) (TenR v1 v2) := PTen (p_of_w_0p A v1) (p_of_w_0p B v2) ;
   p_of_w_0p (A ⊕ B) (OrR1 v)     := POr1 (p_of_w_0p A v) ;
   p_of_w_0p (A ⊕ B) (OrR2 v)     := POr2 (p_of_w_0p B v) ;
   p_of_w_0p (↓ A)  (ShiftPR _)  := PShiftP A ;
   p_of_w_0p (⊖ A)   (NegPR k)    := PNegP (p_of_w_0n A k) ;
+  p_of_w_0p (List A) (ListR1)    := PList1 ;
+  p_of_w_0p (List A) (ListR2 x xs) := PList2 (p_of_w_0p A x) (p_of_w_0p (List A) xs)
 with p_of_w_0n {Γ : neg_ctx} (A : ty0 neg) : whn Γ (t- A) -> pat (t- A) :=
   p_of_w_0n (⊤)     (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_of_w_0n (⊥)     (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
@@ -434,20 +477,23 @@ Equations p_of_v {Γ : neg_ctx} A : val Γ A -> pat A :=
   p_of_v (@KTy neg A) k := p_of_w_0n A k .
 
 #[derive(eliminator=no)]
-Equations p_dom_of_w_0p {Γ : neg_ctx} (A : ty0 pos) (v : whn Γ (t+ A)) : p_dom (p_of_w_0p A v) =[val]> Γ by struct A :=
+Equations p_dom_of_w_0p {Γ : neg_ctx} (A : ty0 pos) (v : whn Γ (t+ A)) : p_dom (p_of_w_0p A v) =[val]> Γ by struct v :=
   p_dom_of_w_0p (0)     (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0p (1)     (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0p (A ⊗ B) (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0p (A ⊕ B) (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0p (↓ A)  (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0p (⊖ A)   (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
+  p_dom_of_w_0p (List A) (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0p (1)     (OneR)       := s_empty ;
   p_dom_of_w_0p (A ⊗ B) (TenR v1 v2) := [ p_dom_of_w_0p A v1 , p_dom_of_w_0p B v2 ] ;
   p_dom_of_w_0p (A ⊕ B) (OrR1 v)     := p_dom_of_w_0p A v ;
   p_dom_of_w_0p (A ⊕ B) (OrR2 v)     := p_dom_of_w_0p B v ;
   p_dom_of_w_0p (↓ A)  (ShiftPR x)  := s_append s_empty x ;
   p_dom_of_w_0p (⊖ A)   (NegPR k)    := p_dom_of_w_0n A k ;
-with p_dom_of_w_0n {Γ : neg_ctx} (A : ty0 neg) (k : whn Γ (t- A)) : p_dom (p_of_w_0n A k) =[val]> Γ by struct A :=
+  p_dom_of_w_0p (List A) (ListR1)    := s_empty ;
+  p_dom_of_w_0p (List A) (ListR2 x xs) := [ p_dom_of_w_0p A x , p_dom_of_w_0p (List A) xs ] ;
+with p_dom_of_w_0n {Γ : neg_ctx} (A : ty0 neg) (k : whn Γ (t- A)) : p_dom (p_of_w_0n A k) =[val]> Γ by struct k :=
   p_dom_of_w_0n (⊤)     (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0n (⊥)     (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0n (A ⅋ B) (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
@@ -553,7 +599,9 @@ Equations eval_aux {Γ : neg_ctx} : state Γ -> (state Γ + nf Γ) :=
   eval_aux (Cut pos (Whn (ShiftPR x))  (Whn (ShiftPL c)))  := inl (c ₛ/[ Whn (ShiftPL c) , x ]) ;
   eval_aux (Cut neg (Whn (ShiftNR c))  (Whn (ShiftNL x)))  := inl (c ₛ/[ Whn (ShiftNR c) , x ]) ;
   eval_aux (Cut pos (Whn (NegPR k))    (Whn (NegPL c)))    := inl (c ₛ/[ k ]) ;
-  eval_aux (Cut neg (Whn (NegNR c))    (Whn (NegNL v)))    := inl (c ₛ/[ v ]) .
+  eval_aux (Cut neg (Whn (NegNR c))    (Whn (NegNL v)))    := inl (c ₛ/[ v ]) ;
+  eval_aux (Cut pos (Whn (ListR1))     (Whn (ListL c1 c2))) := inl c1 ;
+  eval_aux (Cut pos (Whn (ListR2 x xs)) (Whn (ListL c1 c2))) := inl (c2 ₛ/[ x , xs ]) .
 
 Definition eval {Γ : neg_ctx} : state Γ -> delay (nf Γ)
   := iter_delay (fun c => Ret' (eval_aux c)).
@@ -606,6 +654,9 @@ Record syn_ind_args
     ind_negpl : forall Γ A s (H : P_s _ s), P_w Γ (t- (⊖ A)) (NegPL s) ;
     ind_negnr : forall Γ A s (H : P_s _ s), P_w Γ (t+ (¬ A)) (NegNR s) ;
     ind_negnl : forall Γ A w (H : P_w _ _ w), P_w Γ (t- (¬ A)) (NegNL w) ;
+    ind_listr1 : forall Γ A, P_w Γ (t+ (List A)) (ListR1) ;
+    ind_listr2 : forall Γ A x (H1 : P_w _ _ x) xs (H2 : P_w _ _ xs), P_w Γ (t+ (List A)) (ListR2 x xs) ;
+    ind_listl : forall Γ A s1 (H1 : P_s _ s1) s2 (H2 : P_s _ s2), P_w Γ (t- (List A)) (ListL s1 s2) ;
     ind_cut : forall Γ p A t1 (H1 : P_t _ _ t1) t2 (H2 : P_t _ _ t2), P_s Γ (@Cut _ p A t1 t2)
   } .
 
@@ -1146,6 +1197,18 @@ Lemma refold_id_aux {Γ p} A : refold_id_aux_P Γ p A .
   - dependent elimination v.
     pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
     exact (f_equal NegNL (IHA w8)).
+  - dependent induction v.
+    pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
+    reflexivity.
+    simp p_dom_of_w_0p.
+    change (w_subst _ _ _) with
+      (w_subst ([ p_dom_of_w_0p A v1 , p_dom_of_w_0p (List A) v2 ]) _
+         (ListR2 (w_rename r_concat_l _ (w_of_p (p_of_w_0p A v1)))
+                 (w_rename r_concat_r _ (w_of_p (p_of_w_0p (List A) v2))))); cbn.
+    rewrite 2 w_sub_ren.
+    erewrite (w_sub_eq _ _ (s_eq_cat_l _ _)); auto.
+    erewrite (w_sub_eq _ _ (s_eq_cat_r _ _)); auto.
+    f_equal; [ apply IHA | now apply IHv2 ].
 Qed.
 
 Lemma refold_id {Γ : neg_ctx} A (v : val Γ A)
