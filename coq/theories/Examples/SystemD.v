@@ -135,8 +135,8 @@ with w_rename {Γ Δ} : Γ ⊆ Δ -> whn Γ ⇒ᵢ whn Δ :=
   w_rename f _ (BotL)        := BotL ;
   w_rename f _ (TenR v1 v2)  := TenR (w_rename f _ v1) (w_rename f _ v2) ;
   w_rename f _ (TenL c)      := TenL (s_rename (r_shift2 f) c) ;
-  w_rename f _ (ParR c)     := ParR (s_rename (r_shift2 f) c) ;
-  w_rename f _ (ParL k1 k2) := ParL (w_rename f _ k1) (w_rename f _ k2) ;
+  w_rename f _ (ParR c)      := ParR (s_rename (r_shift2 f) c) ;
+  w_rename f _ (ParL k1 k2)  := ParL (w_rename f _ k1) (w_rename f _ k2) ;
   w_rename f _ (OrR1 v)      := OrR1 (w_rename f _ v) ;
   w_rename f _ (OrR2 v)      := OrR2 (w_rename f _ v) ;
   w_rename f _ (OrL c1 c2)   := OrL (s_rename (r_shift f) c1) (s_rename (r_shift f) c2) ;
@@ -166,12 +166,12 @@ Equations v_rename {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ :=
 Definition a_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 =[val]> Γ2 -> Γ1 =[val]> Γ3 :=
   fun f g _ i => v_rename f _ (g _ i) .
 
-Definition t_shift  {Γ} [y] : term Γ ⇒ᵢ term (Γ ▶ y)  := @t_rename _ _ s_pop.
+Definition t_shift {Γ} [y] : term Γ ⇒ᵢ term (Γ ▶ y)  := @t_rename _ _ s_pop.
 Definition w_shift {Γ} [y] : whn Γ ⇒ᵢ whn (Γ ▶ y)  := @w_rename _ _ s_pop.
-Definition s_shift  {Γ} [y] : state Γ -> state (Γ ▶ y) := @s_rename _ _ s_pop.
-Definition v_shift  {Γ} [y] : val Γ ⇒ᵢ val (Γ ▶ y)    := @v_rename _ _ s_pop.
-Definition v_shift2  {Γ} [y z] : val Γ ⇒ᵢ val (Γ ▶ y ▶ z)  := @v_rename _ _ (s_pop ⊛ᵣ s_pop).
-Definition v_shift3  {Γ} [x y z] : val Γ ⇒ᵢ val (Γ ▶ x ▶ y ▶ z)  := @v_rename _ _ (s_pop ⊛ᵣ s_pop ⊛ᵣ s_pop).
+Definition s_shift {Γ} [y] : state Γ -> state (Γ ▶ y) := @s_rename _ _ s_pop.
+Definition v_shift {Γ} [y] : val Γ ⇒ᵢ val (Γ ▶ y)    := @v_rename _ _ s_pop.
+Definition v_shift2 {Γ} [y z] : val Γ ⇒ᵢ val (Γ ▶ y ▶ z)  := @v_rename _ _ (s_pop ⊛ᵣ s_pop).
+Definition v_shift3 {Γ} [x y z] : val Γ ⇒ᵢ val (Γ ▶ x ▶ y ▶ z)  := @v_rename _ _ (s_pop ⊛ᵣ s_pop ⊛ᵣ s_pop).
 
 Definition a_shift {Γ Δ} [y] (a : Γ =[val]> Δ) : (Γ ▶ y) =[val]> (Δ ▶ y) :=
   s_append (fun _ i => v_shift _ (a _ i)) (s_var _ top).
@@ -184,6 +184,8 @@ Definition a_shift3 {Γ Δ} [x y z] (a : Γ =[val]> Δ) : (Γ ▶ x ▶ y ▶ z)
                         (s_var _ (pop (pop top))))
               (s_var _ (pop top)))
     (s_var _ top).
+
+Module example_terms.
 
 Definition sum_shift_to {Γ A B} (u : term Γ (t+ (A ⊕ B))) : term Γ (t+ ↑A ⅋ ↑B).
   apply Whn, ParR.
@@ -205,28 +207,28 @@ Definition sum_shift_from {Γ A B} (u : term Γ (t+ ↑A ⅋ ↑B)) : term Γ (t
     eapply Cut; [ eapply Whn, OrR2, Var, top | apply Whn, Var, pop, top ].
 Defined.
 
-Definition ex_LEM_p {A : ty0 pos} : term ∅ (t+ ↑A ⅋ ¬A) .
+Definition LEM_p {A : ty0 pos} : term ∅ (t+ ↑A ⅋ ¬A) .
   apply Whn, ParR.
   eapply Cut; [ eapply Whn, ShiftNR | apply Whn, Var, pop, top ].
   eapply Cut; [ eapply Whn, NegNR | apply Whn, Var, pop, top ].
   eapply Cut; [ apply Whn, Var, top | apply Whn, Var, pop, top ].
 Defined.
 
-Definition ex_LEM_n {A : ty0 neg} : term ∅ (t+ (A ⅋ ↑⊖A)) .
+Definition LEM_n {A : ty0 neg} : term ∅ (t+ (A ⅋ ↑⊖A)) .
   apply Whn, ParR.
   eapply Cut; [ eapply Whn, ShiftNR | eapply Whn, Var, top ].
   eapply Cut; [ eapply Whn, NegPR, Var, pop, pop, top | eapply Whn, Var, top ].
 Defined.
 
-Definition ex_fun_lambda {Γ A B} (u : state (Γ ▶ t- B ▶ t+ A)) : term Γ (t+ (A → B)).
+Definition fun_lambda {Γ A B} (u : state (Γ ▶ t- B ▶ t+ A)) : term Γ (t+ (A → B)).
   apply Whn, ParR.
   refine (Cut _ _ (Whn (Var (pop top)))).
   apply Whn,NegNR.
   refine (s_rename (r_shift2 s_pop) u).
 Defined.
 
-Definition ex_fun_id {Γ A} : term Γ (t+ (A → ↑ A)).
-  apply ex_fun_lambda.
+Definition fun_id {Γ A} : term Γ (t+ (A → ↑ A)).
+  apply fun_lambda.
   refine (Cut _ (Whn (ShiftNR _)) (Whn (Var (pop top)))).
   refine (Cut _ (Whn (Var (pop top))) (Whn (Var top))).
 Defined.
@@ -237,9 +239,9 @@ match xs with
 | [] => ys
 | x :: xs => rev_append xs (x :: ys)
 *)
-Definition ex_rev_append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
+Definition rev_append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
   (* intro recursive function *)
-  apply RecR, ex_fun_lambda.
+  apply RecR, fun_lambda.
   (* destruct arg *)
   refine (Cut _ (Whn (Var top)) (Whn (TenL _))); apply (s_rename (r_shift2 s_pop)).
   (* match on first arg *)
@@ -256,16 +258,16 @@ Definition ex_rev_append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A))
     + apply Var, pop, pop, pop, top.
 Defined.
 
-Definition ex_reverse_tailrec {A} : term ∅ (t+ (List A → ↑List A)).
-  apply ex_fun_lambda.
-  refine (Cut _ ex_rev_append _).
+Definition reverse_tailrec {A} : term ∅ (t+ (List A → ↑List A)).
+  apply fun_lambda.
+  refine (Cut _ rev_append _).
   apply Whn, ParL.
   - apply NegNL, TenR; [ apply ListR1 | apply Var, top ].
   - apply Var, pop, top.
 Defined.
 
-Definition ex_reverse {Γ A} : term Γ (t+ (List A → ↑List A)).
-  apply RecR, ex_fun_lambda.
+Definition reverse {Γ A} : term Γ (t+ (List A → ↑List A)).
+  apply RecR, fun_lambda.
   apply (Cut _ (Whn (Var top))), Whn, w_shift, ListL.
   - refine (Cut _ (Whn (ShiftNR _)) (Whn (Var top))).
     refine (Cut _ (Whn ListR1) (Whn (Var top))).
@@ -277,8 +279,8 @@ Definition ex_reverse {Γ A} : term Γ (t+ (List A → ↑List A)).
       refine (Cut _ (Whn (ListR2 (Var (pop (pop top))) (Var (pop top)))) (Whn (Var top))).
 Defined.
 
-Definition ex_append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
-  apply RecR, ex_fun_lambda.
+Definition append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
+  apply RecR, fun_lambda.
   refine (Cut _ (Whn (Var top)) (Whn (TenL _))); apply (s_rename (r_shift2 s_pop)).
   apply (Cut _ (Whn (Var (pop top)))), Whn, (w_rename (r_shift s_pop)), ListL.
   - refine (Cut _ (Whn (ShiftNR _)) (Whn (Var (pop top)))); apply (s_rename (r_shift2 s_pop)).
@@ -291,8 +293,22 @@ Definition ex_append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
       refine (Cut _ (Whn (ListR2 (Var (pop (pop top))) (Var (pop top)))) (Whn (Var top))).
 Defined.
 
+Definition rev_append_slow {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
+  apply fun_lambda.
+  eapply (Cut _ (Whn (Var top))), Whn, TenL, (s_rename (r_shift2 s_pop)).
+  eapply (Cut _ reverse), Whn, ParL.
+  - apply NegNL, Var, top.
+  - apply w_shift, ShiftNL, Mu; cbn.
+    eapply (Cut _ append), Whn, ParL; [ | apply Var, pop, pop, top ].
+    apply NegNL, TenR.
+    + apply Var, pop, top.
+    + apply Var, top.
+Defined.
+
 Set Printing Depth 50.
-Eval cbv in ex_reverse.
+Eval cbv in reverse.
+
+End example_terms.
 
 (*
 Definition t_shift_n {Γ} ts : term Γ ⇒ᵢ term (Γ +▶ ts).
