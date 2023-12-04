@@ -261,32 +261,59 @@ aka
 
 rec rev_append.
   λ[¬(xs,ys), ↑α].
-    ⟨ xs ∥ (nil)       ⇒ ⟨ ys ∥ α ⟩
-           (cons x xs) ⇒ ⟨ rev_append ∥ [¬(xs, cons x ys), ↑α] ⟩ ⟩
+    ⟨ xs ∥ (nil)         ⇒ ⟨ ys ∥ α ⟩
+           (cons x' xs') ⇒ ⟨ rev_append ∥ [¬(xs', cons x' ys), ↑α] ⟩ ⟩
 
-actually in the second case branch, we repackage the α inside a thunk, so we didn't have to unpack it
-in the first place. So the comatching of the thunk is moved to only happen in the first branch:  
+actually in the second case branch, we repackage the α inside a shift, so we didn't have to unpack it
+in the first place. So the comatch of the thunk is moved to only happen in the first branch:  
 
 rec rev_append.
-  λ[ ¬(xs,ys), α ].
-    ⟨ xs ∥ (nil)       ⇒ ⟨ λ[↑r].⟨ ys ∥ r ⟩ ∥ α ⟩
-           (cons x xs) ⇒ ⟨ rev_append ∥ [ ¬(xs, cons x ys) , α ] ⟩ ⟩
+  λ[¬(xs,ys), α].
+    ⟨ xs ∥ (nil)         ⇒ ⟨ λ[↑r].⟨ ys ∥ r ⟩ ∥ α ⟩
+           (cons x' xs') ⇒ ⟨ rev_append ∥ [¬(xs', cons x' ys), α] ⟩ ⟩
 
 We are happy since in the recursive case, we do not touch the return
 pointer/continuation channel α: this is an efficient tail-call, effectively
 a jump.
 
-desugaring deep pattern-matching is tedious but straightforward, in
-the end it looks like this:
+desugaring deep pattern-matching is tedious but straightforward, and we
+can also annotate the polarity in cuts. in the end it looks like this:
 
-rec rev_append.
-  λ[n,α].
-    ⟨ λ[¬p].
-      ⟨ λ[xs,ys].
-        ⟨ xs ∥ (nil)       ⇒ ⟨ λ[↑r]. ⟨ ys ∥ r ⟩ ∥ α ⟩
-               (cons x xs) ⇒ ⟨ rev_append ∥ [ ¬(xs, cons x ys), α ] ⟩ ⟩
-      ∥ p ⟩
-    ∥ n ⟩
+rec rev_append. λ[n,α].
+ ⟨ λ[¬p].
+   ⟨ p |+| λ[xs,ys]. ⟨ xs |+| (nil)         ⇒ ⟨ λ[↑r]. ⟨ ys |+| r ⟩ |-| α ⟩
+                              (cons x' xs') ⇒ ⟨ rev_append |-| [ ¬(xs', cons x' ys), α ] ⟩ ⟩ ⟩
+    |-| n ⟩
+
+finally we get in de-bruijn with explicit embedding of values into terms:
+
+RecR                                       binding rev_append  recursive elim
+  (Whn (ParR                               binding n,α         intro parallel         comatch
+    (Cut neg
+      (Whn (NegNR                          binding p           intro negation         comatch
+        (Cut pos
+          (Whn (Var 0))                    is p
+          (Whn (TenL                       binding xs,ys       elim tensor            match
+            (Cut pos
+              (Whn (Var 1))                is xs
+              (Whn (ListL                                      elim list              match
+                (Cut neg                                       (list case 1)
+                  (Whn (ShiftNR            binding r           intro thunk            comatch
+                    (Cut pos
+                      (Whn (Var 1))        is ys
+                      (Whn (Var 0)))))     is r
+                  (Whn (Var 3)))           is α
+                (Cut neg                   binding x',xs'      (list case 2)
+                  (Whn (Var 7))            is rev_append
+                  (Whn (ParL                                   elim par               copattern
+                    (NegNL                                     elim neg               copattern
+                      (TenR                                    intro ten              pattern
+                        (Var 0)            is xs'
+                        (ListR2                                intro list (cons)      pattern
+                          (Var 1)          is x'
+                          (Var 2))))       is ys
+                    (Var 5))))))))))))     is α
+      (Whn (Var 1)))))
 *)
 Definition rev_append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
   (* intro recursive function *)
@@ -306,12 +333,12 @@ Definition rev_append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
       apply Var, pop, pop, top.
     + apply Var, pop, pop, pop, top.
 Defined.
+Set Printing Depth 50.
+Eval cbv in rev_append.
 
 (*
 let reverse_tailrec xs = rev_append xs nil 
-
-aka
-
+---
 reverse_tailrec = λ[¬xs,α]. ⟨ rev_append ∥ [¬(xs, nil), α] ⟩
 *)
 Definition reverse_tailrec {A} : term ∅ (t+ (List A → ↑List A)).
@@ -326,12 +353,12 @@ Defined.
 let rec snoc xs a = match xs with
 | [] => a :: []
 | x :: xs => x :: snoc xs a 
-
+---
 rec snoc.
   λ[¬(xs,a), ↑r].
     ⟨ xs ∥ (nil)       ⇒ ⟨ cons a nil ∥ r ⟩
            (cons x xs) ⇒ ⟨ snoc ∥ [¬(xs, a), ↑μ~[zs]. ⟨ cons x zs ∥ r ⟩ ] ⟩ ⟩
-
+---
 Here the recursive call is not a jump: the continuation binds
 the result into `zs` and returns `cons x zs` into the original continuation.
 *)
@@ -351,11 +378,11 @@ Defined.
 let rec reverse xs = match xs with
 | [] => []
 | x :: xs => snoc (reverse xs) x
-
+---
 rec reverse. λ[¬xs,α].
   ⟨ xs ∥ (nil)       ⇒ ⟨ λ[↑r]. ⟨ nil ∥ r ⟩ ∥ α ⟩
          (cons x xs) ⇒ ⟨ reverse ∥ [¬xs, ↑μ~[zs]. ⟨ snoc ∥ [¬(zs,x), α] ⟩ ] ⟩ ⟩ 
-
+---
 again the call to `reverse` is not a tail call. Here the result is bound to zs and then
 passed to `snoc`. OTOH this second call to `snoc` is a jump.
 *)
@@ -376,11 +403,11 @@ Defined.
 let rec append xs ys = match xs with
 | [] => ys
 | x :: xs => x :: append xs ys
-
+---
 rec append. λ[¬(xs, ys), ↑r].
   ⟨ xs ∥ (nil)       ⇒ ⟨ ys ∥ r ⟩
          (cons x xs) ⇒ ⟨ append ∥ [¬(xs, ys) , ↑μ~[zs]. ⟨ cons x zs ∥ r ⟩ ] ⟩ ⟩
-
+---
 Same story as before, not tail recursive.
 *)
 Definition append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
@@ -408,9 +435,6 @@ Definition rev_append_slow {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A
     + apply Var, pop, top.
     + apply Var, top.
 Defined.
-
-Set Printing Depth 50.
-Eval cbv in reverse.
 
 End example_terms.
 
