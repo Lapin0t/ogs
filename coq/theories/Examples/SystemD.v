@@ -213,7 +213,6 @@ Definition LEM_p {A : ty0 pos} : term ∅ (t+ ↑A ⅋ ¬A) .
   eapply Cut; [ eapply Whn, NegNR | apply Whn, Var, pop, top ].
   eapply Cut; [ apply Whn, Var, top | apply Whn, Var, pop, top ].
 Defined.
-
 Definition LEM_n {A : ty0 neg} : term ∅ (t+ (A ⅋ ↑⊖A)) .
   apply Whn, ParR.
   eapply Cut; [ eapply Whn, ShiftNR | eapply Whn, Var, top ].
@@ -234,10 +233,60 @@ Definition fun_id {Γ A} : term Γ (t+ (A → ↑ A)).
 Defined.
 
 (*
+
+↑A := type of computations returning A's
+A → B := ¬ A ⅋ B
+       := type of computations returning either ¬A's or B's, ie *using* A's or returning B's.
+
+hence function introduced by the left par rule
+  λ[¬a,b]. BODY
+or more precisely (desugaring deep pattern matching) by
+  λ[n,b].⟨ λ[¬a]. BODY ∥ n ⟩
+where `a : t+ A` and `b : t- B`
+
+The type of B must be negative, if we wish to return data we must return a thunk returning said data.
+In such case, b will be of type `b : t- ↑B`, that is, it is something accepting a thunk returning B's.
+To produce such a thunk, we need to say how it will *observed*, that is, what will happen when `b` is actually
+`↑r` where `r : t- B`. So a function returning a thunk will be introduced by:
+  λ[¬a,↑r]. BODY
+or more precisely (desugaring deep pattern matching) by
+  λ[n,b].⟨ λ[¬a]. ⟨ λ[↑r].BODY ∥ b ⟩ ∥ n ⟩
+
 let rec rev_append xs ys =
 match xs with
 | [] => ys
 | x :: xs => rev_append xs (x :: ys)
+
+aka
+
+rec rev_append.
+  λ[¬(xs,ys), ↑α].
+    ⟨ xs ∥ (nil)       ⇒ ⟨ ys ∥ α ⟩
+           (cons x xs) ⇒ ⟨ rev_append ∥ [¬(xs, cons x ys), ↑α] ⟩ ⟩
+
+actually in the second case branch, we repackage the α inside a thunk, so we didn't have to unpack it
+in the first place. So the comatching of the thunk is moved to only happen in the first branch:  
+
+rec rev_append.
+  λ[ ¬(xs,ys), α ].
+    ⟨ xs ∥ (nil)       ⇒ ⟨ λ[↑r].⟨ ys ∥ r ⟩ ∥ α ⟩
+           (cons x xs) ⇒ ⟨ rev_append ∥ [ ¬(xs, cons x ys) , α ] ⟩ ⟩
+
+We are happy since in the recursive case, we do not touch the return
+pointer/continuation channel α: this is an efficient tail-call, effectively
+a jump.
+
+desugaring deep pattern-matching is tedious but straightforward, in
+the end it looks like this:
+
+rec rev_append.
+  λ[n,α].
+    ⟨ λ[¬p].
+      ⟨ λ[xs,ys].
+        ⟨ xs ∥ (nil)       ⇒ ⟨ λ[↑r]. ⟨ ys ∥ r ⟩ ∥ α ⟩
+               (cons x xs) ⇒ ⟨ rev_append ∥ [ ¬(xs, cons x ys), α ] ⟩ ⟩
+      ∥ p ⟩
+    ∥ n ⟩
 *)
 Definition rev_append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
   (* intro recursive function *)
@@ -258,27 +307,82 @@ Definition rev_append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
     + apply Var, pop, pop, pop, top.
 Defined.
 
+(*
+let reverse_tailrec xs = rev_append xs nil 
+
+aka
+
+reverse_tailrec = λ[¬xs,α]. ⟨ rev_append ∥ [¬(xs, nil), α] ⟩
+*)
 Definition reverse_tailrec {A} : term ∅ (t+ (List A → ↑List A)).
   apply fun_lambda.
   refine (Cut _ rev_append _).
   apply Whn, ParL.
-  - apply NegNL, TenR; [ apply ListR1 | apply Var, top ].
+  - apply NegNL, TenR; [ apply Var, top | apply ListR1 ].
   - apply Var, pop, top.
 Defined.
 
-Definition reverse {Γ A} : term Γ (t+ (List A → ↑List A)).
+(*
+let rec snoc xs a = match xs with
+| [] => a :: []
+| x :: xs => x :: snoc xs a 
+
+rec snoc.
+  λ[¬(xs,a), ↑r].
+    ⟨ xs ∥ (nil)       ⇒ ⟨ cons a nil ∥ r ⟩
+           (cons x xs) ⇒ ⟨ snoc ∥ [¬(xs, a), ↑μ~[zs]. ⟨ cons x zs ∥ r ⟩ ] ⟩ ⟩
+
+Here the recursive call is not a jump: the continuation binds
+the result into `zs` and returns `cons x zs` into the original continuation.
+*)
+Definition snoc {Γ A} : term Γ (t+ (List A ⊗ A → ↑List A)).
   apply RecR, fun_lambda.
-  apply (Cut _ (Whn (Var top))), Whn, w_shift, ListL.
-  - refine (Cut _ (Whn (ShiftNR _)) (Whn (Var top))).
-    refine (Cut _ (Whn ListR1) (Whn (Var top))).
-  - refine (Cut _ (Whn (Var (pop (pop (pop top))))) _).
-    apply Whn, ParL.
-    + apply NegNL, Var, top.
+  refine (Cut _ (Whn (ShiftNR _)) (Whn (Var (pop top)))); apply (s_rename (r_shift2 s_pop)).
+  refine (Cut _ (Whn (Var (pop top))) (Whn (TenL _))); apply (s_rename (r_shift3 s_pop)).
+  apply (Cut _ (Whn (Var (pop top)))), Whn, (w_rename (r_shift s_pop)), ListL.
+  - refine (Cut _ (Whn (ListR2 (Var top) ListR1)) (Whn (Var (pop top)))).
+  - refine (Cut _ (Whn (Var (pop (pop (pop (pop top)))))) (Whn (ParL _ _))).
+    + apply NegNL, TenR; [ apply Var, top | apply Var, pop, pop, top ].
     + apply w_shift, ShiftNL, Mu; cbn.
-      refine (Cut _ (Whn (ShiftNR _)) (Whn (Var (pop (pop top))))).
-      refine (Cut _ (Whn (ListR2 (Var (pop (pop top))) (Var (pop top)))) (Whn (Var top))).
+      refine (Cut _ (Whn (ListR2 (Var (pop top)) (Var top))) (Whn (Var (pop (pop (pop top)))))).
 Defined.
 
+(*
+let rec reverse xs = match xs with
+| [] => []
+| x :: xs => snoc (reverse xs) x
+
+rec reverse. λ[¬xs,α].
+  ⟨ xs ∥ (nil)       ⇒ ⟨ λ[↑r]. ⟨ nil ∥ r ⟩ ∥ α ⟩
+         (cons x xs) ⇒ ⟨ reverse ∥ [¬xs, ↑μ~[zs]. ⟨ snoc ∥ [¬(zs,x), α] ⟩ ] ⟩ ⟩ 
+
+again the call to `reverse` is not a tail call. Here the result is bound to zs and then
+passed to `snoc`. OTOH this second call to `snoc` is a jump.
+*)
+Definition reverse {Γ A} : term Γ (t+ (List A → ↑List A)).
+  apply RecR, fun_lambda.
+  apply (Cut _ (Whn (Var top))), Whn, (w_shift), ListL.
+  - refine (Cut _ (Whn (ShiftNR _)) (Whn (Var top))); apply (s_rename (r_shift s_pop)).
+    refine (Cut _ (Whn ListR1) (Whn (Var top))).
+  - apply (Cut _ (Whn (Var (pop (pop (pop top)))))), Whn, ParL.
+    + apply NegNL, Var, top.
+    + apply w_shift, ShiftNL, Mu; cbn.
+      eapply (Cut _ snoc), Whn, ParL.
+      * apply NegNL, TenR. apply Var, top. apply Var, pop, top.
+      * apply Var, pop, pop, top.
+Defined.
+
+(*
+let rec append xs ys = match xs with
+| [] => ys
+| x :: xs => x :: append xs ys
+
+rec append. λ[¬(xs, ys), ↑r].
+  ⟨ xs ∥ (nil)       ⇒ ⟨ ys ∥ r ⟩
+         (cons x xs) ⇒ ⟨ append ∥ [¬(xs, ys) , ↑μ~[zs]. ⟨ cons x zs ∥ r ⟩ ] ⟩ ⟩
+
+Same story as before, not tail recursive.
+*)
 Definition append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
   apply RecR, fun_lambda.
   refine (Cut _ (Whn (Var top)) (Whn (TenL _))); apply (s_rename (r_shift2 s_pop)).
