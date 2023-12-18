@@ -1611,6 +1611,21 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
            ++ cbn; econstructor.
               change (w_subst ?f (t- ?A) ?w) with (v_subst f (t- A) w).
               rewrite s_sub1_sub; apply CIH.
+        -- dependent elimination w0.
+           ++ unfold eval at 2; cbn -[eval then_eval2].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
+              rewrite (refold_id_aux (List A19)).
+              now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
+           ++ cbn; econstructor.
+              apply CIH.
+        -- dependent elimination w0.
+           ++ unfold eval at 2; cbn -[eval then_eval2].
+              unfold then_eval2; simp eval_aux; cbn -[eval].
+              rewrite (refold_id_aux (List A20)).
+              now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
+           ++ cbn; econstructor.
+              change (w_subst ?f (t+ ?A) ?w) with (v_subst f (t+ A) w).
+              rewrite s_sub2_sub; apply CIH.
   - dependent elimination t1.
     + cbn; econstructor.
       change (t_subst e (t+ A) t0) with (v_subst e (t+ A) t0).
@@ -1681,7 +1696,7 @@ Definition is_var_get {Γ A} {v : val Γ A} (p : is_var v) : Γ ∋ A := projT1 
 
 Lemma is_var_dec {Γ A} (v : val Γ A) : is_var v + (is_var v -> False) .
   destruct A as [ [] A | [] A ].
-  2,3: dependent elimination v; [ apply inr; intros [ i H ]; inversion H | ].
+  2,3: dependent elimination v; [ apply inr; intros [ i H ]; inversion H | | ].
   all: try dependent elimination v; try dependent elimination w.
   all: try now (apply inr; intros [ i H ]; inversion H).
   all: apply inl; econstructor; auto.
@@ -1709,32 +1724,31 @@ Qed.
 
 Equations p_of_w_eq_aux_p {Γ : neg_ctx} (A : ty0 pos) (p : pat (t+ A)) (e : p_dom p =[val]> Γ)
           : p_of_w_0p A (w_subst e (t+ A) (w_of_p p) : whn Γ (t+ A)) = p
-          by struct A :=
+          by struct p :=
   p_of_w_eq_aux_p (1)     (POne)       e := eq_refl ;
-  p_of_w_eq_aux_p (A ⊗ B) (PTen p1 p2) e := _ ;
+  p_of_w_eq_aux_p (A ⊗ B) (PTen p1 p2) e := f_equal2 PTen
+        (eq_trans (f_equal _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_p A p1 _))
+        (eq_trans (f_equal _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_p B p2 _)) ;
   p_of_w_eq_aux_p (A ⊕ B) (POr1 p)     e := f_equal POr1 (p_of_w_eq_aux_p A p e) ;
   p_of_w_eq_aux_p (A ⊕ B) (POr2 p)     e := f_equal POr2 (p_of_w_eq_aux_p B p e) ;
   p_of_w_eq_aux_p (↓ A)  (PShiftP _)  e := eq_refl ;
   p_of_w_eq_aux_p (⊖ A)   (PNegP p)    e := f_equal PNegP (p_of_w_eq_aux_n A p e) ;
+  p_of_w_eq_aux_p (List A) (PList1)    e := eq_refl ;
+  p_of_w_eq_aux_p (List A) (PList2 p1 p2) e := f_equal2 PList2
+        (eq_trans (f_equal _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_p A p1 _))
+        (eq_trans (f_equal _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_p (List A) p2 _)) ;
 
      with p_of_w_eq_aux_n {Γ : neg_ctx} (A : ty0 neg) (p : pat (t- A)) (e : p_dom p =[val]> Γ)
          : p_of_w_0n A (w_subst e (t- A) (w_of_p p) : whn Γ (t- A)) = p
-         by struct A :=
+         by struct p :=
   p_of_w_eq_aux_n (⊥)     (PBot)       e := eq_refl ;
-  p_of_w_eq_aux_n (A ⅋ B) (PPar p1 p2) e := _ ;
+  p_of_w_eq_aux_n (A ⅋ B) (PPar p1 p2) e := f_equal2 PPar
+        (eq_trans (f_equal _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_n A p1 _))
+        (eq_trans (f_equal _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_n B p2 _)) ;
   p_of_w_eq_aux_n (A & B) (PAnd1 p)    e := f_equal PAnd1 (p_of_w_eq_aux_n A p e) ;
   p_of_w_eq_aux_n (A & B) (PAnd2 p)    e := f_equal PAnd2 (p_of_w_eq_aux_n B p e) ;
   p_of_w_eq_aux_n (↑ A)  (PShiftN _)  e := eq_refl ;
   p_of_w_eq_aux_n (¬ A)   (PNegN p)    e := f_equal PNegN (p_of_w_eq_aux_p A p e) .
-Obligation 1.
-  rewrite 2 w_sub_ren.
-  change (p_of_w_0p _ (TenR ?v1 ?v2)) with (PTen (p_of_w_0p A v1) (p_of_w_0p B v2)).
-  refine (f_equal2 PTen _ _); apply p_of_w_eq_aux_p.
-Defined.
-Obligation 2.
-  cbn; rewrite 2 w_sub_ren.
-  refine (f_equal2 PPar _ _); apply p_of_w_eq_aux_n.
-Defined.
 
 Definition p_dom_of_w_eq_P (Γ : neg_ctx) p : ty0 p -> Prop :=
   match p with
@@ -1744,12 +1758,12 @@ Definition p_dom_of_w_eq_P (Γ : neg_ctx) p : ty0 p -> Prop :=
       rew [fun p => p_dom p =[ val ]> Γ] p_of_w_eq_aux_n A p e in p_dom_of_w_0n A (w_subst e (t- A) (w_of_p p)) ≡ₐ e
   end .
 
-Lemma p_dom_of_v_eq {Γ p} A : p_dom_of_w_eq_P Γ p A . 
+Lemma p_dom_of_v_eq {Γ p} A : p_dom_of_w_eq_P Γ p A .
+  
   induction A; intros p e; dependent elimination p; cbn.
   - intros ? h; repeat (dependent elimination h; auto).
   - intros ? h; repeat (dependent elimination h; auto).
   - change (p_dom_of_w_0p _ (TenR ?v1 ?v2)) with ([ p_dom_of_w_0p A3 v1 , p_dom_of_w_0p B0 v2 ]).
-    unfold p_of_w_eq_aux_p_obligations_obligation_1.
     pose (H1 := w_sub_ren e r_concat_l (t+ A3) (w_of_p p)) .
     pose (H2 := w_sub_ren e r_concat_r (t+ B0) (w_of_p p0)) .
     pose (x1 := w_subst e (t+ A3) (w_rename r_concat_l (t+ A3) (w_of_p p))).
@@ -1768,7 +1782,6 @@ Lemma p_dom_of_v_eq {Γ p} A : p_dom_of_w_eq_P Γ p A .
     now rewrite <- H1, <- H2, eq_refl_map2_distr.
     apply s_eq_cover_uniq; [ apply IHA1 | apply IHA2 ] .
   - change (p_dom_of_w_0n _ (ParL ?v1 ?v2)) with ([ p_dom_of_w_0n _ v1 , p_dom_of_w_0n _ v2 ]).
-    unfold p_of_w_eq_aux_p_obligations_obligation_2.
     pose (H1 := w_sub_ren e r_concat_l (t- A4) (w_of_p p1)) .
     pose (H2 := w_sub_ren e r_concat_r (t- B1) (w_of_p p2)) .
     pose (x1 := w_subst e (t- A4) (w_rename r_concat_l (t- A4) (w_of_p p1))).
@@ -1812,6 +1825,25 @@ Lemma p_dom_of_v_eq {Γ p} A : p_dom_of_w_eq_P Γ p A .
     remember xx as xx'; unfold xx in Heqxx'; clear xx.
     rewrite (eq_trans Heqxx' (eq_sym (rew_map _ PNegN _ _))).
     apply IHA.
+  - intros ? i; dependent elimination i.
+  - simp p_dom_of_w_0p.
+    pose (H1 := w_sub_ren e r_concat_l (t+ A13) (w_of_p p9)) .
+    pose (H2 := w_sub_ren e r_concat_r (t+ List A13) (w_of_p p10)) .
+    pose (x1 := w_subst e (t+ A13) (w_rename r_concat_l (t+ A13) (w_of_p p9))).
+    pose (x2 := w_subst e (t+ List A13) (w_rename r_concat_r (t+ List A13) (w_of_p p10))).
+    change (w_sub_ren e r_concat_l _ _) with H1.
+    change (w_sub_ren e r_concat_r _ _) with H2.
+    change (w_subst e (t+ A13) _) with x1 in H1 |- *.
+    change (w_subst e (t+ List A13) _) with x2 in H2 |- *.
+    rewrite H1, H2; clear H1 H2 x1 x2; cbn.
+    pose (H1 := p_of_w_eq_aux_p A13 p9 (e ⊛ᵣ r_concat_l)); change (p_of_w_eq_aux_p A13 _ _) with H1 in IHA |- *.
+    pose (H2 := p_of_w_eq_aux_n B1 p2 (e ⊛ᵣ r_concat_r)); change (p_of_w_eq_aux_n B1 _ _) with H2 in IHA2 |- *.
+    transitivity ([ rew [fun p : pat (t- A4) => p_dom p =[ val ]> Γ] H1
+                     in p_dom_of_w_0n A4 (w_subst (e ⊛ᵣ r_concat_l) (t- A4) (w_of_p p1)) ,
+                    rew [fun p : pat (t- B1) => p_dom p =[ val ]> Γ] H2
+                     in p_dom_of_w_0n B1 (w_subst (e ⊛ᵣ r_concat_r) (t- B1) (w_of_p p2)) ]).
+    now rewrite <- H1, <- H2, eq_refl_map2_distr.
+    apply s_eq_cover_uniq; [ apply IHA1 | apply IHA2 ] .
 Qed.
 
 Lemma eval_nf_ret {Γ : neg_ctx} (u : nf Γ) : eval (p_app (s_var _ (fst (projT2 u))) (projT1 (snd (projT2 u))) (projT2 (snd (projT2 u)))) ≋ ret_delay u .
