@@ -1,6 +1,25 @@
+(*|
+Interaction Trees: Structure
+==============================
+ITrees form an iterative monad.
+The [iter] combinator provided here is the direct correspondent
+to the one from the main library: it iterates over arbitrary
+sets of equations.
+The file [Guarded.v] provides a finer iterator, restricted
+to notions of guarded equations, enjoying an additional
+uniqueness property.
+
+.. coq:: none
+|*)
+
 From OGS Require Import Prelude.
 From OGS.Game Require Import Event.
 From OGS.ITree Require Import ITree.
+
+(*|
+
+.. coq::
+|*)
 
 Section monad.
   Context {I} {E : event I I}.
@@ -12,6 +31,9 @@ Section monad.
        | VisF q k => VisF q k
        end .
 
+(*|
+Applicative
+|*)
   Definition fmap {X Y} (f : X ⇒ᵢ Y) : itree E X ⇒ᵢ itree E Y :=
     cofix _fmap _ u :=
       go match u.(_observe) with
@@ -20,6 +42,9 @@ Section monad.
          | VisF e k => VisF e (fun r => _fmap _ (k r))
          end.
 
+(*|
+Monad
+|*)
   Definition subst {X Y} (f : X ⇒ᵢ itree E Y) : itree E X ⇒ᵢ itree E Y :=
     cofix _subst _ u :=
       go match u.(_observe) with
@@ -33,7 +58,10 @@ Section monad.
   Definition kcomp {X Y Z} (f : X ⇒ᵢ itree E Y) (g : Y ⇒ᵢ itree E Z) : X ⇒ᵢ itree E Z :=
     fun i x => bind (f i x) g.
 
-  Definition iter {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) : X ⇒ᵢ itree E Y :=
+(*|
+Iterative
+|*)
+   Definition iter {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) : X ⇒ᵢ itree E Y :=
     cofix _iter _ x :=
       bind (f _ x) (fun _ r => go match r with
                                 | inl x => TauF (_iter _ x)

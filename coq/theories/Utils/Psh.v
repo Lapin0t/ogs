@@ -21,7 +21,7 @@ Definition prodᵢ {I} (X Y : psh I) : psh I := fun i => (X i * Y i)%type.
 #[global] Infix "×ᵢ" := (prodᵢ) (at level 20) : indexed_scope.
 
 #[global] Notation "⦉ X ⦊ᵢ" := (sigT X) : type_scope.
- 
+
 (* pointwise arrows between F G : endo (psh I) *)
 #[global] Notation "F ⇒ₙ G" := (forall X : psh _, F X ⇒ᵢ G X) (at level 30).
 
@@ -39,7 +39,7 @@ Equations fib_coh {A B} {f : A -> B} {b : B} : forall p : fiber f b, f (fib_extr
   fib_coh (Fib _) := eq_refl .
 Definition fib_constr {A B} {f : A -> B} a : forall b (p : f a = b), fiber f b :=
   eq_rect (f a) (fiber f) (Fib a).
- 
+
 (* These two functions form an isomorphism (fiber f ⇒ᵢ X) ≅ (∀ a → X (f a)) *)
 Equations fib_into {A B} {f : A -> B} X (h : forall a, X (f a)) : fiber f ⇒ᵢ X :=
   fib_into _ h _ (Fib a) := h a .

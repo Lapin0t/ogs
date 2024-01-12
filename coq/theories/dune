@@ -2,4 +2,6 @@
 
 (coq.theory
  (name OGS)
- (package coq-ogs))
+ (package coq-ogs)
+ (theories Coinduction Equations)
+)
