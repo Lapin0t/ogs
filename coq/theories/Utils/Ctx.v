@@ -70,6 +70,9 @@ Derive NoConfusion for ctx.
 #[global] Notation "∅" := (cnil) : ctx_scope.
 #[global] Notation "Γ ▶ x" := (ccon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
 
+Notation "'Fam' X" := (ctx X -> Type) (at level 30).
+Notation "'Famₛ' X" := (ctx X -> X -> Type) (at level 30).
+
 Equations c_length {X} (Γ : ctx X) : nat :=
   c_length ∅%ctx := O ;
   c_length (Γ ▶ _)%ctx := Datatypes.S (c_length Γ) .
@@ -103,7 +106,7 @@ Equations join_even_odd_aux {X} : bool -> ctx (ctx X) -> ctx X :=
 (*|
 We wish to manipulate intrinsically typed terms. We hence need a tightly typed notion of position in the context: rather than a loose index, [has Γ x] is a proof of membership of [x] to [Γ].
 |*)
-Inductive has {X} : ctx X -> X -> Type :=
+Inductive has {X} : famₛ X :=
 | top {Γ x} : has (Γ ▶ x) x
 | pop {Γ x y} : has Γ x -> has (Γ ▶ y) x.
 Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
@@ -123,10 +126,8 @@ Assignment
 ------------
 We distinguish assignments, mapping variables in a context to terms, from substitutions, applying an assignment
 to a term. Assignments are again intrinsically typed, mapping variables of a context Γ to open terms with variables in Δ.
-Note: sorted families have the order of their arguments reversed compared to the paper.
+Note on paper: sorted families have the order of their arguments reversed compared to the paper.
 |*)
-Notation "'Fam' X" := (ctx X -> Type) (at level 30).
-Notation "'Famₛ' X" := (ctx X -> X -> Type) (at level 30).
 
 Section WithParam.
 
@@ -194,13 +195,13 @@ Composition of context inclusion induces a composed renaming.
 (*|
 Extends an assignment with an extra mapping
 |*)
-  Equations s_append {Γ Δ : ctx X} {F : ctx X -> X -> Type} {a}
+  Equations s_append {Γ Δ : ctx X} {F : Famₛ X} {a}
     : Γ =[F]> Δ -> F Δ a -> (Γ ▶ a) =[F]> Δ :=
     s_append s z _ top     := z ;
     s_append s z _ (pop i) := s _ i .
   Notation "s ▶ₐ z" := (s_append s z) (at level 40).
 
-  #[global] Instance s_append_eq {Γ Δ : ctx X} {F : ctx X -> X -> Type} {a}
+  #[global] Instance s_append_eq {Γ Δ : ctx X} {F : Famₛ X} {a}
     : Proper (ass_eq _ _ ==> eq ==> ass_eq _ _) (@s_append Γ Δ F a).
   Proof.
     intros f g H1 x y H2 u i; dependent elimination i; [ exact H2 | apply H1 ].
@@ -212,7 +213,7 @@ Elementary weakening
   Definition r_pop {Γ x} : Γ ⊆ (Γ ▶ x) :=
     fun _ i => pop i.
 
-  Lemma s_append_pop {Γ Δ : ctx X} {F : ctx X -> X -> Type} {a}
+  Lemma s_append_pop {Γ Δ : ctx X} {F : Famₛ X} {a}
     (s : Γ =[F]> Δ) (u : F Δ a) :
     s_append s u ⊛ᵣ r_pop ≡ₐ s .
   Proof.

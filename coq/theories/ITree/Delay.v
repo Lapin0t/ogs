@@ -12,6 +12,10 @@ From OGS.Game Require Import Event.
 From OGS.ITree Require Import ITree Structure.
 
 (*|
+The delay monad, defined in Section 5.5 in the paper, is formalized as an itree over
+an empty signature: in the absence of events, [τ] and [ret] are the only constructors
+inhabited.
+
 .. coq::
 |*)
 Definition delay (X : Type) : Type := itree ∅ₑ (fun _ => X) T1_0.

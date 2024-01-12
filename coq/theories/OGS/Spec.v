@@ -312,52 +312,6 @@ Env M Δ opponent es : environment part of the opponent (aka passive at es) conf
     concat0 (u ▶ₑ⁻ e) := [ concat0 u , e ] .
 
 (*|
-SIDETRACK: an alternative implementation of concat0, working pointwise, with precise auxiliary getters
-
-.. coq::
-
-  Equations alt_env_prefix {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) {x} (i : ↓[negb b]Φ ∋ x) : context by struct u :=
-    alt_env_prefix (u ▶ₑ⁺)   i := alt_env_prefix u i ;
-    alt_env_prefix (v ▶ₑ⁻ γ) i with cat_split i := {
-      | CLeftV j  := alt_env_prefix v j ;
-      | CRightV j := Δ1 +▶ ↓⁺ Φ1 } .
-
-  Equations alt_env_prefix_ren {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) {x} (i : ↓[negb b]Φ ∋ x)
-            : alt_env_prefix u i ⊆ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) :=
-    alt_env_prefix_ren (u ▶ₑ⁺)   i := r_concat3_1 ⊛ᵣ alt_env_prefix_ren u i ;
-    alt_env_prefix_ren (v ▶ₑ⁻ γ) i with cat_split i := {
-      | CLeftV j  := alt_env_prefix_ren v j ;
-      | CRightV j := r_id } .
-
-  Equations alt_env_get {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) {x} (i : ↓[negb b]Φ ∋ x)
-            : val (alt_env_prefix u i) x :=
-    alt_env_get (u ▶ₑ⁺)   i := alt_env_get u i ;
-    alt_env_get (v ▶ₑ⁻ γ) i with cat_split i := {
-      | CLeftV j  := alt_env_get v j ;
-      | CRightV j := γ _ j } .
-
-  Definition concat0_alt {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ)
-    : ↓[negb b]Φ ⇒ᵥ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) :=
-    fun _ i => alt_env_prefix_ren u i ᵣ⊛ᵥ alt_env_get u i .
-
-  Lemma concat0_alt_eq {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) : concat0 u ≡ₐ concat0_alt u .
-    intros ? i; unfold concat0_alt.
-    revert Δ1 Δ2 b u i; induction Φ; intros Δ1 Δ2 b u i.
-    - inversion i.
-    - dependent elimination u; cbn.
-      * unfold e_ren, e_comp, s_map, v_ren.
-        rewrite (IHΦ _ _ _ a0 i); unfold v_ren.
-        rewrite v_sub_comp, e_comp_ren_r, v_sub_var, s_ren_comp.
-        reflexivity.
-      * cbn in i; unfold s_cat, s_cover.
-        pose (ii := cat_split i); change (cover_split _ i) with ii; change (cat_split i) with ii.
-        destruct ii; cbn.
-        + exact (IHΦ _ _ _ a1 i).
-        + unfold v_ren; rewrite s_ren_id; symmetry; apply v_var_sub.
-  Qed.
-|*)
-
-(*|
 Flattens a pair of alternating environments for both player and opponent into a "closed" substitution.
 |*)
   Equations concat1 {Δ} Φ {b} : alt_env Δ Δ b Φ -> alt_env Δ Δ (negb b) Φ -> ↓[b]Φ ⇒ᵥ Δ :=
@@ -563,46 +517,6 @@ lem 4.6
       now apply nf_eq_rfl'.
   Qed.
 
-
-(*|
-Interesting facts but not used in the current proof...
-
-.. coq::
-
-  Lemma app_simpl {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) :
-    app v m e = [ v_var , e ] ⊛ₜ app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r) .
-    rewrite app_sub.
-    assert (H : v = ([v_var, e] ⊛ᵥ r_concat_l ᵣ⊛ᵥ v)); [ | rewrite <- H; clear H ].
-    unfold v_ren.
-    pose (foo := s_append s_empty v).
-    eassert (H : foo x Ctx.top = v) by reflexivity.
-    rewrite <- H at 2.
-    do 2 change (?u ⊛ᵥ ?v x Ctx.top)
-      with ((u ⊛ v) x Ctx.top).
-    etransitivity; cycle 1.
-    apply e_comp_proper; [ reflexivity | ].
-    symmetry; apply e_comp_ren_l.
-    rewrite v_sub_sub.
-    etransitivity; cycle 1.
-    apply e_comp_proper; [ | reflexivity ].
-    rewrite v_sub_var.
-    reflexivity.
-    rewrite <- e_comp_ren_l.
-    etransitivity; cycle 1.
-    apply e_comp_proper; [ | reflexivity ].
-    rewrite s_eq_cat_l. reflexivity.
-    rewrite v_var_sub. exact H.
-    apply app_proper.
-    rewrite e_comp_ren_r, v_sub_var, s_eq_cat_r; reflexivity.
-  Qed.
-
-  Lemma eval_app_simpl {Γ x} (v : val Γ x) (m : msg x) (e : S.(dom) m ⇒ᵥ Γ) :
-    eval (app v m e) ≊ eval_sub (app (r_concat_l ᵣ⊛ᵥ v) m (v_var ⊛ᵣ r_concat_r)) e .
-    rewrite app_simpl.
-    apply eval_split.
-  Qed.
-|*)
-
   Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) : delay (msg' Δ)
     := iter_delay compo_body (a ,' (u , v)).
   Notation "u ∥ v" := (compo u v) (at level 40).
@@ -765,32 +679,6 @@ Interesting facts but not used in the current proof...
         + change (s_pop ⊛ᵣ r_cover_r cover_cat) with (@r_cover_r _ _ _ (↓⁻ Φ0 +▶ x ▶ y) cover_cat ⊛ᵣ s_pop).
           now rewrite s_ren_comp, s_eq_cat_r.
   Qed.
-
-  (*
-lemme zig-zag
-
-app v m ...
-
-=eventually>
-
-app w m ...  où not (is_var w)
-
- thm:
-
-  - 1 coup lemme zig-zag
-  on est dans le cas où w != var
-  n: nf sur laquelle on bloque
-  induction sur acc head_inst n  // induction sur la phase de n
-  > par cas sur eval (app .. .. ..)
-    - si tau -> fini
-    - sinon on ret n'
-      tour de boucle de "eventually"
-      on redémarre sur un app z m' ...
-      + lemme zig-zag
-      on est dans le cas où z != var
-      on est dans un cas où on a `head_inst current n`
-*)
-
 
   Lemma compo_body_guarded_aux {Δ Ψ} (u : alt_env Δ Δ Ⓟ Ψ) (v : alt_env Δ Δ Ⓞ Ψ)
                                     {x} (m : msg x) (γ : dom m ⇒ᵥ (Δ +▶ ↓⁺ Ψ)) (j : ↓⁺ Ψ ∋ x)
@@ -1068,34 +956,6 @@ app w m ...  où not (is_var w)
     change (iter _ T1_0 ?u) with (iter_delay compo_body u); rewrite <- 2 compo_compo_alt.
     apply compo_alt_proper; [ exact H | intro; reflexivity ].
   Qed.
-
-(* WIP
-  Definition nf_eqT {Δ} (R : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ)) {t} : relation (nf Δ t) :=
-    fun a b => exists H : projT1 a = projT1 b, R _ (rew H in projT2 a) (projT2 b) .
-
-  Definition nf_eqT' {Δ} (R : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ)) : relation (nf' Δ) :=
-    fun a b => exists H : nf_ty' a = nf_ty' b,
-        (rew H in nf_var' a = nf_var' b) /\ (nf_eqT R (rew H in nf_nf' a) (nf_nf' b)) .
-
-  Definition ciu_gen_pas {Δ} (R : relᵢ conf conf) : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ) :=
-    fun Γ u v => forall x : conf Γ, it_wbisim (fun _ => nf_eqT' ) eval (u ⊛ₜ x) ≈ eval (v ⊛ₜ x) .
-
-  Definition sub_R_act {Δ} (R : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ)) : relᵢ conf conf :=
-    fun Γ u v => forall γ : Γ ⇒ᵥ Δ, it_wbisim (fun _ => nf_eqT' R) T1_0 (eval (γ ⊛ₜ u)) (eval (γ ⊛ₜ v)) .
-
-  Definition sub_R_pas {Δ} (R : relᵢ conf conf) : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ) :=
-    fun Γ γ1 γ2 => forall u : conf Γ, R Δ (γ1 ⊛ₜ u) (γ2 ⊛ₜ u) .
-
-  Theorem ogs_substitutive {Δ} : sub_R_act (Δ:=Δ) (sub_R_pas (m_conf_eqv Δ)) <= m_conf_eqv Δ .
-    intros Γ u v H. unfold sub_R_act in H.
-    unfold m_conf_eqv.
-    Check (H v_var).
-    apply ogs_correction.  
-
-  Definition ciu_gen_pas {Δ} (R : relᵢ conf conf) : relᵢ (fun Γ => Γ ⇒ᵥ Δ) (fun Γ => Γ ⇒ᵥ Δ)) :=
-    fun Γ u v => forall x i, ciu_gen_act 
-*)
-
 
 End withInteractionSpec.
 About ogs_correction.
