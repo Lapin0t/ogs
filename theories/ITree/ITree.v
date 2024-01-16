@@ -16,8 +16,8 @@ From OGS Require Import Prelude.
 From OGS.Game Require Import Event.
 
 (*|
-Guarded iteration
-------------------
+Indexed Interaction Trees
+---------------------------
 .. coq::
 |*)
 

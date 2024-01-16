@@ -16,10 +16,16 @@ The delay monad, defined in Section 5.5 in the paper, is formalized as an itree 
 an empty signature: in the absence of events, [τ] and [ret] are the only constructors
 inhabited.
 
+Relevant definitions for the underlying itree datatype and combinators can be found in
+[ITree/ITree.v] and [ITree/Structure.v].
+
 .. coq::
 |*)
 Definition delay (X : Type) : Type := itree ∅ₑ (fun _ => X) T1_0.
 
+(*|
+Embedding [delay] into itrees over arbitrary signatures.
+|*)
 Definition emb_delay {I} {E : event I I} {X i} : delay X -> itree E (X @ i) i :=
   cofix _emb_delay x :=
       go (match x.(_observe) with

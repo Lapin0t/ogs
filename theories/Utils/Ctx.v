@@ -70,8 +70,8 @@ Derive NoConfusion for ctx.
 #[global] Notation "∅" := (cnil) : ctx_scope.
 #[global] Notation "Γ ▶ x" := (ccon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
 
-Notation "'Fam' X" := (ctx X -> Type) (at level 30).
-Notation "'Famₛ' X" := (ctx X -> X -> Type) (at level 30).
+#[global] Notation "'Fam' X" := (ctx X -> Type) (at level 30).
+#[global] Notation "'Famₛ' X" := (ctx X -> X -> Type) (at level 30).
 
 Equations c_length {X} (Γ : ctx X) : nat :=
   c_length ∅%ctx := O ;
@@ -103,15 +103,6 @@ Equations join_even_odd_aux {X} : bool -> ctx (ctx X) -> ctx X :=
 #[global] Notation join_even := (join_even_odd_aux true) .
 #[global] Notation join_odd := (join_even_odd_aux false) .
 
-(*|
-We wish to manipulate intrinsically typed terms. We hence need a tightly typed notion of position in the context: rather than a loose index, [has Γ x] is a proof of membership of [x] to [Γ].
-|*)
-Inductive has {X} : famₛ X :=
-| top {Γ x} : has (Γ ▶ x) x
-| pop {Γ x y} : has Γ x -> has (Γ ▶ y) x.
-Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
-Derive Signature NoConfusion for has.
-
 Lemma ccat_empty_l {X : Type} {Γ : ctx X} : (∅ +▶ Γ)%ctx = Γ.
   induction Γ; [ reflexivity | ].
   cbn; f_equal; apply IHΓ.
@@ -132,6 +123,16 @@ Note on paper: sorted families have the order of their arguments reversed compar
 Section WithParam.
 
   Context {X : Type}.
+
+(*|
+We wish to manipulate intrinsically typed terms. We hence need a tightly typed notion of position in the context: rather than a loose index, [has Γ x] is a proof of membership of [x] to [Γ].
+|*)
+  Inductive has : Famₛ X :=
+  | top {Γ x} : has (Γ ▶ x) x
+  | pop {Γ x y} : has Γ x -> has (Γ ▶ y) x.
+  Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
+  Derive Signature NoConfusion for has.
+
 
   Definition assignment (F : Famₛ X) (Γ Δ : ctx X) := has Γ ⇒ᵢ F Δ.
   Notation "Γ =[ F ]> Δ" := (assignment F Γ%ctx Δ%ctx) (at level 30).
@@ -195,14 +196,14 @@ Composition of context inclusion induces a composed renaming.
 (*|
 Extends an assignment with an extra mapping
 |*)
-  Equations s_append {Γ Δ : ctx X} {F : Famₛ X} {a}
+  Equations a_append {Γ Δ : ctx X} {F : Famₛ X} {a}
     : Γ =[F]> Δ -> F Δ a -> (Γ ▶ a) =[F]> Δ :=
-    s_append s z _ top     := z ;
-    s_append s z _ (pop i) := s _ i .
-  Notation "s ▶ₐ z" := (s_append s z) (at level 40).
+    a_append s z _ top     := z ;
+    a_append s z _ (pop i) := s _ i .
+  Notation "s ▶ₐ z" := (a_append s z) (at level 40).
 
-  #[global] Instance s_append_eq {Γ Δ : ctx X} {F : Famₛ X} {a}
-    : Proper (ass_eq _ _ ==> eq ==> ass_eq _ _) (@s_append Γ Δ F a).
+  #[global] Instance a_append_eq {Γ Δ : ctx X} {F : Famₛ X} {a}
+    : Proper (ass_eq _ _ ==> eq ==> ass_eq _ _) (@a_append Γ Δ F a).
   Proof.
     intros f g H1 x y H2 u i; dependent elimination i; [ exact H2 | apply H1 ].
   Qed.
@@ -213,17 +214,17 @@ Elementary weakening
   Definition r_pop {Γ x} : Γ ⊆ (Γ ▶ x) :=
     fun _ i => pop i.
 
-  Lemma s_append_pop {Γ Δ : ctx X} {F : Famₛ X} {a}
+  Lemma a_append_pop {Γ Δ : ctx X} {F : Famₛ X} {a}
     (s : Γ =[F]> Δ) (u : F Δ a) :
-    s_append s u ⊛ᵣ r_pop ≡ₐ s .
+    a_append s u ⊛ᵣ r_pop ≡ₐ s .
   Proof.
     intros ? h; dependent elimination h; auto.
   Qed.
 
-  Lemma rew_s_append {F} {Γ1 Γ2 Δ : ctx X} {x}
+  Lemma rew_a_append {F} {Γ1 Γ2 Δ : ctx X} {x}
     (a : Γ1 =[F]> Δ) (b : F Δ x) (H : Γ1 = Γ2) :
-    rew [fun xs => (xs ▶ x) =[F]> Δ] H in s_append a b
- ≡ₐ s_append (rew [fun xs => xs =[F]> Δ] H in a) b .
+    rew [fun xs => (xs ▶ x) =[F]> Δ] H in a_append a b
+ ≡ₐ a_append (rew [fun xs => xs =[F]> Δ] H in a) b .
   Proof.
     revert a; now rewrite H.
   Qed.
@@ -232,7 +233,7 @@ Elementary weakening
 Shift operation in a renaming
 |*)
    Definition r_shift {Γ Δ : ctx X} {a} (f : Γ ⊆ Δ) : (Γ ▶ a) ⊆ (Δ ▶ a) :=
-    s_append (s_ren r_pop f) top.
+    a_append (s_ren r_pop f) top.
 
    Lemma r_shift_comp {Γ1 Γ2 Γ3 : ctx X} {a} (f1 : Γ2 ⊆ Γ3) (f2 : Γ1 ⊆ Γ2) :
      r_shift (a:=a) (f1 ⊛ᵣ f2) ≡ₐ r_shift (a:=a) f1 ⊛ᵣ r_shift (a:=a) f2.
@@ -321,7 +322,7 @@ Predicate for splitting a context into a disjoint union
      ext_cover_r (Γ ▶ _) c := CRight (ext_cover_r Γ c) .
 
    Equations r_cover_l {xs ys zs} : xs ⊎ ys ≡ zs -> xs ⊆ zs :=
-     r_cover_l (CNil)     := s_empty ;
+     r_cover_l (CNil)     := a_empty ;
      r_cover_l (CLeft c)  := r_shift (r_cover_l c) ;
      r_cover_l (CRight c) := s_ren r_pop (r_cover_l c) .
 
@@ -337,7 +338,7 @@ Predicate for splitting a context into a disjoint union
    Qed.
 
    Equations r_cover_r {xs ys zs} : xs ⊎ ys ≡ zs -> ys ⊆ zs :=
-     r_cover_r (CNil)     := s_empty ;
+     r_cover_r (CNil)     := a_empty ;
      r_cover_r (CLeft c)  := s_ren r_pop (r_cover_r c) ;
      r_cover_r (CRight c) := r_shift (r_cover_r c) .
 
@@ -425,7 +426,7 @@ Predicate for splitting a context into a disjoint union
   Definition r_concat3_3 {Γ Δ ϒ : ctx X} : (Δ +▶ ϒ) ⊆ ((Γ +▶ Δ) +▶ ϒ) :=
     [ r_concat_l ⊛ᵣ r_concat_r , r_concat_r ].
 
-  Lemma s_eq_cover_empty_r {F Γ1 Δ} (u : Γ1 =[F]> Δ) : s_cat u s_empty ≡ₐ u.
+  Lemma s_eq_cover_empty_r {F Γ1 Δ} (u : Γ1 =[F]> Δ) : s_cat u a_empty ≡ₐ u.
     intros ? i; unfold s_cat, s_cover.
     destruct (cover_split cover_cat i); cbn.
     + rewrite r_cover_l_nil; eauto.
@@ -532,9 +533,9 @@ Predicate for splitting a context into a disjoint union
       now rewrite s_eq_cover_id.
   Qed.
 
-End lemma.
-#[global] Notation "∅ₐ" := (s_empty).
-#[global] Notation "s ▶ₐ z" := (s_append s z) (at level 40).
+End WithParam.
+#[global] Notation "∅ₐ" := (a_empty).
+#[global] Notation "s ▶ₐ z" := (a_append s z) (at level 40).
 
 Definition map_has {X Y} (f : X -> Y) (Γ : ctx X)
   {x} (i : has Γ x) : has (c_map f Γ) (f x).
@@ -561,8 +562,6 @@ Lemma map_cat {X Y} (f : X -> Y) (Γ Δ : ctx X)
   cbn; f_equal; exact IHΔ.
 Qed.
 
-#[global] Notation join_even := (join_even_odd_aux true) .
-#[global] Notation join_odd := (join_even_odd_aux false) .
 #[global] Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30) : type_scope.
 #[global] Notation "a ⊎ b ≡ c" := (cover a%ctx b%ctx c%ctx) (at level 30) : type_scope.
 #[global] Notation "Γ ⊆ Δ" := (assignment has Γ%ctx Δ%ctx) (at level 30) : type_scope.

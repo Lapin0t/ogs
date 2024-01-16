@@ -6,7 +6,8 @@ notion of equality. We define through this file strong
 and weak bisimilarity of itrees, and their generalization
 lifting value relations.
 These coinductive relations are implemented using Pous's
-[coinduction] library.
+[coinduction] library, i.e. based on the "companion" construction.
+We provide elementary up-to principles for strong and weak bisimilarity.
 
 .. coq:: none
 |*)
@@ -20,53 +21,14 @@ From OGS.Game Require Import Event.
 From OGS.ITree Require Import ITree.
 
 (*|
-Silent step "eating" relation: "it_eat X Y" := "X = Tau^n(Y) for some n".
-Could be generalized to any itreeF coalgebra if needed.
-
-.. coq::
-|*)
-Section it_eat.
-  Context {I : Type} {E : event I I} {R : psh I}.
-
-  Inductive it_eat i : itree' E R i -> itree' E R i -> Prop :=
-  | EatRefl {t} : it_eat i t t
-  | EatStep {t1 t2} : it_eat _ (observe t1) t2 -> it_eat i (TauF t1) t2
-  .
-  Hint Constructors it_eat : core.
-  Arguments EatRefl {i t}.
-  Arguments EatStep {i t1 t2} p.
-
-  #[global] Instance eat_trans : Transitiveᵢ it_eat.
-  Proof.
-    intros i x y z r1 r2; dependent induction r1; auto.
-  Defined.
-
-  Equations eat_cmp : (revᵢ it_eat ⨟ it_eat) <= (it_eat ∨ᵢ revᵢ it_eat) :=
-    eat_cmp i' x' y' (ex_intro _ z' (conj p' q')) := _eat_cmp p' q'
-  where _eat_cmp {i x y z} : it_eat i x y -> it_eat i x z -> (it_eat i y z \/ it_eat i z y) :=
-    _eat_cmp (EatRefl)   q           := or_introl q ;
-    _eat_cmp p           (EatRefl)   := or_intror p ;
-    _eat_cmp (EatStep p) (EatStep q) := _eat_cmp p q .
-
-  Definition it_eat' : relᵢ (itree E R) (itree E R) :=
-    fun i u v => it_eat i u.(_observe) v.(_observe).
-
-  Definition it_eat_tau {i x y} (H : it_eat i (TauF x) (TauF y)) :
-    it_eat i x.(_observe) y.(_observe).
-  Proof.
-    dependent induction H; eauto.
-    unfold observe in H; destruct x.(_observe) eqn:Hx; try inversion H; eauto.
-  Defined.
-
-End it_eat.
-
-#[global] Hint Constructors it_eat : core.
-#[global] Arguments EatRefl {I E R i t}.
-#[global] Arguments EatStep {I E R i t1 t2} p.
-
-(*|
 Strong bisimilarity [it_eq], a.k.a. coinductive equality.
 We write ≅ for strong bisimilarity with equality over leaves.
+|*)
+
+(*|
+Monotone endofunction over indexed relations between trees.
+Strong bisimilarity is defined as the greatest fixpoint of [it_eqF RR],
+for a fixed value relation [RR].
 |*)
 Variant it_eqF {I} E
   {X1 X2} (RX : relᵢ X1 X2) {Y1 Y2} (RR : relᵢ Y1 Y2)
@@ -191,6 +153,62 @@ Weak bisimilarity [it_wbisim]: before each synchronization step, a finite amount
 Note that [itrees] encode deterministic LTSs, hence we do not need to worry about allowing to strip off Taus after the synchronization as well, in particular.
 We write ≈ for weak bisimilarity with equality over leaves.
 |*)
+
+(*|
+We start by defining a silent step "eating" relation: "it_eat X Y" := "X = Tau^n(Y) for some n".
+
+.. coq::
+|*)
+Section it_eat.
+  Context {I : Type} {E : event I I} {R : psh I}.
+
+  Inductive it_eat i : itree' E R i -> itree' E R i -> Prop :=
+  | EatRefl {t} : it_eat i t t
+  | EatStep {t1 t2} : it_eat _ (observe t1) t2 -> it_eat i (TauF t1) t2
+  .
+  Hint Constructors it_eat : core.
+  Arguments EatRefl {i t}.
+  Arguments EatStep {i t1 t2} p.
+
+  #[global] Instance eat_trans : Transitiveᵢ it_eat.
+  Proof.
+    intros i x y z r1 r2; dependent induction r1; auto.
+  Defined.
+
+  Equations eat_cmp : (revᵢ it_eat ⨟ it_eat) <= (it_eat ∨ᵢ revᵢ it_eat) :=
+    eat_cmp i' x' y' (ex_intro _ z' (conj p' q')) := _eat_cmp p' q'
+  where _eat_cmp {i x y z} : it_eat i x y -> it_eat i x z -> (it_eat i y z \/ it_eat i z y) :=
+    _eat_cmp (EatRefl)   q           := or_introl q ;
+    _eat_cmp p           (EatRefl)   := or_intror p ;
+    _eat_cmp (EatStep p) (EatStep q) := _eat_cmp p q .
+
+  Definition it_eat' : relᵢ (itree E R) (itree E R) :=
+    fun i u v => it_eat i u.(_observe) v.(_observe).
+
+  Definition it_eat_tau {i x y} (H : it_eat i (TauF x) (TauF y)) :
+    it_eat i x.(_observe) y.(_observe).
+  Proof.
+    dependent induction H; eauto.
+    unfold observe in H; destruct x.(_observe) eqn:Hx; try inversion H; eauto.
+  Defined.
+
+End it_eat.
+
+#[global] Hint Constructors it_eat : core.
+#[global] Arguments EatRefl {I E R i t}.
+#[global] Arguments EatStep {I E R i t1 t2} p.
+
+
+(*|
+The weak bisimilarity itself, allowing to eat taus on each sides before
+hitting [it_eqF].
+Note that compared to more traditional definitions of bisimilarity, we do
+not eat taus _after_ the call to [it_eqF]: since we only consider deterministics
+LTSs here, it does not matter.
+
+.. coq::
+|*)
+
 Section wbisim.
   Context {I : Type} (E : event I I) {X1 X2 : psh I} (RX : relᵢ X1 X2).
 
