@@ -49,9 +49,9 @@ by functions from variables to values, as such their well-behaved equality is
     {
       v_sub_proper {Γ Δ} ::
         Proper (ass_eq Γ Δ ==> forall_relation (fun i => eq ==> eq)) v_sub ;
-      v_sub_v_var {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : p ⊛ v_var ≡ₐ p ;
-      v_var_v_sub {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : v_var ⊛ p ≡ₐ p ;
-      v_sub_v_sub {Γ1 Γ2 Γ3 Γ4} (p : Γ3 ⇒ᵥ Γ4) (q : Γ2 ⇒ᵥ Γ3) (r : Γ1 ⇒ᵥ Γ2) :
+      v_sub_var {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : p ⊛ v_var ≡ₐ p ;
+      v_var_sub {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : v_var ⊛ p ≡ₐ p ;
+      v_sub_sub {Γ1 Γ2 Γ3 Γ4} (p : Γ3 ⇒ᵥ Γ4) (q : Γ2 ⇒ᵥ Γ3) (r : Γ1 ⇒ᵥ Γ2) :
       p ⊛ (q ⊛ r) ≡ₐ (p ⊛ q) ⊛ r ;
     } .
 
@@ -110,4 +110,7 @@ Notation "u ⊛ᵥ v" := (v_sub u _ v) (at level 30).
 Notation "Γ ⇒ᵥ Δ" := (Γ =[val]> Δ) (at level 30).
 Notation "u ⊛ₜ c" := (c_sub u c) (at level 30).
 Infix "⊛" := e_comp (at level 14).
+Notation "r ᵣ⊛ᵥ v" := (v_ren r _ v) (at level 14).
+Infix "ᵣ⊛" := e_ren (at level 14).
+Infix "ᵣ⊛ₜ" := c_ren (at level 14).
 

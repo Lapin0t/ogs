@@ -85,9 +85,56 @@ The following definition is equivalent, but with a slightly different packaging.
   Definition nf'_of_obs' {Γ} (o : obs∙ Γ) : nf∙ (Γ +▶ dom∙ o) :=
     (obs'_ty o ,' (r_concat_l _ (obs'_var o) , (obs'_obs o ,' v_var ⊛ᵣ r_concat_r))).
 
+  #[global] Instance nf_eq_rfl {Γ t} : Reflexive (@nf_eq Γ t) .
+    intros a; exists eq_refl; auto.
+  Qed.
+
+  #[global] Instance nf_eq_sym {Γ t} : Symmetric (@nf_eq Γ t) .
+    intros a b [ p q ].
+    unshelve econstructor.
+    - now symmetry.
+    - intros ? i.
+      destruct a as [ m a ] ; cbn in *.
+      revert a q i; rewrite p; clear p; intros a q i.
+      symmetry; apply q.
+  Qed.
+
+  #[global] Instance nf_eq_tra {Γ t} : Transitive (@nf_eq Γ t) .
+    intros a b c [ p1 q1 ] [ p2 q2 ].
+    unfold nf_eq.
+    unshelve econstructor.
+    - now transitivity (projT1 b).
+    - transitivity (rew [fun m : obs t => dom m ⇒ᵥ Γ] p2 in projT2 b); auto.
+      now rewrite <- p2.
+  Qed.
+
+  #[global] Instance nf_eq_rfl' {Γ} : Reflexiveᵢ (fun _ : T1 => @nf'_eq Γ) .
+    intros _ [ x [ i n ] ].
+    unshelve econstructor; auto.
+  Qed.
+
+  #[global] Instance nf_eq_sym' {Γ} : Symmetricᵢ (fun _ : T1 => @nf'_eq Γ) .
+    intros _ [ x1 [ i1 n1 ] ] [ x2 [ i2 n2 ] ] [ p [ q1 q2 ] ].
+    unshelve econstructor; [ | split ]; cbn in *.
+    - now symmetry.
+    - revert i1 q1; rewrite p; intros i1 q1; now symmetry.
+    - revert n1 q2; rewrite p; intros n1 q2; now symmetry.
+  Qed.
+
+  #[global] Instance nf_eq_tra' {Γ} : Transitiveᵢ (fun _ : T1 => @nf'_eq Γ) .
+    intros _ [ x1 [ i1 n1 ] ] [ x2 [ i2 n2 ] ] [ x3 [ i3 n3 ] ] [ p1 [ q1 r1 ] ] [ p2 [ q2 r2 ] ].
+    unshelve econstructor; [ | split ]; cbn in *.
+    - now transitivity x2.
+    - transitivity (rew [has Γ] p2 in i2); auto.
+      now rewrite <- p2.
+    - transitivity (rew [nf Γ] p2 in n2); auto.
+      now rewrite <- p2.
+  Qed.
+
 End withFam.
 
 Arguments dom {_ _} [_].
+#[global] Notation context := (ctx typ).
 #[global] Notation "obs∙ Γ" := (obs' Γ) (at level 10).
 #[global] Notation "ty∙ o" := (obs'_ty o) (at level 10).
 #[global] Notation "dom∙ o" := (obs'_dom o) (at level 10).

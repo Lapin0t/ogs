@@ -2,7 +2,7 @@ From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
 From OGS.OGS Require Import Subst Obs.
-From OGS.ITree Require Import ITree Eq Delay Structure Properties Guarded.
+From OGS.ITree Require Import Eq Delay.
 
 Section withFam.
   Context {bT : baseT}.
@@ -44,5 +44,7 @@ Section withFam.
     eval_app_not_var : well_founded head_inst_nostep ;
   } .
 
+  Definition app' {Γ Δ} (u : Γ ⇒ᵥ Δ) (v : nf∙ Γ) : conf Δ :=
+    app (u _ (nf'_var v)) (nf'_obs v) (u ⊛ nf'_val v) .
 
 End withFam.

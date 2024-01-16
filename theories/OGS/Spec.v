@@ -237,7 +237,7 @@ A couple derived properties on the constructed operations.
   Qed.
 
   Lemma v_sub_comp {Γ1 Γ2 Γ3} (u : Γ2 ⇒ᵥ Γ3) (v : Γ1 ⇒ᵥ Γ2) {x} (w : val Γ1 x) : u ⊛ᵥ (v ⊛ᵥ w) = (u ⊛ v) ⊛ᵥ w .
-    pose (w' := s_append s_empty w : (∅ ▶ x) ⇒ᵥ Γ1).
+    pose (w' := a_append a_empty w : (∅ ▶ x) ⇒ᵥ Γ1).
     change w with (w' _ Ctx.top).
     do 2 change (?u ⊛ᵥ ?v _ Ctx.top) with ((u ⊛ v) _ Ctx.top).
     apply v_sub_sub.
@@ -306,7 +306,7 @@ Env M Δ opponent es : environment part of the opponent (aka passive at es) conf
 
   (* flattens an alternating environment into an unstructured one *)
   Equations concat0 {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) : ↓[negb b]Φ ⇒ᵥ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) :=
-    concat0 (εₑ)     := s_empty ;
+    concat0 (εₑ)     := a_empty ;
     concat0 (u ▶ₑ⁺)   := r_concat3_1 ᵣ⊛ concat0 u ;
     concat0 (u ▶ₑ⁻ e) := [ concat0 u , e ] .
 
@@ -314,7 +314,7 @@ Env M Δ opponent es : environment part of the opponent (aka passive at es) conf
 Flattens a pair of alternating environments for both player and opponent into a "closed" substitution.
 |*)
   Equations concat1 {Δ} Φ {b} : alt_env Δ Δ b Φ -> alt_env Δ Δ (negb b) Φ -> ↓[b]Φ ⇒ᵥ Δ :=
-    concat1 ∅       _       _         := s_empty ;
+    concat1 ∅       _       _         := a_empty ;
     concat1 (Φ ▶ _) (u ▶ₑ⁺)  (v ▶ₑ⁻ e) := [ concat1 Φ u v , [ v_var , concat1 Φ v u ] ⊛ e ] ;
     concat1 (Φ ▶ _) (u ▶ₑ⁻ e) (v ▶ₑ⁺)  := concat1 Φ u v .
   Arguments concat1 {Δ Φ b}.
@@ -624,13 +624,13 @@ lem 4.6
           destruct (cat_split (is_var_get p)).
           ++ change (?u x1 _) with ((u ⊛ᵣ r_concat_l) _ i) in Heq.
              unfold r_concat3_1 in Heq; rewrite s_eq_cat_l in Heq.
-             cbn in Heq; unfold s_ren, s_map, s_pop in Heq; inversion Heq.
+             cbn in Heq; unfold s_ren, s_map, r_pop in Heq; inversion Heq.
           ++ change (?u x1 _) with ((u ⊛ᵣ r_concat_r) _ j0) in Heq.
              unfold r_concat3_1 in Heq; rewrite s_eq_cat_r in Heq.
-             cbn in Heq; unfold s_ren, s_map, s_pop in Heq; inversion Heq.
+             cbn in Heq; unfold s_ren, s_map, r_pop in Heq; inversion Heq.
         + apply (IHx (a ▶ₑ⁺) h); cbn.
           pose (H' := (_ ,' H) : is_var _).
-          assert (Heq : is_var_get H' = (s_pop ⊛ᵣ r_cover_r cover_cat) x2 h) by reflexivity.
+          assert (Heq : is_var_get H' = (r_pop ⊛ᵣ r_cover_r cover_cat) x2 h) by reflexivity.
           remember H' as H1; clear H' H HeqH1.
           change ((?u ᵣ⊛ concat0 a) x2 j) with (u ᵣ⊛ᵥ concat0 a x2 j) in H1.
           destruct (view_is_var_ren (concat0 a x2 j) _ H1).
@@ -641,7 +641,7 @@ lem 4.6
              unfold r_concat3_1 in Heq; rewrite s_eq_cat_l in Heq.
              change (r_concat3_1 x2 _) with ((@r_concat3_1 _ _ ↓⁻ Φ x ⊛ᵣ r_concat_l) x2 i).
              unfold r_concat3_1; rewrite s_eq_cat_l; unfold r_concat_l.
-             cbn in Heq; unfold s_pop, s_ren, s_map in Heq.
+             cbn in Heq; unfold r_pop, s_ren, s_map in Heq.
              remember (@r_cover_l _ _ _ (Δ +▶ (↓⁻ Φ +▶ x)) cover_cat x2 i).
              remember (@r_cover_r _ _ _ (Δ +▶ (↓⁻ Φ +▶ x)) cover_cat x2 h).
              clear -Heq; now dependent induction Heq.
@@ -649,7 +649,7 @@ lem 4.6
              unfold r_concat3_1 in Heq; rewrite s_eq_cat_r in Heq.
              change (r_concat3_1 x2 _) with ((@r_concat3_1 _ Δ _ x ⊛ᵣ r_concat_r) x2 j0).
              unfold r_concat3_1; rewrite s_eq_cat_r; unfold r_concat_l.
-             cbn in Heq; unfold s_pop, s_ren, s_map in Heq.
+             cbn in Heq; unfold r_pop, s_ren, s_map in Heq.
              unfold s_ren, s_map, r_concat_r.
              remember ((@r_cover_r _ _ _ (Δ +▶ (↓⁻ Φ +▶ x)) cover_cat x2 (r_concat_l x2 j0))).
              remember ((@r_cover_r _ _ _ (Δ +▶ (↓⁻ Φ +▶ x)) cover_cat x2 (@r_cover_l _ _ _ (↓⁻ Φ +▶ x) cover_cat x2 j0))).
@@ -669,13 +669,13 @@ lem 4.6
         cbn; rewrite r_cover_l_nil; exact H.
       * dependent elimination j; [ apply PeanoNat.Nat.lt_0_succ | ].
         dependent elimination v; cbn.
-        eapply (IHx (a0 ▶ₑ⁻ (a1 ⊛ᵣ s_pop))); cbn in *.
+        eapply (IHx (a0 ▶ₑ⁻ (a1 ⊛ᵣ r_pop))); cbn in *.
         rewrite <- H.
-        change (([ ?u , a1 ]) x2 (pop h)) with (([ u , a1 ] ⊛ᵣ s_pop) x2 h).
+        change (([ ?u , a1 ]) x2 (pop h)) with (([ u , a1 ] ⊛ᵣ r_pop) x2 h).
         apply s_eq_cover_uniq; rewrite <- s_ren_comp.
-        + change (s_pop ⊛ᵣ r_cover_l cover_cat) with (@r_cover_l _ _ _ (↓⁻ Φ0 +▶ x ▶ y) cover_cat).
+        + change (r_pop ⊛ᵣ r_cover_l cover_cat) with (@r_cover_l _ _ _ (↓⁻ Φ0 +▶ x ▶ y) cover_cat).
           now rewrite s_eq_cat_l.
-        + change (s_pop ⊛ᵣ r_cover_r cover_cat) with (@r_cover_r _ _ _ (↓⁻ Φ0 +▶ x ▶ y) cover_cat ⊛ᵣ s_pop).
+        + change (r_pop ⊛ᵣ r_cover_r cover_cat) with (@r_cover_r _ _ _ (↓⁻ Φ0 +▶ x ▶ y) cover_cat ⊛ᵣ r_pop).
           now rewrite s_ren_comp, s_eq_cat_r.
   Qed.
 
