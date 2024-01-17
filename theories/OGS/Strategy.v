@@ -172,6 +172,9 @@ Flattens a pair of alternating environments for both player and opponent into a 
 End withFam.
 
 #[global] Notation εₑ := (ENil) .
+Arguments ENil {_ _ Δ1 Δ2 b}.
+Arguments EConT {_ _ Δ1 Δ2 Φ Γ}.
+Arguments EConF {_ _ Δ1 Δ2 Φ Γ}.
 #[global] Notation "u ▶ₑ⁺" := (EConT u) (at level 40).
 #[global] Notation "u ▶ₑ⁻ e" := (EConF u e) (at level 40).
 #[global] Notation "x ≈ₐ y" := (m_strat_act_eqv _ x y) (at level 50).
