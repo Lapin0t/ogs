@@ -39,6 +39,8 @@ Env M Δ opponent es : environment part of the opponent (aka passive at es) conf
   Arguments ENil {Δ1 Δ2 b}.
   Arguments EConT {Δ1 Δ2 Φ Γ}.
   Arguments EConF {Δ1 Δ2 Φ Γ}.
+  (* Derive Signature for alt_env. *)
+  (* Derive NoConfusionHom for alt_env. *)
 
   Notation εₑ := (ENil) .
   Notation "u ▶ₑ⁺" := (EConT u) (at level 40).
@@ -57,6 +59,7 @@ Flattens a pair of alternating environments for both player and opponent into a 
     concat1 ∅       _       _         := a_empty ;
     concat1 (Φ ▶ _) (u ▶ₑ⁺)  (v ▶ₑ⁻ e) := [ concat1 Φ u v , [ v_var , concat1 Φ v u ] ⊛ e ] ;
     concat1 (Φ ▶ _) (u ▶ₑ⁻ e) (v ▶ₑ⁺)  := concat1 Φ u v .
+
   Arguments concat1 {Δ Φ b}.
 
 (*|
