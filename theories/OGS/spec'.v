@@ -47,41 +47,6 @@ Proof.
     now apply nf_eq_rfl'.
 Qed.
 
-Equations reduce {Δ} : reduce_t Δ -> delay (msg' Δ) :=
-  reduce u := eval_in_env
-                ([ v_var , concat1 (snd (fst (projT2 u))) (snd (projT2 u)) ])
-                (fst (fst (projT2 u))) .
-
-  Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => msg' Δ) i := fun 'T1_0 => reduce .
-
-  Lemma quatre_trois_pre {Δ} (x : reduce_t Δ) :
-    (compo_body x >>= fun _ r =>
-         match r with
-         | inl x' => reduce' _ x'
-         | inr y => Ret' (y : (fun _ => msg' _) _)
-         end)
-    ≊
-    (eval (fst (fst (projT2 x))) >>= fun _ u =>
-         match cat_split (nf_var' u) with
-         | CLeftV h => Ret' (_ ,' (h, nf_msg' u))
-         | CRightV h => reduce' _ (_ ,' (m_strat_resp (snd (projT2 x)) (_ ,' (h, nf_msg' u)) ,
-                                         snd (fst (projT2 x)) ▶ₑ⁻ nf_val' u))
-         end).
-    etransitivity; [ now apply bind_bind_com | ].
-    etransitivity; [ now apply fmap_bind_com | ].
-    unfold m_strat_play, m_strat_wrap.
-    remember (eval (fst (fst (projT2 x)))) as t eqn:H; clear H; revert t.
-    unfold it_eq; coinduction R CIH; intros t.
-    cbn; destruct (t.(_observe)) as [ [ ? [ i [ ? ? ] ] ] | | [] ]; cbn.
-    + destruct (cat_split i).
-      * econstructor; reflexivity.
-      * cbn -[eval_in_env] .
-        change (it_eqF _ _ _ _ (_observe ?a) (_observe ?b))
-          with (it_eq_map  ∅ₑ (eqᵢ _) (it_eq_t _ (eqᵢ _) R) T1_0 a b).
-        reflexivity.
-    + econstructor; apply CIH.
-  Qed.
-
   (* Alternative definition of the composition easier to prove
   congruence (respecting weak bisimilarity). *)
 
