@@ -2,6 +2,7 @@ From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel Ctx.
 From OGS.Game Require Import Event.
 From OGS.ITree Require Import ITree Eq Delay Structure Properties.
+From OGS.OGS Require Import Soundness.
 Set Equations Transparent.
 
 Inductive ty0 : Type :=
@@ -19,7 +20,7 @@ Delimit Scope ty_scope with ty.
 Bind Scope ty_scope with ty0.
 
 (*||*)
-Notation "A × B" := (Prod A B) (at level 40) : ty_scope.
+Notation "A × B" := (Prod A B).
 Notation "A + B" := (Sum A B) : ty_scope.
 Notation "A → B" := (Arr A B) (at level 40) : ty_scope .
 
@@ -100,18 +101,18 @@ Equations v_rename {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ :=
 Definition a_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 =[val]> Γ2 -> Γ1 =[val]> Γ3 :=
   fun f g _ i => v_rename f _ (g _ i) .
 
-Definition t_shift  {Γ} [y] : term Γ ⇒ᵢ term (Γ ▶ y)  := @t_rename _ _ s_pop.
-Definition v0_shift {Γ} [y] : val0 Γ ⇒ᵢ val0 (Γ ▶ y)  := @v0_rename _ _ s_pop.
-Definition s_shift  {Γ} [y] : state Γ -> state (Γ ▶ y) := @s_rename _ _ s_pop.
-Definition v_shift  {Γ} [y] : val Γ ⇒ᵢ val (Γ ▶ y)    := @v_rename _ _ s_pop.
-Definition v_shift2  {Γ} [y z] : val Γ ⇒ᵢ val (Γ ▶ y ▶ z)  := @v_rename _ _ (s_pop ⊛ᵣ s_pop).
-Definition v_shift3  {Γ} [x y z] : val Γ ⇒ᵢ val (Γ ▶ x ▶ y ▶ z)  := @v_rename _ _ (s_pop ⊛ᵣ s_pop ⊛ᵣ s_pop).
+Definition t_shift  {Γ} [y] : term Γ ⇒ᵢ term (Γ ▶ y)  := @t_rename _ _ r_pop.
+Definition v0_shift {Γ} [y] : val0 Γ ⇒ᵢ val0 (Γ ▶ y)  := @v0_rename _ _ r_pop.
+Definition s_shift  {Γ} [y] : state Γ -> state (Γ ▶ y) := @s_rename _ _ r_pop.
+Definition v_shift  {Γ} [y] : val Γ ⇒ᵢ val (Γ ▶ y)    := @v_rename _ _ r_pop.
+Definition v_shift2  {Γ} [y z] : val Γ ⇒ᵢ val (Γ ▶ y ▶ z)  := @v_rename _ _ (r_pop ⊛ᵣ r_pop).
+Definition v_shift3  {Γ} [x y z] : val Γ ⇒ᵢ val (Γ ▶ x ▶ y ▶ z)  := @v_rename _ _ (r_pop ⊛ᵣ r_pop ⊛ᵣ r_pop).
 
 Definition a_shift {Γ Δ} [y] (a : Γ =[val]> Δ) : (Γ ▶ y) =[val]> (Δ ▶ y) :=
-  s_append (fun _ i => v_shift _ (a _ i)) (Var _ top).
+  a_append (fun _ i => v_shift _ (a _ i)) (Var _ top).
 
 Definition a_shift3 {Γ Δ} [x y z] (a : Γ =[val]> Δ) : (Γ ▶ x ▶ y ▶ z) =[val]> (Δ ▶ x ▶ y ▶ z) :=
-  s_append (s_append (s_append (fun _ i => v_shift3 _ (a _ i))
+  a_append (a_append (a_append (fun _ i => v_shift3 _ (a _ i))
                         (Var _ (pop (pop top))))
               (Var _ (pop top)))
     (Var _ top).
@@ -158,7 +159,7 @@ Definition App'' {Γ a b} (f : term Γ (t+ (a → b))) (x : term Γ (t+ a)) : te
 
 (*
 Definition Lam' {Γ a b} (u : term (Γ ▶ t+ a) (t+ b)) : val0 Γ (a → b) :=
-  LamRec (t_rename (r_shift s_pop) (t+ _) u) . 
+  LamRec (t_rename (r_shift r_pop) (t+ _) u) .
 
 Definition ty_nat (a : ty0) : ty0 := (a → ((a → a) → a)) .
 Definition nat_ze {a} : term ∅ (t+ ty_nat a) :=
@@ -184,7 +185,7 @@ Definition example1 {a} : term ∅ (t+ ((ty_nat a → (ty_nat a → ty_nat a))
   exact (App' (App'' f (App' (App' f n) n)) n).
 Defined.
 
-(* λ f n => ((f n) ((f n) n)) *)  
+(* λ f n => ((f n) ((f n) n)) *)
 Definition example2 {a} : term ∅ (t+ ((ty_nat a → (ty_nat a → ty_nat a))
                                       → (ty_nat a → ty_nat a))) .
   do 2 refine (Val (Lam' _)).
@@ -223,7 +224,7 @@ Equations v_subst {Γ Δ} : Γ =[val]> Δ -> val Γ ⇒ᵢ val Δ :=
 Definition a_comp {Γ1 Γ2 Γ3} : Γ2 =[val]> Γ3 -> Γ1 =[val]> Γ2 -> Γ1 =[val]> Γ3 :=
   fun f g _ i => v_subst f _ (g _ i) .
 
-Definition ass1 {Γ a} (v : val Γ a) : (Γ ▶ a) =[val]> Γ := s_append Var v .
+Definition ass1 {Γ a} (v : val Γ a) : (Γ ▶ a) =[val]> Γ := a_append Var v .
 
 Definition t_subst1  {Γ a b} (u : term (Γ ▶ a) b) v := t_subst (ass1 v) _ u.
 Definition v0_subst1 {Γ a b} (u : val0 (Γ ▶ a) b) v := v0_subst (ass1 v) _ u.
@@ -343,15 +344,15 @@ Equations p_dom_of_v0 {Γ : neg_ctx} a (v : val0 Γ a) : pat_dom (p_of_v0 a v) =
   p_dom_of_v0 (a + b) (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_v0 (a + b) (Inl v) := p_dom_of_v0 a v ;
   p_dom_of_v0 (a + b) (Inr v) := p_dom_of_v0 b v ;
-  p_dom_of_v0 (One)    v := s_append s_empty v ;
-  p_dom_of_v0 (a → b) v := s_append s_empty v ;
-  p_dom_of_v0 (a × b)  v := s_append s_empty v .
+  p_dom_of_v0 (One)    v := a_append a_empty v ;
+  p_dom_of_v0 (a → b) v := a_append a_empty v ;
+  p_dom_of_v0 (a × b)  v := a_append a_empty v .
 
 Definition nf0 (Γ : neg_ctx) (a : ty) : Type := { p : pat (t_neg a) & pat_dom p =[val]> Γ } .
 Definition nf (Γ : neg_ctx) : Type := { a : ty & (Γ ∋ a * nf0 Γ a)%type } .
 
 Definition n_rename {Γ Δ : neg_ctx} : Γ ⊆ Δ -> nf Γ -> nf Δ :=
-  fun r u => (projT1 u ,' (r _ (fst (projT2 u)) , (projT1 (snd (projT2 u)) ,' a_ren r (projT2 (snd (projT2 u)))))) . 
+  fun r u => (projT1 u ,' (r _ (fst (projT2 u)) , (projT1 (snd (projT2 u)) ,' a_ren r (projT2 (snd (projT2 u)))))) .
 
 Definition nf0_eq {Γ a} : relation (nf0 Γ a) :=
   fun a b => exists H : projT1 a = projT1 b, rew H in projT2 a ≡ₐ projT2 b .
@@ -444,13 +445,13 @@ Equations eval_aux {Γ : neg_ctx} : state Γ -> (state Γ + nf Γ) :=
 
   eval_aux (Cut (Val (VarP i))     (App v k)) :=
     inr (_ ,' (i , (PApp (p_of_v0 _ v) ,'
-         s_append (p_dom_of_v0 _ v) (k : val _ (t- _))))) ;
+         a_append (p_dom_of_v0 _ v) (k : val _ (t- _))))) ;
 
   eval_aux (Cut (Val (VarP i))     (Fst k)) :=
-    inr (_ ,' (i , (PFst ,' s_append s_empty k))) ;
+    inr (_ ,' (i , (PFst ,' a_append a_empty k))) ;
 
   eval_aux (Cut (Val (VarP i))     (Snd k)) :=
-    inr (_ ,' (i , (PSnd ,' s_append s_empty k))) ;
+    inr (_ ,' (i , (PSnd ,' a_append a_empty k))) ;
 
   eval_aux (Cut (Val (VarP i))     (Match c1 c2))
     with (s_elt_upg i).(sub_prf) := { | (!) } ;
@@ -545,7 +546,7 @@ Lemma r_shift_n_assoc {Γ1 Γ2 Γ3 : t_ctx} ts (f1 : Γ2 ⊆ Γ3) (f2 : Γ1 ⊆ 
   - reflexivity.
   - dependent elimination i.
     + reflexivity.
-    + cbn; unfold s_pop, s_ren; f_equal; apply IHts.
+    + cbn; unfold r_pop, s_ren; f_equal; apply IHts.
 Qed.
 *)
 
@@ -713,7 +714,7 @@ Qed.
 Lemma v_ren_id_r {Γ Δ} (f : Γ ⊆ Δ) a (i : Γ ∋ a) : v_rename f a (Var _ i) = Var _ (f _ i).
   destruct a; auto.
 Qed.
-  
+
 Lemma a_shift_id {Γ a} : @a_shift Γ Γ a Var ≡ₐ Var.
   intros x i; destruct x; dependent elimination i; auto.
 Qed.
@@ -729,7 +730,7 @@ Lemma a_shift_a_ren {Γ1 Γ2 Γ3 y} (f1 : Γ2 ⊆ Γ3) (f2 : Γ1 =[ val ]> Γ2)
   unfold r_shift, a_shift, a_ren, v_shift; intros ? h.
   dependent elimination h; cbn.
   - now rewrite v_ren_id_r.
-  - now rewrite 2 v_ren_ren, s_append_pop.
+  - now rewrite 2 v_ren_ren, a_append_pop.
 Qed.
 
 Lemma a_shift_s_ren {Γ1 Γ2 Γ3 y} (f1 : Γ2 =[val]> Γ3) (f2 : Γ1 ⊆ Γ2)
@@ -806,7 +807,7 @@ Lemma ren_sub_prf : syn_ind_args t_ren_sub_P v0_ren_sub_P s_ren_sub_P.
   all: intros; cbn; f_equal.
   all: try rewrite a_shift_a_ren; try rewrite a_shift3_a_ren; auto.
 Qed.
-  
+
 Lemma t_ren_sub {Γ1 Γ2 Γ3} (f1 : Γ2 ⊆ Γ3) (f2 : Γ1 =[val]> Γ2) a (t : term Γ1 a)
   : t_rename f1 a (t_subst f2 a t) = t_subst (a_ren f1 f2) a t.
   now apply (term_ind_mut _ _ _ ren_sub_prf).
@@ -822,7 +823,7 @@ Qed.
 Lemma v_ren_sub {Γ1 Γ2 Γ3} (f1 : Γ2 ⊆ Γ3) (f2 : Γ1 =[val]> Γ2) a (v : val Γ1 a)
   : v_rename f1 a (v_subst f2 a v) = v_subst (a_ren f1 f2) a v.
   destruct a; [ apply v0_ren_sub | apply t_ren_sub ]; auto. Qed.
-  
+
 Definition t_sub_ren_P Γ1 a (t : term Γ1 a) : Prop :=
   forall Γ2 Γ3 (f1 : Γ2 =[val]> Γ3) (f2 : Γ1 ⊆ Γ2),
     t_subst f1 a (t_rename f2 a t)
@@ -859,7 +860,7 @@ Lemma v_sub_ren {Γ1 Γ2 Γ3} (f1 : Γ2 =[val]> Γ3) (f2 : Γ1 ⊆ Γ2) a (v : v
   : v_subst f1 a (v_rename f2 a v) = v_subst (s_ren f1 f2) a v.
   destruct a; [ apply v0_sub_ren | apply t_sub_ren ]; auto.
 Qed.
-  
+
 Lemma v_sub_id_r {Γ Δ} (f : Γ =[val]> Δ) a (i : Γ ∋ a) : v_subst f a (Var _ i) = f _ i.
   destruct a; auto.
 Qed.
@@ -877,7 +878,7 @@ Lemma a_shift3_comp {Γ1 Γ2 Γ3 x y z} (f1 : Γ2 =[val]> Γ3) (f2 : Γ1 =[val]>
   do 3 (dependent elimination h; cbn; [ now rewrite v_sub_id_r | ]).
   rewrite v_ren_sub, v_sub_ren; now apply v_sub_eq.
 Qed.
-    
+
 Definition t_sub_sub_P Γ1 a (t : term Γ1 a) : Prop :=
   forall Γ2 Γ3 (f1 : Γ2 =[val]> Γ3) (f2 : Γ1 =[val]> Γ2),
     t_subst f1 a (t_subst f2 a t) = t_subst (a_comp f1 f2) a t.
@@ -978,7 +979,7 @@ Lemma s_sub1_sub {Γ Δ a} (f : Γ =[val]> Δ) (v : val Γ a) (s : state (Γ ▶
   unfold s_subst1; rewrite 2 s_sub_sub, sub1_sub; reflexivity.
 Qed.
 
-Lemma s_sub3_sub {Γ Δ x y z} (f : Γ =[val]> Δ) (s : state (Γ ▶ x ▶ y ▶ z)) u v w 
+Lemma s_sub3_sub {Γ Δ x y z} (f : Γ =[val]> Δ) (s : state (Γ ▶ x ▶ y ▶ z)) u v w
   : s_subst (a_shift3 f) s /ₛ[ v_subst f x u , v_subst f y v , v_subst f z w ] = s_subst f (s /ₛ[ u , v , w ]) .
   unfold s_subst3; rewrite 2 s_sub_sub; apply s_sub_eq; auto.
   intros ? h; unfold a_comp, a_shift3, v_shift3.
@@ -1032,7 +1033,7 @@ Definition play_split {Γ Δ : neg_ctx} (e : Γ =[val]> Δ)
       pose (s := @p_dom_of_nf (Δ +▶ₛ _) n).
       unshelve refine ((projT1 u ,' (_ , _)) ,' _).
       refine (p_of_nf n ,' p_dom_of_nf n).
-      refine 
+      refine
     refine ([[Var,e], (a_comp ([Var,e]) (projT2 p))]).
 Defined.
 *)
@@ -1069,7 +1070,7 @@ Lemma emb_play_var {Γ : neg_ctx} {a} (p : pat (t_neg a)) (i : Γ ∋ a)
     + apply (gfp_fp (it_eq_map _ _)).
       cbn; econstructor; cbn.
       rewrite v0_ren_ren.
-      eassert (H : r_shift (r_cover_r cover_cat) ⊛ᵣ s_pop ≡ₐ _).
+      eassert (H : r_shift (r_cover_r cover_cat) ⊛ᵣ r_pop ≡ₐ _).
       intros ? j. cbn.
       by reflexivity.
 *)
@@ -1166,7 +1167,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ ⊆ Δ)
       * unfold play at 2; cbn -[play then_play2].
         unfold then_play2; cbn -[play eval_aux].
         rewrite v0_sub_ren.
-        assert ((@s_append _ _ _ _ (t- b) (p_dom_of_v0 a4 v1) t0 ⊛ᵣ s_pop)
+        assert ((@a_append _ _ _ _ (t- b) (p_dom_of_v0 a4 v1) t0 ⊛ᵣ r_pop)
                 ≡ₐ p_dom_of_v0 a4 v1) by auto.
         rewrite (v0_sub_eq _ _ H a4 _ _ eq_refl), refold_id.
         cbn -[eval_aux];
@@ -1180,16 +1181,16 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ ⊆ Δ)
         rewrite <- (t_sub_eq _ _ (a_comp_assoc _ _ _) (t+ b2) t1 t1 eq_refl).
         rewrite <- t_sub_sub.
         unfold v0_shift at 1; rewrite v0_ren_sub.
-        assert (a_comp (ass1 (v_subst (a_ren (s_pop (x:= (t+ (a2 → b2)))) e) (t+ a2) v1)) (a_shift2 e) ≡ₐ a_comp (a_shift e) (ass1 (v_shift (t+ _) v1))).
+        assert (a_comp (ass1 (v_subst (a_ren (r_pop (x:= (t+ (a2 → b2)))) e) (t+ a2) v1)) (a_shift2 e) ≡ₐ a_comp (a_shift e) (ass1 (v_shift (t+ _) v1))).
         ** intros ? i; dependent elimination i as [ Ctx.top | Ctx.pop Ctx.top | Ctx.pop (Ctx.pop i) ]; cbn.
            ++ rewrite v0_sub_ren; now apply v0_sub_eq.
            ++ reflexivity.
            ++ destruct x1; cbn.
               rewrite v0_ren_ren, v0_sub_ren.
-              rewrite <- (v0_sub_id_l t (v0_rename s_pop t (e _ i))), v0_sub_ren.
+              rewrite <- (v0_sub_id_l t (v0_rename r_pop t (e _ i))), v0_sub_ren.
               now apply v0_sub_eq.
               rewrite t_ren_ren, t_sub_ren.
-              rewrite <- (t_sub_id_l _ (t_rename s_pop _ (e _ i))), t_sub_ren.
+              rewrite <- (t_sub_id_l _ (t_rename r_pop _ (e _ i))), t_sub_ren.
               now apply t_sub_eq.
         ** rewrite (t_sub_eq _ _ H _ _ _ eq_refl).
            rewrite t_sub_sub.
@@ -1225,8 +1226,8 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ ⊆ Δ)
         change (v0_subst e b0 v0) with (v_subst e (t+ b0) v0); rewrite s_sub1_sub.
         apply CIH.
 Qed.
-  - 
-    unfold 
+  -
+    unfold
     rewrite s_ren1_sub.
     apply CIH.
     *)
@@ -1260,7 +1261,7 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
       * unfold play at 2; cbn -[play then_play2].
         unfold then_play2; cbn -[play eval_aux].
         rewrite v0_sub_ren.
-        assert ((@s_append _ _ _ _ (t- b) (p_dom_of_v0 a4 v1) t0 ⊛ᵣ s_pop)
+        assert ((@a_append _ _ _ _ (t- b) (p_dom_of_v0 a4 v1) t0 ⊛ᵣ r_pop)
                 ≡ₐ p_dom_of_v0 a4 v1) by auto.
         rewrite (v0_sub_eq _ _ H a4 _ _ eq_refl), refold_id.
         cbn -[eval_aux]; destruct (eval_aux (Cut (Val (e _ h)) (App (v0_subst e _ v1) (t_subst e _ t0))));
@@ -1326,7 +1327,7 @@ Lemma v_is_var_sub {Γ1 Γ2 x} (v : val Γ1 x) (e : Γ1 ⊆ Γ2) : is_var (v_sub
 Qed.
 *)
 
-Equations p_of_v_eq {Γ : neg_ctx} {t} (p : pat (t+ t)) (e : (pat_dom p) =[ val ]> Γ) 
+Equations p_of_v_eq {Γ : neg_ctx} {t} (p : pat (t+ t)) (e : (pat_dom p) =[ val ]> Γ)
           : p_of_v0 t (v0_subst e t (v_of_p p)) = p :=
   p_of_v_eq (PInl p) e := f_equal PInl (p_of_v_eq p e) ;
   p_of_v_eq (PInr p) e := f_equal PInr (p_of_v_eq p e) ;
@@ -1366,14 +1367,14 @@ Lemma eval_nf_ret {Γ : neg_ctx} (u : nf Γ) : eval (p_app (Var _ (fst (projT2 u
     + do 3 unshelve econstructor; auto; cbn.
       rewrite v0_sub_ren.
       clear ; cbn in *.
-      assert (@nf0_eq _ (t- a4) ((p_of_v0 a4 (v0_subst (γ ⊛ᵣ s_pop) a4 (v_of_p v))) ,'
-                                  p_dom_of_v0 a4 (v0_subst (γ ⊛ᵣ s_pop) a4 (v_of_p v)))
-                (v,' (γ ⊛ᵣ s_pop)))
+      assert (@nf0_eq _ (t- a4) ((p_of_v0 a4 (v0_subst (γ ⊛ᵣ r_pop) a4 (v_of_p v))) ,'
+                                  p_dom_of_v0 a4 (v0_subst (γ ⊛ᵣ r_pop) a4 (v_of_p v)))
+                (v,' (γ ⊛ᵣ r_pop)))
         by (unshelve econstructor; [ apply p_of_v_eq | apply p_dom_of_v_eq ]).
       destruct H as [ p q ]; unshelve econstructor; [ exact (f_equal PApp p) | ].
       cbn; rewrite <- rew_map.
       cbn; rewrite (rew_map (fun xs => (xs ▶ t- b3) =[val]> Γ) pat_dom).
-      rewrite rew_s_append.
+      rewrite rew_a_append.
       intros ? h; dependent elimination h; auto.
       etransitivity; [ | apply (q _ h) ].
       now rewrite (rew_map (fun xs => xs =[val]> Γ) pat_dom).
@@ -1394,7 +1395,7 @@ Lemma foo {I : Type} {E : event I I} {X : psh I} {RX RY : relᵢ X X}
   dependent elimination H2.
   - econstructor; now apply H1.
   - econstructor; now apply CIH.
-  - econstructor; intro; now apply CIH. 
+  - econstructor; intro; now apply CIH.
 Qed.
 
 Lemma clean_hyp_ren {Γ Δ : neg_ctx} (c : state Γ) (e : Γ ⊆ Δ)
@@ -1430,28 +1431,6 @@ Lemma clean_hyp_ren {Γ Δ : neg_ctx} (c : state Γ) (e : Γ ⊆ Δ)
   intros ? j. now rewrite v_ren_id_r.
 Qed.
 
-  
-  
-(*
-Lemma eval_nf_ret {Γ : neg_ctx} (u : nf Γ) : fmap_delay (pat_of_nf Γ) (eval (p_app (Var _ (fst (projT2 u))) (projT1 (snd (projT2 u))) (projT2 (snd (projT2 u))))) ≊ ret_delay (pat_of_nf _ u) .
-  unfold play, iter_delay.
-  rewrite iter_unfold.
-  apply it_eq_unstep; cbn.
-  change (iter _ T1_0 ?x) with (iter_delay (fun c : state Γ => Ret' (eval_aux c)) x).
-  destruct u as [ [] [ i [ m γ ]]]; simpl t_neg in m; simpl p_app.
-  - funelim (v_of_p m); cbn; econstructor; cbn; auto.
-    unfold pat_of_nf; cbn.
-    now rewrite v0_sub_ren, p_of_v_eq.
-  - funelim (v_of_p m); cbn; econstructor; cbn; auto.
-    + unfold pat_of_nf; cbn.
-      change (p_of_v0 _ (Inl ?a)) with (PInl (b:=b) (p_of_v0 _ a)).
-      now rewrite p_of_v_eq.
-    + unfold pat_of_nf; cbn.
-      change (p_of_v0 _ (Inr ?a)) with (PInr (a:=a1) (p_of_v0 _ a)).
-      now rewrite p_of_v_eq.
-Qed.
-*)
-
 Variant head_inst_nostep (u : { x : ty & pat (t_neg x) }) : { x :ty & pat (t_neg x) } -> Prop :=
 | HeadInst {Γ : neg_ctx} {y} (v : val Γ y) (m : pat (t_neg y)) (e : pat_dom m =[val]> Γ) (p : is_var v -> False) (i : Γ ∋ (projT1 u : ty))
            : fmap_delay (pat_of_nf Γ) (eval (p_app v m e)) ≊ ret_delay ((projT1 u : ty) ,' (i , projT2 u)) -> head_inst_nostep u (y ,' m) .
@@ -1478,25 +1457,12 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
     all: destruct (p (_ ,' eq_refl)).
 Qed.
 
-From OGS.OGS Require Spec.
+#[local] Instance stlc_typ  : baseT := {| typ := neg_ty |}.
 
-(*
-Definition ctx_allS (Γ : ctx neg_ty) : allS is_neg (c_map sub_elt Γ).
-  induction Γ; intros ? i; cbn in *.
-  - remember ∅%ctx as Γ; destruct i; inversion HeqΓ.
-  - remember (_ ▶ _)%ctx as Γ' in i; destruct i; inversion HeqΓ'.
-    + exact x.(sub_prf).
-    + rewrite <- H0 in IHΓ; exact (IHΓ _ i).
-Defined.
-
-Definition ctx_from (Γ : ctx neg_ty) : neg_ctx := {| sub_elt := c_map sub_elt Γ ; sub_prf := ctx_allS Γ |}.
-*)
-
-Definition mu_spec : Spec.interaction_spec :=
-  {| Spec.typ := neg_ty ;
-     Spec.msg := fun t => pat (t_neg t) ;
-     Spec.dom := fun t p => ctx_s_to (pat_dom p) |}
-.
+(* Annoying: coercion [neg_coe] does not go through the type class indirection *)
+#[local] Instance stlc_spec : observation_structure :=
+  {| obs := fun t => pat (t_neg (neg_coe t)) ;
+     dom := fun t p => ctx_s_to (pat_dom p) |} .
 
 Definition state' (Γ : ctx neg_ty) : Type := state (ctx_s_from Γ).
 Definition val' (Γ : ctx neg_ty) (a : neg_ty) : Type := val (ctx_s_from Γ) a.(sub_elt).
@@ -1545,11 +1511,11 @@ Lemma from_to_has_R {Γ : ctx neg_ty} {t} (i : ctx_s_from Γ ∋ t) : from_has_R
 Qed.
 
 Lemma to_from_has_R {Γ : ctx neg_ty} {t} (i : Γ ∋ t) : to_has_R (from_has_R i) = i .
-  unfold to_has_R, from_has_R; unfold ctx_s_from. 
+  unfold to_has_R, from_has_R; unfold ctx_s_from.
   destruct (ctx_s_to_inv Γ).
   apply to_from_has_F.
 Qed.
-  
+
 Definition r_from_to_l {Γ : neg_ctx} : ctx_s_from (ctx_s_to Γ) ⊆ Γ :=
   fun _ i => from_has_F (to_has_R i) .
 
@@ -1611,7 +1577,7 @@ Lemma from_to_FB {Γ1 : neg_ctx} {Γ2} (u : Γ1 =[val]> ctx_s_from Γ2) : from_F
   now rewrite from_to_has_F.
 Qed.
 
-Definition to_FF {Γ1 Γ2 : neg_ctx} (u : Γ1 =[val]> Γ2) : ctx_s_to Γ1 =[val']> ctx_s_to Γ2 := 
+Definition to_FF {Γ1 Γ2 : neg_ctx} (u : Γ1 =[val]> Γ2) : ctx_s_to Γ1 =[val']> ctx_s_to Γ2 :=
   to_FB (a_ren r_from_to_r u).
 
 #[global] Instance to_FF_proper {Γ1 Γ2} : Proper (ass_eq _ _ ==> ass_eq _ _) (@to_FF Γ1 Γ2).
@@ -1755,7 +1721,7 @@ Lemma ugly_var_inj {Γ x} (i j : Γ ∋ x) : ugly_var x i = ugly_var x j -> i = 
 
   pose (xx := view_s_has_map (fun x1 : neg_ty => x1) a (s_map_has (fun x1 : sigS is_neg => x1) a i)).
   change (view_s_has_map _ _ _) with xx in x |- *.
-  now rewrite <- x.  
+  now rewrite <- x.
 Qed.
 
 Lemma ugly_var_dec {Γ x} (v : val' Γ x) : {i : Γ ∋ x & v = ugly_var x i} + ({i : Γ ∋ x & v = ugly_var x i} -> False) .
@@ -1800,24 +1766,26 @@ Definition to_nf {Γ} (u : nf (ctx_s_from Γ)) :
   { t : neg_ty & (Γ ∋ t * { m : pat (t_neg t) & ctx_s_to (pat_dom m) =[ val' ]> Γ })%type } :=
   (_ ,' (to_has_R (fst (projT2 u)) , (projT1 (snd (projT2 u)) ,' to_FB (projT2 (snd (projT2 u)))))) .
 
-Program Definition mu_val : @Spec.lang_monoid mu_spec :=
-  {| Spec.val := val' ;
-     Spec.v_var := fun _ => ugly_var ;
-     Spec.v_sub := fun _ _ a _ v => v_subst (from_BB a) _ v ;
+#[local] Instance stlc_val  : baseV := {| Subst.val := val' |}.
+
+#[local] Instance mu_val : subst_monoid _ :=
+  {| v_var := fun _ => ugly_var ;
+     v_sub := fun _ _ a _ v => v_subst (from_BB a) _ v ;
   |}.
 
-Program Definition mu_conf : @Spec.lang_module mu_spec mu_val :=
-  {| Spec.conf := state' ;
-     Spec.c_sub := fun _ _ a s => s_subst (from_BB a) s ;
+#[local] Instance stlc_conf : baseC := {| conf := state' |}.
+
+#[local] Instance mu_conf : subst_module _ _ :=
+  {| c_sub := fun _ _ a s => s_subst (from_BB a) s ;
   |}.
 
-Program Definition mu_machine : @Spec.machine mu_spec mu_val mu_conf :=
-  {| Spec.eval := fun _ c => fmap_delay to_nf (play c) ;
-      Spec.app := fun _ _ v m r => p_app v m (from_FB r) |} .
+#[local] Instance mu_machine : machine :=
+  {| Machine.eval := fun _ c => fmap_delay to_nf (play c) ;
+     Machine.app := fun _ _ v m r => p_app v m (from_FB r) |} .
 
-Lemma mu_val_laws : @Spec.lang_monoid_laws mu_spec mu_val .
-  unfold mu_spec, mu_val.
-  econstructor; unfold Spec.e_comp, s_map; cbn in *.
+#[local] Instance mu_val_laws : subst_monoid_laws.
+Proof.
+  econstructor; unfold e_comp, s_map; cbn in *.
   - intros Γ Δ u1 u2 H1 i v1 v2 H2.
     apply v_sub_eq; auto.
     now rewrite H1.
@@ -1837,9 +1805,9 @@ Lemma mu_val_laws : @Spec.lang_monoid_laws mu_spec mu_val .
     apply v_sub_eq; auto.
 Qed.
 
-Lemma mu_conf_laws : @Spec.lang_module_laws mu_spec mu_val mu_conf .
-  unfold mu_spec, mu_val, mu_conf.
-  econstructor; unfold Spec.e_comp, s_map; cbn in *.
+#[local] Instance mu_conf_laws : subst_module_laws.
+Proof.
+  econstructor; unfold e_comp, s_map; cbn in *.
   - intros Γ Δ u1 u2 H1 s1 s2 H2.
     apply s_sub_eq; auto.
     now rewrite H1.
@@ -1851,9 +1819,9 @@ Lemma mu_conf_laws : @Spec.lang_module_laws mu_spec mu_val mu_conf .
     apply s_sub_eq; auto.
 Qed.
 
-Lemma mu_var_laws : @Spec.var_assumptions mu_spec mu_val .
-  unfold mu_spec, mu_val.
-  econstructor; unfold Spec.is_var; cbn in *.
+#[local] Instance mu_var_laws : var_assumptions.
+Proof.
+  econstructor; unfold is_var; cbn in *.
   - exact @ugly_var_inj.
   - exact @ugly_var_dec.
   - exact @ugly_is_var_ren.
@@ -1862,8 +1830,9 @@ Qed.
 Definition substS {X : SProp} (P : X -> Type) (a b : X) : P a -> P b := fun p => p .
 
 Lemma to_comp_eq {Γ} (u v : delay (nf (ctx_s_from Γ))) (H : u ≋ v) :
-  @Spec.comp_eq mu_spec mu_val _ (fmap_delay to_nf u) (fmap_delay to_nf v) .
-  unfold Spec.comp_eq, fmap_delay.
+  Obs.comp_eq (fmap_delay to_nf u) (fmap_delay to_nf v).
+Proof.
+  unfold Obs.comp_eq, fmap_delay.
   eapply (fmap_eq (RX := fun _ => nf_eq)); auto.
   intros [] ? ?  H1.
   destruct x as [ x1 [ i1 [ m1 γ1 ] ] ].
@@ -1887,16 +1856,21 @@ Definition from_pat_F {Γ : neg_ctx} : { x : neg_ty & (ctx_s_to Γ ∋ x * pat (
 
 Definition to_pat {Γ : ctx neg_ty} : pat' (ctx_s_from Γ) -> { x : neg_ty & (Γ ∋ x * pat (t_neg x))%type } :=
   fun u => (_ ,' (to_has_R (fst (projT2 u)) , snd (projT2 u))) .
-        
+
 Lemma from_to_pat_F {Γ : neg_ctx} (x y : nf (ctx_s_from (ctx_s_to Γ))) (H : x = y)
-  : from_pat_F (@Spec.msg_of_nf' mu_spec mu_val _ (to_nf x)) = pat_of_nf _ (n_rename r_from_to_l y) .
+  : from_pat_F (obs'_of_nf' _ (to_nf x)) = pat_of_nf _ (n_rename r_from_to_l y) .
   now rewrite H.
 Qed.
 
 
-Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machine.
-  unfold mu_spec, mu_val, mu_conf.
-  econstructor; unfold Spec.e_comp, s_map; cbn in *.
+(* #[global] Instance nf_eq_rfl {Γ} : Reflexiveᵢ (fun _ : T1 => @nf_eq Γ) . *)
+(*   intros _ [ x [ i n ] ]. *)
+(*   unshelve econstructor; auto. *)
+(* Qed. *)
+
+
+#[local] Instance mu_machine_laws : machine_laws.
+  econstructor; unfold e_comp, s_map; cbn in *.
   - intros Γ x v m u1 u2 H.
     destruct x as [ [ t | t ] neg ]; cbn in *.
     + f_equal; apply t_sub_eq; [ now rewrite H | reflexivity ].
@@ -1906,27 +1880,30 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
     + f_equal; rewrite t_sub_sub; apply t_sub_eq; auto.
     + do 2 f_equal; rewrite v0_sub_sub; apply v0_sub_eq; auto.
   - intros Γ Δ c e .
-    unfold Spec.comp_eq, fmap_delay.
+    unfold Obs.comp_eq, fmap_delay.
     etransitivity.
-    unshelve eapply fmap_eq. 5: exact (clean_hyp c (from_BB e)).
+    (* Now that's straight up confusing... Need to feed the second argument to avoid divergence *)
+    unshelve eapply (@fmap_eq T1 (@emptyₑ T1)).
+    5: exact (clean_hyp c (from_BB e)).
     exact ((fun _ => to_nf)).
     intros ? u v ->; unshelve econstructor; auto.
     unfold bind_delay', then_play1.
-    rewrite fmap_bind_com, bind_fmap_com.
-    apply (proj1 (t_gfp (it_eq_map ∅ₑ (fun _ : T1 => Spec.nf_eq')) _ _ _)).
+    rewrite fmap_bind_com.
+    rewrite @bind_fmap_com; [| exact nf_eq_rfl' ]. (* Whyyy? *)
+    apply (proj1 (t_gfp (it_eq_map ∅ₑ (fun _ : T1 => nf'_eq)) _ _ _)).
     eapply (it_eq_up2bind_t (eqᵢ _)); econstructor; auto.
-    intros [] u v ->. 
-    change (gfp _ _ ?a ?b) with (Spec.comp_eq a b).
+    intros [] u v ->.
+    change (gfp _ _ ?a ?b) with (Obs.comp_eq a b).
     apply to_comp_eq.
     erewrite p_app_eq; auto.
     now rewrite <- (from_to_FB (projT2 (snd (projT2 v)))).
   - intros Γ u .
-    unfold Spec.eval_to_msg, Spec.msg_of_nf', Spec.nf', Spec.nf_ty', Spec.nf_msg', Spec.nf_val', Spec.nf_var'.
+    unfold eval_to_obs, obs'_of_nf', nf', nf'_ty, nf'_obs, nf'_val, nf'_var.
     destruct u as [ x [ j [ m γ ] ] ] ; cbn in *.
     pose proof (eval_nf_ret ((x : ty) ,' (from_has_R j , (m ,' from_FB γ)))); cbn in H.
     apply to_comp_eq in H.
     rewrite H; clear H.
-    unfold Spec.comp_eq; apply it_eq_unstep; cbn; econstructor.
+    unfold Obs.comp_eq; apply it_eq_unstep; cbn; econstructor.
     unshelve econstructor; auto; cbn.
     unshelve econstructor; auto; cbn.
     + exact (to_from_has_R _).
@@ -1944,14 +1921,14 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
     eassert (H3 : _). refine (H0 ((projT1 y).(sub_elt) ,' projT2 y) _ ((projT1 y).(sub_prf))).
     * dependent elimination H2.
       cbn in *.
-      unfold Spec.eval_to_msg in i0.
+      unfold eval_to_obs in i0.
       destruct x as [ t m ]; cbn in *.
       unshelve econstructor.
       + clear - Γ ; exact (ctx_s_from Γ).
       + clear - v ; exact v.
       + clear - e ; exact (from_FB e).
       + exact (from_has_R i).
-      + intros []; apply p; unfold Spec.is_var, Spec.v_var.
+      + intros []; apply p; unfold Subst.is_var, Subst.v_var.
         apply (substS (fun u => {i1 : Γ ∋ {| sub_elt := t; sub_prf := u |} & v = ugly_var {| sub_elt := t; sub_prf := u |} i1}) ((ctx_s_from Γ).(sub_prf) _ x)).
         refine (to_has_R x ,' _).
         rewrite e0; unfold ugly_var; f_equal; symmetry.
@@ -1960,7 +1937,7 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
         eapply (fmap_eq (RY := eqᵢ _) (fun _ => from_pat_R) (fun _ => from_pat_R)) in i0; [ | intros ? ? ? ->; auto ].
         unfold fmap_delay in i0.
         rewrite 2 fmap_fmap_com in i0.
-        transitivity (((fun (_ : T1) (x : nf (ctx_s_from Γ)) => from_pat_R (@Spec.msg_of_nf' mu_spec mu_val Γ (to_nf x))) <$>
+        transitivity (((fun (_ : T1) (x : nf (ctx_s_from Γ)) => from_pat_R (@obs'_of_nf' _ _ _ Γ (to_nf x))) <$>
         play (p_app v m (from_FB e)))).
         unfold fmap_delay.
         eapply fmap_eq; auto.
@@ -1968,7 +1945,7 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
            destruct n1 as [ x1 [ i1 [ m1 γ1 ]] ].
            destruct n2 as [ x2 [ i2 [ m2 γ2 ]] ].
            destruct H' as [ H2 [ H3 [ H4 _ ] ] ]; cbn in *.
-           unfold Spec.msg_of_nf', pat_of_nf, from_pat_R; cbn.
+           unfold obs'_of_nf', pat_of_nf, from_pat_R; cbn.
            revert i1 m1 γ1 H3 H4; rewrite H2; clear H2 x1; intros i1 m1 γ1 H3 H4; cbn in H3,H4.
            now rewrite H3, H4, from_to_has_R.
         ** rewrite i0; clear.
@@ -1981,36 +1958,28 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
 Qed.
 
 Definition sem_act (Δ Γ : neg_ctx) : Type :=
-  @Spec.ogs_act mu_spec (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx .
+  ogs_act (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx .
 
 Definition sem_pas (Δ Γ : neg_ctx) : Type :=
-  @Spec.ogs_pas mu_spec (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx .
+  ogs_pas (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx .
 
 Definition ugly_state {Γ : neg_ctx} (c : state Γ) : state (ctx_s_from (ctx_s_to Γ)) :=
   match ctx_s_to_inv (ctx_s_to Γ) as f in (fiber _ b) return (b = ctx_s_to Γ -> state (fib_extr f)) with
   | Fib a => fun H => rew <- [state ∘ coe_ctx] ctx_s_to_inj H in c
   end eq_refl .
 
-(*
-Definition interp_act {Δ Γ : neg_ctx} (c : state Γ) : sem_act Δ Γ :=
-  @Spec.m_strat mu_spec mu_val mu_conf mu_machine (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx
-    (@Spec.inj_init_act mu_spec mu_val mu_conf (ctx_s_to Δ) (ctx_s_to Γ)
-    (rew <- [state ∘ coe_ctx] ctx_s_from_to Γ in c)) .
-*)
-
 Definition from_to_state {Γ : neg_ctx} (c : state Γ) : state (ctx_s_from (ctx_s_to Γ)) :=
   s_rename r_from_to_r c .
 
 Definition interp_act_c {Δ Γ : neg_ctx} (c : state Γ) : sem_act Δ Γ :=
-  @Spec.m_strat mu_spec mu_val mu_conf mu_machine (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx
-    (@Spec.inj_init_act mu_spec mu_val mu_conf (ctx_s_to Δ) (ctx_s_to Γ) (from_to_state c)) .
+  m_strat (∅ ▶ ctx_s_to Γ)%ctx (inj_init_act (ctx_s_to Δ) (from_to_state c)) .
 
 Definition c_of_t {Γ : neg_ctx} {x} (t : term Γ (t+ x)) : state (Γ ▶ₛ {| sub_elt := t- x ; sub_prf := stt |}) :=
   Cut (t_shift _ t) (VarN Ctx.top) .
 
 Definition a_of_sk {Γ Δ : neg_ctx} {x} (s : Γ =[val]> Δ) (k : term Δ (t- x))
   : (Γ ▶ₛ {| sub_elt := t- x ; sub_prf := stt |}) =[val]> Δ :=
-  s_append s (k : val Δ (t- x)) .
+  a_append s (k : val Δ (t- x)) .
 
 Lemma sub_csk {Γ Δ : neg_ctx} {x} (t : term Γ (t+ x)) (s : Γ =[val]> Δ) (k : term Δ (t- x))
               : Cut (t_subst s _ t) k = s_subst (a_of_sk s k) (c_of_t t) .
@@ -2038,21 +2007,21 @@ Theorem mu_correction (Δ : neg_ctx) {Γ : neg_ctx} {t} (x y : term Γ (t+ t))
   : ⟦ x ⟧ ≈[ Δ ]≈ ⟦ y ⟧ -> ciu_eq Δ x y .
   intros H σ k.
   pose (Γ' := (Γ ▶ₛ {| sub_elt := t- t ; sub_prf := stt |})%ctx).
-  apply (@Spec.ogs_correction mu_spec mu_val mu_val_laws mu_conf mu_conf_laws
-                 mu_var_laws mu_machine mu_machine_laws
-                 (ctx_s_to Γ')
-                 (ctx_s_to Δ)
-                 (from_to_state (c_of_t x))
-                 (from_to_state (c_of_t y))) in H.
+  pose proof @ogs_correction _ _ _ _ _ _ _ _ _ _ _
+    (ctx_s_to Γ')
+    (ctx_s_to Δ)
+    (from_to_state (c_of_t x))
+    (from_to_state (c_of_t y)) as TH.
+  apply TH in H; clear TH.
   specialize (H (to_FF (a_of_sk σ k))).
   rewrite 2 sub_csk.
   remember (c_of_t x) as x'; clear x Heqx'.
   remember (c_of_t y) as y'; clear y Heqy'.
   remember (a_of_sk σ k) as e; clear σ k Heqe.
 
-  unfold Spec.eval_in_env, Spec.eval_to_msg in H ; cbn in H.
+  unfold eval_in_env, eval_to_obs in H ; cbn in H.
   unfold it_wbisim in H.
-  unfold Spec.msg' in H.
+  unfold obs' in H.
   unshelve eapply (fmap_weq (RY := eqᵢ _) (fun _ : T1 => from_pat_F) (fun _ : T1 => from_pat_F) _ _ _ _) in H.
   intros [] ? ? ->; auto.
   unfold fmap_delay in H.
