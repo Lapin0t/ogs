@@ -1,3 +1,5 @@
+From Coinduction Require Import coinduction tactics.
+
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
@@ -38,11 +40,12 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Equations reduce {Δ} : reduce_t Δ -> delay (obs∙ Δ) :=
     reduce u := eval_in_env
-                  ([ v_var , concat1 (snd (fst (projT2 u))) (snd (projT2 u)) ])
+                  ([ v_var , concat1 _ (snd (fst (projT2 u))) (snd (projT2 u)) ])
                   (fst (fst (projT2 u))) .
 
-  Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => msg' Δ) i := fun 'T1_0 => reduce .
+  Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => obs∙ Δ) i := fun 'T1_0 => reduce .
 
+  Tactic Notation "mytransitivity" := first [eapply @transitivity; [eapply it_eq_t_trans; fail | |] | etransitivity].
 
 (*|
 Equipped with eventually guarded equations, we are ready to prove the adequacy
@@ -51,18 +54,18 @@ Equipped with eventually guarded equations, we are ready to prove the adequacy
     (compo_body x >>= fun _ r =>
          match r with
          | inl x' => reduce' _ x'
-         | inr y => Ret' (y : (fun _ => msg' _) _)
+         | inr y => Ret' (y : (fun _ => obs∙ _) _)
          end)
       ≊
       (eval (fst (fst (projT2 x))) >>= fun _ u =>
-           match cat_split (nf_var' u) with
-           | CLeftV h => Ret' (_ ,' (h, nf_msg' u))
-           | CRightV h => reduce' _ (_ ,' (m_strat_resp (snd (projT2 x)) (_ ,' (h, nf_msg' u)) ,
-                                           snd (fst (projT2 x)) ▶ₑ⁻ nf_val' u))
+           match cat_split (nf'_var u) with
+           | CLeftV h => Ret' (_ ,' (h, nf'_obs u))
+           | CRightV h => reduce' _ (_ ,' (m_strat_resp (snd (projT2 x)) (_ ,' (h, nf'_obs u)) ,
+                                           snd (fst (projT2 x)) ▶ₑ⁻ nf'_val u))
            end).
   Proof.
-    etransitivity; [ now apply bind_bind_com | ].
-    etransitivity; [ now apply fmap_bind_com | ].
+    mytransitivity; [ now apply bind_bind_com | ].
+    mytransitivity; [ now apply fmap_bind_com | ].
     unfold m_strat_play, m_strat_wrap.
     remember (eval (fst (fst (projT2 x)))) as t eqn:H; clear H; revert t.
     unfold it_eq; coinduction R CIH; intros t.
@@ -76,14 +79,47 @@ Equipped with eventually guarded equations, we are ready to prove the adequacy
     + econstructor; apply CIH.
   Qed.
 
-  Lemma adequacy {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a) :
+  Definition split_sub_eval {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : delay (nf∙ Δ) :=
+    eval ([ v_var , e ] ⊛ₜ c) .
+
+  Definition eval_split_sub {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) : delay (nf' Δ) :=
+    eval c >>= fun 'T1_0 u =>
+        match cat_split (nf'_var u) with
+        | CLeftV h => Ret' (nf'_ty u ,' (h , (nf'_obs u ,' [ v_var,  e ] ⊛ nf'_val u)))
+        | CRightV h => eval (app (e _ h) (nf'_obs u) ([v_var , e ] ⊛ nf'_val u))
+        end .
+
+  Lemma eval_split {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ ⇒ᵥ Δ) :
+    split_sub_eval c e ≋ eval_split_sub c e .
+  Proof.
+    unfold split_sub_eval, eval_split_sub.
+    rewrite (eval_sub c ([ v_var , e ])).
+    unfold bind_delay'.
+    remember (eval c) as t; clear c Heqt.
+    revert t; unfold comp_eq,it_eq; coinduction R CIH; cbn; intro t.
+    destruct (_observe t); [ | econstructor; apply CIH | inversion q ].
+    destruct r as [ x [ i [ m γ ] ] ]; cbn in *.
+    destruct (cat_split i).
+    + change (?u x (r_cover_l cover_cat x i)) with ((u ⊛ᵣ r_concat_l) x i).
+      rewrite s_eq_cat_l.
+      eassert (H : _) by exact (eval_nf_ret (x ,' (i , (m ,' ([v_var, e]) ⊛ γ)))).
+      unfold comp_eq in H.
+      apply it_eq_step in H; cbn in *; unfold observe in H.
+      destruct (_observe (eval (app (v_var x i) m (([v_var, e]) ⊛ γ)))); dependent elimination H; auto.
+    + change (?u x (r_cover_r cover_cat x j)) with ((u ⊛ᵣ r_concat_r) x j).
+      rewrite s_eq_cat_r.
+      destruct (_observe (eval (app (e x j) m (([v_var, e]) ⊛ γ)))); econstructor; auto.
+      now apply nf_eq_rfl'.
+  Qed.
+
+  Lemma adequacy_gen {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a) :
     reduce (_ ,' (c , e)) ≊ (c ∥g e).
   Proof.
     refine (iter_evg_uniq (fun 'T1_0 u => compo_body u) (fun 'T1_0 u => reduce u) _ _ T1_0 _).
     clear a c e; intros [] [ ? [ u v ] ].
     etransitivity; [ | symmetry; apply adequacy_pre ].
     unfold reduce at 1.
-    etransitivity; [ apply eval_to_msg_eq, eval_split | ].
+    etransitivity; [ apply eval_to_obs_eq, eval_split | ].
     etransitivity; [ apply bind_fmap_com | ].
     unfold it_eq; cbn [fst snd projT2 projT1].
     apply (tt_t (it_eq_map ∅ₑ (eqᵢ _))).
@@ -94,19 +130,19 @@ Equipped with eventually guarded equations, we are ready to prove the adequacy
     rewrite q; clear q i1.
     destruct r as [ p q ]; cbn in p,q.
     revert γ1 q; rewrite p; clear p m1; intros γ1 q; cbn in q.
-    apply (bt_t (it_eq_map ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)))).
+    apply (bt_t (it_eq_map ∅ₑ (eqᵢ (fun _ : T1 => obs∙ Δ)))).
     pose (xx := cat_split i2); change (cat_split i2) with xx; destruct xx.
     - cbn; econstructor; reflexivity.
     - cbn -[it_eq_map fmap].
-      change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => msg' Δ)) bot) with (it_eq (E:=∅ₑ) (eqᵢ (fun _ : T1 => msg' Δ))).
+      change (it_eq_t ∅ₑ (eqᵢ (fun _ : T1 => obs∙ Δ)) bot) with (it_eq (E:=∅ₑ) (eqᵢ (fun _ : T1 => obs∙ Δ))).
       apply it_eq_step, (fmap_eq (RX := eqᵢ _)).
       intros ? ? ? ->; auto.
       unfold m_strat_resp; cbn [fst snd projT1 projT2].
       rewrite app_sub, concat1_equation_2.
 
-      pose (xx := [ v_var , [concat1 v (snd u), ([v_var, concat1 (snd u) v]) ⊛ γ2]] ⊛ᵥ r_concat3_1 ᵣ⊛ᵥ concat0 v t2 j).
+      pose (xx := [ v_var , [concat1 _ v (snd u), ([v_var, concat1 _ (snd u) v]) ⊛ γ2]] ⊛ᵥ r_concat3_1 ᵣ⊛ᵥ concat0 v t2 j).
       change ([ v_var , [ _ , _ ]] ⊛ᵥ _) with xx.
-      assert (H : xx = concat1 (snd u) v t2 j); [ | rewrite H; clear H ].
+      assert (H : xx = concat1 _ (snd u) v t2 j); [ | rewrite H; clear H ].
       + unfold xx; clear xx.
         change (?a ⊛ᵥ ?b ᵣ⊛ᵥ (concat0 v _ j)) with ((a ⊛ (b ᵣ⊛ concat0 v)) _ j).
         unfold e_ren; rewrite v_sub_sub.
@@ -121,50 +157,69 @@ Equipped with eventually guarded equations, we are ready to prove the adequacy
         now rewrite q, 2 e_comp_ren_r, v_sub_var, 2 s_eq_cat_r.
   Qed.
 
-  Lemma adequacy_app {Γ Δ} (c : conf Γ) (e : Γ ⇒ᵥ Δ) :
+ (* Something in the refactoring broke all rewrites in this proof,
+     there seems to be a unification problem diverging during TC search.
+     To be fixed, for now we painfully fix the proofs by hand.
+   *)
+  Lemma adequacy {Γ Δ} (c : conf Γ) (e : Γ ⇒ᵥ Δ) :
     eval_in_env e c ≊ (inj_init_act Δ c ∥g inj_init_pas e).
   Proof.
-    etransitivity; [ | apply adequacy ].
+    etransitivity; [ | apply adequacy_gen ].
     unfold reduce, inj_init_act, eval_in_env; cbn [fst snd projT1 projT2]; apply (fmap_eq (RX:=eqᵢ _)).
     intros ? ? ? ->; auto.
     unfold inj_init_pas; rewrite concat1_equation_2, 2 concat1_equation_1.
     unfold c_ren; rewrite c_sub_sub, c_sub_proper ; try reflexivity.
-    rewrite s_eq_cover_empty_r.
+    etransitivity.
+    2:{
+      eapply e_comp_proper; [| reflexivity].
+      eapply s_cover_proper; [reflexivity |].
+      eapply s_cover_proper; [reflexivity |].
+      eapply e_comp_proper; [| reflexivity].
+      apply s_eq_cover_empty_r.
+    }
     rewrite e_comp_ren_r, v_sub_var.
-    rewrite s_ren_comp, 2 s_eq_cat_r.
-    unfold e_ren, r_concat_l, cover_cat; cbn; rewrite r_cover_l_nil, s_ren_id.
-    now rewrite 2 v_var_sub.
+    rewrite s_ren_comp.
+    (* rewrite s_eq_cat_r. *)
+    etransitivity.
+    2:{
+      eapply s_ren_proper; [| reflexivity].
+      symmetry; apply s_eq_cat_r.
+    }
+    etransitivity.
+    2:{
+      symmetry; apply s_eq_cat_r.
+    }
+    unfold e_ren, r_concat_l, cover_cat; cbn.
+    etransitivity.
+    2:{
+      eapply e_comp_proper; [reflexivity |].
+      eapply e_comp_proper; [| reflexivity].
+      eapply s_ren_proper; [reflexivity |].
+      symmetry; apply r_cover_l_nil.
+    }
+    etransitivity.
+    2:{
+      eapply e_comp_proper; [reflexivity |].
+      eapply e_comp_proper; [| reflexivity].
+      symmetry; apply s_ren_id.
+    }
+    etransitivity.
+    2:{
+      eapply e_comp_proper; [reflexivity |].
+      symmetry; apply v_var_sub.
+    }
+    etransitivity.
+    2:{
+      eapply e_comp_proper; [| reflexivity].
+      symmetry; apply s_eq_cover_empty_r.
+    }
+    etransitivity.
+    2:{
+      eapply e_comp_proper; [| reflexivity].
+      symmetry; apply s_eq_cover_empty_r.
+    }
+    symmetry; apply v_var_sub.
   Qed.
 
+End withFam.
 
-  Definition ciu {Γ} Δ (x y : conf Γ) : Prop
-    := forall e : Γ ⇒ᵥ Δ, eval_in_env e x ≈ eval_in_env e y.
-  Notation "x ≈⟦ciu Δ ⟧≈ y" := (ciu Δ x y) (at level 50).
-
-
-  Definition barb {Γ} Δ (x y : conf Γ) : Prop
-    := forall e : Γ ⇒ᵥ Δ, (inj_init_act Δ x ∥ inj_init_pas e) ≈ (inj_init_act Δ y ∥ inj_init_pas e).
-  Notation "x ≈⟦barb Δ ⟧≈ y" := (barb Δ x y) (at level 50).
-
-  Theorem barb_correction {Γ} Δ (x y : conf Γ) : x ≈⟦barb Δ ⟧≈ y -> x ≈⟦ciu Δ ⟧≈ y.
-  Proof.
-    intros H e.
-    etransitivity; [ apply it_eq_wbisim, (quatre_trois_app x e) | ].
-    etransitivity; [ apply iter_evg_iter | ].
-    etransitivity; [ apply (H e) | symmetry ].
-    etransitivity; [ apply it_eq_wbisim, (quatre_trois_app y e) | ].
-    etransitivity; [ apply iter_evg_iter | ].
-    reflexivity.
-  Qed.
-
-  Theorem ogs_correction {Γ} Δ (x y : conf Γ) : x ≈⟦ogs Δ ⟧≈ y -> x ≈⟦ciu Δ ⟧≈ y.
-  Proof.
-    intro H; apply barb_correction.
-    intro e; unfold compo.
-    change (iter _ T1_0 ?u) with (iter_delay compo_body u); rewrite <- 2 compo_compo_alt.
-    apply compo_alt_proper; [ exact H | intro; reflexivity ].
-  Qed.
-
-End withInteractionSpec.
-About ogs_correction.
-Print Assumptions ogs_correction.

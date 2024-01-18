@@ -1,8 +1,10 @@
+From Coinduction Require Import coinduction tactics.
+
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
 From OGS.OGS Require Import Subst.
-From OGS.ITree Require Import Delay Eq.
+From OGS.ITree Require Import ITree Delay Eq.
 
 Open Scope ctx_scope.
 
@@ -129,6 +131,22 @@ The following definition is equivalent, but with a slightly different packaging.
       now rewrite <- p2.
     - transitivity (rew [nf Γ] p2 in n2); auto.
       now rewrite <- p2.
+  Qed.
+
+  Lemma eval_to_obs_eq {Γ} (a b : delay (nf∙ Γ)) (H : a ≋ b) :
+    fmap_delay (@obs'_of_nf' Γ) a ≊ fmap_delay (@obs'_of_nf' Γ) b .
+  Proof.
+    revert a b H; unfold it_eq; coinduction R CIH; intros a b H.
+    unfold comp_eq in H; apply it_eq_step in H.
+    cbn in *; unfold observe in H.
+    destruct (_observe a), (_observe b); dependent elimination H; econstructor.
+    - destruct r_rel as [ p [ q [ r _ ] ] ].
+      destruct r1 as [ x1 [ i1 [ m1 a1 ] ] ], r2 as [ x2 [ i2 [ m2 a2 ] ] ].
+      unfold obs'_of_nf', nf'_ty, nf'_var, nf'_obs in *; cbn in *.
+      revert i1 m1 a1 q r; rewrite p; intros i1 m1 a1 q r.
+      now do 2 f_equal.
+    - now apply CIH.
+    - inversion q1.
   Qed.
 
 End withFam.
