@@ -17,6 +17,7 @@ From OGS Require Import Prelude .
 From OGS.Utils Require Import Psh Rel Ctx .
 From OGS.ITree Require Import ITree Delay .
 Declare Scope ty_scope .
+From OGS.OGS Require Import Soundness.
 (*|
 Syntax
 ------
@@ -195,17 +196,17 @@ Definition a_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 =[val_m]> Γ2 -> Γ1 =[val_m
 (*|
 The following bunch of notations will help us to keep the code readable:
 |*)
-Notation "f ᵣ⊛ₜ t" := (t_rename f _ t) (at level 30, right associativity).
+Notation "f ᵣ⊛ₜ t" := (t_rename f _ t).
 Notation "f ᵣ⊛ₑ π" := (e_rename f _ π) (at level 30, right associativity).
 Notation "f ᵣ⊛ₘ v" := (m_rename f _ v) (at level 30, right associativity).
 Notation "f ᵣ⊛ₛ s" := (s_rename f s) (at level 30, right associativity).
-Notation "f ᵣ⊛ g" := (a_ren f g) (at level 30, right associativity).
+Notation "f ᵣ⊛ g" := (a_ren f g).
 (*|
 As discussed above, we can now obtain our precious weakenings. Here are the
 three we will need.
 |*)
-Definition t_shift {Γ a} := @t_rename Γ (Γ ▶ a) s_pop.
-Definition m_shift {Γ a} := @m_rename Γ (Γ ▶ a) s_pop.
+Definition t_shift {Γ a} := @t_rename Γ (Γ ▶ a) r_pop.
+Definition m_shift {Γ a} := @m_rename Γ (Γ ▶ a) r_pop.
 Definition a_shift {Γ Δ a} (f : Γ =[val_m]> Δ) :=
   s_map m_shift f ▶ₐ a_id a top .
 (*|
@@ -241,11 +242,11 @@ Definition a_comp {Γ1 Γ2 Γ3} (f : Γ2 =[val_m]> Γ3) (g : Γ1 =[val_m]> Γ2)
 (*|
 These notations will make everything shine.
 |*)
-Notation "f ⊛ₜ t" := (t_subst f _ t) (at level 30, right associativity).
+Notation "f ⊛ₜ t" := (t_subst f _ t).
 Notation "f ⊛ₑ π" := (e_subst f _ π) (at level 30, right associativity).
 Notation "f ⊛ₘ v" := (m_subst f _ v) (at level 30, right associativity).
 Notation "f ⊛ₛ s" := (s_subst f s) (at level 30, right associativity).
-Notation "f ⊛ g" := (a_comp f g) (at level 30, right associativity).
+Notation "f ⊛ g" := (a_comp f g).
 (*|
 Finally we define a more usual substitution function which only substitutes
 the top two variables instead of doing parallel substitution.

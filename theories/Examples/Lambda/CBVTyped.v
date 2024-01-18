@@ -1113,8 +1113,10 @@ Notation "'λ' x"  := (VLamR (t_rename (r_shift r_pop) _ x)) (at level 10).
 Infix "⋅" := App (at level 10).
 
 (* λ f g x => g (f x) *)
-Definition term_example a b c: term ∅ ((a → b) → ((b → c) → (a → c))) :=
+Definition term_example_aux a b c: term ∅ ((a → b) → ((b → c) → (a → c))) :=
   λ (λ (λ (var1 ⋅ (var2 ⋅ var0)))).
+
+Definition term_example := term_example_aux ι ι ι.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -1123,6 +1125,5 @@ Require ExtrOcamlIntConv.
 Extraction Language OCaml.
 
 Extraction "foo.ml" stlc_eval term_example.
-Set Extraction AccessOpaque.
 
-Extract
+

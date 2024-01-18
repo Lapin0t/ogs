@@ -17,6 +17,7 @@ From OGS Require Import Prelude .
 From OGS.Utils Require Import Psh Rel Ctx .
 From OGS.ITree Require Import ITree Delay .
 Declare Scope ty_scope .
+From OGS.OGS Require Import Soundness.
 (*|
 Syntax
 ------
@@ -191,18 +192,18 @@ Definition a_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 =[val_m]> Γ2 -> Γ1 =[val_m
 (*|
 The following bunch of notations will help us to keep the code readable:
 |*)
-Notation "f ᵣ⊛ₜ t" := (t_rename f t) (at level 30, right associativity).
-Notation "f ᵣ⊛ᵥ v" := (v_rename f v) (at level 30, right associativity).
+Notation "f ᵣ⊛ₜ t" := (t_rename f t).
+Notation "f ᵣ⊛ᵥ v" := (v_rename f v).
 Notation "f ᵣ⊛ₑ π" := (e_rename f π) (at level 30, right associativity).
 Notation "f ᵣ⊛ₘ v" := (m_rename f _ v) (at level 30, right associativity).
 Notation "f ᵣ⊛ₛ s" := (s_rename f s) (at level 30, right associativity).
-Notation "f ᵣ⊛ g" := (a_ren f g) (at level 30, right associativity).
+Notation "f ᵣ⊛ g" := (a_ren f g).
 (*|
 As discussed above, we can now obtain our precious weakenings. Here are the
 three we will need.
 |*)
-Definition t_shift {Γ a} := @t_rename Γ (Γ ▶ a) s_pop.
-Definition m_shift {Γ a} := @m_rename Γ (Γ ▶ a) s_pop.
+Definition t_shift {Γ a} := @t_rename Γ (Γ ▶ a) r_pop.
+Definition m_shift {Γ a} := @m_rename Γ (Γ ▶ a) r_pop.
 Definition a_shift {Γ Δ a} (f : Γ =[val_m]> Δ) :=
   s_map m_shift f ▶ₐ a_id a top .
 (*|
@@ -241,12 +242,12 @@ Definition a_comp {Γ1 Γ2 Γ3} (f : Γ2 =[val_m]> Γ3) (g : Γ1 =[val_m]> Γ2)
 (*|
 These notations will make everything shine.
 |*)
-Notation "f ⊛ₜ t" := (t_subst f t) (at level 30, right associativity).
-Notation "f ⊛ᵥ v" := (v_subst f v) (at level 30, right associativity).
+Notation "f ⊛ₜ t" := (t_subst f t).
+Notation "f ⊛ᵥ v" := (v_subst f v).
 Notation "f ⊛ₑ π" := (e_subst f π) (at level 30, right associativity).
 Notation "f ⊛ₘ v" := (m_subst f _ v) (at level 30, right associativity).
 Notation "f ⊛ₛ s" := (s_subst f s) (at level 30, right associativity).
-Notation "f ⊛ g" := (a_comp f g) (at level 30, right associativity).
+Notation "f ⊛ g" := (a_comp f g).
 (*|
 Finally we define a more usual substitution function which only substitutes
 the top two variables instead of doing parallel substitution.
@@ -809,44 +810,47 @@ The Actual Instance
 Having proved all the basic syntactic properties of STLC, we are now ready to
 instanciate our framework!
 |*)
-From OGS.OGS Require Import Spec.
 (*|
 As we only have negative types, we instanciate the interaction specification
 with types and observations. Beware that in more involved cases, the notion of
 "types" we give to the interaction specification does not coincide with the
 "language types": you should only give the "non-shareable types".
 |*)
-Definition stlc_spec : interaction_spec :=
-  {| typ := ty ;
-     msg := obs ;
+#[local] Instance stlc_typ  : baseT := {| typ := ty |}.
+#[local] Instance stlc_val  : baseV := {| Subst.val := val_m |}.
+#[local] Instance stlc_conf : baseC := {| Subst.conf := state |}.
+
+#[local] Instance stlc_spec : observation_structure :=
+  {| Obs.obs := obs ;
      dom := @obs_dom |} .
+
 (*|
 As hinted at the beginning, we instanciate the abstract value notion with our
 "machine values". They form a suitable monoid, which means we get a category
 of assigments.
 |*)
-Program Definition stlc_val : @lang_monoid stlc_spec :=
-  {| val := val_m ;
-     v_var := @a_id ;
+#[local] Instance stlc_val_mon : subst_monoid _ :=
+  {| v_var := @a_id ;
      v_sub := @m_subst |} .
 
-Program Definition stlc_val_laws : @lang_monoid_laws stlc_spec stlc_val :=
+#[local] Instance stlc_val_laws : subst_monoid_laws :=
   {| v_sub_proper := @m_sub_eq ;
      v_sub_var := @a_comp_id_r ;
      v_var_sub := @a_comp_id_l ;
-     v_sub_sub := @a_comp_assoc |} .
+     Subst.v_sub_sub := @a_comp_assoc |} .
+
 (*|
 Configurations are instanciated with our states, and what we have proved
 earlier amounts to showing they are a right-module on values.
 |*)
-Program Definition stlc_conf : @lang_module stlc_spec stlc_val :=
-  {| conf := state ;
-     c_sub := @s_subst |} .
+#[local] Instance stlc_conf_mod : subst_module _ _ :=
+  {| c_sub := @s_subst |} .
 
-Program Definition stlc_conf_laws : @lang_module_laws stlc_spec stlc_val stlc_conf :=
+#[local] Instance stlc_conf_laws : subst_module_laws :=
   {| c_sub_proper := @s_sub_eq ;
      c_var_sub := @s_sub_id_l ;
      c_sub_sub := @s_sub_sub |} .
+
 (*|
 In our generic theorem, there is a finicky lemma that is the counter-part to
 the exclusion of any "infinite chit-chat" that one finds in other accounts of
@@ -856,7 +860,7 @@ injective and that its fibers are decidable and invert renamings. These
 technicalities are easily shown by induction on values but help us to
 distinguish conveniently between values which are variables and others.
 |*)
-Definition stlc_var_laws : @var_assumptions stlc_spec stlc_val .
+#[local] Instance stlc_var_laws : var_assumptions.
   econstructor; intros.
   - destruct x; now dependent induction H.
   - destruct x; induction v; try (apply inr; intros [ i H ]; now inversion H).
@@ -870,9 +874,9 @@ We now instanciate the machine with `stlc_eval` as the active step ("compute
 the next observable action") and `obs_app` as the passive step ("resume from
 a stuck state").
 |*)
-Program Definition stlc_machine : @machine stlc_spec stlc_val stlc_conf :=
-  {| Spec.eval := @stlc_eval ;
-     Spec.app := @obs_app |} .
+#[local] Instance stlc_machine : machine :=
+  {| eval := @stlc_eval ;
+     app := @obs_app |} .
 (*|
 All that is left is to prove our theorem-specific hypotheses. All but another
 technical lemma for the chit-chat problem are again coherence conditions
@@ -885,7 +889,7 @@ coinductive reasoning on the delay monad.
 From Coinduction Require Import coinduction lattice rel tactics.
 From OGS.ITree Require Import Eq.
 
-Lemma stlc_machine_law : @machine_laws stlc_spec stlc_val stlc_conf stlc_machine .
+#[local] Instance stlc_machine_law : machine_laws.
   econstructor; intros; unfold stlc_spec, stlc_val in *; cbn in *.
 (*|
 The first one proves that `obs_app` respects pointwise equality of assigments.
@@ -930,7 +934,7 @@ one has the flavor of an identity law. It states that evaluating a normal form
 is the identity computation.
 |*)
   - destruct u as [ a [ i [ p γ ] ]].
-    unfold nf_ty', nf_var', nf_val', a_id; cbn in *.
+    unfold nf'_ty, nf'_var, nf'_val, a_id; cbn in *.
     destruct a; dependent elimination p; cbn in *.
     all: unfold comp_eq; apply it_eq_unstep; cbn; econstructor.
     all: do 3 (unshelve econstructor; auto; cbn).
@@ -966,7 +970,7 @@ splitting".
         dependent elimination v; try now destruct (p (_ ,' eq_refl)).
         apply it_eq_step in i0; now inversion i0.
         dependent elimination v0; apply it_eq_step in i0; cbn in i0; dependent elimination i0.
-        unfold msg_of_nf' in r_rel; cbn in r_rel.
+        unfold obs'_of_nf' in r_rel; cbn in r_rel.
         inversion_sigma r_rel; dependent elimination r_rel1; clear .
         econstructor; intros [ z p ] H.
         destruct z; dependent elimination p; dependent elimination H.
@@ -979,7 +983,7 @@ splitting".
         dependent elimination v; try now destruct (p (_ ,' eq_refl)).
         apply it_eq_step in i0; now inversion i0.
         dependent elimination v0; apply it_eq_step in i0; cbn in i0; dependent elimination i0.
-        unfold msg_of_nf' in r_rel; cbn in r_rel.
+        unfold obs'_of_nf' in r_rel; cbn in r_rel.
         inversion_sigma r_rel; inversion r_rel1.
 Qed.
 (*|
@@ -1002,8 +1006,9 @@ distinguishes terminating from non-terminating programs.
 Our first shorthand is this generic `eval_to_msg`, which postcomposes the
 evaluation with projection onto the observation.
 |*)
-Definition eval_to_obs {Γ : t_ctx} : state Γ -> delay (@msg' stlc_spec Γ) :=
-  @eval_to_msg stlc_spec stlc_val stlc_conf stlc_machine Γ .
+Definition eval_to_obs {Γ : t_ctx} : state Γ -> delay (obs' Γ) :=
+  eval_to_obs (Γ := Γ).
+
 (*|
 As discussed in the paper, the "native output" of the generic theorem is
 correctness with respect to an equivalence we call "substitution equivalence".
@@ -1018,23 +1023,20 @@ Our semantic objects live in what is defined in the generic construction as
 own notion of equivalence, weak bisimilarity and we get to interpret states
 into semantic objects.
 |*)
-Definition sem_act Δ Γ := @ogs_act stlc_spec Δ (∅ ▶ Γ) .
+Definition sem_act Δ Γ := ogs_act Δ (∅ ▶ Γ) .
 
 Definition ogs_weq_act Δ {Γ} : relation (sem_act Δ Γ) := fun u v => u ≈ v .
 Notation "u ≈[ogs Δ ]≈ v" := (ogs_weq_act Δ u v) (at level 40).
 
 Definition interp_act_s Δ {Γ} (c : state Γ) : sem_act Δ Γ :=
-  @m_strat stlc_spec stlc_val stlc_conf stlc_machine Δ (∅ ▶ Γ)
-    (@inj_init_act stlc_spec stlc_val stlc_conf Δ Γ c) .
+  m_strat (∅ ▶ Γ) (inj_init_act Δ c) .
 Notation "⟦ t ⟧ₛ" := (interp_act_s _ t) .
 (*|
 We can now obtain our instance of the correctness result!
 |*)
 Theorem stlc_subst_correct Δ {Γ} (x y : state Γ)
   : ⟦ x ⟧ₛ ≈[ogs Δ ]≈ ⟦ y ⟧ₛ -> x ≈[sub Δ ]≈ y .
-  exact (@ogs_correction stlc_spec stlc_val stlc_val_laws stlc_conf
-           stlc_conf_laws stlc_var_laws stlc_machine stlc_machine_law
-           Γ Δ x y).
+  exact (ogs_correction (Γ := Γ) Δ x y).
 Qed.
 (*|
 Recovering CIU-equivalence
