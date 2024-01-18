@@ -1,7 +1,7 @@
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
-From OGS.OGS Require Import Subst Obs Machine Game Strategy Utility_lemmas.
+From OGS.OGS Require Import Subst Obs Machine Game Strategy.
 From OGS.ITree Require Import ITree Eq Delay Structure Properties Guarded.
 
 Open Scope ctx_scope.

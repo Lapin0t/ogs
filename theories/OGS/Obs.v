@@ -57,7 +57,6 @@ assignment for its domain.
 The following definition is equivalent, but with a slightly different packaging.
 |*)
   Context {bV : baseV}.
-  Context {sV : subst_monoid bV}.
 
   Definition nf  (Γ : context) (t : typ) : Type := { m : obs t & dom m ⇒ᵥ Γ }.
   Definition nf' (Γ : context) : Type := { t : typ & Γ ∋ t * nf Γ t }%type.
@@ -84,6 +83,7 @@ The following definition is equivalent, but with a slightly different packaging.
   Definition obs'_of_nf' : nf∙ ⇒ᵢ obs∙ :=
     fun Γ u => (nf'_ty u ,' (nf'_var u , nf'_obs u)).
 
+  Context {sV : subst_monoid bV}.
   Definition nf'_of_obs' {Γ} (o : obs∙ Γ) : nf∙ (Γ +▶ dom∙ o) :=
     (obs'_ty o ,' (r_concat_l _ (obs'_var o) , (obs'_obs o ,' v_var ⊛ᵣ r_concat_r))).
 

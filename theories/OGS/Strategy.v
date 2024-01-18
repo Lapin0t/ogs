@@ -3,7 +3,7 @@ From Coinduction Require Import coinduction tactics.
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
-From OGS.OGS Require Import Subst Obs Machine Game Utility_lemmas.
+From OGS.OGS Require Import Subst Obs Machine Game.
 From OGS.ITree Require Import ITree Eq Delay Structure Properties Guarded.
 
 Section withFam.
@@ -55,7 +55,8 @@ Env M Δ opponent es : environment part of the opponent (aka passive at es) conf
 (*|
 Flattens a pair of alternating environments for both player and opponent into a "closed" substitution.
 |*)
-  Equations concat1 {Δ} Φ {b} : alt_env Δ Δ b Φ -> alt_env Δ Δ (negb b) Φ -> ↓[b]Φ ⇒ᵥ Δ :=
+  Equations concat1 {Δ} Φ {b} :
+    alt_env Δ Δ b Φ -> alt_env Δ Δ (negb b) Φ -> ↓[b]Φ ⇒ᵥ Δ :=
     concat1 ∅       _       _         := a_empty ;
     concat1 (Φ ▶ _) (u ▶ₑ⁺)  (v ▶ₑ⁻ e) := [ concat1 Φ u v , [ v_var , concat1 Φ v u ] ⊛ e ] ;
     concat1 (Φ ▶ _) (u ▶ₑ⁻ e) (v ▶ₑ⁺)  := concat1 Φ u v .
