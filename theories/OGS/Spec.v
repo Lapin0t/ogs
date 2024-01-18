@@ -821,7 +821,7 @@ lem 4.6
       + erewrite app_proper; [ reflexivity | ].
         now rewrite q, 2 e_comp_ren_r, v_sub_var, 2 s_eq_cat_r.
    Qed.
-
+  
   Lemma quatre_trois_app {Γ Δ} (c : conf Γ) (e : Γ ⇒ᵥ Δ)
         : eval_in_env e c ≊ (inj_init_act Δ c ∥g inj_init_pas e).
     etransitivity; [ | apply quatre_trois ].
