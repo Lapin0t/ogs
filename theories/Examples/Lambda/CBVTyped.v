@@ -100,6 +100,7 @@ Inductive term (Γ : t_ctx) : ty0 -> Type :=
 | App {a b} : term Γ (a → b) -> term Γ a -> term Γ b
 with val (Γ : t_ctx) : ty0 -> Type :=
 | Var {a} : Γ ∋ + a -> val Γ a
+| TT : val Γ ι
 | LamRec {a b} : term (Γ ▶ (a → b) ▶ a) b -> val Γ (a → b)
 .
 (*|
@@ -108,6 +109,7 @@ with val (Γ : t_ctx) : ty0 -> Type :=
 Arguments Val {Γ a} v .
 Arguments App {Γ a b} t1 t2 .
 Arguments Var {Γ a} i .
+Arguments TT {Γ} .
 Arguments LamRec {Γ a b} t .
 (*|
 Evaluation contexts follow. As discussed, there is a "covariable" case, to
@@ -182,6 +184,7 @@ Equations t_rename {Γ Δ} : Γ ⊆ Δ -> term Γ ⇒ᵢ term Δ :=
   t_rename f _ (App t1 t2) := App (t_rename f _ t1) (t_rename f _ t2) ;
 with v_rename {Γ Δ} : Γ ⊆ Δ -> val Γ ⇒ᵢ val Δ :=
   v_rename f _ (Var i)    := Var (f _ i) ;
+  v_rename f _ (TT)       := TT ;
   v_rename f _ (LamRec t) := LamRec (t_rename (r_shift2 f) _ t) .
 
 Equations e_rename {Γ Δ} : Γ ⊆ Δ -> ev_ctx Γ ⇒ᵢ ev_ctx Δ :=
@@ -233,6 +236,7 @@ Equations t_subst {Γ Δ} : Γ =[val_m]> Δ -> term Γ ⇒ᵢ term Δ :=
   t_subst f _ (App t1 t2) := App (t_subst f _ t1) (t_subst f _ t2) ;
 with v_subst {Γ Δ} : Γ =[val_m]> Δ -> val Γ ⇒ᵢ val Δ :=
   v_subst f _ (Var i)    := f _ i ;
+  v_subst f _ (TT)       := TT ;
   v_subst f _ (LamRec t) := LamRec (t_subst (a_shift2 f) _ t) .
 
 Equations e_subst {Γ Δ} : Γ =[val_m]> Δ -> ev_ctx Γ ⇒ᵢ ev_ctx Δ :=
@@ -412,6 +416,7 @@ Record syn_ind_args (P_t : forall Γ A, term Γ A -> Prop)
     ind_val {Γ a} v (_ : P_v Γ a v) : P_t Γ a (Val v) ;
     ind_app {Γ a b} t1 (_ : P_t Γ (a → b) t1) t2 (_ : P_t Γ a t2) : P_t Γ b (App t1 t2) ;
     ind_var {Γ a} i : P_v Γ a (Var i) ;
+    ind_tt {Γ} : P_v Γ (ι) (TT) ;
     ind_lamrec {Γ a b} t (_ : P_t _ b t) : P_v Γ (a → b) (LamRec t) ;
     ind_kvar {Γ a} i : P_e Γ a (K0 i) ;
     ind_kfun {Γ a b} t (_ : P_t Γ (a → b) t) π (_ : P_e Γ b π) : P_e Γ a (K1 t π) ;
@@ -1118,6 +1123,7 @@ Definition term_example_aux a b c: term ∅ ((a → b) → ((b → c) → (a →
 
 Definition term_example := term_example_aux ι ι ι.
 
+(* WIP extraction
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
 Require ExtrOcamlIntConv.
@@ -1125,5 +1131,4 @@ Require ExtrOcamlIntConv.
 Extraction Language OCaml.
 
 Extraction "foo.ml" stlc_eval term_example.
-
-
+*)

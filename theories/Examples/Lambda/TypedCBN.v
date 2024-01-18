@@ -251,9 +251,9 @@ Notation "f ⊛ g" := (a_comp f g).
 Finally we define a more usual substitution function which only substitutes
 the top two variables instead of doing parallel substitution.
 |*)
-Definition assign2 {Γ a b} v1 v2 : (Γ ▶ a ▶ b) =[val_m]> Γ := a_id ▶ₐ v1 ▶ₐ v2 .
-Definition t_subst2 {Γ a b c} (t : term _ c) v1 v2 := @assign2 Γ a b v1 v2 ⊛ₜ t.
-Notation "t /[ v1 , v2 ]" := (t_subst2 t v1 v2) (at level 50, left associativity).
+Definition assign1 {Γ a} v : (Γ ▶ a) =[val_m]> Γ := a_id ▶ₐ v .
+Definition t_subst1 {Γ a b} (t : term _ b) v := @assign1 Γ a v ⊛ₜ t.
+Notation "u /[ v ]" := (t_subst1 u v) (at level 50, left associativity).
 (*|
 An Evaluator
 ------------
@@ -292,7 +292,7 @@ the observations are pretty simple:
 |*)
 Variant obs : ty -> Type :=
 | OLam {a b} : obs (¬ (a → b))
-| OApp {a b} : obs (a → b)
+| OApp {a} : obs a
 .
 (*|
 As observations correspond to a subset of (machine) values where all the
@@ -305,7 +305,7 @@ observation.
 |*)
 Equations obs_dom {a} : obs a -> t_ctx :=
   obs_dom (@OLam a b)   := ∅ ▶ + (a → b) ;
-  obs_dom (@OApp a b) := ∅ ▶ + a ▶ ¬ b .
+  obs_dom (@OApp a) := ∅ ▶ a .
 (*|
 Given a value, an observation on its type and a value for each fresh variable
 of the observation, we can "refold" everything and form a new state which will
@@ -355,13 +355,10 @@ Rules 1,3,5 step to a new configuration, while cases 2,4 are stuck on normal
 forms.
 |*)
 Equations? eval_step {Γ : t_ctx} : state Γ -> (state Γ + nf Γ) :=
-  eval_step (Cut u (K0 i))   := _ ;
-  eval_step (Cut u (K1 v π)) := _ .
-  eval_step (Cut (App t1 t2)      (π))      := inl (Cut t2 (K1 t1 π)) ;
-  eval_step (Cut (Val v)          (K0 i))   := inr (_ ,' (i, (ORet ,' (∅ₐ ▶ₐ v)))) ;
-  eval_step (Cut (Val v)          (K1 t π)) := inl (Cut t (K2 v π)) ;
-  eval_step (Cut (Val (Var i))    (K2 v π)) := inr (_,' (i, (OApp ,' (∅ₐ ▶ₐ v ▶ₐ π)))) ;
-  eval_step (Cut (Val (LamRec t)) (K2 v π)) := inl (Cut (t /[ LamRec t , v ]) π) .
+  eval_step (Cut (Var i)   π)        := _ ;
+  eval_step (Cut (Lam u)   (K0 i))   := _ ;
+  eval_step (Cut (Lam u)   (K1 v π)) := inl (Cut (u /[ v ]) π) ;
+  eval_step (Cut (App u v) π)        := inl (Cut u (K1 v π)) .
 (*|
 Having defined the transition function, we can now iterate it inside the delay
 monad. This constructs a possibly non-terminating computation ending with

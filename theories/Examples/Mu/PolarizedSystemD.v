@@ -25,7 +25,6 @@ Inductive ty0 : pol -> Type :=
 | ShiftN : ty0 pos -> ty0 neg
 | NegP : ty0 neg -> ty0 pos
 | NegN : ty0 pos -> ty0 neg
-| List : ty0 pos -> ty0 pos
 .
 
 (*| .. coq:: none |*)
@@ -99,9 +98,6 @@ with whn : t_ctx -> ty -> Type :=
 | NegPL {Γ A} : state (Γ ▶ t- A) -> whn Γ (t- (⊖ A))
 | NegNR {Γ A} : state (Γ ▶ t+ A) -> whn Γ (t+ (¬ A))
 | NegNL {Γ A} : whn Γ (t+ A) -> whn Γ (t- (¬ A))
-| ListR1 {Γ A} : whn Γ (t+ (List A))
-| ListR2 {Γ A} : whn Γ (t+ A) -> whn Γ (t+ (List A)) -> whn Γ (t+ (List A))
-| ListL {Γ A} : state Γ -> state (Γ ▶ t+ A ▶ t+ (List A)) -> whn Γ (t- (List A))
 with state : t_ctx -> Type :=
 | Cut {Γ} p {A : ty0 p} : term Γ (t+ A) -> term Γ (t- A) -> state Γ
 .
@@ -152,9 +148,6 @@ with w_rename {Γ Δ} : Γ ⊆ Δ -> whn Γ ⇒ᵢ whn Δ :=
   w_rename f _ (NegPL c)     := NegPL (s_rename (r_shift f) c) ;
   w_rename f _ (NegNR c)     := NegNR (s_rename (r_shift f) c) ;
   w_rename f _ (NegNL v)     := NegNL (w_rename f _ v) ;
-  w_rename f _ (ListR1)      := ListR1 ;
-  w_rename f _ (ListR2 x xs) := ListR2 (w_rename f _ x) (w_rename f _ xs) ;
-  w_rename f _ (ListL c1 c2) := ListL (s_rename f c1) (s_rename (r_shift2 f) c2) ;
 with s_rename {Γ Δ} : Γ ⊆ Δ -> state Γ -> state Δ :=
    s_rename f (Cut _ v k) := Cut _ (t_rename f _ v) (t_rename f _ k) .
 
@@ -185,259 +178,6 @@ Definition a_shift3 {Γ Δ} [x y z] (a : Γ =[val]> Δ) : (Γ ▶ x ▶ y ▶ z)
                         (s_var _ (pop (pop top))))
               (s_var _ (pop top)))
     (s_var _ top).
-
-Module example_terms.
-
-Definition sum_shift_to {Γ A B} (u : term Γ (t+ (A ⊕ B))) : term Γ (t+ ↑A ⅋ ↑B).
-  apply Whn, ParR.
-  eapply Cut; [ eapply Whn, ShiftNR | apply Whn, Var, pop, top ].
-  eapply Cut; [ eapply Whn, ShiftNR | apply Whn, Var, pop, top ].
-  eapply Cut; [ apply (t_rename (r_pop ⊛ᵣ r_pop ⊛ᵣ r_pop ⊛ᵣ r_pop)), u | ].
-  eapply Whn, OrL.
-  - eapply Cut; [ apply Whn, Var, top | apply Whn, Var, pop, pop, top ].
-  - eapply Cut; [ apply Whn, Var, top | apply Whn, Var, pop, top ].
-Defined.
-
-Definition sum_shift_from {Γ A B} (u : term Γ (t+ ↑A ⅋ ↑B)) : term Γ (t+ (A ⊕ B)).
-  apply Mu; cbn.
-  eapply Cut; [ exact (t_shift _ u) | ].
-  apply Whn, ParL.
-  - apply ShiftNL, Mu; cbn.
-    eapply Cut; [ eapply Whn, OrR1, Var, top | apply Whn, Var, pop, top ].
-  - apply ShiftNL, Mu; cbn.
-    eapply Cut; [ eapply Whn, OrR2, Var, top | apply Whn, Var, pop, top ].
-Defined.
-
-Definition LEM_p {A : ty0 pos} : term ∅ (t+ ↑A ⅋ ¬A) .
-  apply Whn, ParR.
-  eapply Cut; [ eapply Whn, ShiftNR | apply Whn, Var, pop, top ].
-  eapply Cut; [ eapply Whn, NegNR | apply Whn, Var, pop, top ].
-  eapply Cut; [ apply Whn, Var, top | apply Whn, Var, pop, top ].
-Defined.
-Definition LEM_n {A : ty0 neg} : term ∅ (t+ (A ⅋ ↑⊖A)) .
-  apply Whn, ParR.
-  eapply Cut; [ eapply Whn, ShiftNR | eapply Whn, Var, top ].
-  eapply Cut; [ eapply Whn, NegPR, Var, pop, pop, top | eapply Whn, Var, top ].
-Defined.
-
-Definition fun_lambda {Γ A B} (u : state (Γ ▶ t- B ▶ t+ A)) : term Γ (t+ (A → B)).
-  apply Whn, ParR.
-  refine (Cut _ _ (Whn (Var (pop top)))).
-  apply Whn,NegNR.
-  refine (s_rename (r_shift2 r_pop) u).
-Defined.
-
-Definition fun_id {Γ A} : term Γ (t+ (A → ↑ A)).
-  apply fun_lambda.
-  refine (Cut _ (Whn (ShiftNR _)) (Whn (Var (pop top)))).
-  refine (Cut _ (Whn (Var (pop top))) (Whn (Var top))).
-Defined.
-
-(*
-
-↑A := type of computations returning A's
-A → B := ¬ A ⅋ B
-       := type of computations returning either ¬A's or B's, ie *using* A's or returning B's.
-
-hence function introduced by the left par rule
-  λ[¬a,b]. BODY
-or more precisely (desugaring deep pattern matching) by
-  λ[n,b].⟨ λ[¬a]. BODY ∥ n ⟩
-where `a : t+ A` and `b : t- B`
-
-The type of B must be negative, if we wish to return data we must return a thunk returning said data.
-In such case, b will be of type `b : t- ↑B`, that is, it is something accepting a thunk returning B's.
-To produce such a thunk, we need to say how it will *observed*, that is, what will happen when `b` is actually
-`↑r` where `r : t- B`. So a function returning a thunk will be introduced by:
-  λ[¬a,↑r]. BODY
-or more precisely (desugaring deep pattern matching) by
-  λ[n,b].⟨ λ[¬a]. ⟨ λ[↑r].BODY ∥ b ⟩ ∥ n ⟩
-
-let rec rev_append xs ys =
-match xs with
-| [] => ys
-| x :: xs => rev_append xs (x :: ys)
-
-aka
-
-rec rev_append.
-  λ[¬(xs,ys), ↑α].
-    ⟨ xs ∥ (nil)         ⇒ ⟨ ys ∥ α ⟩
-           (cons x' xs') ⇒ ⟨ rev_append ∥ [¬(xs', cons x' ys), ↑α] ⟩ ⟩
-
-actually in the second case branch, we repackage the α inside a shift, so we didn't have to unpack it
-in the first place. So the comatch of the thunk is moved to only happen in the first branch:
-
-rec rev_append.
-  λ[¬(xs,ys), α].
-    ⟨ xs ∥ (nil)         ⇒ ⟨ λ[↑r].⟨ ys ∥ r ⟩ ∥ α ⟩
-           (cons x' xs') ⇒ ⟨ rev_append ∥ [¬(xs', cons x' ys), α] ⟩ ⟩
-
-We are happy since in the recursive case, we do not touch the return
-pointer/continuation channel α: this is an efficient tail-call, effectively
-a jump.
-
-desugaring deep pattern-matching is tedious but straightforward, and we
-can also annotate the polarity in cuts. in the end it looks like this:
-
-rec rev_append. λ[n,α].
- ⟨ λ[¬p].
-   ⟨ p |+| λ[xs,ys]. ⟨ xs |+| (nil)         ⇒ ⟨ λ[↑r]. ⟨ ys |+| r ⟩ |-| α ⟩
-                              (cons x' xs') ⇒ ⟨ rev_append |-| [ ¬(xs', cons x' ys), α ] ⟩ ⟩ ⟩
-    |-| n ⟩
-
-finally we get in de-bruijn with explicit embedding of values into terms:
-
-RecR                                       binding rev_append  recursive elim
-  (Whn (ParR                               binding n,α         intro parallel         comatch
-    (Cut neg
-      (Whn (NegNR                          binding p           intro negation         comatch
-        (Cut pos
-          (Whn (Var 0))                    is p
-          (Whn (TenL                       binding xs,ys       elim tensor            match
-            (Cut pos
-              (Whn (Var 1))                is xs
-              (Whn (ListL                                      elim list              match
-                (Cut neg                                       (list case 1)
-                  (Whn (ShiftNR            binding r           intro thunk            comatch
-                    (Cut pos
-                      (Whn (Var 1))        is ys
-                      (Whn (Var 0)))))     is r
-                  (Whn (Var 3)))           is α
-                (Cut neg                   binding x',xs'      (list case 2)
-                  (Whn (Var 7))            is rev_append
-                  (Whn (ParL                                   elim par               copattern
-                    (NegNL                                     elim neg               copattern
-                      (TenR                                    intro ten              pattern
-                        (Var 0)            is xs'
-                        (ListR2                                intro list (cons)      pattern
-                          (Var 1)          is x'
-                          (Var 2))))       is ys
-                    (Var 5))))))))))))     is α
-      (Whn (Var 1)))))
-*)
-Definition rev_append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
-  (* intro recursive function *)
-  apply RecR, fun_lambda.
-  (* destruct arg *)
-  refine (Cut _ (Whn (Var top)) (Whn (TenL _))); apply (s_rename (r_shift2 r_pop)).
-  (* match on first arg *)
-  apply (Cut _ (Whn (Var (pop top)))), Whn, (w_rename (r_shift r_pop)), ListL.
-  - (* return second arg *)
-    refine (Cut _ (Whn (ShiftNR _)) (Whn (Var (pop top)))); apply (s_rename (r_shift2 r_pop)).
-    refine (Cut _ (Whn (Var (pop top))) (Whn (Var top))).
-  - (* call rec fun *)
-    refine (Cut _ (Whn (Var (pop (pop (pop (pop top)))))) _).
-    apply Whn, ParL.
-    + apply NegNL, TenR; [ apply Var, top | apply ListR2 ].
-      apply Var, pop, top.
-      apply Var, pop, pop, top.
-    + apply Var, pop, pop, pop, top.
-Defined.
-Set Printing Depth 50.
-Eval cbv in rev_append.
-
-(*
-let reverse_tailrec xs = rev_append xs nil
----
-reverse_tailrec = λ[¬xs,α]. ⟨ rev_append ∥ [¬(xs, nil), α] ⟩
-*)
-Definition reverse_tailrec {A} : term ∅ (t+ (List A → ↑List A)).
-  apply fun_lambda.
-  refine (Cut _ rev_append _).
-  apply Whn, ParL.
-  - apply NegNL, TenR; [ apply Var, top | apply ListR1 ].
-  - apply Var, pop, top.
-Defined.
-
-(*
-let rec snoc xs a = match xs with
-| [] => a :: []
-| x :: xs => x :: snoc xs a
----
-rec snoc.
-  λ[¬(xs,a), ↑r].
-    ⟨ xs ∥ (nil)       ⇒ ⟨ cons a nil ∥ r ⟩
-           (cons x xs) ⇒ ⟨ snoc ∥ [¬(xs, a), ↑μ~[zs]. ⟨ cons x zs ∥ r ⟩ ] ⟩ ⟩
----
-Here the recursive call is not a jump: the continuation binds
-the result into `zs` and returns `cons x zs` into the original continuation.
-*)
-Definition snoc {Γ A} : term Γ (t+ (List A ⊗ A → ↑List A)).
-  apply RecR, fun_lambda.
-  refine (Cut _ (Whn (ShiftNR _)) (Whn (Var (pop top)))); apply (s_rename (r_shift2 r_pop)).
-  refine (Cut _ (Whn (Var (pop top))) (Whn (TenL _))); apply (s_rename (r_shift3 r_pop)).
-  apply (Cut _ (Whn (Var (pop top)))), Whn, (w_rename (r_shift r_pop)), ListL.
-  - refine (Cut _ (Whn (ListR2 (Var top) ListR1)) (Whn (Var (pop top)))).
-  - refine (Cut _ (Whn (Var (pop (pop (pop (pop top)))))) (Whn (ParL _ _))).
-    + apply NegNL, TenR; [ apply Var, top | apply Var, pop, pop, top ].
-    + apply w_shift, ShiftNL, Mu; cbn.
-      refine (Cut _ (Whn (ListR2 (Var (pop top)) (Var top))) (Whn (Var (pop (pop (pop top)))))).
-Defined.
-
-(*
-let rec reverse xs = match xs with
-| [] => []
-| x :: xs => snoc (reverse xs) x
----
-rec reverse. λ[¬xs,α].
-  ⟨ xs ∥ (nil)       ⇒ ⟨ λ[↑r]. ⟨ nil ∥ r ⟩ ∥ α ⟩
-         (cons x xs) ⇒ ⟨ reverse ∥ [¬xs, ↑μ~[zs]. ⟨ snoc ∥ [¬(zs,x), α] ⟩ ] ⟩ ⟩
----
-again the call to `reverse` is not a tail call. Here the result is bound to zs and then
-passed to `snoc`. OTOH this second call to `snoc` is a jump.
-*)
-Definition reverse {Γ A} : term Γ (t+ (List A → ↑List A)).
-  apply RecR, fun_lambda.
-  apply (Cut _ (Whn (Var top))), Whn, (w_shift), ListL.
-  - refine (Cut _ (Whn (ShiftNR _)) (Whn (Var top))); apply (s_rename (r_shift r_pop)).
-    refine (Cut _ (Whn ListR1) (Whn (Var top))).
-  - apply (Cut _ (Whn (Var (pop (pop (pop top)))))), Whn, ParL.
-    + apply NegNL, Var, top.
-    + apply w_shift, ShiftNL, Mu; cbn.
-      eapply (Cut _ snoc), Whn, ParL.
-      * apply NegNL, TenR. apply Var, top. apply Var, pop, top.
-      * apply Var, pop, pop, top.
-Defined.
-
-(*
-let rec append xs ys = match xs with
-| [] => ys
-| x :: xs => x :: append xs ys
----
-rec append. λ[¬(xs, ys), ↑r].
-  ⟨ xs ∥ (nil)       ⇒ ⟨ ys ∥ r ⟩
-         (cons x xs) ⇒ ⟨ append ∥ [¬(xs, ys) , ↑μ~[zs]. ⟨ cons x zs ∥ r ⟩ ] ⟩ ⟩
----
-Same story as before, not tail recursive.
-*)
-Definition append {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
-  apply RecR, fun_lambda.
-  refine (Cut _ (Whn (Var top)) (Whn (TenL _))); apply (s_rename (r_shift2 r_pop)).
-  apply (Cut _ (Whn (Var (pop top)))), Whn, (w_rename (r_shift r_pop)), ListL.
-  - refine (Cut _ (Whn (ShiftNR _)) (Whn (Var (pop top)))); apply (s_rename (r_shift2 r_pop)).
-    refine (Cut _ (Whn (Var (pop top))) (Whn (Var top))).
-  - refine (Cut _ (Whn (Var (pop (pop (pop (pop top)))))) _).
-    apply Whn, ParL.
-    + apply NegNL, TenR; [ apply Var, top | apply Var, pop, pop, top ].
-    + apply w_shift, (w_rename (r_shift r_pop)), ShiftNL, Mu; cbn.
-      refine (Cut _ (Whn (ShiftNR _)) (Whn (Var (pop (pop top))))).
-      refine (Cut _ (Whn (ListR2 (Var (pop (pop top))) (Var (pop top)))) (Whn (Var top))).
-Defined.
-
-Definition rev_append_slow {Γ A} : term Γ (t+ (List A ⊗ List A → ↑List A)).
-  apply fun_lambda.
-  eapply (Cut _ (Whn (Var top))), Whn, TenL, (s_rename (r_shift2 r_pop)).
-  eapply (Cut _ reverse), Whn, ParL.
-  - apply NegNL, Var, top.
-  - apply w_shift, ShiftNL, Mu; cbn.
-    eapply (Cut _ append), Whn, ParL; [ | apply Var, pop, pop, top ].
-    apply NegNL, TenR.
-    + apply Var, pop, top.
-    + apply Var, top.
-Defined.
-
-End example_terms.
 
 Equations v_of_w {Γ} : whn Γ ⇒ᵢ val Γ :=
   v_of_w (@VTy pos _) v := v ;
@@ -482,9 +222,6 @@ with w_subst {Γ Δ} : Γ =[val]> Δ -> whn Γ ⇒ᵢ val Δ :=
   w_subst f _ (NegPL c)    := Whn (NegPL (s_subst (a_shift f) c)) ;
   w_subst f _ (NegNR c)    := Whn (NegNR (s_subst (a_shift f) c)) ;
   w_subst f _ (NegNL v)    := NegNL (w_subst f _ v) ;
-  w_subst f _ (ListR1)      := ListR1 ;
-  w_subst f _ (ListR2 x xs) := ListR2 (w_subst f _ x) (w_subst f _ xs) ;
-  w_subst f _ (ListL c1 c2) := Whn (ListL (s_subst f c1) (s_subst (a_shift2 f) c2)) ;
 with s_subst {Γ Δ} : Γ =[val]> Δ -> state Γ -> state Δ :=
    s_subst f (Cut p v k) := Cut p (t_subst f _ v) (t_subst f _ k) .
 
@@ -557,8 +294,6 @@ Inductive pat : ty -> Type :=
 | PShiftN A : pat (t- (↑ A))
 | PNegP {A} : pat (t- A) -> pat (t+ (⊖ A))
 | PNegN {A} : pat (t+ A) -> pat (t- (¬ A))
-| PList1 {A} : pat (t+ (List A))
-| PList2 {A} : pat (t+ A) -> pat (t+ (List A)) -> pat (t+ (List A))
 .
 
 Equations p_dom {t} : pat t -> neg_ctx :=
@@ -575,9 +310,7 @@ Equations p_dom {t} : pat t -> neg_ctx :=
   p_dom (PShiftP A)  := ∅ₛ ▶ₛ {| sub_elt := t+ A ; sub_prf := stt |} ;
   p_dom (PShiftN A)  := ∅ₛ ▶ₛ {| sub_elt := t- A ; sub_prf := stt |} ;
   p_dom (PNegP p)    := p_dom p ;
-  p_dom (PNegN p)    := p_dom p ;
-  p_dom (PList1)     := ∅ₛ ;
-  p_dom (PList2 p1 p2) := p_dom p1 +▶ₛ p_dom p2 .
+  p_dom (PNegN p)    := p_dom p .
 
 Definition pat' (Γ : t_ctx) : Type := sigT (fun A => prod (Γ ∋ A) (pat (t_neg A))).
 Definition p_dom' Γ : pat' Γ -> neg_ctx := fun p => p_dom (snd (projT2 p)).
@@ -596,9 +329,7 @@ Equations w_of_p {a} (p : pat a) : whn (p_dom p) a :=
   w_of_p (PShiftP _)  := ShiftPR (Whn (Var top)) ;
   w_of_p (PShiftN _)  := ShiftNL (Whn (Var top)) ;
   w_of_p (PNegP p)    := NegPR (w_of_p p) ;
-  w_of_p (PNegN p)    := NegNL (w_of_p p) ;
-  w_of_p (PList1)     := ListR1 ;
-  w_of_p (PList2 p1 p2) := ListR2 (w_rename r_concat_l _ (w_of_p p1)) (w_rename r_concat_r _ (w_of_p p2)) .
+  w_of_p (PNegN p)    := NegNL (w_of_p p) .
 
 #[derive(eliminator=no)]
 Equations p_of_w_0p {Γ : neg_ctx} (A : ty0 pos) : whn Γ (t+ A) -> pat (t+ A) :=
@@ -608,15 +339,12 @@ Equations p_of_w_0p {Γ : neg_ctx} (A : ty0 pos) : whn Γ (t+ A) -> pat (t+ A) :
   p_of_w_0p (A ⊕ B) (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_of_w_0p (↓ A)  (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_of_w_0p (⊖ A)   (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
-  p_of_w_0p (List A) (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_of_w_0p (1)     (OneR)       := POne ;
   p_of_w_0p (A ⊗ B) (TenR v1 v2) := PTen (p_of_w_0p A v1) (p_of_w_0p B v2) ;
   p_of_w_0p (A ⊕ B) (OrR1 v)     := POr1 (p_of_w_0p A v) ;
   p_of_w_0p (A ⊕ B) (OrR2 v)     := POr2 (p_of_w_0p B v) ;
   p_of_w_0p (↓ A)  (ShiftPR _)  := PShiftP A ;
   p_of_w_0p (⊖ A)   (NegPR k)    := PNegP (p_of_w_0n A k) ;
-  p_of_w_0p (List A) (ListR1)    := PList1 ;
-  p_of_w_0p (List A) (ListR2 x xs) := PList2 (p_of_w_0p A x) (p_of_w_0p (List A) xs)
 with p_of_w_0n {Γ : neg_ctx} (A : ty0 neg) : whn Γ (t- A) -> pat (t- A) :=
   p_of_w_0n (⊤)     (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_of_w_0n (⊥)     (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
@@ -645,15 +373,12 @@ Equations p_dom_of_w_0p {Γ : neg_ctx} (A : ty0 pos) (v : whn Γ (t+ A)) : p_dom
   p_dom_of_w_0p (A ⊕ B) (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0p (↓ A)  (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0p (⊖ A)   (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
-  p_dom_of_w_0p (List A) (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0p (1)     (OneR)       := a_empty ;
   p_dom_of_w_0p (A ⊗ B) (TenR v1 v2) := [ p_dom_of_w_0p A v1 , p_dom_of_w_0p B v2 ] ;
   p_dom_of_w_0p (A ⊕ B) (OrR1 v)     := p_dom_of_w_0p A v ;
   p_dom_of_w_0p (A ⊕ B) (OrR2 v)     := p_dom_of_w_0p B v ;
   p_dom_of_w_0p (↓ A)  (ShiftPR x)  := a_append a_empty x ;
   p_dom_of_w_0p (⊖ A)   (NegPR k)    := p_dom_of_w_0n A k ;
-  p_dom_of_w_0p (List A) (ListR1)    := a_empty ;
-  p_dom_of_w_0p (List A) (ListR2 x xs) := [ p_dom_of_w_0p A x , p_dom_of_w_0p (List A) xs ] ;
 with p_dom_of_w_0n {Γ : neg_ctx} (A : ty0 neg) (k : whn Γ (t- A)) : p_dom (p_of_w_0n A k) =[val]> Γ by struct k :=
   p_dom_of_w_0n (⊤)     (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_w_0n (⊥)     (Var i) with (s_elt_upg i).(sub_prf) := { | ! } ;
@@ -763,9 +488,7 @@ Equations eval_aux {Γ : neg_ctx} : state Γ -> (state Γ + nf Γ) :=
   eval_aux (Cut pos (Whn (ShiftPR x))  (Whn (ShiftPL c)))  := inl (c ₛ/[ x ]) ;
   eval_aux (Cut neg (Whn (ShiftNR c))  (Whn (ShiftNL x)))  := inl (c ₛ/[ x ]) ;
   eval_aux (Cut pos (Whn (NegPR k))    (Whn (NegPL c)))    := inl (c ₛ/[ k ]) ;
-  eval_aux (Cut neg (Whn (NegNR c))    (Whn (NegNL v)))    := inl (c ₛ/[ v ]) ;
-  eval_aux (Cut pos (Whn (ListR1))     (Whn (ListL c1 c2))) := inl c1 ;
-  eval_aux (Cut pos (Whn (ListR2 x xs)) (Whn (ListL c1 c2))) := inl (c2 ₛ/[ x , xs ]) .
+  eval_aux (Cut neg (Whn (NegNR c))    (Whn (NegNL v)))    := inl (c ₛ/[ v ]) .
 
 Definition eval {Γ : neg_ctx} : state Γ -> delay (nf Γ)
   := iter_delay (fun c => Ret' (eval_aux c)).
@@ -820,9 +543,6 @@ Record syn_ind_args
     ind_negpl : forall Γ A s (H : P_s _ s), P_w Γ (t- (⊖ A)) (NegPL s) ;
     ind_negnr : forall Γ A s (H : P_s _ s), P_w Γ (t+ (¬ A)) (NegNR s) ;
     ind_negnl : forall Γ A w (H : P_w _ _ w), P_w Γ (t- (¬ A)) (NegNL w) ;
-    ind_listr1 : forall Γ A, P_w Γ (t+ (List A)) (ListR1) ;
-    ind_listr2 : forall Γ A x (H1 : P_w _ _ x) xs (H2 : P_w _ _ xs), P_w Γ (t+ (List A)) (ListR2 x xs) ;
-    ind_listl : forall Γ A s1 (H1 : P_s _ s1) s2 (H2 : P_s _ s2), P_w Γ (t- (List A)) (ListL s1 s2) ;
     ind_cut : forall Γ p A t1 (H1 : P_t _ _ t1) t2 (H2 : P_t _ _ t2), P_s Γ (@Cut _ p A t1 t2)
   } .
 
@@ -1363,18 +1083,6 @@ Lemma refold_id_aux {Γ p} A : refold_id_aux_P Γ p A .
   - dependent elimination v.
     pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
     exact (f_equal NegNL (IHA w8)).
-  - dependent induction v.
-    pose (nope := (s_elt_upg h).(sub_prf)); dependent elimination nope.
-    reflexivity.
-    simp p_dom_of_w_0p.
-    change (w_subst _ _ _) with
-      (w_subst ([ p_dom_of_w_0p A v1 , p_dom_of_w_0p (List A) v2 ]) _
-         (ListR2 (w_rename r_concat_l _ (w_of_p (p_of_w_0p A v1)))
-                 (w_rename r_concat_r _ (w_of_p (p_of_w_0p (List A) v2))))); cbn.
-    rewrite 2 w_sub_ren.
-    erewrite (w_sub_eq _ _ (s_eq_cat_l _ _)); auto.
-    erewrite (w_sub_eq _ _ (s_eq_cat_r _ _)); auto.
-    f_equal; [ apply IHA | now apply IHv2 ].
 Qed.
 
 Lemma refold_id {Γ : neg_ctx} A (v : val Γ A)
@@ -1500,21 +1208,6 @@ Lemma clean_hyp {Γ Δ : neg_ctx} (c : state Γ) (e : Γ =[val]> Δ)
            ++ cbn; econstructor.
               change (w_subst ?f (t- ?A) ?w) with (v_subst f (t- A) w).
               rewrite s_sub1_sub; apply CIH.
-        -- dependent elimination w0.
-           ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; simp eval_aux; cbn -[eval].
-              rewrite (refold_id_aux (List A19)).
-              now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
-           ++ cbn; econstructor.
-              apply CIH.
-        -- dependent elimination w0.
-           ++ unfold eval at 2; cbn -[eval then_eval2].
-              unfold then_eval2; simp eval_aux; cbn -[eval].
-              rewrite (refold_id_aux (List A20)).
-              now change (it_eqF _ ?RX ?RY _ (observe ?a) (_observe ?b)) with (it_eq_map ∅ₑ RX RY T1_0 a b).
-           ++ cbn; econstructor.
-              change (w_subst ?f (t+ ?A) ?w) with (v_subst f (t+ A) w).
-              rewrite s_sub2_sub; apply CIH.
   - dependent elimination t1.
     + cbn; econstructor.
       change (t_subst e (t+ A) t0) with (v_subst e (t+ A) t0).
@@ -1602,10 +1295,6 @@ Equations p_of_w_eq_aux_p {Γ : neg_ctx} (A : ty0 pos) (p : pat (t+ A)) (e : p_d
   p_of_w_eq_aux_p (A ⊕ B) (POr2 p)     e := f_equal POr2 (p_of_w_eq_aux_p B p e) ;
   p_of_w_eq_aux_p (↓ A)  (PShiftP _)  e := eq_refl ;
   p_of_w_eq_aux_p (⊖ A)   (PNegP p)    e := f_equal PNegP (p_of_w_eq_aux_n A p e) ;
-  p_of_w_eq_aux_p (List A) (PList1)    e := eq_refl ;
-  p_of_w_eq_aux_p (List A) (PList2 p1 p2) e := f_equal2 PList2
-        (eq_trans (f_equal _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_p A p1 _))
-        (eq_trans (f_equal _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_p (List A) p2 _)) ;
 
      with p_of_w_eq_aux_n {Γ : neg_ctx} (A : ty0 neg) (p : pat (t- A)) (e : p_dom p =[val]> Γ)
          : p_of_w_0n A (w_subst e (t- A) (w_of_p p) : whn Γ (t- A)) = p
@@ -1694,25 +1383,6 @@ Lemma p_dom_of_v_eq {Γ p} A : p_dom_of_w_eq_P Γ p A .
     remember xx as xx'; unfold xx in Heqxx'; clear xx.
     rewrite (eq_trans Heqxx' (eq_sym (rew_map _ PNegN _ _))).
     apply IHA.
-  - intros ? i; dependent elimination i.
-  - simp p_dom_of_w_0p.
-    pose (H1 := w_sub_ren e r_concat_l (t+ A13) (w_of_p p9)) .
-    pose (H2 := w_sub_ren e r_concat_r (t+ List A13) (w_of_p p10)) .
-    pose (x1 := w_subst e (t+ A13) (w_rename r_concat_l (t+ A13) (w_of_p p9))).
-    pose (x2 := w_subst e (t+ List A13) (w_rename r_concat_r (t+ List A13) (w_of_p p10))).
-    change (w_sub_ren e r_concat_l _ _) with H1.
-    change (w_sub_ren e r_concat_r _ _) with H2.
-    change (w_subst e (t+ A13) _) with x1 in H1 |- *.
-    change (w_subst e (t+ List A13) _) with x2 in H2 |- *.
-    rewrite H1, H2; clear H1 H2 x1 x2; cbn.
-    pose (H1 := p_of_w_eq_aux_p A13 p9 (e ⊛ᵣ r_concat_l)); change (p_of_w_eq_aux_p A13 _ _) with H1 in IHA |- *.
-    pose (H2 := p_of_w_eq_aux_n B1 p2 (e ⊛ᵣ r_concat_r)); change (p_of_w_eq_aux_n B1 _ _) with H2 in IHA2 |- *.
-    transitivity ([ rew [fun p : pat (t- A4) => p_dom p =[ val ]> Γ] H1
-                     in p_dom_of_w_0n A4 (w_subst (e ⊛ᵣ r_concat_l) (t- A4) (w_of_p p1)) ,
-                    rew [fun p : pat (t- B1) => p_dom p =[ val ]> Γ] H2
-                     in p_dom_of_w_0n B1 (w_subst (e ⊛ᵣ r_concat_r) (t- B1) (w_of_p p2)) ]).
-    now rewrite <- H1, <- H2, eq_refl_map2_distr.
-    apply s_eq_cover_uniq; [ apply IHA1 | apply IHA2 ] .
 Qed.
 
 Lemma eval_nf_ret {Γ : neg_ctx} (u : nf Γ) : eval (p_app (s_var _ (fst (projT2 u))) (projT1 (snd (projT2 u))) (projT2 (snd (projT2 u)))) ≋ ret_delay u .
