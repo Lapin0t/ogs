@@ -1886,7 +1886,7 @@ Definition eval_to_msg {Γ : neg_ctx} (c : state Γ) : delay (pat' Γ) :=
 Definition subst_eq (Δ : neg_ctx) {Γ} : relation (state Γ) :=
   fun u v => forall (σ : Γ =[val]> Δ), eval_to_msg (s_subst σ u) ≈ eval_to_msg (s_subst σ v) .
 
-Theorem mu_subst_correct (Δ : neg_ctx) {Γ : neg_ctx} (x y : state Γ)
+Theorem sysL_subst_correct (Δ : neg_ctx) {Γ : neg_ctx} (x y : state Γ)
   : ⟦ x ⟧ₛ ≈[ Δ ]≈ ⟦ y ⟧ₛ -> subst_eq Δ x y .
   intros H σ.
   apply (ogs_correction (M := sysL_machine)
@@ -1935,11 +1935,11 @@ Definition ciu_p_eq (Δ : neg_ctx) {Γ} {x : ty0 pos} : relation (term Γ (t+ x)
   fun u v => forall (σ : Γ =[val]> Δ) (k : term Δ (t- x)),
       eval_to_msg (Cut _ (t_subst σ _ u) k) ≈ eval_to_msg (Cut _ (t_subst σ _ v) k) .
 
-Theorem mu_ciu_p_correct (Δ : neg_ctx) {Γ : neg_ctx} {t} (x y : term Γ (t+ t))
+Theorem sysL_ciu_p_correct (Δ : neg_ctx) {Γ : neg_ctx} {t} (x y : term Γ (t+ t))
   : ⟦ x ⟧ₚ ≈[ Δ ]≈ ⟦ y ⟧ₚ -> ciu_p_eq Δ x y .
   intros H σ k.
   rewrite 2 sub_csk_p.
-  now apply mu_subst_correct.
+  now apply sysL_subst_correct.
 Qed. 
 
 Definition ciu_n_eq (Δ : neg_ctx) {Γ} {x : ty0 neg} : relation (term Γ (t- x)) :=
@@ -1961,9 +1961,9 @@ Lemma sub_csk_n {Γ Δ : neg_ctx} {x : ty0 neg} (t : term Γ (t- x)) (s : Γ =[v
   now apply t_sub_eq.
 Qed.
 
-Theorem mu_ciu_n_correct (Δ : neg_ctx) {Γ : neg_ctx} {t} (x y : term Γ (t- t))
+Theorem sysL_ciu_n_correct (Δ : neg_ctx) {Γ : neg_ctx} {t} (x y : term Γ (t- t))
   : ⟦ x ⟧ₙ ≈[ Δ ]≈ ⟦ y ⟧ₙ -> ciu_n_eq Δ x y .
   intros H σ k.
   rewrite 2 sub_csk_n.
-  now apply mu_subst_correct.
+  now apply sysL_subst_correct.
 Qed. 

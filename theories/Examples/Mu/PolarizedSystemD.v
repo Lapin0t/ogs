@@ -1615,20 +1615,16 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
        | _ => idtac
        end.
   1-12,25-36: apply it_eq_step in H; now inversion H.
-  12, 24: match goal with
-       | t : term _ _ |- _ =>
+  1-12: match goal with
+       | t : term _ (t- _) |- _ =>
            dependent elimination t;
-           [ apply it_eq_step in H; cbn in H; now inversion H | ]
+           [ apply it_eq_step in H; now inversion H | apply it_eq_step in H; now inversion H | ]
        | _ => idtac
        end.
-  all: cycle 11.
-           dependent elimination v';
-           [ apply it_eq_step in H; cbn in H; now inversion H | | ].
-  WIPWIP
-  match goal with
-       | v' : term Γ (t- _) |- _ =>
-           dependent elimination v';
-           [ apply it_eq_step in H; cbn in H; now inversion H | ]
+  13-24: match goal with
+       | t : term _ (t+ _) |- _ =>
+           dependent elimination t;
+           [ apply it_eq_step in H; now inversion H | apply it_eq_step in H; now inversion H | ]
        | _ => idtac
        end.
   1-12: match goal with
@@ -1638,365 +1634,40 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
            try now destruct (p (_ ,' eq_refl))
        | _ => idtac
        end.
-  match goal with
+  13-24: match goal with
+       | w : whn _ (t+ _) |- _ =>
+           dependent elimination w;
+           [ | apply it_eq_step in H; now inversion H ];
+           try now destruct (p (_ ,' eq_refl))
+       | _ => idtac
+       end.
+   all: apply it_eq_step in H; cbn in H; simp eval_aux in H; dependent elimination H.
+   all: cbn in r_rel; inversion_sigma r_rel as [ H1 H2 ].
+   all: revert m i H2; rewrite <- H1; intros m i H2; inversion_clear H2; cbn; clear.
+   all: econstructor; intros [ A ee ] H; dependent elimination H; cbn in *.
+   all: dependent elimination v; [ apply it_eq_step in H; now inversion H | apply it_eq_step in H; now inversion H | ].
+  1-12: match goal with
        | w : whn _ (t- _) |- _ =>
            dependent elimination w;
            [ | apply it_eq_step in H; now inversion H ];
            try now destruct (p (_ ,' eq_refl))
        | _ => idtac
        end.
-
-  all: match goal with
-       | t : term _ _ |- _ =>
-           dependent elimination t;
-           [ apply it_eq_step in H; cbn in H; now inversion H | ]
+  now destruct (p1 (_ ,' eq_refl)).
+  1-12: match goal with
+       | w : whn _ (t+ _) |- _ =>
+           dependent elimination w;
+           [ | apply it_eq_step in H; now inversion H ];
+           try now destruct (p (_ ,' eq_refl))
        | _ => idtac
        end.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w1.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w1.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ ? ? ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p2 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
-  - dependent elimination w.
-    * apply it_eq_step in H; cbn in H; simp eval_aux in H.
-      dependent elimination H; cbn in r_rel.
-      inversion_sigma r_rel as [ H1 H2 ].
-      revert m i H2; rewrite <- H1; intros m i H2.
-      inversion_clear H2; cbn; clear.
-      econstructor; intros [ A p ] H; dependent elimination H; cbn in *.
-      dependent elimination v.
-      + apply it_eq_step in H; now inversion H.
-      + dependent elimination w.
-        now destruct (p0 (_ ,' eq_refl)).
-        apply it_eq_step in H; now inversion H.
-    * apply it_eq_step in H; now inversion H.
 Qed.
 
-From OGS.OGS Require Spec.
+#[local] Instance sysD_typ  : baseT := {| typ := neg_ty |}.
 
-(*
-Definition ctx_allS (Γ : ctx neg_ty) : allS is_neg (c_map sub_elt Γ).
-  induction Γ; intros ? i; cbn in *.
-  - remember ∅%ctx as Γ; destruct i; inversion HeqΓ.
-  - remember (_ ▶ _)%ctx as Γ' in i; destruct i; inversion HeqΓ'.
-    + exact x.(sub_prf).
-    + rewrite <- H0 in IHΓ; exact (IHΓ _ i).
-Defined.
-
-Definition ctx_from (Γ : ctx neg_ty) : neg_ctx := {| sub_elt := c_map sub_elt Γ ; sub_prf := ctx_allS Γ |}.
-*)
-
-Definition mu_spec : Spec.interaction_spec :=
-  {| Spec.typ := neg_ty ;
-     Spec.msg := fun t => pat (t_neg t) ;
-     Spec.dom := fun t p => ctx_s_to (p_dom p) |}
-.
+#[local] Instance sysD_spec : observation_structure :=
+  {| obs A := pat (t_neg (neg_coe A)) ;
+     dom _ p := ctx_s_to (p_dom p) |} .
 
 Definition state' (Γ : ctx neg_ty) : Type := state (ctx_s_from Γ).
 Definition val' (Γ : ctx neg_ty) (a : neg_ty) : Type := val (ctx_s_from Γ) a.(sub_elt).
@@ -2304,50 +1975,43 @@ Definition to_nf {Γ} (u : nf (ctx_s_from Γ)) :
   sigT (fun t : neg_ty => prod (Γ ∋ t) (sigT (fun m : pat (t_neg t) => ctx_s_to (p_dom m) =[ val' ]> Γ ))) :=
   (_ ,' (to_has_L (fst (projT2 u)) , (projT1 (snd (projT2 u)) ,' to_FB (projT2 (snd (projT2 u)))))) .
 
-Program Definition mu_val : @Spec.lang_monoid mu_spec :=
-  {| Spec.val := val' ;
-     Spec.v_var := fun _ => ugly_var ;
-     Spec.v_sub := fun _ _ a _ v => v_subst (from_BB a) _ v ;
-  |}.
+#[local] Instance sysD_val  : baseV := {| Subst.val := val' |}.
+#[local] Instance sysD_conf : baseC := {| Subst.conf := state' |}.
 
-Program Definition mu_conf : @Spec.lang_module mu_spec mu_val :=
-  {| Spec.conf := state' ;
-     Spec.c_sub := fun _ _ a s => s_subst (from_BB a) s ;
-  |}.
+#[local] Instance sysD_val_mon : subst_monoid _ :=
+  {| v_var := @ugly_var ;
+     v_sub := fun _ _ a _ v => v_subst (from_BB a) _ v |} .
 
-Program Definition mu_machine : @Spec.machine mu_spec mu_val mu_conf :=
-  {| Spec.eval := fun _ c => fmap_delay to_nf (eval c) ;
-      Spec.app := fun _ _ v m r => p_app v m (from_FB r) |} .
-
-Lemma mu_val_laws : @Spec.lang_monoid_laws mu_spec mu_val .
-  unfold mu_spec, mu_val.
-  econstructor; unfold Spec.e_comp, s_map; cbn in *.
+#[local] Instance sysD_val_laws : subst_monoid_laws .
+  econstructor.
   - intros Γ Δ u1 u2 H1 i v1 v2 H2.
     apply v_sub_eq; auto.
     now rewrite H1.
-  - intros Γ1 Γ2 u ? i.
+  - intros Γ1 Γ2 u ? i; cbn.
     etransitivity.
     unfold ugly_var, from_has_L; apply v_sub_id_r.
     unfold from_BB, from_has_F, r_to_from_l, s_elt_upg, ctx_s_from, to_has_L.
     destruct (ctx_s_to_inv Γ1); cbn.
     pose (xx := view_s_has_map (fun x : sigS is_neg => x) a0 i).
     fold xx; now destruct xx.
-  - intros Γ1 Γ2 u ? i.
+  - intros Γ1 Γ2 u ? i; cbn.
     etransitivity.
     apply v_sub_eq; [ apply from_BB_var | reflexivity ].
     apply v_sub_id_l.
-  - intros Γ1 Γ2 Γ3 Γ4 p q r ? i.
+  - intros Γ1 Γ2 Γ3 Γ4 p q r ? i; cbn.
     rewrite v_sub_sub.
     apply v_sub_eq; auto.
 Qed.
 
-Lemma mu_conf_laws : @Spec.lang_module_laws mu_spec mu_val mu_conf .
-  unfold mu_spec, mu_val, mu_conf.
-  econstructor; unfold Spec.e_comp, s_map; cbn in *.
-  - intros Γ Δ u1 u2 H1 s1 s2 H2.
+#[local] Instance sysD_conf_mod : subst_module _ _ :=
+  {| c_sub := fun _ _ a s => s_subst (from_BB a) s |} .
+
+#[local] Instance sysD_conf_laws : subst_module_laws .
+  econstructor.
+  - intros Γ Δ u1 u2 H1 s1 s2 H2; cbn.
     apply s_sub_eq; auto.
     now rewrite H1.
-  - intros Γ c.
+  - intros Γ c; cbn.
     rewrite from_BB_var.
     apply s_sub_id_l.
   - intros Γ1 Γ2 Γ3 u v c; cbn.
@@ -2355,17 +2019,16 @@ Lemma mu_conf_laws : @Spec.lang_module_laws mu_spec mu_val mu_conf .
     apply s_sub_eq; auto.
 Qed.
 
-Lemma mu_var_laws : @Spec.var_assumptions mu_spec mu_val .
-  unfold mu_spec, mu_val.
-  econstructor; unfold Spec.is_var; cbn in *.
+#[local] Instance sysD_var_laws : var_assumptions.
+  econstructor.
   - exact @ugly_var_inj.
   - exact @ugly_var_dec.
   - exact @ugly_is_var_ren.
 Qed.
 
 Lemma to_comp_eq {Γ} (u v : delay (nf (ctx_s_from Γ))) (H : u ≋ v) :
-  @Spec.comp_eq mu_spec mu_val _ (fmap_delay to_nf u) (fmap_delay to_nf v) .
-  unfold Spec.comp_eq, fmap_delay.
+  Obs.comp_eq (fmap_delay to_nf u) (fmap_delay to_nf v) .
+  unfold Obs.comp_eq, fmap_delay.
   eapply (fmap_eq (RX := fun _ => nf_eq)); auto.
   intros [] ? ?  H1.
   destruct x as [ x1 [ i1 [ m1 γ1 ] ] ].
@@ -2391,14 +2054,16 @@ Definition to_pat {Γ : ctx neg_ty} : pat' (ctx_s_from Γ) -> sigT (fun x : neg_
   fun u => (_ ,' (to_has_L (fst (projT2 u)) , snd (projT2 u))) .
 
 Lemma from_to_pat_F {Γ : neg_ctx} (x y : nf (ctx_s_from (ctx_s_to Γ))) (H : x = y)
-  : from_pat_F (@Spec.msg_of_nf' mu_spec mu_val _ (to_nf x)) = pat_of_nf _ (n_rename r_from_to_l y) .
+  : from_pat_F (obs'_of_nf' _ (to_nf x)) = pat_of_nf _ (n_rename r_from_to_l y) .
   now rewrite H.
 Qed.
 
+#[local] Instance sysD_machine : machine :=
+  {| Machine.eval := fun _ c => fmap_delay to_nf (eval c) ;
+     Machine.app := fun _ _ v m e => p_app v m (from_FB e) |} .
 
-Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machine.
-  unfold mu_spec, mu_val, mu_conf.
-  econstructor; unfold Spec.e_comp, s_map; cbn in *.
+#[local] Instance sysD_machine_law : machine_laws.
+  econstructor; unfold sysD_spec, sysD_val in *; cbn in *.
   - intros Γ x v m u1 u2 H.
     destruct x as [ [ [] | [] ] neg ]; cbn in *; try now destruct neg.
     all: do 2 f_equal; apply w_sub_eq; [ now rewrite H | reflexivity ].
@@ -2407,27 +2072,25 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
     all: do 2 f_equal; change (w_subst ?u ?t) with (v_subst u t); rewrite v_sub_sub.
     all: apply v_sub_eq; auto.
   - intros Γ Δ c e .
-    unfold Spec.comp_eq, fmap_delay.
+    unfold Obs.comp_eq, fmap_delay.
     etransitivity.
     unshelve eapply fmap_eq. 5: exact (clean_hyp c (from_BB e)).
     exact ((fun _ => to_nf)).
     intros ? u v ->; unshelve econstructor; auto.
     unfold bind_delay', then_eval1.
     rewrite fmap_bind_com, bind_fmap_com.
-    apply (proj1 (t_gfp (it_eq_map ∅ₑ (fun _ : T1 => Spec.nf_eq')) _ _ _)).
+    apply (proj1 (t_gfp (it_eq_map ∅ₑ (fun _ : T1 => Obs.nf'_eq)) _ _ _)).
     eapply (it_eq_up2bind_t (eqᵢ _)); econstructor; auto.
     intros [] u v ->.
-    change (gfp _ _ ?a ?b) with (Spec.comp_eq a b).
+    change (gfp _ _ ?a ?b) with (Obs.comp_eq a b).
     apply to_comp_eq.
     erewrite p_app_eq; auto.
     now rewrite <- (from_to_FB (projT2 (snd (projT2 v)))).
-  - intros Γ u .
-    unfold Spec.eval_to_msg, Spec.msg_of_nf', Spec.nf', Spec.nf_ty', Spec.nf_msg', Spec.nf_val', Spec.nf_var'.
-    destruct u as [ x [ j [ m γ ] ] ] ; cbn in *.
+  - intros Γ [ x [ j [ m γ ] ] ] ; cbn in *.
     pose proof (eval_nf_ret ((x : ty) ,' (from_has_L j , (m ,' from_FB γ)))); cbn in H.
     apply to_comp_eq in H.
     rewrite H; clear H.
-    unfold Spec.comp_eq; apply it_eq_unstep; cbn; econstructor.
+    unfold Obs.comp_eq; apply it_eq_unstep; cbn; econstructor.
     unshelve econstructor; auto; cbn.
     unshelve econstructor; auto; cbn.
     + exact (to_from_has_L _).
@@ -2445,23 +2108,23 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
     eassert (H3 : _). refine (H0 ((projT1 y).(sub_elt) ,' projT2 y) _ ((projT1 y).(sub_prf))).
     * dependent elimination H2.
       cbn in *.
-      unfold Spec.eval_to_msg in i0.
+      (*unfold Spec.eval_to_msg in i0.*)
       destruct x as [ t m ]; cbn in *.
       unshelve econstructor.
       + clear - Γ ; exact (ctx_s_from Γ).
       + clear - v ; exact v.
       + clear - e ; exact (from_FB e).
       + exact (from_has_L i).
-      + intros []; apply p; unfold Spec.is_var, Spec.v_var.
+      + intros []; apply p. (*; unfold Spec.is_var, Spec.v_var.*)
         apply (substS (fun u => sigT (fun i1 : Γ ∋ {| sub_elt := t; sub_prf := u |} => v = ugly_var {| sub_elt := t; sub_prf := u |} i1)) ((ctx_s_from Γ).(sub_prf) _ x)).
         refine (to_has_L x ,' _).
         rewrite e0; unfold ugly_var; f_equal; symmetry.
         apply from_to_has_L.
       + cbn in *.
         eapply (fmap_eq (RY := eqᵢ _) (fun _ => from_pat_L) (fun _ => from_pat_L)) in i0; [ | intros ? ? ? ->; auto ].
-        unfold fmap_delay in i0.
+        unfold eval_to_obs, Machine.eval in i0; cbn in i0; unfold fmap_delay in i0.
         rewrite 2 fmap_fmap_com in i0.
-        transitivity (((fun (_ : T1) (x : nf (ctx_s_from Γ)) => from_pat_L (@Spec.msg_of_nf' mu_spec mu_val Γ (to_nf x))) <$>
+        transitivity (((fun (_ : T1) (x : nf (ctx_s_from Γ)) => from_pat_L (obs'_of_nf' Γ (to_nf x))) <$>
         eval (p_app v m (from_FB e)))).
         unfold fmap_delay.
         eapply fmap_eq; auto.
@@ -2469,7 +2132,7 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
            destruct n1 as [ x1 [ i1 [ m1 γ1 ]] ].
            destruct n2 as [ x2 [ i2 [ m2 γ2 ]] ].
            destruct H' as [ H2 [ H3 [ H4 _ ] ] ]; cbn in *.
-           unfold Spec.msg_of_nf', pat_of_nf, from_pat_L; cbn.
+           unfold Obs.obs'_of_nf', pat_of_nf, from_pat_L; cbn.
            revert i1 m1 γ1 H3 H4; rewrite H2; clear H2 x1; intros i1 m1 γ1 H3 H4; cbn in H3,H4.
            now rewrite H3, H4, from_to_has_L.
         ** rewrite i0; clear.
@@ -2481,30 +2144,19 @@ Definition mu_machine_laws : @Spec.machine_laws mu_spec mu_val mu_conf mu_machin
       reflexivity.
 Qed.
 
-Definition sem_act (Δ Γ : neg_ctx) : Type :=
-  @Spec.ogs_act mu_spec (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx .
-
-Definition sem_pas (Δ Γ : neg_ctx) : Type :=
-  @Spec.ogs_pas mu_spec (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx .
+Definition sem_act (Δ Γ : neg_ctx) : Type := ogs_act (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ) .
+Definition sem_pas (Δ Γ : neg_ctx) : Type := ogs_pas (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ) .
 
 Definition ugly_state {Γ : neg_ctx} (c : state Γ) : state (ctx_s_from (ctx_s_to Γ)) :=
   match ctx_s_to_inv (ctx_s_to Γ) as f in (fiber _ b) return (b = ctx_s_to Γ -> state (fib_extr f)) with
   | Fib a => fun H => rew <- [state ∘ coe_ctx] ctx_s_to_inj H in c
   end eq_refl .
 
-(*
-Definition interp_act {Δ Γ : neg_ctx} (c : state Γ) : sem_act Δ Γ :=
-  @Spec.m_strat mu_spec mu_val mu_conf mu_machine (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx
-    (@Spec.inj_init_act mu_spec mu_val mu_conf (ctx_s_to Δ) (ctx_s_to Γ)
-    (rew <- [state ∘ coe_ctx] ctx_s_from_to Γ in c)) .
-*)
-
 Definition from_to_state {Γ : neg_ctx} (c : state Γ) : state (ctx_s_from (ctx_s_to Γ)) :=
   s_rename r_from_to_r c .
 
 Definition interp_act_s Δ {Γ : neg_ctx} (c : state Γ) : sem_act Δ Γ :=
-  @Spec.m_strat mu_spec mu_val mu_conf mu_machine (ctx_s_to Δ) (∅ ▶ ctx_s_to Γ)%ctx
-    (@Spec.inj_init_act mu_spec mu_val mu_conf (ctx_s_to Δ) (ctx_s_to Γ) (from_to_state c)) .
+  m_strat (∅ ▶ ctx_s_to Γ) (inj_init_act (ctx_s_to Δ) (from_to_state c)) .
 Notation "⟦ t ⟧ₛ" := (interp_act_s _ t) .
 
 Definition ogs_weq_act Δ {Γ} : relation (sem_act Δ Γ) := fun u v => u ≈ v .
@@ -2516,18 +2168,16 @@ Definition eval_to_msg {Γ : neg_ctx} (c : state Γ) : delay (pat' Γ) :=
 Definition subst_eq (Δ : neg_ctx) {Γ} : relation (state Γ) :=
   fun u v => forall (σ : Γ =[val]> Δ), eval_to_msg (s_subst σ u) ≈ eval_to_msg (s_subst σ v) .
 
-Theorem mu_subst_correct (Δ : neg_ctx) {Γ : neg_ctx} (x y : state Γ)
+Theorem sysD_subst_correct (Δ : neg_ctx) {Γ : neg_ctx} (x y : state Γ)
   : ⟦ x ⟧ₛ ≈[ Δ ]≈ ⟦ y ⟧ₛ -> subst_eq Δ x y .
   intros H σ.
-  apply (@Spec.ogs_correction mu_spec mu_val mu_val_laws mu_conf mu_conf_laws
-                 mu_var_laws mu_machine mu_machine_laws
-                 (ctx_s_to Γ)
-                 (ctx_s_to Δ)
-                 (from_to_state x)
-                 (from_to_state y)) in H.
+  apply (ogs_correction (M := sysD_machine)
+            (ctx_s_to Δ)
+            (from_to_state x)
+            (from_to_state y)) in H.
   specialize (H (to_FF σ)).
 
-  unfold Spec.eval_in_env, Spec.eval_to_msg in H ; cbn in H.
+  unfold eval_in_env, eval_to_msg, eval_to_obs in H ; cbn in H.
 
   unshelve eapply (fmap_weq (RY := eqᵢ _) (fun _ : T1 => from_pat_F) (fun _ : T1 => from_pat_F) _ _ _ _) in H.
   intros [] ? ? ->; auto.
@@ -2567,11 +2217,11 @@ Definition ciu_p_eq (Δ : neg_ctx) {Γ} {x : ty0 pos} : relation (term Γ (t+ x)
   fun u v => forall (σ : Γ =[val]> Δ) (k : term Δ (t- x)),
       eval_to_msg (Cut _ (t_subst σ _ u) k) ≈ eval_to_msg (Cut _ (t_subst σ _ v) k) .
 
-Theorem mu_ciu_p_correct (Δ : neg_ctx) {Γ : neg_ctx} {t} (x y : term Γ (t+ t))
+Theorem sysD_ciu_p_correct (Δ : neg_ctx) {Γ : neg_ctx} {t} (x y : term Γ (t+ t))
   : ⟦ x ⟧ₚ ≈[ Δ ]≈ ⟦ y ⟧ₚ -> ciu_p_eq Δ x y .
   intros H σ k.
   rewrite 2 sub_csk_p.
-  now apply mu_subst_correct.
+  now apply sysD_subst_correct.
 Qed.
 
 Definition ciu_n_eq (Δ : neg_ctx) {Γ} {x : ty0 neg} : relation (term Γ (t- x)) :=
@@ -2593,9 +2243,9 @@ Lemma sub_csk_n {Γ Δ : neg_ctx} {x : ty0 neg} (t : term Γ (t- x)) (s : Γ =[v
   now apply t_sub_eq.
 Qed.
 
-Theorem mu_ciu_n_correct (Δ : neg_ctx) {Γ : neg_ctx} {t} (x y : term Γ (t- t))
+Theorem sysD_ciu_n_correct (Δ : neg_ctx) {Γ : neg_ctx} {t} (x y : term Γ (t- t))
   : ⟦ x ⟧ₙ ≈[ Δ ]≈ ⟦ y ⟧ₙ -> ciu_n_eq Δ x y .
   intros H σ k.
   rewrite 2 sub_csk_n.
-  now apply mu_subst_correct.
+  now apply sysD_subst_correct.
 Qed.
