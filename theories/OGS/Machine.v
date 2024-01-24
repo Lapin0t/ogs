@@ -1,3 +1,25 @@
+(*|
+Evaluation Structure (Definition 4.7)
+=======================================
+Abstract characterization of the evaluation structure of a programming
+language.
+We have here a minor mismatch between the formalization and the paper:
+we have realized a posteriori a more elegant way to decompose the abstract
+machine as exposed in the paper.
+Here, instead of only requiring an embedding of normal forms into configurations,
+we require an application function describing how to rebuild a configuration
+from a value, an observation, and an assignment.
+This less minimalist axiomatization puts the dependencies of our modules slightly
+backwards compared to the paper's Section 4.
+Here, evaluation structures, dubbed [machine]s, are parameterized by a substitution
+monoid of values, a substitution module of configurations, and an observation structure,
+instead of coming first.
+
+Patching the development for following the paper's presentation would be slightly
+technical due to the technicality of the mechanized proofs involved, but essentially
+straightforward.
+
+|*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
@@ -12,6 +34,10 @@ Section withFam.
   Context {sC : subst_module bV bC}.
   Context {oS : observation_structure}.
 
+(*|
+Evaluation structures, telling us how to evaluate a configuration and stitch one back together
+from the data sent by Opponent.
+|*)
   Class machine : Type := {
       eval {Γ} : conf Γ -> delay (nf' Γ) ;
       app {Γ x} (v : val Γ x) (m : obs x) (r : dom m ⇒ᵥ Γ) : conf Γ ;
@@ -27,7 +53,10 @@ Section withFam.
              : eval_to_obs (app v m e) ≊ ret_delay (projT1 u ,' (i , projT2 u)) ->
                head_inst_nostep u (y ,' m) .
 
-  Class machine_laws : Prop := {
+(*|
+Axiomatization of the machine
+|*)
+   Class machine_laws : Prop := {
     app_proper {Γ x v m} :: Proper (ass_eq (dom m) Γ ==> eq) (@app _ Γ x v m) ;
 
     app_sub {Γ1 Γ2 x} (e : Γ1 ⇒ᵥ Γ2) (v : val Γ1 x) (m : obs x) (r : dom m ⇒ᵥ Γ1)

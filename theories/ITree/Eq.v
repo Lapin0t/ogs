@@ -54,6 +54,9 @@ Definition it_eq_map {I} E {X1 X2} RX : mon (relᵢ (@itree I E X1) (@itree I E 
   Hbody _ _ H _ _ _ r := it_eqF_mon _ _ H _ _ _ r ;
 |}.
 
+(*|
+Definition of the bisimilarity itself as greatest fixed point.
+|*)
 Definition it_eq {I E X1 X2} RX [i] := gfp (@it_eq_map I E X1 X2 RX) i.
 #[global] Notation it_eq_t E RX := (t (it_eq_map E RX)).
 #[global] Notation it_eq_bt E RX := (bt (it_eq_map E RX)).
@@ -198,7 +201,6 @@ End it_eat.
 #[global] Arguments EatRefl {I E R i t}.
 #[global] Arguments EatStep {I E R i t1 t2} p.
 
-
 (*|
 The weak bisimilarity itself, allowing to eat taus on each sides before
 hitting [it_eqF].
@@ -208,7 +210,6 @@ LTSs here, it does not matter.
 
 .. coq::
 |*)
-
 Section wbisim.
   Context {I : Type} (E : event I I) {X1 X2 : psh I} (RX : relᵢ X1 X2).
 

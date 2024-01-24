@@ -16,8 +16,11 @@ The delay monad, defined in Section 5.5 in the paper, is formalized as an itree 
 an empty signature: in the absence of events, [τ] and [ret] are the only constructors
 inhabited.
 
-Relevant definitions for the underlying itree datatype and combinators can be found in
-[ITree/ITree.v] and [ITree/Structure.v].
+Relevant definitions can be found:
+- for the underlying itree datatype, in [ITree/ITree.v]
+- for the combinators, in [ITree/Structure.v].
+- for the (strong/weak) bisimilarity, in [ITree/Eq.v].
+- for guarded iteration (Section 6.2), in [ITree/Guarded.v]
 
 .. coq::
 |*)
@@ -34,6 +37,9 @@ Definition emb_delay {I} {E : event I I} {X i} : delay X -> itree E (X @ i) i :=
          | VisF e k => match e with end
          end).
 
+(*|
+Specialization of the operations to the delay monad.
+|*)
 Definition ret_delay {X} : X -> delay X := fun x => Ret' x .
 
 Definition tau_delay {X} : delay X -> delay X :=
