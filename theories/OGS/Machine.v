@@ -50,7 +50,7 @@ Evaluation structures, telling us how to evaluate a configuration,
     fmap_delay (obs'_of_nf' Γ) (eval t) .
 
 (*|
-The ≺ relation from Def 6.7
+The ≺ relation (Def 6.7)
 |*)
   Variant head_inst_nostep (u : { x : typ & obs x }) : { x : typ & obs x } -> Prop :=
   | HeadInst {Γ y} (v : val Γ y) (m : obs y) (e : dom m ⇒ᵥ Γ) (p : is_var v -> False) (i : Γ ∋ projT1 u)
@@ -74,7 +74,7 @@ Axiomatization of the machine
        : e ⊛ₜ app v m r = app (e ⊛ᵥ v) m (e ⊛ r) ;
 
 (*|
-Hypothesis from Def 4.23:
+Core hypothesis over the evaluator (Def 4.23):
 "Substituting, then evaluating"
 is equivalent to
 "Evaluating, then substituting, then evaluating once more"

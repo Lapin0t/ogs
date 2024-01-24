@@ -28,6 +28,9 @@ Satisfying an appropriate axiomatization
   Context {VA : var_assumptions} .
   Context {ML: machine_laws}.
 
+(*|
+Substitution equivalence of two abstract machine configurations (Def 4.21)
+|*)
   Definition ciu {Γ} Δ (x y : conf Γ) : Prop
     := forall e : Γ ⇒ᵥ Δ, eval_in_env e x ≈ eval_in_env e y.
   Notation "x ≈⟦ciu Δ ⟧≈ y" := (ciu Δ x y) (at level 50).

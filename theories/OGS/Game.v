@@ -1,3 +1,9 @@
+(*|
+The OGS Game (§ 5.4)
+=====================
+
+|*)
+
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
@@ -25,14 +31,17 @@ Satisfying an appropriate axiomatization
   Context {ML: machine_laws}.
 
 (*|
-Section 3: game definition
-↓+ ~ join_even
+Interleaved contexts (Def 5.12)
+Collapsing functions (Def 5.13, see Utils/Ctx.v for auxiliary definitions)
 |*)
   Definition alt_ext : Type := ctx (context).
   Notation "↓⁺ a" := (join_even a) (at level 9).
   Notation "↓⁻ a" := (join_odd a) (at level 9).
   Notation "↓[ b ] a" := (join_even_odd_aux b a) (at level 9).
 
+(*|
+Half games and games (Def 5.15)
+|*)
   Definition ogs_hg : half_game alt_ext alt_ext :=
     {| g_move := fun es => obs∙ ↓⁺es ;
        g_next := fun es m => (es ▶ dom∙ m) |} .
