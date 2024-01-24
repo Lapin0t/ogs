@@ -6,9 +6,8 @@ The OGS Game (§ 5.4)
 
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
-From OGS.Game Require Import HalfGame Event.
-From OGS.OGS Require Import Subst Obs Machine.
-From OGS.ITree Require Import ITree Eq Delay Structure Properties Guarded.
+From OGS.OGS Require Import HalfGame Subst Obs Machine.
+From OGS.ITree Require Import Event ITree Eq Delay Structure Properties Guarded.
 
 Section withFam.
 

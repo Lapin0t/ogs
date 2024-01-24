@@ -1,6 +1,6 @@
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Rel.
-From OGS.Game Require Import Event.
+From OGS.ITree Require Import Event.
 
 Record half_game (I J : Type) := {
  g_move : I -> Type ;

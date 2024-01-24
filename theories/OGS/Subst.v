@@ -4,7 +4,7 @@ Substitution (§ 4.3)
 |*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
-From OGS.Game Require Import HalfGame Event.
+From OGS.ITree Require Import Event.
 
 Open Scope ctx_scope.
 

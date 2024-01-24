@@ -1,7 +1,6 @@
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel Ctx.
-From OGS.Game Require Import Event.
-From OGS.ITree Require Import ITree Eq Delay Structure Properties.
+From OGS.ITree Require Import Event ITree Eq Delay Structure Properties.
 From OGS.OGS Require Import Soundness.
 Set Equations Transparent.
 

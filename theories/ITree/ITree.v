@@ -13,7 +13,7 @@ i.e.:
 |*)
 
 From OGS Require Import Prelude.
-From OGS.Game Require Import Event.
+From OGS.ITree Require Import Event.
 
 (*|
 Indexed Interaction Trees

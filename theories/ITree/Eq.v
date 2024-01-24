@@ -17,8 +17,7 @@ From Coinduction Require Import lattice rel coinduction tactics.
 
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel.
-From OGS.Game Require Import Event.
-From OGS.ITree Require Import ITree.
+From OGS.ITree Require Import Event ITree.
 
 (*|
 Strong bisimilarity [it_eq], a.k.a. coinductive equality.

@@ -23,9 +23,8 @@ straightforward.
 |*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
-From OGS.Game Require Import HalfGame Event.
-From OGS.OGS Require Import Subst Obs.
-From OGS.ITree Require Import Eq Delay.
+From OGS.OGS Require Import HalfGame Subst Obs.
+From OGS.ITree Require Import Event Eq Delay.
 
 Section withFam.
   Context {bT : baseT}.

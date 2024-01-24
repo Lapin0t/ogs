@@ -13,8 +13,7 @@ uniqueness property.
 |*)
 
 From OGS Require Import Prelude.
-From OGS.Game Require Import Event.
-From OGS.ITree Require Import ITree.
+From OGS.ITree Require Import Event ITree.
 
 (*|
 

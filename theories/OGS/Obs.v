@@ -2,9 +2,8 @@ From Coinduction Require Import coinduction tactics.
 
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
-From OGS.Game Require Import HalfGame Event.
-From OGS.OGS Require Import Subst.
-From OGS.ITree Require Import ITree Delay Eq.
+From OGS.OGS Require Import HalfGame Subst.
+From OGS.ITree Require Import Event ITree Delay Eq.
 
 Open Scope ctx_scope.
 

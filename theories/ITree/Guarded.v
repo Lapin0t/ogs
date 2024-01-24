@@ -24,8 +24,7 @@ be guarded, but they must always finitely lead to a guarded one.
 From Coinduction Require Import coinduction tactics.
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Rel.
-From OGS.Game Require Import Event.
-From OGS.ITree Require Import ITree Structure Eq Properties.
+From OGS.ITree Require Import Event ITree Structure Eq Properties.
 
 (*|
 Guarded iteration

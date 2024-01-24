@@ -8,8 +8,7 @@ indexed tree over the empty signature ∅ₑ.
 |*)
 
 From OGS Require Import Prelude.
-From OGS.Game Require Import Event.
-From OGS.ITree Require Import ITree Structure.
+From OGS.ITree Require Import Event ITree Structure.
 
 (*|
 The delay monad, defined in Section 5.5 in the paper, is formalized as an itree over
