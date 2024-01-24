@@ -1596,6 +1596,7 @@ Variant head_inst_nostep (u : sigT (fun A => pat (t_neg A))) : sigT (fun A => pa
 Lemma eval_app_not_var : well_founded head_inst_nostep .
   intros A; econstructor; intros [ B m ] H; dependent elimination H; cbn in *.
   destruct A0 as [ [] | [] ].
+  1,3: cycle 1.
   all: dependent elimination v; try now destruct (p (_ ,' eq_refl)).
   all: clear p.
   all: dependent elimination m0; cbn in H.
@@ -1613,6 +1614,38 @@ Lemma eval_app_not_var : well_founded head_inst_nostep .
            remember vv as v'; clear e vv Heqv'; cbn in v'
        | _ => idtac
        end.
+  1-12,25-36: apply it_eq_step in H; now inversion H.
+  12, 24: match goal with
+       | t : term _ _ |- _ =>
+           dependent elimination t;
+           [ apply it_eq_step in H; cbn in H; now inversion H | ]
+       | _ => idtac
+       end.
+  all: cycle 11.
+           dependent elimination v';
+           [ apply it_eq_step in H; cbn in H; now inversion H | | ].
+  WIPWIP
+  match goal with
+       | v' : term Γ (t- _) |- _ =>
+           dependent elimination v';
+           [ apply it_eq_step in H; cbn in H; now inversion H | ]
+       | _ => idtac
+       end.
+  1-12: match goal with
+       | w : whn _ (t- _) |- _ =>
+           dependent elimination w;
+           [ | apply it_eq_step in H; now inversion H ];
+           try now destruct (p (_ ,' eq_refl))
+       | _ => idtac
+       end.
+  match goal with
+       | w : whn _ (t- _) |- _ =>
+           dependent elimination w;
+           [ | apply it_eq_step in H; now inversion H ];
+           try now destruct (p (_ ,' eq_refl))
+       | _ => idtac
+       end.
+
   all: match goal with
        | t : term _ _ |- _ =>
            dependent elimination t;
