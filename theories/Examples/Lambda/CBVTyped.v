@@ -1026,12 +1026,6 @@ types in our language are unshareable, the positive part of any value is
 pretty useless: it is always a singleton. Yet our notion of testing still
 distinguishes terminating from non-terminating programs.
 
-Our first shorthand is this generic `eval_to_msg`, which postcomposes the
-evaluation with projection onto the observation.
-|*)
-Definition eval_to_obs {Γ : t_ctx} : state Γ -> delay (obs' Γ) :=
-  eval_to_obs (Γ := Γ).
-(*|
 As discussed in the paper, the "native output" of the generic theorem is
 correctness with respect to an equivalence we call "substitution equivalence".
 We will recover a more standard CIU later on.
@@ -1108,27 +1102,3 @@ Qed.
    Second-Order Abstract Syntax", 2022.
 .. [L05] Soren Lassen, "Eager Normal Form Bisimulation", 2005.
 |*)
-
-Notation var0 := (Val (Var (Ctx.top))).
-Notation var1 := (Val (Var (Ctx.pop Ctx.top))).
-Notation var2 := (Val (Var (Ctx.pop (Ctx.pop Ctx.top)))).
-
-Notation "'VLamR' x" := (Val (LamRec x)) (at level 10).
-Notation "'λ' x"  := (VLamR (t_rename (r_shift r_pop) _ x)) (at level 10).
-Infix "⋅" := App (at level 10).
-
-(* λ f g x => g (f x) *)
-Definition term_example_aux a b c: term ∅ ((a → b) → ((b → c) → (a → c))) :=
-  λ (λ (λ (var1 ⋅ (var2 ⋅ var0)))).
-
-Definition term_example := term_example_aux ι ι ι.
-
-(* WIP extraction
-Require ExtrOcamlBasic.
-Require ExtrOcamlString.
-Require ExtrOcamlIntConv.
-
-Extraction Language OCaml.
-
-Extraction "foo.ml" stlc_eval term_example.
-*)
