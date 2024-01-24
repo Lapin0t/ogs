@@ -12,6 +12,9 @@ From OGS.Utils Require Import Psh Rel Ctx .
 From OGS.ITree Require Import ITree Delay .
 Declare Scope ty_scope .
 From OGS.OGS Require Import Soundness.
+Set Warnings "-notation-overridden".
+Set Warnings "-parsing".
+
 (*|
 Syntax
 ------

@@ -1,3 +1,6 @@
+#[global] Set Warnings "-notation-overridden".
+#[global] Set Warnings "-parsing".
+
 #[global] Set Primitive Projections.
 
 From Equations Require Export Equations.
@@ -16,9 +19,9 @@ Qed.
 #[global] Existing Instance YesUIP.
 
 #[global] Notation endo T := (T -> T).
-  
+
 #[global] Notation "f ∘ g" := (fun x => f (g x))
- (at level 40, left associativity) : function_scope.  
+ (at level 40, left associativity) : function_scope.
 
 #[global] Notation "a ,' b" := (existT _ a b) (at level 30).
 
