@@ -1,3 +1,7 @@
+(*|
+Substitution (§ 4.3)
+=====================
+|*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.Game Require Import HalfGame Event.
@@ -19,11 +23,11 @@ Section withFam.
   Context {bC : baseC}.
 
 (*|
-Substitution Monoid (§ 5.3)
-===========================
+Substitution Monoid (Def. 4.9)
+==============================
 
 The specification of an evaluator will be separated in several steps. First we will ask for a family of values,
-ie objects that can be substituted for variables. We formalize well-typed well-scoped substitutions in the
+i.e. objects that can be substituted for variables. We formalize well-typed well-scoped substitutions in the
 monoidal style of Fiore et al and Allais et al.
 |*)
   Class subst_monoid : Type := {
@@ -56,7 +60,10 @@ by functions from variables to values, as such their well-behaved equality is
     } .
 
 (*|
-Next we ask for a module over the monoid of values, to represent the configurations of the machine.
+Substitution Module (Def. 4.11)
+=================================
+
+Next, we ask for a module over the monoid of values, to represent the configurations of the machine.
 |*)
   Class subst_module : Type := {
       c_sub {Γ Δ} : Γ ⇒ᵥ Δ -> conf Γ -> conf Δ ;
