@@ -26,8 +26,8 @@ Satisfying an appropriate axiomatization
   Context {ML: machine_laws}.
 
 (*|
-Env*
-Env M Δ player es : environment part of the player (aka active at es) configuration at (Δ + es)
+Active and passive OGS environments (Def 5.16)
+Env M Δ player es   : environment part of the player (aka active at es) configuration at (Δ + es)
 Env M Δ opponent es : environment part of the opponent (aka passive at es) configuration at (Δ + es)
 |*)
   Inductive alt_env (Δ1 Δ2 : context) : bool -> alt_ext -> Type :=
@@ -45,7 +45,9 @@ Env M Δ opponent es : environment part of the opponent (aka passive at es) conf
   Notation "u ▶ₑ⁺" := (EConT u) (at level 40).
   Notation "u ▶ₑ⁻ e" := (EConF u e) (at level 40).
 
-  (* flattens an alternating environment into an unstructured one *)
+(*|
+Collapsing functions (Def 5.18)
+|*)
   Equations concat0 {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) : ↓[negb b]Φ ⇒ᵥ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) :=
     concat0 (εₑ)     := a_empty ;
     concat0 (u ▶ₑ⁺)   := r_concat3_1 ᵣ⊛ concat0 u ;
@@ -62,9 +64,6 @@ Flattens a pair of alternating environments for both player and opponent into a 
 
   Arguments concat1 {Δ Φ b}.
 
-(*|
-
-|*)
   Lemma concat_fixpoint {Δ Φ} (u : alt_env Δ Δ Ⓟ Φ) (v : alt_env Δ Δ Ⓞ Φ)
     :  [ v_var , concat1 u v ] ⊛ concat0 u ≡ₐ concat1 v u
      /\ [ v_var , concat1 v u ] ⊛ concat0 v ≡ₐ concat1 u v .
@@ -86,6 +85,13 @@ Flattens a pair of alternating environments for both player and opponent into a 
       * now rewrite <- e_comp_ren_r, s_eq_cat_r.
   Qed.
 
+(*|
+OGS strategies (Def 5.19)
+===========================
+|*)
+(*|
+Active and passive states
+|*)
   Definition m_strat_act Δ : psh alt_ext := fun Φ => (conf (Δ +▶ ↓⁺Φ) * alt_env Δ Δ Ⓟ Φ)%type.
   Definition m_strat_pas Δ : psh alt_ext := fun Φ => alt_env Δ Δ Ⓞ Φ.
 
@@ -97,6 +103,9 @@ Flattens a pair of alternating environments for both player and opponent into a 
         | CRightV h => inr ((_ ,' (h , nf'_obs u)) ,' (x ▶ₑ⁻ nf'_val u))
         end .
 
+(*|
+Action and reaction morphisms
+|*)
   Definition m_strat_play {Δ Φ} (x : m_strat_act Δ Φ)
     : delay (obs∙ Δ + h_actv ogs_hg (m_strat_pas Δ) Φ)
     := (fun _ => m_strat_wrap (snd x)) <$> eval (fst x).
@@ -108,7 +117,10 @@ Flattens a pair of alternating environments for both player and opponent into a 
                    (v_var ⊛ᵣ r_concat_r ⊛ᵣ r_concat_r) ,
                x ▶ₑ⁺) .
 
-  Definition m_strat {Δ} : m_strat_act Δ ⇒ᵢ ogs_act Δ :=
+(*|
+Strategies
+|*)
+   Definition m_strat {Δ} : m_strat_act Δ ⇒ᵢ ogs_act Δ :=
     cofix _m_strat Φ e :=
       emb_delay (m_strat_play e) >>=
         fun j (r : (_ @ Φ) j) =>
@@ -146,7 +158,10 @@ Flattens a pair of alternating environments for both player and opponent into a 
     fun i x y => forall m, m_strat_resp x m ≈ₐ m_strat_resp y m .
   Notation "x ≈ₚ y" := (m_strat_pas_eqv _ x y) (at level 50).
 
-  Definition inj_init_act Δ {Γ} (c : conf Γ) : m_strat_act Δ (∅ ▶ Γ) :=
+(*|
+Injection of configurations into strategies
+|*)
+   Definition inj_init_act Δ {Γ} (c : conf Γ) : m_strat_act Δ (∅ ▶ Γ) :=
     ((r_concat_r ⊛ᵣ r_concat_r) ᵣ⊛ₜ c , εₑ ▶ₑ⁺).
 
   Definition inj_init_pas {Δ Γ} (γ : Γ ⇒ᵥ Δ) : m_strat_pas Δ (∅ ▶ Γ) :=

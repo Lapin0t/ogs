@@ -1,3 +1,17 @@
+(*|
+Adequacy (Def 6.1)
+==================
+
+We prove in this module that the composition of strategy is adequate.
+The proof essentially proceeds by showing that "evaluating and observing",
+i.e., [reduce], is a solution of the same equations as is the composition
+of strategies.
+
+This argument assumes we can rely on the unicity of such a solution:
+we prove this fact by proving that these equations are eventually
+guarded in [OGS/CompGuarded.v].
+|*)
+
 From Coinduction Require Import coinduction tactics.
 
 From OGS Require Import Prelude.
@@ -111,6 +125,13 @@ Equipped with eventually guarded equations, we are ready to prove the adequacy
       now apply nf_eq_rfl'.
   Qed.
 
+(*|
+Note the use of [iter_evg_uniq]: the proof of adequacy is proved by unicity
+of the fixed point, which is made possible by equivalently viewing the fixpoint
+combinator used to define the composition of strategy as a fixpoint of eventually
+guarded equations.
+|*)
+
   Lemma adequacy_gen {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a) :
     reduce (_ ,' (c , e)) ≊ (c ∥g e).
   Proof.
@@ -156,10 +177,13 @@ Equipped with eventually guarded equations, we are ready to prove the adequacy
         now rewrite q, 2 e_comp_ren_r, v_sub_var, 2 s_eq_cat_r.
   Qed.
 
- (* Something in the refactoring broke all rewrites in this proof,
-     there seems to be a unification problem diverging during TC search.
-     To be fixed, for now we painfully fix the proofs by hand.
-   *)
+(*|
+Adequacy (Def 6.1) holds
+
+Note: Something in the refactoring broke all rewrites in this specific proof,
+there seems to be a unification problem diverging during TC search.
+To be fixed, for now we painfully fix the proofs by hand.
+|*)
   Lemma adequacy {Γ Δ} (c : conf Γ) (e : Γ ⇒ᵥ Δ) :
     eval_in_env e c ≊ (inj_init_act Δ c ∥g inj_init_pas e).
   Proof.

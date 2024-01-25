@@ -1,3 +1,14 @@
+(*|
+Congruence (Def 6.1)
+=====================
+
+We prove in this module that weak bisimilarity is a congruence
+for composition.
+The proof makes a slight technical side step: we prove the composition
+to be equivalent to an alternate definition, [compo0], for which
+proving congruence is slightly easier.
+|*)
+
 From Coinduction Require Import coinduction tactics.
 
 From OGS Require Import Prelude.

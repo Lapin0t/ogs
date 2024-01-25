@@ -1,3 +1,16 @@
+(*|
+Eventual guardedness of the composition
+==========================================
+
+We want to prove adequacy by unicity of solutions to the set of
+equations defining the composition. To do so, we rely on the
+notion of guarded iteration introduced in [ITree/Guarded].
+Through this file, we prove that the composition is indeed
+eventually guarded.
+As described in §6.2, the proof relies crucially on the [eval_app_not_var]
+assumption (Def 6.6).
+|*)
+
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
 From OGS.OGS Require Import Subst Obs Machine Game Strategy.
