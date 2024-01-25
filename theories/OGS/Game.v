@@ -11,9 +11,13 @@ From OGS.ITree Require Import Event ITree Eq Delay Structure Properties Guarded.
 (*|
 Games (§ 5.1)
 ===============
-
+Levy and Staton's general notion of game.
 |*)
 
+(*|
+An half games (Def 5.1) is composed of "moves" as an indexed family of types,
+and a [next] map computing the next index following a move.
+|*)
 Record half_game (I J : Type) := {
  g_move : I -> Type ;
  g_next : forall i, g_move i -> J
@@ -21,6 +25,9 @@ Record half_game (I J : Type) := {
 Arguments g_move {I J h} i.
 Arguments g_next {I J h i} m.
 
+(*|
+Action (h_actv) and reaction (h_pasv) functors (Def 5.8)
+|*)
 Definition h_actv {I J} (H : half_game I J) (X : psh J) : psh I :=
   fun i => { m : H.(g_move) i & X (H.(g_next) m) } .
 
@@ -38,6 +45,9 @@ Equations h_sync {I J} (H : half_game I J) {X Y : psh J}
           : ⦉ h_actv H X ×ᵢ h_pasv H Y ⦊ᵢ -> ⦉ Y ×ᵢ X ⦊ᵢ :=
   h_sync H (i ,' ((m ,' x) , k)) := (_ ,' (k m , x)) .
 
+(*|
+A game (Def 5.4) is composed of two compatible half games.
+|*)
 Record game (I J : Type) : Type := {
   g_client : half_game I J ;
   g_server : half_game J I
@@ -50,11 +60,9 @@ Definition e_of_g {I J} (G : game I J) : event I I :=
      e_rsp := fun i q => G.(g_server).(g_move) (G.(g_client).(g_next) q) ;
      e_nxt := fun i q r => G.(g_server).(g_next) r |} .
 
-
 (*|
 OGS Games (§ 5.2)
 ==================
-
 |*)
 
 Section withFam.
