@@ -1,3 +1,9 @@
+(*|
+Type families
+===============
+
+.. coq:: none
+|*)
 From OGS Require Import Prelude.
 
 (* (covariant) presheaves *)

@@ -3,8 +3,7 @@ Substitution (§ 4.3)
 =====================
 |*)
 From OGS Require Import Prelude.
-From OGS.Utils Require Import Ctx Rel.
-From OGS.ITree Require Import Event.
+From OGS.Utils Require Import Ctx Psh Rel.
 
 Open Scope ctx_scope.
 

@@ -2,13 +2,13 @@
 Contexts, families and variables
 =================================
 
-See Sections 5.1 and 5.3 in the paper.
+See Sections 4.1 and 4.3 in the paper.
 
 We work in an intrinsically typed setting across the development.
 Through this file, we introduce the necessary technicalities to
 manipulate contexts, variables and assignments.
 
-Contexts (§ 5.1)
+Contexts (§ 4.1)
 ------------------
 We represent contexts [ctx T] as lists, appending to the right by convention.
 We write `Γ ▶ x` to cons x to the context Γ (as opposed to `Γ , x` in the paper).
@@ -19,7 +19,7 @@ Main operations:
 - Γ ∋ x  : membership judgment
 - join_even/join_odd : join operators flattening the even/odd contexts from a context of contexts
 
-Assignments (§ 5.3)
+Assignments (§ 4.3)
 ---------------------
 Assignments [Γ =[ F ]> Δ], maps variables in Γ to F-terms with variables in Δ
 - ∅ₐ          : empty assignment

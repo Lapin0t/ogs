@@ -2,7 +2,7 @@ From Coinduction Require Import coinduction tactics.
 
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Ctx Rel.
-From OGS.OGS Require Import HalfGame Subst.
+From OGS.OGS Require Import Subst.
 From OGS.ITree Require Import Event ITree Delay Eq.
 
 Open Scope ctx_scope.
@@ -11,7 +11,7 @@ Section withFam.
   Context {bT : baseT}.
 
 (*|
-Observation Structure (§ 5.4)
+Observation Structure (§ 4.4)
 ==============================
 
 The messages that player and opponent exchange in the OGS
@@ -35,7 +35,7 @@ of the language:
 
 (*|
 Given an observation structure, we define the family of pointed observations
-(Definition 5.15) packaging them into a type, and an observation at
+(Definition 4.15) packaging them into a type, and an observation at
 this type.
 |*)
   Notation context := (ctx typ).
