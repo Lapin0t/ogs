@@ -3,7 +3,7 @@ From OGS.Utils Require Import Psh Rel Ctx.
 From OGS.ITree Require Import Event ITree Eq Delay Structure Properties.
 From OGS.OGS Require Import Soundness.
 Set Equations Transparent.
-
+ 
 Variant pol : Type := pos | neg .
 Derive NoConfusion for pol.
 

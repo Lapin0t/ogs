@@ -115,7 +115,7 @@ Definition a_shift3 {Γ Δ} [x y z] (a : Γ =[val]> Δ) : (Γ ▶ x ▶ y ▶ z)
                         (Var _ (pop (pop top))))
               (Var _ (pop top)))
     (Var _ top).
- 
+
 Equations t_of_v {Γ} : val Γ ⇒ᵢ term Γ :=
   t_of_v (t+ _) v := Val v ;
   t_of_v (t- _) k := k .
@@ -268,7 +268,7 @@ Equations v_of_p {a} (p : pat a) : val (pat_dom p) a :=
   v_of_p (PFst) := Fst (VarN top) ;
   v_of_p (PSnd) := Snd (VarN top) .
 
-Equations p_of_v0 {Γ : neg_ctx} a : val0 Γ a -> pat (t+ a) :=
+#[derive(eliminator=no)]Equations p_of_v0 {Γ : neg_ctx} a : val0 Γ a -> pat (t+ a) :=
   p_of_v0 (Zer)   (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_of_v0 (a + b) (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_of_v0 (a + b) (Inl v) := PInl (p_of_v0 _ v) ;
@@ -277,7 +277,7 @@ Equations p_of_v0 {Γ : neg_ctx} a : val0 Γ a -> pat (t+ a) :=
   p_of_v0 (a → b) _ := PLam ;
   p_of_v0 (a × b) _ := PPair .
 
-Equations p_dom_of_v0 {Γ : neg_ctx} a (v : val0 Γ a) : pat_dom (p_of_v0 a v) =[val]> Γ :=
+#[derive(eliminator=no)]Equations p_dom_of_v0 {Γ : neg_ctx} a (v : val0 Γ a) : pat_dom (p_of_v0 a v) =[val]> Γ :=
   p_dom_of_v0 (Zer)   (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_v0 (a + b) (VarP i) with (s_elt_upg i).(sub_prf) := { | ! } ;
   p_dom_of_v0 (a + b) (Inl v) := p_dom_of_v0 a v ;

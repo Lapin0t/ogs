@@ -91,3 +91,7 @@ This can be double checked as follows:
 - for the abstract result of soundness of the OGS by running [Print Assumptions ogs_correction.] at the end of [OGS/Soundness.v]
 - for any particular example, for instance by running [Print Assumptions stlc_ciu_correct.] at the end of [Example/CBVTyped.v]
 
+### Warning
+
+The output of compilation is slightly cluttered with warnings: in particular when dealing with SProp, Equations fails to generate induction principles. Unfortunately, there is no convenient way to silence these warnings at the moment. They are naturally completely harmless w.r.t. to the formalization.
+
