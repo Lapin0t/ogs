@@ -12,11 +12,11 @@
 
 (package
  (name coq-ogs)
- (synopsis "An abstract, certified account of operational game semantics.")
+ (synopsis "An abstract, certified account of operational game semantics")
  (version 0.1)
  (depends
-  (coq (= 8.17))
+  (coq (= 8.17.1))
   (coq-coinduction (= 1.6))
-  (coq-equations (= 1.3))
+  (coq-equations (= 1.3+8.17))
  )
 )
