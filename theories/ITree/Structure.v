@@ -60,12 +60,12 @@ Monad
 (*|
 Iterative
 |*)
-   Definition iter {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) : X ⇒ᵢ itree E Y :=
+  Definition iter {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) : X ⇒ᵢ itree E Y :=
     cofix _iter _ x :=
       bind (f _ x) (fun _ r => go match r with
-                                | inl x => TauF (_iter _ x)
-                                | inr y => RetF y
-                                end) .
+                              | inl x => TauF (_iter _ x)
+                              | inr y => RetF y
+                              end) .
 
 End monad.
 

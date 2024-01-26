@@ -1,3 +1,8 @@
+(*|
+Indexed relations
+==================
+A few standard constructions to work with indexed relations.
+|*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh.
 

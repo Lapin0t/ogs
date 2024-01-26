@@ -11,15 +11,14 @@ From OGS Require Import Prelude.
 From OGS.ITree Require Import Event ITree Structure.
 
 (*|
-The delay monad, defined in Section 5.5 in the paper, is formalized as an itree over
-an empty signature: in the absence of events, [τ] and [ret] are the only constructors
-inhabited.
+The delay monad (Def 4.5) is formalized as an itree over
+an empty signature: in the absence of events, [τ] and [ret] are the only constructors inhabited.
 
 Relevant definitions can be found:
 - for the underlying itree datatype, in [ITree/ITree.v]
 - for the combinators, in [ITree/Structure.v].
 - for the (strong/weak) bisimilarity, in [ITree/Eq.v].
-- for guarded iteration (Section 6.2), in [ITree/Guarded.v]
+- for guarded iteration (§ 6.2), in [ITree/Guarded.v]
 
 .. coq::
 |*)

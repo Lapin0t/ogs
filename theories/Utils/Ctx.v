@@ -2,8 +2,6 @@
 Contexts, families and variables
 =================================
 
-See Sections 4.1 and 4.3 in the paper.
-
 We work in an intrinsically typed setting across the development.
 Through this file, we introduce the necessary technicalities to
 manipulate contexts, variables and assignments.
@@ -132,7 +130,6 @@ We wish to manipulate intrinsically typed terms. We hence need a tightly typed n
   | pop {Γ x y} : has Γ x -> has (Γ ▶ y) x.
   Notation "Γ ∋ x" := (has Γ%ctx x) (at level 30).
   Derive Signature NoConfusion for has.
-
 
   Definition assignment (F : Famₛ X) (Γ Δ : ctx X) := has Γ ⇒ᵢ F Δ.
   Notation "Γ =[ F ]> Δ" := (assignment F Γ%ctx Δ%ctx) (at level 30).

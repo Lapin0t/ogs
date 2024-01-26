@@ -12,8 +12,7 @@ from a value, an observation, and an assignment.
 This less minimalist axiomatization puts the dependencies of our modules slightly
 backwards compared to the paper's Section 4.
 Here, evaluation structures, dubbed [machine]s, are parameterized by a substitution
-monoid of values, a substitution module of configurations, and an observation structure,
-instead of coming first.
+monoid of values, a substitution module of configurations, and an observation structure, instead of coming first.
 
 Patching the development for following the paper's presentation would be slightly
 technical due to the technicality of the mechanized proofs involved, but essentially

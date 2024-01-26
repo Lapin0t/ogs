@@ -618,7 +618,7 @@ Lemma a_comp_assoc {Γ1 Γ2 Γ3 Γ4} (u : Γ3 =[val_m]> Γ4) (v : Γ2 =[val_m]> 
 Qed.
 Lemma a_sub1_sub {Γ Δ a} (f : Γ =[val_m]> Δ) (v : val_m Γ a)
   : assign1 (f ⊛ₘ v) ⊛ a_shift f ≡ₐ f ⊛ (assign1 v).
-  
+
   intros ? h; unfold a_comp, s_map.
   dependent elimination h; [ cbn; now rewrite m_sub_id_r | ].
   cbn; unfold s_map, m_shift; rewrite m_sub_ren, m_sub_id_r.
@@ -715,7 +715,7 @@ Evaluation respects substitution.
     * cbn; econstructor.
       exact (CIH (Cut t1 (K1 t0 e0)) e).
 (*|
-Evaluating a normal form yields the same normal form instantly. 
+Evaluating a normal form yields the same normal form instantly.
 |*)
   - destruct u as [ a [ i [ p γ ] ]].
     unfold nf'_ty, nf'_var, nf'_val, a_id; cbn in *.

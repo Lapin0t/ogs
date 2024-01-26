@@ -20,7 +20,7 @@ on which it is stuck, an observation, and an assignment.
 
 An **observation structure** axiomatizes the observations
 of the language:
-- a Type [typ] of types (assumed globally in Section 5),
+- a Type [typ] of types (assumed globally in §4),
 - a type-indexed set [obs] of observations,
 - a map [dom] mapping observations to values filling their copattern
 

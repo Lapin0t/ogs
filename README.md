@@ -5,8 +5,8 @@ It has been rendered anonymous for the purpose of submission.
 
 The main contribution of this library are:
 - an independent implementation of an indexed counterpart to the itree library with support for guarded and eventually guarded recursion
-- an abstract OGS model of an axiomatized language proven sound
-- several instantiating of the abstract result to concrete languages
+- an abstract OGS model of an axiomatised language proven sound w.r.t. substitution equivalence
+- several instantiations of this abstract result to concrete languages: typed and untyped cbv lambda calculus with fix, Downen and Ariola's polarized system D and system L.
 
 ## Meta
 

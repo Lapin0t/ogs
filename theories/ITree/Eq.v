@@ -26,8 +26,7 @@ We write ≅ for strong bisimilarity with equality over leaves.
 
 (*|
 Monotone endofunction over indexed relations between trees.
-Strong bisimilarity is defined as the greatest fixpoint of [it_eqF RR],
-for a fixed value relation [RR].
+Strong bisimilarity is defined as the greatest fixpoint of [it_eqF RR], for a fixed value relation [RR].
 |*)
 Variant it_eqF {I} E
   {X1 X2} (RX : relᵢ X1 X2) {Y1 Y2} (RR : relᵢ Y1 Y2)
@@ -201,11 +200,8 @@ End it_eat.
 #[global] Arguments EatStep {I E R i t1 t2} p.
 
 (*|
-The weak bisimilarity itself, allowing to eat taus on each sides before
-hitting [it_eqF].
-Note that compared to more traditional definitions of bisimilarity, we do
-not eat taus _after_ the call to [it_eqF]: since we only consider deterministics
-LTSs here, it does not matter.
+The weak bisimilarity itself, allowing to eat taus on each sides before hitting [it_eqF].
+Note that compared to more traditional definitions of bisimilarity, we do not eat taus _after_ the call to [it_eqF]: since we only consider deterministics LTSs here, it does not matter.
 
 .. coq::
 |*)

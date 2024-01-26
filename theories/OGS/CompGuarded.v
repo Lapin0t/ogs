@@ -7,8 +7,7 @@ equations defining the composition. To do so, we rely on the
 notion of guarded iteration introduced in [ITree/Guarded].
 Through this file, we prove that the composition is indeed
 eventually guarded.
-As described in §6.2, the proof relies crucially on the [eval_app_not_var]
-assumption (Def 6.6).
+As described in §6.2, the proof relies crucially on the [eval_app_not_var] assumption (Def 6.6).
 |*)
 
 From OGS Require Import Prelude.
@@ -39,10 +38,8 @@ Satisfying an appropriate axiomatization
   Context {ML: machine_laws}.
 
 (*|
-A central elements in the proof lies in ensuring that there exists a unique solution
-to [compo_body]. Since the composition of strategies is defined as such a solution,
-adequacy can be established by proving that evaluating and observing the substituted
-term.
+A central elements in the proof lies in ensuring that there exists a unique solution to [compo_body]. Since the composition of strategies is defined as such a solution,
+adequacy can be established by proving that evaluating and observing the substituted term.
 
 By [iter_evg_uniq], we know that eventually guarded equations admit a unique fixed point:
 we hence start by proving this eventual guardedness, captured in lemma [compo_body_guarded].

@@ -1564,28 +1564,6 @@ Lemma clean_hyp_ren {Γ Δ : neg_ctx} (c : state Γ) (e : Γ ⊆ Δ)
   intros ? j; now rewrite v_ren_id_r.
 Qed.
 
-
-
-(*
-Lemma eval_nf_ret {Γ : neg_ctx} (u : nf Γ) : fmap_delay (pat_of_nf Γ) (eval (p_app (Var _ (fst (projT2 u))) (projT1 (snd (projT2 u))) (projT2 (snd (projT2 u))))) ≊ ret_delay (pat_of_nf _ u) .
-  unfold eval, iter_delay.
-  rewrite iter_unfold.
-  apply it_eq_unstep; cbn.
-  change (iter _ T1_0 ?x) with (iter_delay (fun c : state Γ => Let' (eval_aux c)) x).
-  destruct u as [ [] [ i [ m γ ]]]; simpl t_neg in m; simpl p_app.
-  - funelim (v_of_p m); cbn; econstructor; cbn; auto.
-    unfold pat_of_nf; cbn.
-    now rewrite w_sub_ren, p_of_v_eq.
-  - funelim (v_of_p m); cbn; econstructor; cbn; auto.
-    + unfold pat_of_nf; cbn.
-      change (p_of_v0 _ (Inl ?a)) with (PInl (b:=b) (p_of_v0 _ a)).
-      now rewrite p_of_v_eq.
-    + unfold pat_of_nf; cbn.
-      change (p_of_v0 _ (Inr ?a)) with (PInr (a:=a1) (p_of_v0 _ a)).
-      now rewrite p_of_v_eq.
-Qed.
-*)
-
 Variant head_inst_nostep (u : sigT (fun A => pat (t_neg A))) : sigT (fun A => pat (t_neg A)) -> Prop :=
 | HeadInst {Γ : neg_ctx} {A} (v : val Γ A) (m : pat (t_neg A)) (e : p_dom m =[val]> Γ)
       (p : is_var v -> False) (i : Γ ∋ (projT1 u : ty))
@@ -1844,20 +1822,6 @@ Lemma from_BB_to_FF {Δ Γ : neg_ctx} (e : Γ =[ val ]> Δ) : a_ren r_from_to_l 
   unfold from_BB, to_FF, to_FB, a_ren, s_map; cbn; intros ? i.
   now rewrite v_ren_ren, r_from_to_lr, v_ren_id_l.
 Qed.
-
-(*
-Lemma to_from_BF {Γ1 : ctx neg_ty} {Γ2 : neg_ctx} (u : Γ1 =[val']> ctx_s_to Γ2) : to_BF (from_BF u) ≡ₐ u .
-  intros ? i; unfold to_BF, from_BF.
-  rewrite to_from_FF.
-  f_equal; apply to_from_has_F.
-Qed.
-
-Lemma from_to_FB {Γ1 : neg_ctx} {Γ2} (u : Γ1 =[val]> ctx_s_from Γ2) : from_FB (to_FB u) ≡ₐ u.
-  intros ? i; unfold to_FB, from_FB.
-  now rewrite from_to_has_F.
-Qed.
-*)
-
 
 Definition ugly_var {Γ} : Γ =[val']> Γ := fun _ i => s_var _ (from_has_L i) .
 

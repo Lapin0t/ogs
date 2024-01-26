@@ -7,10 +7,8 @@ Having worked hard to establish adequacy and congruence of weak bisimilarity for
 very little remains to do here.
 
 At the end of the file, we run two commands:
-- [About ogs_correction.] explicit the assumptions of the theorem, that we show how to instantiate in the [Example]
-folder on several concrete examples of languages.
-- [Print Assumptions ogs_correction.] explicit if any axiom has been used to establish the result. As stated in the
-Readme, we exclusively use [Eqdep.Eq_rect_eq.eq_rect_eq] (i.e., axiom K).
+- [About ogs_correction.] explicit the assumptions of the theorem, that we show how to instantiate in the [Example] folder on several concrete examples of languages.
+- [Print Assumptions ogs_correction.] explicit if any axiom has been used to establish the result. As stated in the Readme, we exclusively use [Eqdep.Eq_rect_eq.eq_rect_eq] (i.e., axiom K).
 |*)
 
 From Coinduction Require Import coinduction tactics.
