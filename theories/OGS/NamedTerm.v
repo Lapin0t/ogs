@@ -43,7 +43,7 @@ Section withFam.
 
   Notation "u ⊛ₑ E" := (esub_val u E) (at level 30).
 
-  Class subst_module_ctx_laxs `{subst_module_ectx} := {
+  Class subst_module_ctx_laws `{subst_module_ectx} := {
     (* esub_val_proper {Γ Δ} :: Proper (ass_eq Γ Δ ==> forall_relation (fun i => eq ==> eq)) esub_val ; *)
     esub_val_id {Γ τ1 τ2} (e : ectx Γ τ1 τ2) : esub_val v_var e = e;
     esub_val_comp {τ1 τ2 Γ1 Γ2 Γ3} (u : Γ2 ⇒ᵥ Γ3) (v : Γ1 ⇒ᵥ Γ2) (e : ectx Γ1 τ1 τ2) : 
@@ -86,44 +86,93 @@ Section withFam.
   }.
 End withFam.
 
-Variant interactive_type (source_ty : Type) := | ValTy (t:source_ty) | CtxTy (t:source_ty).
-Arguments ValTy {source_ty} t.
-Arguments CtxTy {source_ty} t.
+Section translation.
+  Variable source_ty : baseT.
+  Variable source_val : @baseV source_ty.
+  Variable source_ectx : @baseEctx source_ty.
+  Variable source_term : @baseTerm source_ty.
+  Variable val_monoid : subst_monoid source_val.
+  Variable ectx_monoid : subst_monoid_ectx.
+  Variable ectx_valmodule : subst_module_ectx.
+  Variable term_ectxmodule : ectx_module_term.
+  Variable term_valmodule : subst_module_term.
+
+
+Variant interactive_type := | ValTy (t:typ) | CtxTy (t:typ).
 
 Notation "¬ x" := (CtxTy x) (at level 50).
 
-Equations restrict_valTy {source_ty : Type} : ctx (interactive_type source_ty) -> ctx source_ty :=
+Equations restrict_valTy : ctx interactive_type -> ctx typ :=
 restrict_valTy ∅ := ∅;
 restrict_valTy (Γ ▶ (ValTy τ)) := (restrict_valTy Γ) ▶ τ;
-restrict_valTy (Γ ▶ (CtxTy τ)) := (restrict_valTy Γ).
+restrict_valTy (Γ ▶ ¬τ) := (restrict_valTy Γ).
 
-Definition interactive_baseT (source_ty : baseT) : baseT := {|typ := interactive_type typ|}.
+Definition interactive_baseT : baseT := {|typ := interactive_type|}.
 
-Variant interactive_value {source_ty : baseT} (source_val : @baseV source_ty) (source_ectx : @baseEctx source_ty) : Famₛ (interactive_type typ) :=
-  | IVal {Γ τ} (v : val (restrict_valTy Γ) τ) : interactive_value source_val source_ectx Γ (ValTy τ)
-  | ICtx {Γ τ σ} (α:Γ ∋ ¬σ) (E : ectx (restrict_valTy Γ) τ σ) : interactive_value source_val source_ectx Γ (¬τ).
+Variant ival : Famₛ interactive_type :=
+  | IVal {Γ τ} (v : val (restrict_valTy Γ) τ) : ival Γ (ValTy τ)
+  | ICtx {Γ τ σ} (α:Γ ∋ ¬σ) (E : ectx (restrict_valTy Γ) τ σ) : ival Γ (¬τ).
 
-Program Definition interactive_baseV (source_ty : baseT) (source_val : @baseV source_ty) (source_ectx : @baseEctx source_ty) : @baseV (interactive_baseT source_ty) :=
-{|val := interactive_value source_val source_ectx |}.
+Program Definition interactive_baseV  : @baseV interactive_baseT :=
+{|val := ival |}.
 
-Record namedTerm {source_ty : baseT} (interactive_ty : interactive_type typ) (source_term : @baseTerm source_ty) (Γ : ctx (interactive_type typ) ) {σ : typ} := 
-  {α:Γ ∋ ¬σ;  te : term (restrict_valTy Γ) σ}.
-  
-Class isubst_monoid {source_ty : baseT} (source_val : @baseV source_ty) (source_ectx : @baseEctx source_ty) : Type := {
-  iv_var {Γ} : Γ =[interactive_value source_val source_ectx]> Γ ; (* Γ ∋ x -> val Γ x *)
-  iv_sub {Γ Δ} : Γ =[interactive_value source_val source_ectx]> Δ -> interactive_value source_val source_ectx Γ ⇒ᵢ interactive_value source_val source_ectx Δ ;
-}.
+Record namedTerm (Γ : ctx (interactive_type) ) := 
+  {σ : typ; α:Γ ∋ ¬σ;  te : term (restrict_valTy Γ) σ}.
 
-Notation "u ⊛ᵢ v" := (iv_sub u _ v) (at level 30).
-Notation "Γ ⇒ᵢᵥ Δ" := (Γ =[interactive_value]> Δ) (at level 30). (*To be corrected *)
+Arguments Build_namedTerm {_ _}.
 
-(* TODO 
-Class subst_monoid_laws {source_ty : baseT} (source_val : @baseV source_ty) (source_ectx : @baseEctx source_ty) : Prop :=
-{
-  iv_sub_var {Γ1 Γ2} (p : Γ1 =[interactive_value source_val source_ectx]> Γ2) : p ⊛ᵢ iv_var ≡ₐ p ;
-  iv_var_sub {Γ1 Γ2} (p : Γ1 ⇒ᵥ Γ2) : v_var ⊛ p ≡ₐ p ;
-  iv_sub_sub {Γ1 Γ2 Γ3 Γ4} (p : Γ3 ⇒ᵥ Γ4) (q : Γ2 ⇒ᵥ Γ3) (r : Γ1 ⇒ᵥ Γ2) :
-  p ⊛ (q ⊛ r) ≡ₐ (p ⊛ q) ⊛ r ;
-} .
+Program Definition interactive_baseC  : @baseC interactive_baseT :=
+{|conf := namedTerm |}.
 
-*)
+Lemma restrict_invert {Γ σ} (i: Γ ∋ ValTy σ) : restrict_valTy Γ ∋ σ.
+clear -i. dependent induction i.
+cbn.
+- apply Ctx.top.
+- destruct y. cbn. 
+  * eapply Ctx.pop. eapply IHi; eauto.
+  * cbn. eapply IHi; eauto.
+Qed. 
+
+Lemma inject_to_restrict {Γ σ} (i : restrict_valTy Γ ∋ σ) : Γ ∋ ValTy σ.
+clear -Γ σ i.
+dependent induction i.
+- induction Γ.
+  * inversion x.
+  * destruct x1.
+    + cbn in x. inversion x. apply Ctx.top.
+    + cbn in x. apply Ctx.pop. exact (IHΓ x).
+- induction Γ.
+ * inversion x.
+ * destruct x1.
+    + cbn in x. inversion x. exact (Ctx.pop (IHi Γ H0)).
+    + cbn in x. apply Ctx.pop. exact (IHΓ x).
+Qed.
+
+Definition restrict_val_ival {Γ Δ} (γ : Γ =[ival]> Δ) : (restrict_valTy Γ) =[val]> (restrict_valTy Δ).
+intros τ i. clear -i γ τ.
+pose (γ (ValTy τ) (inject_to_restrict i)).
+inversion i0.
+apply v.
+Qed.
+
+
+Definition ival_monoid : subst_monoid interactive_baseV.
+split.
+- refine (fun Γ τ => match τ with ValTy σ => fun i => IVal (v_var _ (restrict_invert i)) 
+| CtxTy σ => fun i => ICtx i ectx_var end).
+- intros Γ Δ γ τ v. destruct τ; cbn; cbn in v.
+  * apply IVal.
+    refine (@v_sub source_ty source_val val_monoid (restrict_valTy Γ) (restrict_valTy Δ) _ _ _).
+    + exact (restrict_val_ival γ).
+    + inversion v; eauto.
+  * inversion v. pose (γ (¬σ0) α0). inversion v0.  eapply (ICtx α1). eapply (ectx_sub E0).
+    exact (esub_val (restrict_val_ival γ) E).
+Defined.
+
+Definition nterm_module : subst_module interactive_baseV interactive_baseC.
+  split. intros Γ Δ γ M. destruct M. pose (γ (¬σ0) α0). inversion v.
+  pose (restrict_val_ival γ) as δ.
+  pose (fill E (t_sub δ _ te0)). 
+  cbn.
+  eexact {|α := α1; te := t|}.
+Defined.
