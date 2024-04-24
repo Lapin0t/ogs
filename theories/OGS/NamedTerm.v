@@ -85,6 +85,12 @@ Section withFam.
       u ⊛ₑ (E2 @ₑ E1) = (u ⊛ₑ E2) @ₑ (u ⊛ₑ E1);
   }.
 End withFam.
+Notation "•" := ectx_var.
+Notation "E @ₑ F" := (ectx_sub E F) (at level 20).
+Notation "u ⊛ₑ E" := (esub_val u E) (at level 30).
+Notation "E @ₜ t" := (fill E t) (at level 20).
+Notation "u ⊛ₜ t" := (t_sub u _ t) (at level 30).
+
 
 Section translation.
   Variable source_ty : baseT.
@@ -98,81 +104,166 @@ Section translation.
   Variable term_valmodule : subst_module_term.
 
 
+(* ptet on pourrait renommer à ityp.. *)
 Variant interactive_type := | ValTy (t:typ) | CtxTy (t:typ).
+(*
+le NoConfusion c'est un truc dont Equations a besoin pour faire
+proprement du pattern matching dépendent. Globalement ça dérive une
+relation qui ressemble à l'égalité mais qui est mieux plus
+pratique. Tu peux checker:
 
-Notation "¬ x" := (CtxTy x) (at level 50).
+Print NoConfusion_interactive_type.
+Print NoConfusionPackage.
+*)
+Derive NoConfusion for interactive_type.
 
-Equations restrict_valTy : ctx interactive_type -> ctx typ :=
-restrict_valTy ∅ := ∅;
-restrict_valTy (Γ ▶ (ValTy τ)) := (restrict_valTy Γ) ▶ τ;
-restrict_valTy (Γ ▶ ¬τ) := (restrict_valTy Γ).
+(* petite notation en plus pour ValTy *)
+Notation "+ x" := (ValTy x) (at level 5).
+Notation "¬ x" := (CtxTy x) (at level 5).
+
+(* petit renommage et notation pour la restriction de contexte *)
+Equations restrict : ctx interactive_type -> ctx typ :=
+restrict ∅ := ∅;
+restrict (Γ ▶ +τ) := (restrict Γ) ▶ τ;
+restrict (Γ ▶ ¬τ) := (restrict Γ).
+Notation "↓ Γ" := (restrict Γ) (at level 5).
 
 Definition interactive_baseT : baseT := {|typ := interactive_type|}.
 
 Variant ival : Famₛ interactive_type :=
-  | IVal {Γ τ} (v : val (restrict_valTy Γ) τ) : ival Γ (ValTy τ)
-  | ICtx {Γ τ σ} (α:Γ ∋ ¬σ) (E : ectx (restrict_valTy Γ) τ σ) : ival Γ (¬τ).
+| IVal {Γ τ} (v : val ↓Γ τ) : ival Γ +τ
+| ICtx {Γ τ σ} (α : Γ ∋ ¬σ) (E : ectx ↓Γ τ σ) : ival Γ ¬τ.
+Derive NoConfusion for ival.
 
 Program Definition interactive_baseV  : @baseV interactive_baseT :=
-{|val := ival |}.
+  {| val := ival |}.
 
-Record namedTerm (Γ : ctx (interactive_type) ) := 
-  {σ : typ; α:Γ ∋ ¬σ;  te : term (restrict_valTy Γ) σ}.
-
-Arguments Build_namedTerm {_ _}.
+(* juste des petits noms plus cohérents avec le reste, aussi les champs c'est bien qu'ils
+ aient des noms explicites vu que ça devient des accesseurs. *)
+Record iterm (Γ : ctx interactive_type) := ITerm {
+  itm_ty : typ ;
+  itm_var : Γ ∋ ¬itm_ty ;
+  itm_tm : term ↓Γ itm_ty ;
+}.
+#[global] Arguments ITerm {Γ σ} i t : rename.
+#[global] Arguments itm_ty {Γ}.
+#[global] Arguments itm_var {Γ}.
+#[global] Arguments itm_tm {Γ}.
 
 Program Definition interactive_baseC  : @baseC interactive_baseT :=
-{|conf := namedTerm |}.
+  {| conf := iterm |}.
 
-Lemma restrict_invert {Γ σ} (i: Γ ∋ ValTy σ) : restrict_valTy Γ ∋ σ.
-clear -i. dependent induction i.
-cbn.
-- apply Ctx.top.
-- destruct y. cbn. 
-  * eapply Ctx.pop. eapply IHi; eauto.
-  * cbn. eapply IHi; eauto.
-Qed. 
+(* on embed une variable du sous-context
 
-Lemma inject_to_restrict {Γ σ} (i : restrict_valTy Γ ∋ σ) : Γ ∋ ValTy σ.
-clear -Γ σ i.
-dependent induction i.
-- induction Γ.
-  * inversion x.
-  * destruct x1.
-    + cbn in x. inversion x. apply Ctx.top.
-    + cbn in x. apply Ctx.pop. exact (IHΓ x).
-- induction Γ.
- * inversion x.
- * destruct x1.
-    + cbn in x. inversion x. exact (Ctx.pop (IHi Γ H0)).
-    + cbn in x. apply Ctx.pop. exact (IHΓ x).
+note: la technique pour faire du équations c'est de commencer par utiliser
+Equations? (avec le ?), qui va te mettre direct en proof mode. Et après de
+raffiner les clauses successivement, genre:
+
+Equations? restrict_emb Γ {σ} (i : ↓Γ ∋ σ) : Γ ∋ +σ :=
+  restrict_emb Γ i := _ .
+
+puis 
+
+Equations? restrict_emb Γ {σ} (i : ↓Γ ∋ σ) : Γ ∋ +σ :=
+  restrict_emb ∅       i := _ ;
+  restrict_emb (Γ ▶ τ) i := _ .
+
+Là on se rend compte que dans le cas 1, il n'y a aucun i possible, du coup soit
+on écrit:
+
+Equations? restrict_emb Γ {σ} (i : ↓Γ ∋ σ) : Γ ∋ +σ :=
+  restrict_emb ∅       (!) ;
+  restrict_emb (Γ ▶ τ) i   := _ .
+
+Soit juste on enlève (normalement il trouve tout seul)
+
+Equations? restrict_emb Γ {σ} (i : ↓Γ ∋ σ) : Γ ∋ +σ :=
+  restrict_emb (Γ ▶ τ) i   := _ .
+
+Puis
+
+Equations? restrict_emb Γ {σ} (i : ↓Γ ∋ σ) : Γ ∋ +σ :=
+  restrict_emb (Γ ▶ +τ) i   := _ ;
+  restrict_emb (Γ ▶ ¬τ) i   := _ .
+
+etc.
+*)
+
+Equations restrict_emb Γ {σ} (i : ↓Γ ∋ σ) : Γ ∋ +σ :=
+  restrict_emb (Γ ▶ +τ) Ctx.top     := Ctx.top ;
+  restrict_emb (Γ ▶ +τ) (Ctx.pop i) := Ctx.pop (restrict_emb Γ i) ;
+  restrict_emb (Γ ▶ ¬τ) i           := Ctx.pop (restrict_emb Γ i) .
+#[global] Arguments restrict_emb {Γ σ} i.
+
+(* plus tard on aura besoin de savoir que c'est injectif *)
+Lemma restrict_emb_inj {Γ σ} (i j : ↓Γ ∋ σ) : restrict_emb i = restrict_emb j -> i = j.
+Admitted.
+
+(* on défini les fibres de restrict_emb *)
+Variant restrict_view {Γ σ} : Γ ∋ +σ -> Type :=
+| RestrictV (i : restrict Γ ∋ σ) : restrict_view (restrict_emb i)
+.
+
+(* on montre que toute fibre est habitée *)
+Lemma view_restrict {Γ σ} (i : Γ ∋ +σ) : restrict_view i .
+  clear -i; induction Γ.
+  - dependent elimination i.
+  - dependent elimination i.
+    + exact (@RestrictV (_ ▶ +_) σ Ctx.top).
+    + specialize (IHΓ h).
+      dependent elimination IHΓ.
+      destruct y.
+      exact (@RestrictV (_ ▶ +_) _ (Ctx.pop i)).
+      exact (@RestrictV (_ ▶ ¬_) _ i).
 Qed.
 
-Definition restrict_val_ival {Γ Δ} (γ : Γ =[ival]> Δ) : (restrict_valTy Γ) =[val]> (restrict_valTy Δ).
-intros τ i. clear -i γ τ.
-pose (γ (ValTy τ) (inject_to_restrict i)).
-inversion i0.
-apply v.
-Qed.
+(* maintenant pour inverser il suffit de pattern-matcher sur un
+élément de la fibre *)
+Equations restrict_get {Γ σ} (i : Γ ∋ +σ) : restrict Γ ∋ σ :=
+  restrict_get i with view_restrict i := {
+     | RestrictV j := j
+  }.
 
+(* des petits accesseurs pour ival *)
+Equations ival_v_get_val {Γ σ} (iv : ival Γ +σ) : val ↓Γ σ :=
+  ival_v_get_val (IVal v) := v .
 
-Definition ival_monoid : subst_monoid interactive_baseV.
-split.
-- refine (fun Γ τ => match τ with ValTy σ => fun i => IVal (v_var _ (restrict_invert i)) 
-| CtxTy σ => fun i => ICtx i ectx_var end).
-- intros Γ Δ γ τ v. destruct τ; cbn; cbn in v.
-  * apply IVal.
-    refine (@v_sub source_ty source_val val_monoid (restrict_valTy Γ) (restrict_valTy Δ) _ _ _).
-    + exact (restrict_val_ival γ).
-    + inversion v; eauto.
-  * inversion v. pose (γ (¬σ0) α0). inversion v0.  eapply (ICtx α1). eapply (ectx_sub E0).
-    exact (esub_val (restrict_val_ival γ) E).
-Defined.
+Equations ival_e_get_ty {Γ σ} (iv : ival Γ ¬σ) : typ :=
+  ival_e_get_ty (@ICtx Γ τ1 τ2 i E) := τ2 .
 
-Definition nterm_module : subst_module interactive_baseV interactive_baseC.
-  split. intros Γ Δ γ M. destruct M. pose (γ (¬σ0) α0). inversion v.
-  pose (restrict_val_ival γ) as δ.
-  pose (fill E (t_sub δ _ te0)). 
-  cbn.
-  eexact {|α := α1; te := t|}.
-Defined.
+Equations ival_e_get_var {Γ σ} (iv : ival Γ ¬σ) : Γ ∋ ¬(ival_e_get_ty iv) :=
+  ival_e_get_var (@ICtx Γ τ1 τ2 i E) := i .
+
+Equations ival_e_get_ectx {Γ σ} (iv : ival Γ ¬σ) : ectx ↓Γ σ (ival_e_get_ty iv) :=
+  ival_e_get_ectx (@ICtx Γ τ1 τ2 i E) := E .
+
+(* downgrade des assignations (j'ai renommé un changé l'implem pour
+utiliser les nouveaux outils) *)
+Definition restrict_ass {Γ Δ} (γ : Γ =[ival]> Δ) : ↓Γ =[val]> ↓Δ :=
+  fun σ i => ival_v_get_val (γ +σ (restrict_emb i)) .
+
+(* j'ai extrait les defs qui étaient en tactiques inline, pour utiliser equations *)
+Equations ival_var {Γ} σ : Γ ∋ σ -> ival Γ σ :=
+  ival_var (+ σ) i := IVal (v_var _ (restrict_get i)) ;
+  ival_var (¬ σ) i := ICtx i ectx_var .
+Arguments ival_var {Γ σ} i.
+
+Equations ival_sub {Γ Δ} (γ : Γ =[ival]> Δ) {σ} (v : ival Γ σ) : ival Δ σ :=
+  ival_sub γ (IVal v)   := IVal (restrict_ass γ ⊛ᵥ v) ;
+  ival_sub γ (ICtx i E) :=
+    let i' := ival_e_get_var (γ _ i) in
+    let E' := ival_e_get_ectx (γ _ i) in
+    ICtx i' (E' @ₑ (restrict_ass γ ⊛ₑ E)) .
+
+Definition iterm_sub {Γ Δ} (γ : Γ =[ival]> Δ) (t : iterm Γ) : iterm Δ :=
+  let i' := ival_e_get_var (γ _ t.(itm_var)) in
+  let E' := ival_e_get_ectx (γ _ t.(itm_var)) in
+  ITerm i' (E' @ₜ (restrict_ass γ ⊛ₜ t.(itm_tm))).
+
+Program Definition ival_monoid : subst_monoid interactive_baseV :=
+  {| v_var := @ival_var ; v_sub := @ival_sub |}.
+
+Program Definition nterm_module : subst_module interactive_baseV interactive_baseC :=
+  {| c_sub := @iterm_sub |}.
+
+End translation.
