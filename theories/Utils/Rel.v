@@ -11,6 +11,7 @@ From Coinduction Require Export lattice.
 
 #[export] Existing Instance CompleteLattice_dfun.
 
+#[global] Notation "∀ₕ x , R" := (forall_relation (fun i => R)) (at level 60).
 Notation relᵢ A B := (forall i, A i -> B i -> Prop).
 
 #[global] Notation Reflexiveᵢ R := (forall i, Reflexive (R i)).
