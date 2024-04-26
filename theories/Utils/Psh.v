@@ -26,7 +26,7 @@ Definition sumᵢ {I} (X Y : psh I) : psh I := fun i => (X i + Y i)%type.
 Definition prodᵢ {I} (X Y : psh I) : psh I := fun i => (X i * Y i)%type.
 #[global] Infix "×ᵢ" := (prodᵢ) (at level 20) : indexed_scope.
 
-#[global] Notation "⦉ X ⦊ᵢ" := (sigT X) : type_scope.
+(*#[global] Notation "⦉ X ⦊ᵢ" := (sigT X) : type_scope.*)
 
 (* pointwise arrows between F G : endo (psh I) *)
 #[global] Notation "F ⇒ₙ G" := (forall X : psh _, F X ⇒ᵢ G X) (at level 30).

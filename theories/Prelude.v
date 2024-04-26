@@ -2,6 +2,7 @@
 #[global] Set Warnings "-parsing".
 
 #[global] Set Primitive Projections.
+#[global] Generalizable All Variables.
 
 From Equations Require Export Equations.
 #[global] Set Equations Transparent.
@@ -47,6 +48,13 @@ Derive NoConfusion for T3.
 
 Definition ex_falso {A : Type} (bot : T0) : A := match bot with end.
 
+#[global] Notation "¬ P" := (P -> T0) (at level 5).
+Variant decidable (X : Type) : Type :=
+| Yes : X -> decidable X
+| No : ¬X -> decidable X
+.
+Derive NoConfusion NoConfusionHom for decidable.
+
 Record sigS {X : Type} (P : X -> SProp) := { sub_elt : X ; sub_prf : P sub_elt }.
 Arguments sub_elt {X P}.
 Arguments sub_prf {X P}.
@@ -62,3 +70,5 @@ Definition substS {X : SProp} (P : X -> Type) (a b : X) : P a -> P b := fun p =>
 Lemma eq_refl_map2_distr [A B C : Type] (x : A) (y : B) (f : A -> B -> C) : f_equal2 f (@eq_refl _ x) (@eq_refl _ y) = eq_refl .
   apply YesUIP.
 Qed.
+
+Definition injective {A B : Type} (f : A -> B) := forall x y : A, f x = f y -> x = y .
