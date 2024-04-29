@@ -1,13 +1,12 @@
 From OGS Require Import Prelude.
-From OGS.Utils Require Import Ctx Psh Rel.
+From OGS.Utils Require Import Psh Rel.
+From OGS.Ctx Require Import All DirectSum Ctx.
 From OGS.OGS Require Import Subst.
 
 Open Scope ctx_scope.
 
-#[global] Notation "'Fam₂' X" := (ctx X -> X -> X -> Type) (at level 30).
-
 (* hole and composition of contexts *)
-Class fill_monoid {T} (ectx : Fam₂ T) : Type := {
+Class fill_monoid `{CC : context T C} (ectx : Fam₂ T C) := {
   e_hole {Γ τ} : ectx Γ τ τ ;
   e_fill {Γ τ1 τ2 τ3} : ectx Γ τ2 τ3 -> ectx Γ τ1 τ2 -> ectx Γ τ1 τ3 ;
 }.
@@ -15,35 +14,35 @@ Class fill_monoid {T} (ectx : Fam₂ T) : Type := {
 #[global] Notation "∙" := e_hole.
 #[global] Notation "E @ₑ F" := (e_fill E F) (at level 20).
 
-Class fill_monoid_laws {T} (ectx : Fam₂ T) {EM : fill_monoid ectx} : Prop := {
+Class fill_monoid_laws `{CC : context T C} (ectx : Fam₂ T C) {EM : fill_monoid ectx} := {
   e_hole_fill {Γ τ1 τ2} (e : ectx Γ τ1 τ2) : ∙ @ₑ e = e ;
   e_fill_hole {Γ τ1 τ2} (e : ectx Γ τ1 τ2) : e @ₑ ∙ = e ;
-  e_fill_fill {Γ τ1 τ2 τ3 τ4} 
-    (E1 : ectx Γ τ1 τ2) (E2 : ectx Γ τ2 τ3) (E3 : ectx Γ τ3 τ4) :
-    E3 @ₑ (E2 @ₑ E1) = (E3 @ₑ E2) @ₑ E1 ;
+  e_fill_fill {Γ τ1 τ2 τ3 τ4}  (E1 : ectx Γ τ1 τ2) (E2 : ectx Γ τ2 τ3) (E3 : ectx Γ τ3 τ4)
+    : E3 @ₑ (E2 @ₑ E1) = (E3 @ₑ E2) @ₑ E1 ;
 }.
 
 (* substitution of a Fam₂-shaped family by values *)
-Class subst_module2 {T} (val : Famₛ T) (ectx : Fam₂ T) : Type := {
-  e_sub {Γ Δ} : Γ =[val]> Δ -> forall τ1 τ2, ectx Γ τ1 τ2 -> ectx Δ τ1 τ2
+Class subst_module2 `{CC : context T C} (val : Fam₁ T C) (ectx : Fam₂ T C) := {
+  e_sub : ectx ⇒₂ ⟦ val , ectx ⟧₂ ;
 }.
-#[global] Notation "u ⊛ₑ E" := (e_sub u _ _ E) (at level 30).
+#[global] Arguments e_sub {T C CC val ectx _} [Γ x y] E [Δ] a : rename. 
+#[global] Notation "E ₑ⊛ a" := (e_sub E a%asgn) (at level 30).
 
-Class subst_module2_laws {T} (val : Famₛ T) (ectx : Fam₂ T)
+Class subst_module2_laws `{CC : context T C} (val : Fam₁ T C) (ectx : Fam₂ T C)
       {VM : subst_monoid val} {ESM : subst_module2 val ectx} := {
-  e_sub_proper {Γ Δ} :: Proper (ass_eq Γ Δ ==> ∀ₕ _, ∀ₕ _, eq ==> eq) e_sub ;
-  e_sub_id {Γ τ1 τ2} (e : ectx Γ τ1 τ2) : v_var ⊛ₑ e = e;
-  e_sub_comp {τ1 τ2 Γ1 Γ2 Γ3} (u : Γ2 =[val]> Γ3) (v : Γ1 =[val]> Γ2) (e : ectx Γ1 τ1 τ2)
-    : u ⊛ₑ (v ⊛ₑ e) = (u ⊛ v) ⊛ₑ e
+  e_sub_proper :: Proper (∀ₕ Γ, ∀ₕ _, ∀ₕ _, eq ==> ∀ₕ Δ, asgn_eq Γ Δ ==> eq) e_sub ;
+  e_sub_id {Γ τ1 τ2} (E : ectx Γ τ1 τ2) : E ₑ⊛ a_id = E;
+  e_sub_comp {τ1 τ2 Γ1 Γ2 Γ3} (E : ectx Γ1 τ1 τ2) (u : Γ1 =[val]> Γ2) (v : Γ2 =[val]> Γ3)
+    : E ₑ⊛ (u ⊛ v) = (E ₑ⊛ u) ₑ⊛ v ;
 }.
 
 (* filling a context with a term *)
-Class fill_module {T} (ectx : Fam₂ T) (term : Famₛ T) : Type := {
+Class fill_module `{CC : context T C} (ectx : Fam₂ T C) (term : Fam₁ T C) := {
   t_fill {Γ τ1 τ2} : ectx Γ τ1 τ2 -> term Γ τ1 -> term Γ τ2
 }.
 #[global] Notation "E @ₜ t" := (t_fill E t) (at level 20).
 
-Class fill_module_laws {T} (ectx : Fam₂ T) (term : Famₛ T)
+Class fill_module_laws `{CC : context T C} (ectx : Fam₂ T C) (term : Fam₁ T C)
       {EFM : fill_monoid ectx} {TFM : fill_module ectx term} := {
   t_fill_id {Γ τ1} (t : term Γ τ1) : ∙ @ₜ t = t ;
   t_fill_comp  {Γ τ1 τ2 τ3} (E1 : ectx Γ τ1 τ2) (E2 : ectx Γ τ2 τ3) (t : term Γ τ1)
@@ -51,62 +50,85 @@ Class fill_module_laws {T} (ectx : Fam₂ T) (term : Famₛ T)
 }.
 
 (* substituting a Famₛ-shaped family *)
-Class subst_module1 {T} (val : Famₛ T) (term : Famₛ T) : Type := {
-  t_sub {Γ Δ} : Γ =[val]> Δ -> term Γ ⇒ᵢ term Δ ;
+Class subst_module1 `{CC : context T C} (val term : Fam₁ T C) := {
+  t_sub : term ⇒₁ ⟦ val , term ⟧₁ ;
 }.
-#[global] Notation "u ⊛ₜ t" := (t_sub u _ t) (at level 30).
+#[global] Arguments t_sub {T C CC val term _} [Γ x] t [Δ] a : rename. 
+#[global] Notation "t ₜ⊛ a" := (t_sub t a%asgn) (at level 30).
 
-Class subst_module1_laws {T} (val : Famₛ T) (term : Famₛ T)
-      {VM : subst_monoid val} {TSM : subst_module1 val term} : Prop := {
-  t_sub_proper {Γ Δ} :: Proper (ass_eq Γ Δ ==> ∀ₕ _, eq ==> eq) t_sub ;
-  t_var_sub {Γ τ} (t : term Γ τ) : v_var ⊛ₜ t = t ;
-  t_sub_sub {Γ1 Γ2 Γ3 τ} (u : Γ2 =[val]> Γ3) (v : Γ1 =[val]> Γ2) (t : term Γ1 τ)
-    : u ⊛ₜ (v ⊛ₜ t) = (u ⊛ v) ⊛ₜ t ;
+Class subst_module1_laws `{CC : context T C} (val term : Fam₁ T C)
+      {VM : subst_monoid val} {TSM : subst_module1 val term} := {
+  t_sub_proper :: Proper (∀ₕ Γ, ∀ₕ _, eq ==> ∀ₕ Δ, asgn_eq Γ Δ ==> eq) t_sub ;
+  t_sub_id {Γ τ} (t : term Γ τ) : t ₜ⊛ a_id = t ;
+  t_sub_sub {Γ1 Γ2 Γ3 τ} (t : term Γ1 τ) (u : Γ1 =[val]> Γ2) (v : Γ2 =[val]> Γ3)
+    : t ₜ⊛ (u ⊛ v) = (t ₜ⊛ u) ₜ⊛ v ;
 } .
 
 (* all the laws for a fill-monoid that can also be substituted *)
-Class fill_monoid_subst_module2_coh {T} (val : Famₛ T) (ectx : Fam₂ T)
+Class fill_monoid_subst_module2_coh `{CC : context T C} (val : Fam₁ T C) (ectx : Fam₂ T C)
       {VM : subst_monoid val} {EFM : fill_monoid ectx} {ESM : subst_module2 val ectx} := {
   fsmon_fill_monoid_laws :: fill_monoid_laws ectx ;
   fsmon_subst_module2_laws :: subst_module2_laws val ectx ;
-  e_sub_hole {Γ Δ τ} (u : Γ =[val]> Δ) : u ⊛ₑ ∙ = (∙ : ectx _ τ τ) ;
-  e_sub_fill {Γ Δ τ1 τ2 τ3} (u : Γ =[val]> Δ) (E1 : ectx Γ τ1 τ2) (E2 : ectx  Γ τ2 τ3)
-    : u ⊛ₑ (E2 @ₑ E1) = (u ⊛ₑ E2) @ₑ (u ⊛ₑ E1);
+  e_sub_hole {Γ Δ τ} (u : Γ =[val]> Δ) : ∙ ₑ⊛ u = (∙ : ectx _ τ τ) ;
+  e_sub_fill {Γ Δ τ1 τ2 τ3} (E1 : ectx Γ τ1 τ2) (E2 : ectx Γ τ2 τ3) (u : Γ =[val]> Δ) 
+    : (E2 @ₑ E1) ₑ⊛ u = (E2 ₑ⊛ u) @ₑ (E1 ₑ⊛ u);
 }.
 
 (* all the laws for a fill-module that can also be substituted *)
-Class fill_module_subst_module1_coh {T} (val : Famₛ T) (ectx : Fam₂ T) (term : Famₛ T)
+Class fill_module_subst_module1_coh `{CC : context T C}
+      (val : Fam₁ T C) (ectx : Fam₂ T C) (term : Fam₁ T C)
       {VM : subst_monoid val} {EFM : fill_monoid ectx} {ESM : subst_module2 val ectx}
       {TVM : subst_module1 val term} {TFM : fill_module ectx term} := {
   fsmod_fill_module_laws :: fill_module_laws ectx term ;
   fsmod_subst_module1_laws :: subst_module1_laws val term ;
-  t_sub_fill {Γ Δ τ1 τ2} (u : Γ =[val]> Δ) (E : ectx Γ τ1 τ2) (t : term  Γ τ1)
-    : u ⊛ₜ (E @ₜ t) = (u ⊛ₑ E) @ₜ (u ⊛ₜ t) ;
+  t_sub_fill {Γ Δ τ1 τ2} (E : ectx Γ τ1 τ2) (t : term  Γ τ1) (u : Γ =[val]> Δ)
+    : (E @ₜ t) ₜ⊛ u = (E ₑ⊛ u) @ₜ (t ₜ⊛ u) ;
 }.
 
 Section translation.
-  Context {typ : Type} {val : Famₛ typ} {ectx : Fam₂ typ} {term : Famₛ typ}.
+  Context `{CC : context T C} {val : Fam₁ T C} {ectx : Fam₂ T C} {term : Fam₁ T C}.
   Context {VM : subst_monoid val} {VML : subst_monoid_laws val}.
   Context {EFM : fill_monoid ectx} {ESM : subst_module2 val ectx}
           {EML : fill_monoid_subst_module2_coh val ectx}.
   Context {TFM : fill_module ectx term} {TSM : subst_module1 val term}
           {TML : fill_module_subst_module1_coh val ectx term}.
 
-  Variant ityp := | VTy (t : typ) | CTy (t : typ).
-  Derive NoConfusion for ityp.
-  Notation "+ x" := (VTy x) (at level 5).
-  Notation "¬ x" := (CTy x) (at level 5).
+  Notation ictx := (dsum C C).
+  Notation ityp := (T + T)%type.
+  Notation "⌊ x ⌋" := (inl x) (at level 5).
+  Notation "¬ x" := (inr x) (at level 5).
 
-  (* petit renommage et notation pour la restriction de contexte *)
-  Equations restrict : ctx ityp -> ctx typ :=
-    restrict ∅ := ∅;
-    restrict (Γ ▶ +τ) := (restrict Γ) ▶ τ;
-    restrict (Γ ▶ ¬τ) := (restrict Γ).
-  Notation "↓ Γ" := (restrict Γ) (at level 5).
+  Notation "ᵥ↓ Γ" := (fst Γ) (at level 5).
+  Notation "ₖ↓ Γ" := (snd Γ) (at level 5).
 
-  Variant ival : Famₛ ityp :=
-  | IVal {Γ τ} (v : val ↓Γ τ) : ival Γ +τ
-  | ICtx {Γ τ σ} (α : Γ ∋ ¬σ) (E : ectx ↓Γ τ σ) : ival Γ ¬τ.
+  Record f_named (F : C -> T -> Type) (Γ : ictx) := Named {
+    n_ty : T ;
+    n_kvar : ₖ↓Γ ∋ n_ty ;
+    n_elt : F ᵥ↓Γ n_ty ;
+  }.
+  #[global] Arguments Named {F Γ σ} i t : rename.
+  #[global] Arguments n_ty {F Γ}.
+  #[global] Arguments n_kvar {F Γ}.
+  #[global] Arguments n_elt {F Γ}.
+  Notation "⦅ i ⦆ x" := (Named i x) (at level 40).
+
+  Equations ival : Fam₁ ityp ictx :=
+    ival Γ ⌊τ⌋ := val ᵥ↓Γ τ ;
+    ival Γ ¬τ  := f_named (fun Δ σ => ectx Δ τ σ) Γ .
+
+  Equations ival_var {Γ} σ : Γ ∋ σ -> ival Γ σ :=
+    ival_var ⌊σ⌋ i := v_var (i : ᵥ↓Γ ∋ _) ;
+    ival_var ¬σ  i := ⦅i⦆ ∙ .
+
+  Equations ival_sub {Γ Δ} (γ : Γ =[ival]> Δ) σ (v : ival Γ σ) : ival Δ σ :=
+    ival_sub γ ⌊σ⌋ v       := (v : val _ _) ᵥ⊛ (γ ∘ inl) ;
+    ival_sub γ ¬σ  (⦅i⦆ E) :=
+      let (_ , j, E') := γ (¬ _) i in
+      ⦅j⦆ (E' @ₑ (E ₑ⊛ (γ ∘ inl))) .
+
+  Variant ival (Γ : ictx) : ityp -> Type :=
+  | IVal {τ} (v : val ᵥ↓Γ τ) : ival Γ +τ
+  | ICtx {τ σ} (α : ₖ↓Γ ∋ σ) (E : ectx ᵥ↓Γ τ σ) : ival Γ ¬τ.
   Derive NoConfusion for ival.
 
   (* des petits accesseurs pour ival *)
@@ -124,16 +146,6 @@ Section translation.
 
   (* juste des petits noms plus cohérents avec le reste, aussi les champs c'est bien
      qu'ils aient des noms explicites vu que ça devient des accesseurs. *)
-  Record iterm (Γ : ctx ityp) := ITerm {
-    itm_ty : typ ;
-    itm_var : Γ ∋ ¬itm_ty ;
-    itm_tm : term ↓Γ itm_ty ;
-  }.
-  #[global] Arguments ITerm {Γ σ} i t : rename.
-  #[global] Arguments itm_ty {Γ}.
-  #[global] Arguments itm_var {Γ}.
-  #[global] Arguments itm_tm {Γ}.
-
 (* on embed une variable du sous-context
 
 note: la technique pour faire du équations c'est de commencer par utiliser

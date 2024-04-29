@@ -1,14 +1,15 @@
 From Coinduction Require Import coinduction tactics.
 
 From OGS Require Import Prelude.
-From OGS.Utils Require Import Ctx Rel.
+From OGS.Utils Require Import Rel.
+From OGS.Ctx Require Import All.
 From OGS.OGS Require Import Subst.
 From OGS.ITree Require Import Event ITree Delay Eq.
 
 Open Scope ctx_scope.
-
-Section withFam.
-  Context {bT : baseT}.
+Reserved Notation "O ∙" (at level 5).
+Reserved Notation "i ⋅ o ⦉ a ⦊" (at level 30).
+Reserved Notation "u ≋ v" (at level 40).
 
 (*|
 Observation Structure (§ 4.4)
@@ -25,135 +26,67 @@ of the language:
 - a map [dom] mapping observations to values filling their copattern
 
 |*)
-  Class observation_structure : Type := {
-      obs : typ -> Type ;
-      dom : forall t, obs t -> ctx typ ;
-    }.
-  Arguments dom {_} [_].
+#[global] Notation obs_struct T := (f_slice T).
+#[global] Notation dom := s_dom.
+#[global] Coercion s_op : obs_struct >-> Funclass.
 
-  Context {O : observation_structure}.
+Definition pointed_obs {T} (O : obs_struct T) : Fam T := var ∥ ⦇ O ⦈.
+#[global] Notation "O ∙" := (pointed_obs O).
+Definition nf {T} (O : obs_struct T) (X : Fam₁ T) : Fam T := var ∥ (O # X).
 
-(*|
-Given an observation structure, we define the family of pointed observations
-(Definition 4.15) packaging them into a type, and an observation at
-this type.
-|*)
-  Notation context := (ctx typ).
-  Definition obs' (Γ : context) : Type := { t : typ & Γ ∋ t * obs t }%type.
-  Notation "obs∙" := obs'.
+Definition mk_nf {T} {O : obs_struct T} {X : Fam₁ T} {Γ t}
+           (i : t ∈ Γ) (o : O t) (a : dom o =[X]> Γ)
+  : nf O X Γ
+  := ⟨ i | OFill o a ⟩.
+#[global] Notation "i ⋅ o ⦉ a ⦊" := (mk_nf i o a%asgn).
 
-  Definition obs'_ty {Γ} (o : obs∙ Γ) : typ := projT1 o.
-  Notation "ty∙ o" := (obs'_ty o) (at level 10).
-  Definition obs'_var {Γ} (o : obs∙ Γ) : Γ ∋ ty∙ o := fst (projT2 o).
-  Definition obs'_obs {Γ} (o : obs∙ Γ) : obs (ty∙ o) := snd (projT2 o).
-  Definition obs'_dom {Γ} (o : obs∙ Γ) : context := dom (obs'_obs o).
-  Notation "dom∙ o" := (obs'_dom o) (at level 10).
+Definition nf_to_obs {T O} {X : Fam₁ T} : forall Γ, nf O X Γ -> O∙ Γ
+  := f_cut_map f_id₁ forget_args.
+#[global] Coercion nf_to_obs : nf >-> pointed_obs.
 
-(*|
-Given an observation structure and a sorted family of values,
-we can define normal forms as a pair of a pointed observation and an
-assignment for its domain.
-The following definition is equivalent, but with a slightly different packaging.
-|*)
-  Context {bV : baseV}.
+Definition then_to_obs {T O} {X : Fam₁ T} {Γ} : delay (nf O X Γ) -> delay (O∙ Γ)
+  := fmap_delay (nf_to_obs Γ).
 
-  Definition nf  (Γ : context) (t : typ) : Type := { m : obs t & dom m ⇒ᵥ Γ }.
-  Definition nf' (Γ : context) : Type := { t : typ & Γ ∋ t * nf Γ t }%type.
-  Notation "nf∙" := nf'.
+Section with_param.
+  Context {T : Type} {O : obs_struct T} {X : Fam₁ T}.
 
-  Definition nf'_ty {Γ} : nf∙ Γ -> typ := @projT1 _ _.
-  Definition nf'_var {Γ} (u : nf∙ Γ) : Γ ∋ (nf'_ty u) := fst (projT2 u).
-  Definition nf'_nf {Γ} (u : nf∙ Γ) : nf Γ (nf'_ty u) := snd (projT2 u).
-  Definition nf'_obs {Γ} (u : nf∙ Γ) : obs (nf'_ty u) := projT1 (snd (projT2 u)).
-  Definition nf'_val {Γ} (u : nf∙ Γ) : dom (nf'_obs u) ⇒ᵥ Γ := projT2 (snd (projT2 u)).
+  Definition nf_ty {Γ} (n : nf O X Γ) : T
+    := n.(cut_ty).
+  Definition nf_var {Γ} (n : nf O X Γ) : nf_ty n ∈ Γ
+    := n.(cut_l).
+  Definition nf_obs {Γ} (n : nf O X Γ) : O (nf_ty n)
+    := n.(cut_r).(fill_op).
+  Definition nf_dom {Γ} (n : nf O X Γ) : ctx T
+    := dom n.(cut_r).(fill_op).
+  Definition nf_args {Γ} (n : nf O X Γ) : nf_dom n =[X]> Γ
+    := n.(cut_r).(fill_args).
 
-  Definition nf_eq {Γ t} : relation (nf Γ t) :=
-    fun a b => exists H : projT1 a = projT1 b,
-        rew H in projT2 a ≡ₐ projT2 b.
+  Variant nf_eq {Γ} : nf O X Γ -> nf O X Γ -> Prop :=
+  | NfEq {t} {i : t ∈ Γ} {o a1 a2} : a1 ≡ₐ a2 -> nf_eq (i⋅o⦉a1⦊) (i⋅o⦉a2⦊).
 
-  Definition nf'_eq {Γ} : relation (nf∙ Γ) :=
-    fun a b => exists H : nf'_ty a = nf'_ty b,
-        (rew H in nf'_var a = nf'_var b) /\ (nf_eq (rew H in nf'_nf a) (nf'_nf b)).
-
-  Definition comp_eq {Γ} : relation (delay (nf∙ Γ)) :=
-    it_eq (fun _ : T1 => nf'_eq) (i := T1_0).
-  Notation "u ≋ v" := (comp_eq u v) (at level 40).
-
-  Definition obs'_of_nf' : nf∙ ⇒ᵢ obs∙ :=
-    fun Γ u => (nf'_ty u ,' (nf'_var u , nf'_obs u)).
-
-  Context {sV : subst_monoid bV}.
-  Definition nf'_of_obs' {Γ} (o : obs∙ Γ) : nf∙ (Γ +▶ dom∙ o) :=
-    (obs'_ty o ,' (r_concat_l _ (obs'_var o) , (obs'_obs o ,' v_var ⊛ᵣ r_concat_r))).
-
-  #[global] Instance nf_eq_rfl {Γ t} : Reflexive (@nf_eq Γ t) .
-    intros a; exists eq_refl; auto.
-  Qed.
-
-  #[global] Instance nf_eq_sym {Γ t} : Symmetric (@nf_eq Γ t) .
-    intros a b [ p q ].
-    unshelve econstructor.
-    - now symmetry.
-    - intros ? i.
-      destruct a as [ m a ] ; cbn in *.
-      revert a q i; rewrite p; clear p; intros a q i.
-      symmetry; apply q.
-  Qed.
-
-  #[global] Instance nf_eq_tra {Γ t} : Transitive (@nf_eq Γ t) .
-    intros a b c [ p1 q1 ] [ p2 q2 ].
-    unfold nf_eq.
-    unshelve econstructor.
-    - now transitivity (projT1 b).
-    - transitivity (rew [fun m : obs t => dom m ⇒ᵥ Γ] p2 in projT2 b); auto.
-      now rewrite <- p2.
-  Qed.
-
-  #[global] Instance nf_eq_rfl' {Γ} : Reflexiveᵢ (fun _ : T1 => @nf'_eq Γ) .
-    intros _ [ x [ i n ] ].
-    unshelve econstructor; auto.
-  Qed.
-
-  #[global] Instance nf_eq_sym' {Γ} : Symmetricᵢ (fun _ : T1 => @nf'_eq Γ) .
-    intros _ [ x1 [ i1 n1 ] ] [ x2 [ i2 n2 ] ] [ p [ q1 q2 ] ].
-    unshelve econstructor; [ | split ]; cbn in *.
-    - now symmetry.
-    - revert i1 q1; rewrite p; intros i1 q1; now symmetry.
-    - revert n1 q2; rewrite p; intros n1 q2; now symmetry.
-  Qed.
-
-  #[global] Instance nf_eq_tra' {Γ} : Transitiveᵢ (fun _ : T1 => @nf'_eq Γ) .
-    intros _ [ x1 [ i1 n1 ] ] [ x2 [ i2 n2 ] ] [ x3 [ i3 n3 ] ] [ p1 [ q1 r1 ] ] [ p2 [ q2 r2 ] ].
-    unshelve econstructor; [ | split ]; cbn in *.
-    - now transitivity x2.
-    - transitivity (rew [has Γ] p2 in i2); auto.
-      now rewrite <- p2.
-    - transitivity (rew [nf Γ] p2 in n2); auto.
-      now rewrite <- p2.
-  Qed.
-
-  Lemma eval_to_obs_eq {Γ} (a b : delay (nf∙ Γ)) (H : a ≋ b) :
-    fmap_delay (@obs'_of_nf' Γ) a ≊ fmap_delay (@obs'_of_nf' Γ) b .
+  #[global] Instance nf_eq_Equivalence {Γ} : Equivalence (@nf_eq Γ).
   Proof.
-    revert a b H; unfold it_eq; coinduction R CIH; intros a b H.
+    split.
+    - intros ?; now econstructor.
+    - intros ?? []; now econstructor.
+    - intros ??? [] h2; dependent induction h2.
+      econstructor; now transitivity a2.
+  Qed.
+
+  Definition comp_eq {Γ} : relation (delay (nf O X Γ))
+    := it_eq (fun _ : T1 => nf_eq) (i := T1_0).
+
+  #[global] Instance then_to_obs_proper {Γ}
+    : Proper (@comp_eq Γ ==> it_eq (eqᵢ _) (i:=_)) then_to_obs.
+  Proof.
+    intros a b; revert a b; unfold it_eq; coinduction R CIH; intros a b H.
     unfold comp_eq in H; apply it_eq_step in H.
     cbn in *; unfold observe in H.
     destruct (_observe a), (_observe b); dependent elimination H; econstructor.
-    - destruct r_rel as [ p [ q [ r _ ] ] ].
-      destruct r1 as [ x1 [ i1 [ m1 a1 ] ] ], r2 as [ x2 [ i2 [ m2 a2 ] ] ].
-      unfold obs'_of_nf', nf'_ty, nf'_var, nf'_obs in *; cbn in *.
-      revert i1 m1 a1 q r; rewrite p; intros i1 m1 a1 q r.
-      now do 2 f_equal.
+    - cbn in r_rel; now destruct r_rel.
     - now apply CIH.
-    - inversion q1.
+    - destruct q1.
   Qed.
+End with_param.
 
-End withFam.
-
-Arguments dom {_ _} [_].
-#[global] Notation context := (ctx typ).
-#[global] Notation "obs∙ Γ" := (obs' Γ) (at level 10).
-#[global] Notation "ty∙ o" := (obs'_ty o) (at level 10).
-#[global] Notation "dom∙ o" := (obs'_dom o) (at level 10).
-#[global] Notation "nf∙ Γ" := (nf' Γ) (at level 10).
-#[global] Notation "u ≋ v" := (comp_eq u v) (at level 40).
+#[global] Notation "u ≋ v" := (comp_eq u v).
