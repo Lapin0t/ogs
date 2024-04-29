@@ -12,6 +12,9 @@ Require Export Coq.Program.Equality.
 Export EqNotations.
 Require Export Coq.Logic.StrictProp.
 
+Require Import Coq.Lists.List.
+Export ListNotations.
+
 (* hook-up Equations' UIP class with Coq's axiom K *)
 Lemma YesUIP : forall X : Type, UIP X.
   intro; apply EqdepFacts.eq_dep_eq__UIP, EqdepFacts.eq_rect_eq__eq_dep_eq.
