@@ -9,8 +9,8 @@ Reserved Notation "u ⦿₀ v" (at level 40).
 Reserved Notation "u ⦿₁ v" (at level 40).
 Reserved Notation "u ⦿₂ v" (at level 40).
 Reserved Notation "F ∥ G" (at level 40).
-Reserved Notation "⟨ u | v ⟩" (at level 40).
-Reserved Notation "⦇ S ⦈" .
+Reserved Notation "⟨ u | v ⟩" (at level 8).
+Reserved Notation "⦉ S ⦊" .
 
 Definition Fam₀ T C {CC : context T C} := C -> Type .
 Definition Fam₁ T C {CC : context T C} := C -> T -> Type .
@@ -77,4 +77,4 @@ End with_param.
 #[global] Notation "F ∥ G" := (f_cut F G).
 #[global] Notation "⟨ u | v ⟩ " := (Cut u v).
 
-#[global] Notation "⦇ S ⦈" := (bare_op S) .
+#[global] Notation "⦉ S ⦊" := (bare_op S) .

@@ -2,6 +2,7 @@ From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel.
 From OGS.Ctx Require Import Abstract Family.
 
+Reserved Notation "C ⊕ D" (at level 40).
 #[local] Open Scope ctx_scope.
 
 Section with_param.
@@ -44,3 +45,4 @@ Section with_param.
   Qed.
 End with_param.
 #[global] Arguments dsum C1 C2 : clear implicits.
+#[global] Notation "C ⊕ D" := (dsum C D).

@@ -110,7 +110,7 @@ Constructing a sorted family of operations from O with arguments taken from the 
 (*|
 We can forget the arguments and get back a bare operation.
 |*)
-  Definition forget_args {O : Oper T C} {F} : (O # F) ⇒₁ ⦇ O ⦈
+  Definition forget_args {O : Oper T C} {F} : (O # F) ⇒₁ ⦉ O ⦊
     := fun _ _ => fill_op.
 
 (*|

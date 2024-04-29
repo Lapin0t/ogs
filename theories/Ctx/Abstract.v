@@ -43,9 +43,9 @@ Class context_laws T C {CC : context T C} := {
   c_var_cat :: context_cat_wkn T C ;
   c_view_emp {t} i : c_emp_view t i ;
   c_view_cat {Γ Δ t} i : c_cat_view Γ Δ t i ;
-  r_cat_l_inj {t Γ Δ} : injective (@r_cat_l _ _ _ _ Γ Δ t) ;
-  r_cat_r_inj {t Γ Δ} : injective (@r_cat_r _ _ _ _ Γ Δ t) ;
-  r_cat_disj {t Γ Δ} (i : Γ ∋ t) (j : Δ ∋ t) : ¬ (r_cat_l i = r_cat_r j) ;
+  r_cat_l_inj {Γ Δ t} : injective (@r_cat_l _ _ _ _ Γ Δ t) ;
+  r_cat_r_inj {Γ Δ t} : injective (@r_cat_r _ _ _ _ Γ Δ t) ;
+  r_cat_disj {Γ Δ t} (i : Γ ∋ t) (j : Δ ∋ t) : ¬ (r_cat_l i = r_cat_r j) ;
 } .
 
 (*
