@@ -1,8 +1,5 @@
 # An abstract, certified account of operational game semantics
 
-This development is a companion to the LICS'24 submission "An abstract, certified account of operational game semantics".
-It has been rendered anonymous for the purpose of submission.
-
 The main contribution of this library are:
 - an independent implementation of an indexed counterpart to the itree library with support for guarded and eventually guarded recursion
 - an abstract OGS model of an axiomatised language proven sound w.r.t. substitution equivalence
@@ -10,7 +7,11 @@ The main contribution of this library are:
 
 ## Meta
 
-- Author(s): REDACTED
+- Author(s):
+  - Peio Borthelle
+  - Tom Hirschowitz
+  - Guilhem Jaber
+  - Yannick Zakowski
 - License:  GPLv3
 - Compatible Coq versions: 8.17
 - Additional dependencies:
