@@ -2,13 +2,9 @@
 opam-version: "2.0"
 version: "0.1"
 synopsis: "An abstract, certified account of operational game semantics"
-maintainer: ["Peio Borthelle"]
-authors: [
-  "Peio Borthelle" "Tom Hirschowitz" "Guilhem Jaber" "Yannick Zakowski"
-]
+maintainer: ["REDACTED"]
+authors: ["REDACTED"]
 license: "GPLv3"
-homepage: "https://gitlab.com/yzakowsk/ogs-coq"
-bug-reports: "https://gitlab.inria.fr/yzakowsk/ogs-coq/-/issues"
 depends: [
   "dune" {>= "3.8"}
   "coq" {= "8.17.1"}
@@ -30,4 +26,3 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://gitlab.com/yzakowsk/ogs-coq.git"

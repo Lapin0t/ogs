@@ -7,11 +7,7 @@ The main contribution of this library are:
 
 ## Meta
 
-- Author(s):
-  - Peio Borthelle
-  - Tom Hirschowitz
-  - Guilhem Jaber
-  - Yannick Zakowski
+- Author(s): REDACTED
 - License:  GPLv3
 - Compatible Coq versions: 8.17
 - Additional dependencies:

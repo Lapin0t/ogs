@@ -3,10 +3,8 @@
 (name coq-ogs)
 
 (license "GPLv3")
-(authors "Peio Borthelle" "Tom Hirschowitz" "Guilhem Jaber" "Yannick Zakowski")
-(maintainers "Peio Borthelle")
-(source (gitlab yzakowsk/ogs-coq))
-(bug_reports "https://gitlab.inria.fr/yzakowsk/ogs-coq/-/issues")
+(authors "REDACTED")
+(maintainers "REDACTED")
 
 (generate_opam_files true)
 
