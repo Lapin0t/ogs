@@ -4,7 +4,8 @@ The OGS Game (§ 5.1 and 5.2)
 |*)
 
 From OGS Require Import Prelude.
-From OGS.Utils Require Import Ctx Rel.
+From OGS.Utils Require Import Rel.
+From OGS.Ctx Require Import All Ctx.
 From OGS.OGS Require Import Subst Obs Machine.
 From OGS.ITree Require Import Event ITree Eq Delay Structure Properties Guarded.
 
@@ -41,10 +42,6 @@ Definition h_pasv {I J} (H : half_game I J) (X : psh J) : psh I :=
 Definition h_pasvR {I J} (H : half_game I J) {X Y : psh J} (R : relᵢ X Y)
   : relᵢ (h_pasv H X) (h_pasv H Y) := fun i u v => forall m, R _ (u m) (v m) .
 
-Equations h_sync {I J} (H : half_game I J) {X Y : psh J}
-          : ⦉ h_actv H X ×ᵢ h_pasv H Y ⦊ᵢ -> ⦉ Y ×ᵢ X ⦊ᵢ :=
-  h_sync H (i ,' ((m ,' x) , k)) := (_ ,' (k m , x)) .
-
 (*|
 A game (Def 5.4) is composed of two compatible half games.
 |*)
@@ -65,25 +62,30 @@ OGS Games (§ 5.2)
 ==================
 |*)
 
-Section withFam.
+Section with_param.
+(*|
+We consider an observation structure.
+|*)
+  Context `{CC : context T C} {obs : obs_struct T C}.
 
-(*|
-We consider a language abstractly captured as a machine
-|*)
-  Context {bT : baseT}.
-  Context {bV : baseV}.
-  Context {bC : baseC}.
-  Context {sV : subst_monoid bV}.
-  Context {sC : subst_module bV bC}.
-  Context {oS : observation_structure}.
-  Context {M: machine}.
-(*|
-Satisfying an appropriate axiomatization
-|*)
-  Context {sVL: subst_monoid_laws}.
-  Context {sCL: subst_module_laws}.
-  Context {VA : var_assumptions} .
-  Context {ML: machine_laws}.
+  Inductive pctx (Δ : C) : ctx C -> Type :=
+  | PCemp : pctx Δ (∅ ▶ Δ)
+  | PCcat {Ψ Γ} (xs : pctx Δ Ψ) (i : Ψ ∋ Γ) (E : C) : pctx Δ (Ψ ▶ E)
+  .
+
+  Equations prefix {X} (Γ : ctx X) {x} : Γ ∋ x -> ctx X :=
+    prefix (Γ ▶ _) top     := Γ ;
+    prefix (Γ ▶ _) (pop i) := prefix Γ i .
+
+  Equations view 
+
+  Equations r_prefix {X} {Γ : ctx X} {x} (i : Γ ∋ x) : prefix Γ i ⊆ Γ :=
+    r_prefix top     _ j := pop j ;
+    r_prefix (pop i) _ j := pop (r_prefix i _ j) .
+
+  Equations view {Δ Ψ} : pctx Δ Ψ -> ctx C :=
+    view (PCemp)        := (∅ ▶ Δ) ;
+    view (PCcat xs i E) := view (prefix ) .
 
 (*|
 Interleaved contexts (Def 5.12)

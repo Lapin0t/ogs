@@ -19,7 +19,6 @@ Inductive ctx (X : Type) : Type :=
 #[global] Arguments cnil {X}.
 #[global] Arguments ccon {X} Γ x.
 Derive NoConfusion for ctx.
-#[global] Notation "∅" := (cnil) : ctx_scope.
 #[global] Notation "Γ ▶ x" := (ccon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
 (*|
 We wish to manipulate intrinsically typed terms. We hence need a tightly typed notion of
@@ -39,7 +38,7 @@ Derive Signature NoConfusion NoConfusionHom for var.
 A couple basic functions: length, concatenation and pointwise function application.
 |*)
 Equations c_length {X} (Γ : ctx X) : nat :=
-  c_length ∅       := Datatypes.O ;
+  c_length cnil       := Datatypes.O ;
   c_length (Γ ▶ _) := Datatypes.S (c_length Γ) .
 
 Equations ccat {X} : ctx X -> ctx X -> ctx X :=
@@ -47,7 +46,7 @@ Equations ccat {X} : ctx X -> ctx X -> ctx X :=
   ccat Γ (ccon Δ x) := ccon (ccat Γ Δ) x .
 
 Equations c_map {X Y} : (X -> Y) -> ctx X -> ctx Y :=
-  c_map f ∅        := ∅ ;
+  c_map f cnil        := cnil ;
   c_map f (Γ ▶ x) := c_map f Γ ▶ f x .
 (*|
 Implementation of the abstract context interface.

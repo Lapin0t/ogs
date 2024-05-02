@@ -6,7 +6,7 @@ From OGS.ITree Require Import Event ITree Delay Eq Properties.
 
 Open Scope ctx_scope.
 Reserved Notation "O ∙" (at level 5).
-Reserved Notation "i ⋅ o ⦉ a ⦊" (at level 30).
+(*Reserved Notation "i ⋅ o ⦉ a ⦊" (at level 30).*)
 Reserved Notation "u ≋ v" (at level 40).
 
 (*|
@@ -55,7 +55,7 @@ Section with_param.
     := n.(cut_r).(fill_args).
 
   Variant nf_eq {Γ} : nf O X Γ -> nf O X Γ -> Prop :=
-  | NfEq {t} {i : Γ ∋ t} {o a1 a2} : a1 ≡ₐ a2 -> nf_eq ⟨i|o⦇a1⦈⟩ ⟨i|o⦇a2⦈⟩.
+  | NfEq {t} {i : Γ ∋ t} {o a1 a2} : a1 ≡ₐ a2 -> nf_eq (i⋅o⦇a1⦈) (i⋅o⦇a2⦈).
 
   #[global] Instance nf_eq_Equivalence {Γ} : Equivalence (@nf_eq Γ).
   Proof.

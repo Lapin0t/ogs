@@ -9,7 +9,7 @@ Reserved Notation "u ⦿₀ v" (at level 40).
 Reserved Notation "u ⦿₁ v" (at level 40).
 Reserved Notation "u ⦿₂ v" (at level 40).
 Reserved Notation "F ∥ G" (at level 40).
-Reserved Notation "⟨ u | v ⟩" (at level 8).
+Reserved Notation "u ⋅ v" (at level 50).
 Reserved Notation "⦉ S ⦊" .
 
 Definition Fam₀ T C {CC : context T C} := C -> Type .
@@ -75,6 +75,6 @@ End with_param.
 #[global] Notation "u ⦿₂ v" := (f_comp₂ u v).
 
 #[global] Notation "F ∥ G" := (f_cut F G).
-#[global] Notation "⟨ u | v ⟩ " := (Cut u v).
+#[global] Notation "u ⋅ v" := (Cut u v).
 
 #[global] Notation "⦉ S ⦊" := (bare_op S) .
