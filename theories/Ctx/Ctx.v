@@ -19,15 +19,16 @@ Inductive ctx (X : Type) : Type :=
 #[global] Arguments cnil {X}.
 #[global] Arguments ccon {X} Γ x.
 Derive NoConfusion for ctx.
-#[global] Notation "Γ ▶ x" := (ccon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
+#[global] Notation "∅ₓ" := (cnil) : ctx_scope.
+#[global] Notation "Γ ▶ₓ x" := (ccon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
 (*|
 We wish to manipulate intrinsically typed terms. We hence need a tightly typed notion of
 position in the context: rather than a loose index, [var x Γ] is a proof of membership of
 [x] to [Γ].
 |*)
 Inductive var {X} (x : X) : ctx X -> Type :=
-| top {Γ} : var x (Γ ▶ x)
-| pop {Γ y} : var x Γ -> var x (Γ ▶ y).
+| top {Γ} : var x (Γ ▶ₓ x)
+| pop {Γ y} : var x Γ -> var x (Γ ▶ₓ y).
 (*|
 .. coq:: none
 |*)
@@ -38,16 +39,16 @@ Derive Signature NoConfusion NoConfusionHom for var.
 A couple basic functions: length, concatenation and pointwise function application.
 |*)
 Equations c_length {X} (Γ : ctx X) : nat :=
-  c_length cnil       := Datatypes.O ;
-  c_length (Γ ▶ _) := Datatypes.S (c_length Γ) .
+  c_length ∅ₓ       := Datatypes.O ;
+  c_length (Γ ▶ₓ _) := Datatypes.S (c_length Γ) .
 
 Equations ccat {X} : ctx X -> ctx X -> ctx X :=
-  ccat Γ cnil       := Γ ;
-  ccat Γ (ccon Δ x) := ccon (ccat Γ Δ) x .
+  ccat Γ ∅ₓ       := Γ ;
+  ccat Γ (Δ ▶ₓ x) := ccat Γ Δ ▶ₓ x .
 
 Equations c_map {X Y} : (X -> Y) -> ctx X -> ctx Y :=
-  c_map f cnil        := cnil ;
-  c_map f (Γ ▶ x) := c_map f Γ ▶ f x .
+  c_map f ∅ₓ       := cnil ;
+  c_map f (Γ ▶ₓ x) := c_map f Γ ▶ₓ f x .
 (*|
 Implementation of the abstract context interface.
 |*)
@@ -69,8 +70,8 @@ Proof. induction Δ; eauto; cbn; f_equal; apply IHΔ. Qed.
 A view-based inversion package for variables in mapped contexts.
 |*)
 Equations map_has {X Y} {f : X -> Y} (Γ : ctx X) {x} (i : Γ ∋ x) : c_map f Γ ∋ f x :=
-  map_has (Γ ▶ _) top     := top ;
-  map_has (Γ ▶ _) (pop i) := pop (map_has Γ i) .
+  map_has (Γ ▶ₓ _) top     := top ;
+  map_has (Γ ▶ₓ _) (pop i) := pop (map_has Γ i) .
 #[global] Arguments map_has {X Y f Γ x}.
 
 Variant has_map_view {X Y} {f : X -> Y} {Γ} : forall {y}, c_map f Γ ∋ y -> Type :=
@@ -85,15 +86,15 @@ Qed.
 (*|
 Additional goodies.
 |*)
-Definition r_pop {X} {Γ : ctx X} {x} : Γ ⊆ (Γ ▶ x) :=
+Definition r_pop {X} {Γ : ctx X} {x} : Γ ⊆ (Γ ▶ₓ x) :=
   fun _ i => pop i.
 #[global] Arguments r_pop _ _ _ _/.
 
-Equations r_shift1 {X} {Γ Δ : ctx X} {a} (f : Γ ⊆ Δ) : (Γ ▶ a) ⊆ (Δ ▶ a) :=
+Equations r_shift1 {X} {Γ Δ : ctx X} {a} (f : Γ ⊆ Δ) : (Γ ▶ₓ a) ⊆ (Δ ▶ₓ a) :=
   r_shift1 f _ top     := top ;
   r_shift1 f _ (pop i) := pop (f _ i) .
 
 Equations a_append {X} {Γ Δ : ctx X} {F : Fam₁ X (ctx X)} {a}
-  : Γ =[F]> Δ -> F Δ a -> (Γ ▶ a) =[F]> Δ :=
+  : Γ =[F]> Δ -> F Δ a -> (Γ ▶ₓ a) =[F]> Δ :=
   a_append s z _ top     := z ;
   a_append s z _ (pop i) := s _ i .

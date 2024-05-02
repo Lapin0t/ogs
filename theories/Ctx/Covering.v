@@ -16,9 +16,9 @@ Covering:
 Predicate for splitting a context into a disjoint union
 |*)
   Inductive cover : ctx X -> ctx X -> ctx X -> Type :=
-  | CNil : ∅ ⊎ ∅  ≡ ∅
-  | CLeft  {x xs ys zs} : xs ⊎ ys ≡ zs -> (xs ▶ x) ⊎ ys ≡ (zs ▶ x)
-  | CRight {x xs ys zs} : xs ⊎ ys ≡ zs -> xs ⊎ (ys ▶ x) ≡ (zs ▶ x)
+  | CNil : ∅ₓ ⊎ ∅ₓ  ≡ ∅ₓ
+  | CLeft  {x xs ys zs} : xs ⊎ ys ≡ zs -> (xs ▶ₓ x) ⊎ ys ≡ (zs ▶ₓ x)
+  | CRight {x xs ys zs} : xs ⊎ ys ≡ zs -> xs ⊎ (ys ▶ₓ x) ≡ (zs ▶ₓ x)
   where "a ⊎ b ≡ c" := (cover a b c).
 (*|
 .. coq:: none
@@ -27,19 +27,19 @@ Predicate for splitting a context into a disjoint union
 (*|
 .. coq::
 |*)
-  Equations cover_nil_r xs : xs ⊎ ∅ ≡ xs :=
-    cover_nil_r ∅        := CNil ;
-    cover_nil_r (xs ▶ _) := CLeft (cover_nil_r xs) .
+  Equations cover_nil_r xs : xs ⊎ ∅ₓ ≡ xs :=
+    cover_nil_r ∅ₓ        := CNil ;
+    cover_nil_r (xs ▶ₓ _) := CLeft (cover_nil_r xs) .
   #[global] Arguments cover_nil_r {xs}.
 
-  Equations cover_nil_l xs : ∅ ⊎ xs ≡ xs :=
-    cover_nil_l ∅        := CNil ;
-    cover_nil_l (xs ▶ _) := CRight (cover_nil_l xs) .
+  Equations cover_nil_l xs : ∅ₓ ⊎ xs ≡ xs :=
+    cover_nil_l ∅ₓ        := CNil ;
+    cover_nil_l (xs ▶ₓ _) := CRight (cover_nil_l xs) .
   #[global] Arguments cover_nil_l {xs}.
 
   Equations cover_cat {xs} ys : xs ⊎ ys ≡ (xs +▶ ys) :=
-    cover_cat ∅        := cover_nil_r ;
-    cover_cat (ys ▶ _) := CRight (cover_cat ys) .
+    cover_cat ∅ₓ        := cover_nil_r ;
+    cover_cat (ys ▶ₓ _) := CRight (cover_cat ys) .
   #[global] Arguments cover_cat {xs ys}.
 
   Equations r_cover_l {xs ys zs} : xs ⊎ ys ≡ zs -> xs ⊆ zs :=
