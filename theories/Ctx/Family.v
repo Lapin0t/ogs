@@ -28,8 +28,8 @@ Section with_param.
   Context {T C : Type} {CC : context T C}.
 
   Definition arr_fam₀ (F G : Fam₀ T C) := forall Γ, F Γ -> G Γ.
-  Definition arr_fam₁ (F G : Fam₁ T C) := forall x Γ, F x Γ -> G x Γ.
-  Definition arr_fam₂ (F G : Fam₂ T C) := forall x y Γ, F x y Γ -> G x y Γ.
+  Definition arr_fam₁ (F G : Fam₁ T C) := forall Γ x, F Γ x -> G Γ x.
+  Definition arr_fam₂ (F G : Fam₂ T C) := forall Γ x y, F Γ x y -> G Γ x y.
 
   Notation "F ⇒₀ G" := (arr_fam₀ F G).
   Notation "F ⇒₁ G" := (arr_fam₁ F G).
