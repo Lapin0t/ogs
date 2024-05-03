@@ -46,11 +46,7 @@ Definition evalₒ `{machine val conf obs}
   fun _ t => then_to_obs (eval t) .
 #[global] Arguments evalₒ {_ _ _ _} [_].
 
-(*
-Definition app' `{machine val conf obs} [Γ x] v (o : obs x) (a : dom o =[val]> Γ)
-  := app (v⋅o⦇a⦈) .
-Notation "v ⊙ o ⦗ a ⦘" := (app' v o a) (at level 20).
-*)
+Notation "v ⊙ o ⦗ a ⦘" := (oapp v o a) (at level 20).
 
 Definition emb `{machine val conf obs} {_ : subst_monoid val}
   : nf obs val ⇒₀ conf
@@ -64,13 +60,13 @@ Variant head_inst_nostep `{machine val conf obs} {VM : subst_monoid val}
         (u : sigT obs) : sigT obs -> Prop :=
 | HeadInst {Γ y} (v : val Γ y) (o : obs y) (a : dom o =[val]> Γ) (i : Γ ∋ projT1 u)
     : ¬(is_var v)
-    -> evalₒ (oapp v o a) ≊ ret_delay (i ⋅ projT2 u)
+    -> evalₒ (v ⊙ o⦗a⦘) ≊ ret_delay (i ⋅ projT2 u)
     -> head_inst_nostep u (y ,' o) .
 
 (*|
 Axiomatization of the machine
 |*)
-Class machine_laws `{machine val conf obs} {VM : subst_monoid val}
+Class machine_laws val conf obs {M : machine val conf obs} {VM : subst_monoid val}
       {CM : subst_module val conf} := {
 
 (*|
@@ -82,7 +78,7 @@ Class machine_laws `{machine val conf obs} {VM : subst_monoid val}
 [app] commutes with substitution
 |*)
    app_sub {Γ1 Γ2 x} (v : val Γ1 x) (o : obs x) (a : dom o =[val]> Γ1) (b : Γ1 =[val]> Γ2)
-   : (oapp v o a) ₜ⊛ b = oapp (v ᵥ⊛ b) o (a ⊛ b) ;
+   : (v ⊙ o⦗a⦘) ₜ⊛ b = (v ᵥ⊛ b) ⊙ o⦗a ⊛ b⦘ ;
 
 (*|
 Core hypothesis over the evaluator (Def 4.23): "Substituting, then evaluating"
@@ -111,3 +107,5 @@ can be defined by eventually guarded iteration.
 *)
 
 End with_param.
+
+#[global] Notation "v ⊙ o ⦗ a ⦘" := (oapp v o a) (at level 20).

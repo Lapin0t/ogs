@@ -6,6 +6,7 @@ From OGS.ITree Require Import Event ITree Delay Eq Properties.
 
 Open Scope ctx_scope.
 Reserved Notation "O ∙" (at level 5).
+Reserved Notation "'dom∙' o" (at level 5).
 (*Reserved Notation "i ⋅ o ⦉ a ⦊" (at level 30).*)
 Reserved Notation "u ≋ v" (at level 40).
 
@@ -29,6 +30,10 @@ of the language:
 Definition pointed_obs `{CC : context T C} (O : Oper T C) : Fam₀ T C
   := c_var ∥ ⦉O⦊.
 #[global] Notation "O ∙" := (pointed_obs O).
+#[global] Notation m_var o := (o.(cut_l)).
+#[global] Notation m_obs o := (o.(cut_r)).
+#[global] Notation m_dom o := (o_dom o.(cut_r)).
+
 Definition nf `{CC : context T C} (O : obs_struct T C) (X : Fam₁ T C) : Fam₀ T C
   := c_var ∥ (O # X).
 

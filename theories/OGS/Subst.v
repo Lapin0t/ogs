@@ -21,21 +21,19 @@ Class subst_monoid `{CC : context T C} (val : Fam₁ T C) := {
   v_var : c_var ⇒₁ val ;
   v_sub : val ⇒₁ ⟦ val , val ⟧₁ ;
 }.
-#[global] Arguments v_var {T _ _ val _} [x Γ].
-#[global] Arguments v_sub {T _ _ val _} [x Γ] v {Δ} a.
-#[global] Notation "v ᵥ⊛ a" := (v_sub v a) (at level 30).
+#[global] Arguments v_var {T _ _ val _ Γ} [x].
+#[global] Arguments v_sub {T _ _ val _} [Γ x] v {Δ} a.
+#[global] Notation "v ᵥ⊛ a" := (v_sub v a%asgn) (at level 30).
 
-Definition a_id `{subst_monoid T C val} {Γ} : Γ =[val]> Γ
-  := fun _ i => v_var i.
-#[global] Arguments a_id _ _ _ _ _ _ _ /.
+Notation a_id := v_var.
 Definition a_comp `{subst_monoid T C val} {Γ1 Γ2 Γ3}
   : Γ1 =[val]> Γ2 -> Γ2 =[val]> Γ3 -> Γ1 =[val]> Γ3
   := fun u v _ i => u _ i ᵥ⊛ v.
-#[global] Infix "⊛" := a_comp (at level 14).
+#[global] Infix "⊛" := a_comp (at level 14) : asgn_scope.
 #[global] Arguments a_comp _ _ _ _ _ _ _ _ _ _ _ /.
 
 (*|
-The laws for monoids and modules are pretty straitforward. A specificity is that
+The laws for monoids and modules are pretty straightforward. A specificity is that
 assignments are represented by functions from variables to values, as such their
 well-behaved equality is pointwise equality and we require substitution to respect it.
 |*)
@@ -67,7 +65,7 @@ Class subst_module `{CC : context T C} (val : Fam₁ T C) (conf : Fam₀ T C) :=
   c_sub : conf ⇒₀ ⟦ val , conf ⟧₀ ;
 }.
 #[global] Arguments c_sub {T C CC val conf _} [Γ] c {Δ} a.
-#[global] Notation "c ₜ⊛ a" := (c_sub c a) (at level 30).
+#[global] Notation "c ₜ⊛ a" := (c_sub c a%asgn) (at level 30).
 
 Class subst_module_laws `{CC : context T C} (val : Fam₁ T C) (conf : Fam₀ T C)
       {VM : subst_monoid val} {CM : subst_module val conf} := {
@@ -100,16 +98,16 @@ Section renaming.
     := fun _ _ v _ r => v ᵥ⊛ r_emb r.
   Definition c_ren : conf ⇒₀ ⟦ c_var , conf ⟧₀
     := fun _ c _ r => c ₜ⊛ r_emb r.
-  #[global] Arguments v_ren [x Γ] v [Δ] r /.
+  #[global] Arguments v_ren [Γ x] v [Δ] r /.
   #[global] Arguments c_ren [Γ] v [Δ] r /.
 
   Definition a_ren_r {Γ1 Γ2 Γ3} : Γ1 =[val]> Γ2 -> Γ2 ⊆ Γ3 -> Γ1 =[val]> Γ3
-    := fun a r => a ⊛ (r_emb r).
+    := fun a r => (a ⊛ (r_emb r))%asgn.
   #[global] Arguments a_ren_r _ _ _ _ _ _ /.
 End renaming.
-#[global] Notation "v ᵥ⊛ᵣ r" := (v_ren v r) (at level 14).
-#[global] Notation "c ₜ⊛ᵣ r" := (c_ren c r) (at level 14).
-#[global] Notation "a ⊛ᵣ r" := (a_ren_r a r) (at level 14).
+#[global] Notation "v ᵥ⊛ᵣ r" := (v_ren v r%asgn) (at level 14).
+#[global] Notation "c ₜ⊛ᵣ r" := (c_ren c r%asgn) (at level 14).
+#[global] Notation "a ⊛ᵣ r" := (a_ren_r a r) (at level 14) : asgn_scope.
 
 (*|
 Additional assumptions on how variables behave. We basically ask that the identity

@@ -1,135 +1,204 @@
-From Coinduction Require Import coinduction tactics.
-
 From OGS Require Import Prelude.
-From OGS.Utils Require Import Ctx Rel.
+From OGS.Utils Require Import Psh Rel.
+From OGS.Ctx Require Import All Ctx.
 From OGS.OGS Require Import Subst Obs Machine Game.
-From OGS.ITree Require Import Event ITree Eq Delay Structure Properties Guarded.
+From OGS.ITree Require Import Event ITree Eq Structure Delay. (*Properties Guarded.*)
 
-Section withFam.
+Reserved Notation "'ε⁺'".
+Reserved Notation "'ε⁻'".
+Reserved Notation "u ;⁺" (at level 40).
+Reserved Notation "u ;⁻ e" (at level 40).
+Reserved Notation "ₐ↓ γ" (at level 3).
+Reserved Notation "u ∥ v" (at level 40).
+Reserved Notation "x ≈ₐ y" (at level 50).
+Reserved Notation "x ≈ₚ y" (at level 50).
+Reserved Notation "x ≈⟦ogs Δ ⟧≈ y" (at level 50).
 
+Section with_param.
 (*|
 We consider a language abstractly captured as a machine
 |*)
-  Context {bT : baseT}.
-  Context {bV : baseV}.
-  Context {bC : baseC}.
-  Context {sV : subst_monoid bV}.
-  Context {sC : subst_module bV bC}.
-  Context {oS : observation_structure}.
-  Context {M: machine}.
-(*|
-Satisfying an appropriate axiomatization
-|*)
-  Context {sVL: subst_monoid_laws}.
-  Context {sCL: subst_module_laws}.
-  Context {VA : var_assumptions} .
-  Context {ML: machine_laws}.
+  Context `{CC : context T C} {CL : context_laws T C}.
+  Context {val} {VM : subst_monoid val} {VML : subst_monoid_laws val}.
+  Context {conf} {CM : subst_module val conf} {CML : subst_module_laws val conf}.
+  Context {obs : obs_struct T C} {M : machine val conf obs}.
 
 (*|
 Active and passive OGS environments (Def 5.16)
-Env M Δ player es   : environment part of the player (aka active at es) configuration at (Δ + es)
-Env M Δ opponent es : environment part of the opponent (aka passive at es) configuration at (Δ + es)
+TODO comment
+Env M Δ Act Φ : environment part of the player (aka active at es) configuration at (Δ + es)
+Env M Δ Pas Φ : environment part of the opponent (aka passive at es) configuration at (Δ + es)
 |*)
-  Inductive alt_env (Δ1 Δ2 : context) : bool -> alt_ext -> Type :=
-  | ENil {b} : alt_env Δ1 Δ2 b ∅
-  | EConT {Φ Γ} : alt_env Δ2 Δ1 Ⓞ Φ -> alt_env Δ1 Δ2 Ⓟ (Φ ▶ Γ)
-  | EConF {Φ Γ} : alt_env Δ2 Δ1 Ⓟ Φ -> Γ ⇒ᵥ (Δ1 +▶ ↓⁺Φ) -> alt_env Δ1 Δ2 Ⓞ (Φ ▶ Γ)
+  Inductive ogs_env (Δ : C) : polarity -> ogs_ctx -> Type :=
+  | ENilA : ogs_env Δ Act ∅ₓ
+  | ENilP : ogs_env Δ Pas ∅ₓ
+  | EConA {Φ Γ} : ogs_env Δ Pas Φ -> ogs_env Δ Act (Φ ▶ₓ Γ)
+  | EConP {Φ Γ} : ogs_env Δ Act Φ -> Γ =[val]> (Δ +▶ ↓⁺Φ) -> ogs_env Δ Pas (Φ ▶ₓ Γ)
   .
-  Arguments ENil {Δ1 Δ2 b}.
-  Arguments EConT {Δ1 Δ2 Φ Γ}.
-  Arguments EConF {Δ1 Δ2 Φ Γ}.
-  (* Derive Signature for alt_env. *)
-  (* Derive NoConfusionHom for alt_env. *)
+  #[global] Arguments ENilA {Δ}.
+  #[global] Arguments ENilP {Δ}.
+  #[global] Arguments EConA {Δ Φ Γ} u.
+  #[global] Arguments EConP {Δ Φ Γ} u γ.
+  Derive Signature NoConfusion NoConfusionHom for ogs_env.
 
-  Notation εₑ := (ENil) .
-  Notation "u ▶ₑ⁺" := (EConT u) (at level 40).
-  Notation "u ▶ₑ⁻ e" := (EConF u e) (at level 40).
+  Notation "'ε⁺'" := (ENilA).
+  Notation "'ε⁻'" := (ENilP).
+  Notation "u ;⁺" := (EConA u).
+  Notation "u ;⁻ e" := (EConP u e).
 
 (*|
 Collapsing functions (Def 5.18)
 |*)
-  Equations concat0 {Δ1 Δ2 b Φ} (u : alt_env Δ1 Δ2 b Φ) : ↓[negb b]Φ ⇒ᵥ ((if b then Δ2 else Δ1) +▶ ↓[b]Φ) :=
-    concat0 (εₑ)     := a_empty ;
-    concat0 (u ▶ₑ⁺)   := r_concat3_1 ᵣ⊛ concat0 u ;
-    concat0 (u ▶ₑ⁻ e) := [ concat0 u , e ] .
+  Equations collapse {Δ p Φ} : ogs_env Δ p Φ -> ↓[p^]Φ =[val]> (Δ +▶ ↓[p]Φ) :=
+    collapse ε⁺       := ! ;
+    collapse ε⁻       := ! ;
+    collapse (u ;⁺)   := collapse u ⊛ᵣ r_cat3_1 ;
+    collapse (u ;⁻ e) := [ collapse u , e ] .
+  Notation "ₐ↓ γ" := (collapse γ).
+  #[derive(eliminator=no)]
+
+  Equations bicollapse {Δ} Φ : ogs_env Δ Act Φ -> ogs_env Δ Pas Φ -> forall p, ↓[p]Φ =[val]> Δ :=
+    bicollapse ∅ₓ       (ε⁺)     (ε⁻)     Act   := ! ;
+    bicollapse ∅ₓ       (ε⁺)     (ε⁻)     Pas   := ! ;
+    bicollapse (Φ ▶ₓ _) (u ;⁺)   (v ;⁻ γ) Act :=
+          [ bicollapse Φ v u Pas , γ ⊛ [ a_id , bicollapse Φ v u Act ] ] ;
+    bicollapse (Φ ▶ₓ _) (v ;⁺)   (u ;⁻ e) Pas := bicollapse Φ u v Act .
+  #[global] Arguments bicollapse {Δ Φ} u v {p}.
+
+  Lemma collapse_fix_aux {Δ Φ} (u : ogs_env Δ Act Φ) (v : ogs_env Δ Pas Φ)
+    :  ₐ↓u ⊛ [ a_id , bicollapse u v ] ≡ₐ bicollapse u v
+     /\ ₐ↓v ⊛ [ a_id , bicollapse u v ] ≡ₐ bicollapse u v .
+  Proof.
+    induction Φ; dependent destruction u; dependent destruction v.
+    - split; intros ? i; now destruct (c_view_emp i).
+    - split; cbn; simp collapse; simp bicollapse.
+      + intros ? i; cbn; rewrite <- v_sub_sub, a_ren_r_simpl, r_cat3_1_simpl.
+        now apply IHΦ.
+        exact _. (* wtf typeclass?? *)
+      + intros ? i; cbn; destruct (c_view_cat i); eauto.
+        now apply IHΦ.
+  Qed.
+
+  Lemma collapse_fix_act {Δ Φ} (u : ogs_env Δ Act Φ) (v : ogs_env Δ Pas Φ)
+    : ₐ↓u ⊛ [ a_id , bicollapse u v ] ≡ₐ bicollapse u v .
+  Proof. now apply collapse_fix_aux. Qed.
+
+  Lemma collapse_fix_pas {Δ Φ} (u : ogs_env Δ Act Φ) (v : ogs_env Δ Pas Φ)
+    : ₐ↓v ⊛ [ a_id , bicollapse u v ] ≡ₐ bicollapse u v .
+  Proof. now apply collapse_fix_aux. Qed.
 
 (*|
-Flattens a pair of alternating environments for both player and opponent into a "closed" substitution.
+Alternative definition using precise lookup.
 |*)
-  Equations concat1 {Δ} Φ {b} :
-    alt_env Δ Δ b Φ -> alt_env Δ Δ (negb b) Φ -> ↓[b]Φ ⇒ᵥ Δ :=
-    concat1 ∅       _       _         := a_empty ;
-    concat1 (Φ ▶ _) (u ▶ₑ⁺)  (v ▶ₑ⁻ e) := [ concat1 Φ u v , [ v_var , concat1 Φ v u ] ⊛ e ] ;
-    concat1 (Φ ▶ _) (u ▶ₑ⁻ e) (v ▶ₑ⁺)  := concat1 Φ u v .
+  Equations ctx_dom Φ p {x} : ↓[p^]Φ ∋ x -> C :=
+    ctx_dom ∅ₓ       Act i with c_view_emp i := { | ! } ;
+    ctx_dom ∅ₓ       Pas i with c_view_emp i := { | ! } ;
+    ctx_dom (Φ ▶ₓ Γ) Act i := ctx_dom Φ Pas i ;
+    ctx_dom (Φ ▶ₓ Γ) Pas i with c_view_cat i := {
+      | Vcat_l j := ctx_dom Φ Act j ;
+      | Vcat_r j := ↓[Act]Φ } .
+  #[global] Arguments ctx_dom {Φ p x} i.
 
-  Arguments concat1 {Δ Φ b}.
+  Equations r_ctx_dom Φ p {x} (i : ↓[p^]Φ ∋ x) : ctx_dom i ⊆ ↓[p]Φ :=
+    r_ctx_dom ∅ₓ       Act i with c_view_emp i := { | ! } ;
+    r_ctx_dom ∅ₓ       Pas i with c_view_emp i := { | ! } ;
+    r_ctx_dom (Φ ▶ₓ Γ) Act i := r_ctx_dom Φ Pas i ᵣ⊛ r_cat_l ;
+    r_ctx_dom (Φ ▶ₓ Γ) Pas i with c_view_cat i := {
+      | Vcat_l j := r_ctx_dom Φ Act j ;
+      | Vcat_r j := r_id } .
+  #[global] Arguments r_ctx_dom {Φ p x} i.
 
-  Lemma concat_fixpoint {Δ Φ} (u : alt_env Δ Δ Ⓟ Φ) (v : alt_env Δ Δ Ⓞ Φ)
-    :  [ v_var , concat1 u v ] ⊛ concat0 u ≡ₐ concat1 v u
-     /\ [ v_var , concat1 v u ] ⊛ concat0 v ≡ₐ concat1 u v .
-    induction Φ; dependent destruction u; dependent destruction v; cbn; split.
-    - cbn. intros ? i; dependent elimination i.
-    - intros ? i; dependent elimination i.
-    - simp concat1.
-      rewrite <- e_comp_ren_l.
-      rewrite <- (proj2 (IHΦ v u)).
-      apply e_comp_proper; [ | reflexivity ].
-      symmetry; apply s_eq_cover_uniq.
-      * unfold r_concat3_1.
-        now rewrite <- s_ren_comp, 2 s_eq_cat_l.
-      * unfold r_concat3_1.
-        now rewrite <- s_ren_comp, s_eq_cat_r, s_ren_comp, s_eq_cat_r, s_eq_cat_l.
-    - simp concat1. symmetry; apply s_eq_cover_uniq.
-      * rewrite <- e_comp_ren_r, s_eq_cat_l.
-        symmetry; apply IHΦ.
-      * now rewrite <- e_comp_ren_r, s_eq_cat_r.
+  Equations lookup {Δ p Φ} (γ : ogs_env Δ p Φ) [x] (i : ↓[p^]Φ ∋ x)
+            : val (Δ +▶ ctx_dom i) x :=
+    lookup ε⁺       i with c_view_emp i := { | ! } ;
+    lookup ε⁻       i with c_view_emp i := { | ! } ;
+    lookup (γ ;⁺)   i := lookup γ i ;
+    lookup (γ ;⁻ e) i with c_view_cat i := {
+      | Vcat_l j := lookup γ j ;
+      | Vcat_r j := e _ j } .
+
+  Lemma lookup_collapse {Δ p Φ} (γ : ogs_env Δ p Φ) :
+    collapse γ ≡ₐ (fun x i => lookup γ i ᵥ⊛ᵣ [ r_cat_l , r_ctx_dom i ᵣ⊛ r_cat_r ]).
+  Proof.
+    intros ? i; funelim (lookup γ i).
+    - cbn; rewrite H.
+      unfold v_ren; rewrite <- v_sub_sub.
+      apply v_sub_proper; eauto.
+      intros ? j; cbn; rewrite v_sub_var; cbn; f_equal.
+      unfold r_cat3_1; destruct (c_view_cat j); cbn.
+      + now rewrite c_view_cat_simpl_l.
+      + now rewrite c_view_cat_simpl_r.
+    - cbn; rewrite 2 c_view_cat_simpl_l; exact H.
+    - cbn; rewrite 2 c_view_cat_simpl_r.
+      cbn; rewrite a_ren_l_id, a_cat_id.
+      symmetry; apply v_var_sub.
   Qed.
 
 (*|
 OGS strategies (Def 5.19)
 ===========================
-|*)
-(*|
+
 Active and passive states
 |*)
-  Definition m_strat_act Δ : psh alt_ext := fun Φ => (conf (Δ +▶ ↓⁺Φ) * alt_env Δ Δ Ⓟ Φ)%type.
-  Definition m_strat_pas Δ : psh alt_ext := fun Φ => alt_env Δ Δ Ⓞ Φ.
+  Record m_strat_act Δ (Φ : ogs_ctx) : Type := MS {
+    ms_conf : conf (Δ +▶ ↓⁺Φ) ;
+    ms_env : ogs_env Δ Act Φ ;
+  }.
+  #[global] Arguments MS {Δ Φ}.
+  #[global] Arguments ms_conf {Δ Φ}.
+  #[global] Arguments ms_env {Δ Φ}.
 
-  Definition m_strat_wrap {Δ Φ} (x : alt_env Δ Δ Ⓟ Φ)
-     : nf' (Δ +▶ ↓⁺ Φ) -> (obs∙ Δ + h_actv ogs_hg (m_strat_pas Δ) Φ) :=
-      fun u =>
-        match cat_split (fst (projT2 u)) with
-        | CLeftV h => inl (_ ,' (h , nf'_obs u))
-        | CRightV h => inr ((_ ,' (h , nf'_obs u)) ,' (x ▶ₑ⁻ nf'_val u))
-        end .
+  Definition m_strat_pas Δ : psh ogs_ctx := ogs_env Δ Pas.
 
 (*|
 Action and reaction morphisms
 |*)
-  Definition m_strat_play {Δ Φ} (x : m_strat_act Δ Φ)
-    : delay (obs∙ Δ + h_actv ogs_hg (m_strat_pas Δ) Φ)
-    := (fun _ => m_strat_wrap (snd x)) <$> eval (fst x).
+  Definition m_strat_wrap {Δ Φ} (γ : ogs_env Δ Act Φ)
+     : nf _ _ (Δ +▶ ↓⁺ Φ) -> (obs∙ Δ + h_actv ogs_hg (m_strat_pas Δ) Φ) :=
+      fun n =>
+        match c_view_cat (nf_var n) with
+        | Vcat_l i => inl (i ⋅ nf_obs n)
+        | Vcat_r j => inr ((j ⋅ nf_obs n) ,' (γ ;⁻ nf_args n))
+        end .
 
-  Definition m_strat_resp {Δ Φ} (x : m_strat_pas Δ Φ)
+  Definition m_strat_play {Δ Φ} (ms : m_strat_act Δ Φ)
+    : delay (obs∙ Δ + h_actv ogs_hg (m_strat_pas Δ) Φ)
+    := fmap_delay (m_strat_wrap ms.(ms_env)) (eval ms.(ms_conf)).
+
+  Definition m_strat_resp {Δ Φ} (γ : m_strat_pas Δ Φ)
     : h_pasv ogs_hg (m_strat_act Δ) Φ
-    := fun m => (app (r_concat3_1 ᵣ⊛ᵥ concat0 x _ (fst (projT2 m)))
-                   (snd (projT2 m))
-                   (v_var ⊛ᵣ r_concat_r ⊛ᵣ r_concat_r) ,
-               x ▶ₑ⁺) .
+    := fun m =>
+         {| ms_conf := (ₐ↓γ _ (m_var m) ᵥ⊛ᵣ r_cat3_1) ⊙ (m_obs m)⦗r_cat_rr ᵣ⊛ a_id⦘ ;
+            ms_env := γ ;⁺ |} .
 
 (*|
-Strategies
+Strategies (unfolded)
 |*)
    Definition m_strat {Δ} : m_strat_act Δ ⇒ᵢ ogs_act Δ :=
     cofix _m_strat Φ e :=
-      emb_delay (m_strat_play e) >>=
-        fun j (r : (_ @ Φ) j) =>
-          go (match r in (fiber _ b) return (itree' ogs_e (fun _ : alt_ext => obs∙ Δ) b) with
-              | Fib (inl m) => RetF (m : (fun _ : alt_ext => obs∙ Δ) Φ)
-              | Fib (inr (x ,' p)) => VisF (x : ogs_e.(e_qry) Φ)
-                                          (fun r => _m_strat (g_next r) (m_strat_resp p r))
-              end).
+       subst_delay
+         (fun r => go match r with
+          | inl m        => RetF m
+          | inr (x ,' p) => VisF x (fun r : ogs_e.(e_rsp) _ => _m_strat _ (m_strat_resp p r))
+          end)
+         (m_strat_play e).
 
+  Definition m_stratp {Δ} : m_strat_pas Δ ⇒ᵢ ogs_pas Δ :=
+    fun _ x m => m_strat _ (m_strat_resp x m).
+
+(*|
+Notions of equivalence.
+|*)
+  Definition m_strat_act_eqv {Δ} : relᵢ (m_strat_act Δ) (m_strat_act Δ) :=
+    fun i x y => m_strat i x ≈ m_strat i y.
+  Notation "x ≈ₐ y" := (m_strat_act_eqv _ x y).
+
+  Definition m_strat_pas_eqv {Δ} : relᵢ (m_strat_pas Δ) (m_strat_pas Δ) :=
+    fun i x y => forall m, m_strat_resp x m ≈ₐ m_strat_resp y m .
+  Notation "x ≈ₚ y" := (m_strat_pas_eqv _ x y).
+
+
+   (*
   Lemma unfold_mstrat {Δ a} (x : m_strat_act Δ a) :
     m_strat a x
     ≊ (emb_delay (m_strat_play x) >>=
@@ -146,56 +215,53 @@ Strategies
     eapply (ft_t (it_eq_up2bind_t _ _)); econstructor; [ reflexivity | ].
     intros ? ? x2 ->; destruct x2 as [ [ | [] ] ]; auto.
   Qed.
-
-  Definition m_stratp {Δ} : m_strat_pas Δ ⇒ᵢ ogs_pas Δ :=
-    fun _ x m => m_strat _ (m_strat_resp x m).
-
-  Definition m_strat_act_eqv {Δ} : relᵢ (m_strat_act Δ) (m_strat_act Δ) :=
-    fun i x y => m_strat i x ≈ m_strat i y.
-  Notation "x ≈ₐ y" := (m_strat_act_eqv _ x y) (at level 50).
-
-  Definition m_strat_pas_eqv {Δ} : relᵢ (m_strat_pas Δ) (m_strat_pas Δ) :=
-    fun i x y => forall m, m_strat_resp x m ≈ₐ m_strat_resp y m .
-  Notation "x ≈ₚ y" := (m_strat_pas_eqv _ x y) (at level 50).
-
+*)
 (*|
 Injection of configurations into strategies
 |*)
-   Definition inj_init_act Δ {Γ} (c : conf Γ) : m_strat_act Δ (∅ ▶ Γ) :=
-    ((r_concat_r ⊛ᵣ r_concat_r) ᵣ⊛ₜ c , εₑ ▶ₑ⁺).
+   Definition inj_init_act Δ {Γ} (c : conf Γ) : m_strat_act Δ (∅ₓ ▶ₓ Γ) :=
+    {| ms_conf := c ₜ⊛ᵣ (r_cat_r ᵣ⊛ r_cat_r) ; ms_env := ε⁻ ;⁺ |}.
 
-  Definition inj_init_pas {Δ Γ} (γ : Γ ⇒ᵥ Δ) : m_strat_pas Δ (∅ ▶ Γ) :=
-    εₑ ▶ₑ⁻ (r_concat_l ᵣ⊛ γ).
+  Definition inj_init_pas {Δ Γ} (γ : Γ =[val]> Δ) : m_strat_pas Δ (∅ₓ ▶ₓ Γ) :=
+    ε⁺ ;⁻ (γ ⊛ᵣ r_cat_l).
 
   Definition m_conf_eqv Δ : relᵢ conf conf :=
     fun Γ u v => inj_init_act Δ u ≈ₐ inj_init_act Δ v .
-  Notation "x ≈⟦ogs Δ ⟧≈ y" := (m_conf_eqv Δ _ x y) (at level 50).
 
-  Definition reduce_t (Δ : context) : Type :=
-    ⦉ m_strat_act Δ ×ᵢ m_strat_pas Δ ⦊ᵢ .
+(*|
+Definition of composition (not for general OGS (counter-)strategies, but a more
+precise version only for machine (counter-)strategies).
+|*)
+  Record reduce_t (Δ : C) : Type := RedT {
+    red_ctx : ogs_ctx ;
+    red_act : m_strat_act Δ red_ctx ;
+    red_pas : m_strat_pas Δ red_ctx
+  } .
+  #[global] Arguments RedT {Δ Φ} u v : rename.
+  #[global] Arguments red_ctx {Δ}.
+  #[global] Arguments red_act {Δ}.
+  #[global] Arguments red_pas {Δ}.
 
-  Equations compo_body {Δ} : reduce_t Δ -> delay (reduce_t Δ + obs∙ Δ) :=
-    compo_body x :=
-      m_strat_play (fst (projT2 x)) >>= fun _ r =>
-          match r with
-          | inl r => Ret' (inr r)
-          | inr e => Ret' (inl (_ ,' (m_strat_resp (snd (projT2 x)) (projT1 e) , (projT2 e))))
-          end.
+  Definition compo_body {Δ} (x : reduce_t Δ)
+    : delay (reduce_t Δ + obs∙ Δ)
+    := fmap_delay (fun r => match r with
+                  | inl r => inr r
+                  | inr e => inl (RedT (m_strat_resp x.(red_pas) (projT1 e)) (projT2 e))
+                  end)
+                  (m_strat_play x.(red_act)).
+  
+  Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a)
+    : delay (obs∙ Δ)
+    := iter_delay compo_body (RedT u v).
 
-  Definition compo {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a) :
-    delay (obs∙ Δ) :=
-    iter_delay compo_body (a ,' (u , v)).
-  Notation "u ∥ v" := (compo u v) (at level 40).
+End with_param.
 
-End withFam.
-
-#[global] Notation εₑ := (ENil) .
-Arguments ENil {_ _ Δ1 Δ2 b}.
-Arguments EConT {_ _ Δ1 Δ2 Φ Γ}.
-Arguments EConF {_ _ Δ1 Δ2 Φ Γ}.
-#[global] Notation "u ▶ₑ⁺" := (EConT u) (at level 40).
-#[global] Notation "u ▶ₑ⁻ e" := (EConF u e) (at level 40).
-#[global] Notation "x ≈ₐ y" := (m_strat_act_eqv _ x y) (at level 50).
-#[global] Notation "x ≈ₚ y" := (m_strat_pas_eqv _ x y) (at level 50).
-#[global] Notation "u ∥ v" := (compo u v) (at level 40).
-#[global] Notation "x ≈⟦ogs Δ ⟧≈ y" := (m_conf_eqv Δ _ x y) (at level 50).
+#[global] Notation "'ε⁺'" := (ENilA).
+#[global] Notation "'ε⁻'" := (ENilP).
+#[global] Notation "u ;⁺" := (EConA u).
+#[global] Notation "u ;⁻ e" := (EConP u e).
+#[global] Notation "ₐ↓ γ" := (collapse γ).
+#[global] Notation "u ∥ v" := (compo u v).
+#[global] Notation "x ≈ₐ y" := (m_strat_act_eqv _ x y).
+#[global] Notation "x ≈ₚ y" := (m_strat_pas_eqv _ x y).
+#[global] Notation "x ≈⟦ogs Δ ⟧≈ y" := (m_conf_eqv Δ _ x y).
