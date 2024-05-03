@@ -115,17 +115,25 @@ assignment is injective, that being in its image is stable by renaming and that 
 image is decidable.
 |*)
 
-Variant is_var `{VM : subst_monoid T C val} {Γ x} : val Γ x -> Prop :=
+Variant is_var `{VM : subst_monoid T C val} {Γ x} : val Γ x -> Type :=
 | Vvar (i : Γ ∋ x) : is_var (v_var i)
 .
 
-Lemma ren_is_var `{VM : subst_monoid_laws T C val} {Γ1 Γ2 x} (v : val Γ1 x) (r : Γ1 ⊆ Γ2)
+Equations is_var_get `{VM : subst_monoid T C val} {Γ x} {v : val Γ x} : is_var v -> Γ ∋ x :=
+  is_var_get (Vvar i) := i .
+
+Lemma ren_is_var `{VM : subst_monoid_laws T C val} {Γ1 Γ2} (r : Γ1 ⊆ Γ2) {x} {v : val Γ1 x} 
       : is_var v -> is_var (v ᵥ⊛ᵣ r).
 Proof.
   intro p; dependent elimination p.
   cbn; rewrite v_sub_var.
   econstructor.
 Qed.
+
+Variant is_var_ren_view `{VM : subst_monoid_laws T C val} {Γ1 Γ2 x}
+  (v : val Γ1 x) (r : Γ1 ⊆ Γ2) : is_var (v ᵥ⊛ᵣ r) -> Type :=
+| Vvren (H : is_var v) : is_var_ren_view v r (ren_is_var r H) .
+
 
 Class var_assumptions `{CC : context T C} (val : Fam₁ T C) {VM : subst_monoid val} := {
   v_var_inj {Γ x} : injective (@v_var _ _ _ _ _ Γ x) ;
@@ -134,7 +142,7 @@ Class var_assumptions `{CC : context T C} (val : Fam₁ T C) {VM : subst_monoid 
 }.
 
 Section variables.
-  Context `{CC : context T C} (val : Fam₁ T C).
+  Context `{CC : context T C} {val : Fam₁ T C}.
   Context {VM : subst_monoid val} {VML : subst_monoid_laws val}.
   Context {VA : var_assumptions val}.
 
@@ -152,6 +160,23 @@ Section variables.
   Lemma is_var_simpl {Γ x} {i : Γ ∋ x} (p : is_var (v_var i)) : p = Vvar i.
   Proof. apply is_var_irr. Qed.
 
+  Lemma view_is_var_ren {Γ1 Γ2 x} (v : val Γ1 x) (r : Γ1 ⊆ Γ2) (H : is_var (v ᵥ⊛ᵣ r))
+    : is_var_ren_view v r H .
+  Proof.
+    rewrite (is_var_irr H (ren_is_var r (is_var_ren v r H))); econstructor.
+  Qed.
+
+  Lemma ren_is_var_get {Γ1 Γ2} {r : Γ1 ⊆ Γ2}
+    {x v} (H : is_var v) : is_var_get (ren_is_var r H) = r x (is_var_get H) .
+  Proof.
+    destruct H; cbn.
+    generalize (ren_is_var r (Vvar i)).
+    unfold v_ren; rewrite v_sub_var; unfold r_emb; intro H.
+    now rewrite (is_var_irr H (Vvar (r _ i))).
+  Qed.
+
+  Lemma is_var_get_eq {Γ x} {v : val Γ x} (H : is_var v) : v = v_var (is_var_get H) .
+  Proof. now destruct H. Qed.
 End variables.
 
 (*|
