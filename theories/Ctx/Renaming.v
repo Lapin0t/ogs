@@ -105,6 +105,9 @@ Renaming assignments on the left by precomposition.
     now rewrite H.
   Qed.
 
+  Definition r_cat_rr {Γ1 Γ2 Γ3} : Γ3 ⊆ (Γ1 +▶ (Γ2 +▶ Γ3)) :=
+    r_cat_r ᵣ⊛ r_cat_r .
+
   Definition r_cat3_1 {Γ1 Γ2 Γ3} : (Γ1 +▶ Γ2) ⊆ (Γ1 +▶ (Γ2 +▶ Γ3)) :=
     [ r_cat_l , r_cat_l ᵣ⊛ r_cat_r ].
 
@@ -119,6 +122,30 @@ Renaming assignments on the left by precomposition.
 
   Definition r_assoc_l {Γ1 Γ2 Γ3} : (Γ1 +▶ (Γ2 +▶ Γ3)) ⊆ ((Γ1 +▶ Γ2) +▶ Γ3)
     := [ r_cat_l ᵣ⊛ r_cat_l , r_cat3_3 ] .
+
+  Lemma r_cat3_1_simpl {F Γ1 Γ2 Γ3 Δ} (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ) (w : Γ3 =[F]> Δ)
+        : r_cat3_1 ᵣ⊛ [ u , [ v , w ] ] ≡ₐ [ u , v ] .
+  Proof.
+    intros ? i; cbv; destruct (c_view_cat i).
+    - now rewrite c_view_cat_simpl_l.
+    - now rewrite c_view_cat_simpl_r, c_view_cat_simpl_l.
+  Qed.
+
+  Lemma r_cat3_2_simpl {F Γ1 Γ2 Γ3 Δ} (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ) (w : Γ3 =[F]> Δ)
+        : r_cat3_2 ᵣ⊛ [ u , [ v , w ] ] ≡ₐ [ u , w ] .
+  Proof.
+    intros ? i; cbv; destruct (c_view_cat i).
+    - now rewrite c_view_cat_simpl_l.
+    - now rewrite 2 c_view_cat_simpl_r.
+  Qed.
+
+  Lemma r_cat3_3_simpl {F Γ1 Γ2 Γ3 Δ} (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ) (w : Γ3 =[F]> Δ)
+        : r_cat3_3 ᵣ⊛ [ [ u , v ] , w ] ≡ₐ [ v , w ] .
+  Proof.
+    intros ? i; cbv; destruct (c_view_cat i).
+    - now rewrite c_view_cat_simpl_l, c_view_cat_simpl_r.
+    - now rewrite c_view_cat_simpl_r.
+  Qed.
 
   Lemma r_assoc_rl {Γ1 Γ2 Γ3} : @r_assoc_l Γ1 Γ2 Γ3 ᵣ⊛ @r_assoc_r Γ1 Γ2 Γ3 ≡ₐ r_id .
   Proof.

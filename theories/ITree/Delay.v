@@ -51,6 +51,14 @@ Definition bind_delay' {X Y}
   : delay X -> (X -> delay Y) -> delay Y
   := fun x f => bind x (fun 'T1_0 y => f y).
 
+Definition subst_delay {I} {E : event I I} {X Y i} (f : X -> itree E Y i)
+  : delay X -> itree E Y i
+  := cofix _subst_delay x := go match x.(_observe) with
+                                | RetF r => (f r).(_observe)
+                                | TauF t => TauF (_subst_delay t)
+                                | VisF e k => match e with end
+                                end .
+
 Definition fmap_delay {X Y} (f : X -> Y) : delay X -> delay Y :=
   fmap (fun _ => f) T1_0 .
 
