@@ -7,8 +7,11 @@ indexed tree over the empty signature ∅ₑ.
 .. coq:: none
 |*)
 
+From Coinduction Require Import coinduction tactics.
+
 From OGS Require Import Prelude.
-From OGS.ITree Require Import Event ITree Structure.
+From OGS.Utils Require Import Psh Rel.
+From OGS.ITree Require Import Event ITree Structure Eq.
 
 (*|
 The delay monad (Def 4.5) is formalized as an itree over
@@ -34,6 +37,9 @@ Definition emb_delay {I} {E : event I I} {X i} : delay X -> itree E (X @ i) i :=
          | TauF t => TauF (_emb_delay t)
          | VisF e k => match e with end
          end).
+
+#[global] Notation "'RetD' x" := (RetF (x : (fun _ : T1 => _) T1_0)) (at level 40).
+#[global] Notation "'TauD' t" := (TauF (t : itree ∅ₑ (fun _ : T1 => _) T1_0)) (at level 40).
 
 (*|
 Specialization of the operations to the delay monad.
@@ -64,3 +70,18 @@ Definition fmap_delay {X Y} (f : X -> Y) : delay X -> delay Y :=
 
 Definition iter_delay {X Y} : (X -> delay (X + Y)) -> X -> delay Y :=
   fun f => iter (fun 'T1_0 => f) T1_0 .
+
+#[global] Instance subst_delay_eq {I E X RX Y RY i}
+ : Proper ((RX ==> it_eq RY (i:=i)) ==> (it_eq (fun _ => RX) (i:=T1_0) ==> it_eq RY (i:=i)))
+    (@subst_delay I E X Y i).
+Proof.
+  intros ? ? Hf; unfold it_eq at 2; unfold respectful; coinduction R CIH; intros t1 t2 H.
+  apply it_eq_step in H; cbn in *; unfold observe in H.
+  remember (_observe t1) as ot1; clear t1 Heqot1.
+  remember (_observe t2) as ot2; clear t2 Heqot2.
+  dependent elimination H; cbn.
+  - eapply it_eqF_mon; [ apply gfp_t | ].
+    specialize (Hf _ _ r_rel); apply it_eq_step in Hf; exact Hf.
+  - econstructor; now apply CIH.
+  - destruct q.
+Qed.
