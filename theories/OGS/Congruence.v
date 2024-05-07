@@ -10,133 +10,147 @@ The proof makes a slight technical side step: we prove the composition to be equ
 From Coinduction Require Import coinduction tactics.
 
 From OGS Require Import Prelude.
-From OGS.Utils Require Import Ctx Rel.
-From OGS.OGS Require Import Subst Obs Machine Game Strategy CompGuarded Adequacy.
+From OGS.Utils Require Import Rel.
+From OGS.Ctx Require Import All Ctx.
+From OGS.OGS Require Import Subst Obs Machine Game Strategy CompGuarded.
 From OGS.ITree Require Import Event ITree Eq Delay Structure Properties Guarded.
 
-Open Scope ctx_scope.
-
-Section withFam.
-
+Section with_param.
 (*|
-We consider a language abstractly captured as a machine
+We consider a language abstractly captured as a machine satisfying an
+appropriate axiomatization.
 |*)
-  Context {bT : baseT}.
-  Context {bV : baseV}.
-  Context {bC : baseC}.
-  Context {sV : subst_monoid bV}.
-  Context {sC : subst_module bV bC}.
-  Context {oS : observation_structure}.
-  Context {M: machine}.
-(*|
-Satisfying an appropriate axiomatization
-|*)
-  Context {sVL: subst_monoid_laws}.
-  Context {sCL: subst_module_laws}.
-  Context {VA : var_assumptions} .
-  Context {ML: machine_laws}.
+  Context {T C} {CC : context T C} {CL : context_laws T C}.
+  Context {val} {VM : subst_monoid val} {VML : subst_monoid_laws val}.
+  Context {conf} {CM : subst_module val conf} {CML : subst_module_laws val conf}.
+  Context {obs : obs_struct T C} {M : machine val conf obs} {ML : machine_laws val conf obs}.
+  Context {VV : var_assumptions val}.
 
   (* Alternative definition of the composition easier to prove
   congruence (respecting weak bisimilarity). *)
 
-  Definition compo_alt_t (Δ : context) : Type :=
-    ⦉ ogs_act Δ ×ᵢ ogs_pas Δ ⦊ᵢ .
+  Record compo_alt_t (Δ : C) : Type := AltT {
+    alt_ctx : ogs_ctx ;
+    alt_act : ogs_act (obs:=obs) Δ alt_ctx ;
+    alt_pas : ogs_pas (obs:=obs) Δ alt_ctx
+  } .
+  #[global] Arguments AltT {Δ Φ} u v : rename.
+  #[global] Arguments alt_ctx {Δ}.
+  #[global] Arguments alt_act {Δ}.
+  #[global] Arguments alt_pas {Δ}.
 
-  Notation "'RetD' x" := (RetF (x : (fun _ : T1 => _) T1_0)) (at level 40).
-  Notation "'TauD' t" := (TauF (t : itree ∅ₑ (fun _ : T1 => _) T1_0)) (at level 40).
-
-  Equations compo_alt_body {Δ} : compo_alt_t Δ -> delay (compo_alt_t Δ + obs∙ Δ) :=
-    compo_alt_body :=
-      cofix _compo_body u :=
-        go match (fst (projT2 u)).(_observe) with
+  Definition compo_alt_body {Δ}
+    : compo_alt_t Δ -> delay (compo_alt_t Δ + obs∙ Δ)
+    := cofix _compo_body x :=
+        go match x.(alt_act).(_observe) with
             | RetF r => RetD (inr r)
-            | TauF t => TauD (_compo_body (_ ,' (t , (snd (projT2 u)))))
-            | VisF e k => RetD (inl (_ ,' (snd (projT2 u) e , k)))
+            | TauF t => TauD (_compo_body (AltT t x.(alt_pas)))
+            | VisF e k => RetD (inl (AltT (x.(alt_pas) e) k))
             end .
 
-  Definition compo0 {Δ a} (u : ogs_act Δ a) (v : ogs_pas Δ a) : delay (obs∙ Δ)
-    := iter_delay compo_alt_body (a ,' (u , v)).
+  Definition compo_alt {Δ a} (u : ogs_act Δ a) (v : ogs_pas Δ a) : delay (obs∙ Δ)
+    := iter_delay compo_alt_body (AltT u v).
 
-  Definition compo_t_eq (Δ : context) : relation (compo_alt_t Δ) :=
-    fun x1 x2 =>
-     exists p : projT1 x1 = projT1 x2,
-       rew p in fst (projT2 x1) ≈ fst (projT2 x2)
-       /\ h_pasvR ogs_hg (it_wbisim (eqᵢ _)) _ (rew p in snd (projT2 x1)) (snd (projT2 x2)).
+  Variant alt_t_weq Δ : relation (compo_alt_t Δ) :=
+  | AltWEq {Φ u1 u2 v1 v2}
+    : u1 ≈ u2
+      -> h_pasvR ogs_hg (it_wbisim (eqᵢ _)) _ v1 v2
+      -> alt_t_weq Δ (AltT (Φ:=Φ) u1 v1) (AltT (Φ:=Φ) u2 v2).
 
-  Definition compo_t_eq_strong (Δ : context) : relation (compo_alt_t Δ) :=
-    fun x1 x2 =>
-     exists p : projT1 x1 = projT1 x2,
-       rew p in fst (projT2 x1) ≊ fst (projT2 x2)
-       /\ h_pasvR ogs_hg (it_eq (eqᵢ _)) _ (rew p in snd (projT2 x1)) (snd (projT2 x2)).
+  Variant alt_t_seq Δ : relation (compo_alt_t Δ) :=
+  | AltSEq {Φ u1 u2 v1 v2}
+    : u1 ≊ u2
+      -> h_pasvR ogs_hg (it_eq (eqᵢ _)) _ v1 v2
+      -> alt_t_seq Δ (AltT (Φ:=Φ) u1 v1) (AltT (Φ:=Φ) u2 v2).
 
   #[global] Instance compo_alt_proper {Δ a}
-    : Proper (it_wbisim (eqᵢ _) a ==> h_pasvR ogs_hg (it_wbisim (eqᵢ _)) a ==> it_wbisim (eqᵢ _) T1_0)
-        (@compo0 Δ a).
+    : Proper (it_wbisim (eqᵢ _) a
+                ==> h_pasvR ogs_hg (it_wbisim (eqᵢ _)) a
+                ==> it_wbisim (eqᵢ _) T1_0)
+        (@compo_alt Δ a).
     intros x y H1 u v H2.
-    unshelve eapply (iter_weq (RX := fun _ => compo_t_eq Δ)); [ | exact (ex_intro _ eq_refl (conj H1 H2)) ].
-    clear a x y H1 u v H2; intros [] [ ? [ x u ]] [ ? [ y v ]] [ H1 H2 ].
-    cbn in H1; destruct H1; cbn in H2; destruct H2 as [ H1 H2 ].
-    unfold it_wbisim; revert x y H1; coinduction R CIH; intros x y H1.
-    apply it_wbisim_step in H1; cbn in *; unfold observe in H1; destruct H1 as [ ? ? r1 r2 rr ].
+    unshelve eapply (iter_weq (RX := fun _ => alt_t_weq Δ)); [ | now econstructor ].
+    clear a x y H1 u v H2; intros [] ?? [ ????? Hu Hv ].
+    revert u1 u2 Hu; unfold it_wbisim; coinduction R CIH; intros u1 u2 Hu.
+    apply it_wbisim_step in Hu; cbn in *; unfold observe in Hu.
+    destruct Hu as [ ? ? r1 r2 rr ].
     dependent destruction rr.
-    - unshelve econstructor.
-      * exact (RetF (inr r0)).
+    - dependent destruction r_rel; unshelve econstructor.
       * exact (RetF (inr r3)).
-      * remember (_observe x) eqn:H; clear H.
-        remember (@RetF alt_ext ogs_e (fun _ => obs∙ Δ) (ogs_act Δ) x0 r0) eqn:H.
-        apply (fun u => rew <- [ fun v => it_eat _ _ v ] H in u) in r1.
+      * exact (RetF (inr r3)).
+      * remember (_observe u1) eqn:H; clear H.
+        remember (RetF (E:=ogs_e) r3) eqn:H.
         induction r1; [ now rewrite H | eauto ].
-      * remember (_observe y) eqn:H; clear H.
-        remember (@RetF alt_ext ogs_e (fun _ => obs∙ Δ) (ogs_act Δ) x0 r3) eqn:H.
-        apply (fun u => rew <- [ fun v => it_eat _ _ v ] H in u) in r2.
+      * remember (_observe u2) eqn:H; clear H.
+        remember (RetF (E:=ogs_e) r3) eqn:H.
         induction r2; [ now rewrite H | eauto ].
       * now repeat econstructor.
     - unshelve econstructor.
-      * exact (TauD (compo_alt_body (_ ,' (t1 , u)))).
-      * exact (TauD (compo_alt_body (_ ,' (t2 , v)))).
-      * remember (_observe x) eqn:H; clear H.
+      * exact (TauD (compo_alt_body (AltT t1 v1))).
+      * exact (TauD (compo_alt_body (AltT t2 v2))).
+      * remember (_observe u1) eqn:H; clear H.
         remember (TauF t1) eqn:H.
         induction r1; [ now rewrite H | auto ].
-      * remember (_observe y) eqn:H; clear H.
+      * remember (_observe u2) eqn:H; clear H.
         remember (TauF t2) eqn:H.
         induction r2; [ now rewrite H | auto ].
       * auto.
     - unshelve econstructor.
-      * exact (RetF (inl (_ ,' (u q , k1)))).
-      * exact (RetF (inl (_ ,' (v q , k2)))).
-      * remember (_observe x) eqn:H; clear H.
+      * exact (RetF (inl (AltT (v1 q) k1))).
+      * exact (RetF (inl (AltT (v2 q) k2))).
+      * remember (_observe u1) eqn:H; clear H.
         remember (VisF q k1) eqn:H.
         induction r1; [ now rewrite H | auto ].
-      * remember (_observe y) eqn:H; clear H.
+      * remember (_observe u2) eqn:H; clear H.
         remember (VisF q k2) eqn:H.
         induction r2; [ now rewrite H | auto ].
-      * unshelve (do 3 econstructor); [ exact eq_refl | exact (conj (H2 q) k_rel) ].
+      * unshelve (do 3 econstructor); eauto.
    Qed.
 
-  Definition reduce_t_inj {Δ : context} (x : reduce_t Δ) : compo_alt_t Δ
-     := (_ ,' (m_strat _ (fst (projT2 x)) , m_stratp _ (snd (projT2 x)))) .
+  Definition reduce_t_inj {Δ} (x : reduce_t Δ) : compo_alt_t Δ
+     := AltT (m_strat _ x.(red_act)) (m_stratp _ x.(red_pas)) .
 
   Lemma compo_compo_alt {Δ} {x : reduce_t Δ}
         : iter_delay compo_alt_body (reduce_t_inj x) ≊ iter_delay compo_body x .
+  Proof.
+    apply (iter_cong_strong (RX := fun _ a b => alt_t_seq _ a (reduce_t_inj b))); cycle 1.
 
-    apply (iter_cong_strong (RX := fun _ a b => compo_t_eq_strong _ a (reduce_t_inj b))); cycle 1.
+    cbn; destruct (reduce_t_inj x) as [ Φ u v ]; econstructor; [ | intro ]; eauto.
+    clear x.
 
-    cbn; destruct (reduce_t_inj x) as [ ? [] ].
-    exists eq_refl; split; cbn; [ | intro r ]; reflexivity.
-
-    intros [] [? [u1 e1]] [? [u2 e2]] [A B].
-    dependent elimination A; cbn in B; destruct B as [H1 H2].
-    rewrite unfold_mstrat in H1.
-    unfold compo_body; cbn [fst snd projT1 projT2].
-    remember (m_strat_play u2) eqn:Hu; clear Hu.
-    clear u2; unfold it_eq; revert u1 d H1; coinduction R CIH; intros u1 d H1.
-    apply it_eq_step in H1; cbn in *; unfold observe in *.
-    destruct (_observe d).
-    + destruct r as [ | [] ]; destruct (_observe u1); dependent elimination H1;
-        econstructor; econstructor; eauto.
-      exists eq_refl; split; [ exact (H2 q0) | exact k_rel ].
-    + destruct (_observe u1); dependent elimination H1; eauto.
-    + destruct q.
+    intros [] ?? H; dependent destruction H.
+    destruct b as [ Φ [ c u ] v ]; cbn in *.
+    rewrite unfold_mstrat in H; apply it_eq_step in H; cbn in H; unfold observe in H.
+    apply it_eq_unstep; cbn.
+    remember (_observe u1) as ou1; clear u1 Heqou1.
+    remember (_observe (eval c)) as ou2; clear c Heqou2.
+    
+    destruct ou2.
+    - destruct (m_strat_wrap u r).
+      + cbn in H; dependent elimination H; cbn.
+        do 2 econstructor; exact r_rel.
+      + destruct h; cbn in H; dependent elimination H.
+        do 3 econstructor.
+        * apply H0.
+        * exact k_rel.
+    - destruct ou1; dependent elimination H.
+      econstructor.
+      remember (fmap_delay (m_strat_wrap u) t) as t2; clear u t Heqt2.
+      revert t1 t2 t_rel; unfold it_eq at 2; coinduction R CIH; intros t1 t2 t_rel.
+      apply it_eq_step in t_rel; cbn in t_rel; unfold observe in t_rel; cbn.
+      remember (_observe t1) as ot1; clear t1 Heqot1.
+      remember (_observe t2) as ot2; clear t2 Heqot2.
+      destruct ot2.
+      + destruct r.
+        * cbn in t_rel; dependent elimination t_rel; cbn.
+          do 2 econstructor; exact r_rel.
+        * destruct h; dependent elimination t_rel; cbn.
+          do 3 econstructor.
+          now apply H0.
+          exact k_rel.
+      + dependent elimination t_rel; econstructor.
+        now apply CIH.
+      + destruct q.
+    - destruct q.
   Qed.
-
-End withFam.
+End with_param.
