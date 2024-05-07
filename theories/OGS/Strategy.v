@@ -197,25 +197,30 @@ Notions of equivalence.
     fun i x y => forall m, m_strat_resp x m ≈ₐ m_strat_resp y m .
   Notation "x ≈ₚ y" := (m_strat_pas_eqv _ x y).
 
-
-   (*
   Lemma unfold_mstrat {Δ a} (x : m_strat_act Δ a) :
     m_strat a x
-    ≊ (emb_delay (m_strat_play x) >>=
-        fun j (r : (_ @ a) j) =>
-          match r in (fiber _ b) return (itree ogs_e (fun _ : alt_ext => obs∙ Δ) b)
-          with
-          | Fib (inl m) => Ret' (m : (fun _ : alt_ext => obs∙ Δ) a)
-          | Fib (inr (x ,' p)) => Vis' (x : ogs_e.(e_qry) _)
-                                       (fun r => m_strat (g_next r) (m_strat_resp p r))
-          end).
-    revert a x; unfold it_eq; coinduction R CIH; intros a x.
-    cbn -[m_strat_play].
-    destruct (_observe (m_strat_play x)) as [ [ | [] ] | | [] ]; econstructor; auto.
-    eapply (ft_t (it_eq_up2bind_t _ _)); econstructor; [ reflexivity | ].
-    intros ? ? x2 ->; destruct x2 as [ [ | [] ] ]; auto.
+    ≊ subst_delay
+         (fun r => match r with
+          | inl m        => Ret' m
+          | inr (x ,' p) => Vis' x (fun r : ogs_e.(e_rsp) _ => m_strat _ (m_strat_resp p r))
+          end)
+         (m_strat_play x).
+  Proof.
+    apply it_eq_unstep; cbn.
+    destruct (_observe (eval (ms_conf x))); cbn.
+    - destruct (m_strat_wrap (ms_env x) r); cbn.
+      now econstructor.
+      destruct h; econstructor; intro.
+      apply it_eq_t_equiv.
+    - econstructor; apply (subst_delay_eq (RX := eq)).
+      intros ? ? <-; apply it_eq_unstep; cbn.
+      destruct x0; cbn.
+      + now econstructor.
+      + destruct s; econstructor; intro; now apply it_eq_t_equiv.
+      + now apply it_eq_t_equiv.
+    - destruct q.
   Qed.
-*)
+
 (*|
 Injection of configurations into strategies
 |*)

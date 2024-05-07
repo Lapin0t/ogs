@@ -72,7 +72,7 @@ Class machine_laws val conf obs {M : machine val conf obs} {VM : subst_monoid va
 (*|
 [app] respects [asgn_eq], to avoid relying on functional extensionality
 |*)
-   (*app_proper {Γ x v m} :: Proper (asgn_eq (dom m) Γ ==> eq) (@app _ Γ x v m) ;*)
+   oapp_proper {Γ x} {v : val Γ x} {o} :: Proper (asgn_eq (dom o) Γ ==> eq) (oapp v o) ;
 
 (*|
 [app] commutes with substitution
