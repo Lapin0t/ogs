@@ -19,6 +19,7 @@ Inductive ctx (X : Type) : Type :=
 #[global] Arguments cnil {X}.
 #[global] Arguments ccon {X} Γ x.
 Derive NoConfusion for ctx.
+#[global] Bind Scope ctx_scope with ctx.
 #[global] Notation "∅ₓ" := (cnil) : ctx_scope.
 #[global] Notation "Γ ▶ₓ x" := (ccon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
 (*|

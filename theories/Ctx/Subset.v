@@ -5,6 +5,7 @@ From OGS.Ctx Require Import Abstract Family.
 #[local] Open Scope ctx_scope.
 
 Reserved Notation "∅ₛ".
+Reserved Notation "Γ ▶ₛ x" (at level 40).
 Reserved Notation "Γ +▶ₛ Δ" (at level 40).
 
 Section with_param.
@@ -48,6 +49,8 @@ Section with_param.
     - intros ????? H; exact (r_cat_disj _ _ H).
   Qed.
 
+  Definition s_prf {Γ : ctxS} {x} (i : Γ.(sub_elt) ∋ x) : P x := Γ.(sub_prf) x i .
+
   Definition s_elt_upg {Γ : ctxS} {x} (i : Γ.(sub_elt) ∋ x) : sigS P :=
     {| sub_prf := Γ.(sub_prf) x i |}.
 
@@ -60,3 +63,22 @@ End with_param.
 
 #[global] Notation "∅ₛ" := (nilS) : ctx_scope.
 #[global] Notation "Γ +▶ₛ Δ" := (catS Γ Δ) : ctx_scope.
+
+From OGS.Ctx Require Import Ctx Covering.
+Section with_param.
+  Context {T} {P : T -> SProp}.
+
+  Program Definition conS (Γ : ctxS T (ctx T) P) (x : sigS P) : ctxS T (ctx T) P :=
+    {| sub_elt := Γ.(sub_elt) ▶ₓ x.(sub_elt) |}.
+  Next Obligation.
+    intros ? i; cbn in i.
+    remember (Γ.(sub_elt) ▶ₓ x.(sub_elt)) as c; apply noConfusion_inv in Heqc.
+    destruct i.
+    - pose proof (H := f_equal (pr2 (B := fun _ => _)) Heqc); cbn in H.
+      rewrite H; now apply x.(sub_prf).
+    - pose proof (H := f_equal (pr1 (B := fun _ => _)) Heqc); cbn in H.
+      rewrite H in i; now apply Γ.(sub_prf).
+  Qed.
+End with_param.
+
+#[global] Notation "Γ ▶ₛ x" := (conS Γ x) : ctx_scope.
