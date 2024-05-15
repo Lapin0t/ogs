@@ -28,14 +28,14 @@ of the language:
 #[global] Notation obs_struct T C := (Oper T C).
 #[global] Notation dom := o_dom.
 Definition pointed_obs `{CC : context T C} (O : Oper T C) : Fam₀ T C
-  := c_var ∥ ⦉O⦊.
+  := c_var ∥ₛ ⦉O⦊.
 #[global] Notation "O ∙" := (pointed_obs O).
 #[global] Notation m_var o := (o.(cut_l)).
 #[global] Notation m_obs o := (o.(cut_r)).
 #[global] Notation m_dom o := (o_dom o.(cut_r)).
 
 Definition nf `{CC : context T C} (O : obs_struct T C) (X : Fam₁ T C) : Fam₀ T C
-  := c_var ∥ (O # X).
+  := c_var ∥ₛ (O # X).
 
 Definition nf_to_obs `{CC : context T C} {O} {X : Fam₁ T C} : forall Γ, nf O X Γ -> O∙ Γ
   := f_cut_map f_id₁ forget_args.

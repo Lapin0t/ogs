@@ -30,6 +30,7 @@ position in the context: rather than a loose index, [var x Γ] is a proof of mem
 Inductive var {X} (x : X) : ctx X -> Type :=
 | top {Γ} : var x (Γ ▶ₓ x)
 | pop {Γ y} : var x Γ -> var x (Γ ▶ₓ y).
+Definition cvar {X} Γ x := @var X x Γ.
 (*|
 .. coq:: none
 |*)
@@ -54,7 +55,7 @@ Equations c_map {X Y} : (X -> Y) -> ctx X -> ctx Y :=
 Implementation of the abstract context interface.
 |*)
 #[global] Instance free_context {X} : context X (ctx X) :=
-  {| c_emp := cnil ; c_cat := ccat ; c_var Γ x := var x Γ |}.
+  {| c_emp := cnil ; c_cat := ccat ; c_var := cvar |}.
 (*|
 Basic theory.
 |*)
@@ -91,11 +92,47 @@ Definition r_pop {X} {Γ : ctx X} {x} : Γ ⊆ (Γ ▶ₓ x) :=
   fun _ i => pop i.
 #[global] Arguments r_pop _ _ _ _/.
 
-Equations r_shift1 {X} {Γ Δ : ctx X} {a} (f : Γ ⊆ Δ) : (Γ ▶ₓ a) ⊆ (Δ ▶ₓ a) :=
-  r_shift1 f _ top     := top ;
-  r_shift1 f _ (pop i) := pop (f _ i) .
-
 Equations a_append {X} {Γ Δ : ctx X} {F : Fam₁ X (ctx X)} {a}
   : Γ =[F]> Δ -> F Δ a -> (Γ ▶ₓ a) =[F]> Δ :=
   a_append s z _ top     := z ;
   a_append s z _ (pop i) := s _ i .
+#[global] Notation "[ u ,ₓ x ]" := (a_append u x) (at level 9) : asgn_scope.
+
+#[global] Instance a_append_eq {X Γ Δ F a}
+  : Proper (asgn_eq _ _ ==> eq ==> asgn_eq _ _) (@a_append X Γ Δ F a).
+Proof.
+  intros ?? Hu ?? Hx ? i.
+  dependent elimination i; cbn.
+  - exact Hx.
+  - now apply Hu.
+Qed.
+
+Definition r_shift1 {X} {Γ Δ : ctx X} {a} (f : Γ ⊆ Δ)
+  : (Γ ▶ₓ a) ⊆ (Δ ▶ₓ a)
+  := [ f ᵣ⊛ r_pop ,ₓ top ].
+
+Definition r_shift2 {X} {Γ Δ : ctx X} {a b} (f : Γ ⊆ Δ)
+  : (Γ ▶ₓ a ▶ₓ b) ⊆ (Δ ▶ₓ a ▶ₓ b)
+  := [ [ f ᵣ⊛ r_pop ᵣ⊛ r_pop ,ₓ pop top ] ,ₓ top ].
+
+Definition r_shift3 {X} {Γ Δ : ctx X} {a b c} (f : Γ ⊆ Δ)
+  : (Γ ▶ₓ a ▶ₓ b ▶ₓ c) ⊆ (Δ ▶ₓ a ▶ₓ b ▶ₓ c)
+  := [ [ [ f ᵣ⊛ r_pop ᵣ⊛ r_pop ᵣ⊛ r_pop ,ₓ pop (pop top) ] ,ₓ pop top ] ,ₓ top ].
+
+#[global] Instance r_shift1_eq {X Γ Δ a}
+  : Proper (asgn_eq _ _ ==> asgn_eq _ _) (@r_shift1 X Γ Δ a).
+Proof.
+  intros ?? Hu; unfold r_shift1; now rewrite Hu.
+Qed.
+
+#[global] Instance r_shift2_eq {X Γ Δ a b}
+  : Proper (asgn_eq _ _ ==> asgn_eq _ _) (@r_shift2 X Γ Δ a b).
+Proof.
+  intros ?? Hu; unfold r_shift2; now rewrite Hu.
+Qed.
+
+#[global] Instance r_shift3_eq {X Γ Δ a b c}
+  : Proper (asgn_eq _ _ ==> asgn_eq _ _) (@r_shift3 X Γ Δ a b c).
+Proof.
+  intros ?? Hu; unfold r_shift3; now rewrite Hu.
+Qed.

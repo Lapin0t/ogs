@@ -8,20 +8,20 @@ Reserved Notation "F ⇒₂ G" (at level 30).
 Reserved Notation "u ⦿₀ v" (at level 40).
 Reserved Notation "u ⦿₁ v" (at level 40).
 Reserved Notation "u ⦿₂ v" (at level 40).
-Reserved Notation "F ∥ G" (at level 40).
+Reserved Notation "F ∥ₛ G" (at level 40).
 Reserved Notation "u ⋅ v" (at level 50).
 Reserved Notation "⦉ S ⦊" .
 
-Definition Fam₀ T C {CC : context T C} := C -> Type .
-Definition Fam₁ T C {CC : context T C} := C -> T -> Type .
-Definition Fam₂ T C {CC : context T C} := C -> T -> T -> Type .
-Record Oper T C {CC : context T C} := {
+Definition Fam₀ (T C : Type) := C -> Type .
+Definition Fam₁ (T C : Type) := C -> T -> Type .
+Definition Fam₂ (T C : Type) := C -> T -> T -> Type .
+Record Oper T C := {
   o_op : T -> Type ;
   o_dom : forall x, o_op x -> C ;
 }.
 
-#[global] Arguments o_op {_ _ _}.
-#[global] Arguments o_dom {_ _ _} [_ _].
+#[global] Arguments o_op {_ _}.
+#[global] Arguments o_dom {_ _} [_ _].
 #[global] Coercion o_op : Oper >-> Funclass.
 
 Section with_param.
@@ -74,7 +74,7 @@ End with_param.
 #[global] Notation "u ⦿₁ v" := (f_comp₁ u v).
 #[global] Notation "u ⦿₂ v" := (f_comp₂ u v).
 
-#[global] Notation "F ∥ G" := (f_cut F G).
+#[global] Notation "F ∥ₛ G" := (f_cut F G).
 #[global] Notation "u ⋅ v" := (Cut u v).
 
 #[global] Notation "⦉ S ⦊" := (bare_op S) .
