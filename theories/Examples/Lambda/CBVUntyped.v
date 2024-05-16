@@ -7,10 +7,10 @@ the comments on this one will be quite more terse and focus on the differences.
 
 .. coq:: none
 |*)
-From OGS Require Import Prelude .
-From OGS.Utils Require Import Psh Rel Ctx .
-From OGS.ITree Require Import ITree Delay .
-Declare Scope ty_scope .
+From OGS Require Import Prelude.
+From OGS.Utils Require Import Psh Rel.
+From OGS.Ctx Require Import All Ctx Covering.
+From OGS.ITree Require Import ITree Delay.
 From OGS.OGS Require Import Soundness.
 Set Warnings "-notation-overridden".
 Set Warnings "-parsing".
@@ -34,6 +34,7 @@ Variant ty : Type :=
 Notation "⊕" := (Tpro) (at level 20) : ty_scope .
 Notation "⊖" := (Tkon) (at level 20) : ty_scope .
 
+Declare Scope ty_scope .
 Derive NoConfusion for ty .
 Bind Scope ty_scope with ty .
 Open Scope ty_scope .
@@ -49,12 +50,12 @@ Inductive term (Γ : t_ctx) : Type :=
 | App : term Γ -> term Γ -> term Γ
 with val (Γ : t_ctx) : Type :=
 | Var : Γ ∋ ⊕ -> val Γ
-| Lam : term (Γ ▶ ⊕) -> val Γ
+| Lam : term (Γ ▶ₓ ⊕) -> val Γ
 .
-Arguments Val {Γ} v .
-Arguments App {Γ} t1 t2 .
-Arguments Var {Γ} i .
-Arguments Lam {Γ} t .
+Arguments Val {Γ} & v .
+Arguments App {Γ} & t1 t2 .
+Arguments Var {Γ} & i .
+Arguments Lam {Γ} & t .
 
 Inductive ev_ctx (Γ : t_ctx) : Type :=
 | K0 : Γ ∋ ⊖ -> ev_ctx Γ
@@ -89,7 +90,7 @@ Equations t_rename {Γ Δ} : Γ ⊆ Δ -> term Γ -> term Δ :=
   t_rename f (App t1 t2) := App (t_rename f t1) (t_rename f t2) ;
 with v_rename {Γ Δ} : Γ ⊆ Δ -> val Γ -> val Δ :=
   v_rename f (Var i) := Var (f _ i) ;
-  v_rename f (Lam t) := Lam (t_rename (r_shift f) t) .
+  v_rename f (Lam t) := Lam (t_rename (r_shift1 f) t) .
 
 Equations e_rename {Γ Δ} : Γ ⊆ Δ -> ev_ctx Γ -> ev_ctx Δ :=
   e_rename f (K0 i)   := K0 (f _ i) ;
@@ -105,24 +106,66 @@ Equations m_rename {Γ Δ} : Γ ⊆ Δ -> val_m Γ ⇒ᵢ val_m Δ :=
 (*|
 Renaming an assigment on the left.
 |*)
-Definition a_ren {Γ1 Γ2 Γ3} : Γ2 ⊆ Γ3 -> Γ1 =[val_m]> Γ2 -> Γ1 =[val_m]> Γ3 :=
-  fun f g _ i => m_rename f _ (g _ i) .
+Definition a_ren {Γ1 Γ2 Γ3} : Γ1 =[val_m]> Γ2 -> Γ2 ⊆ Γ3 -> Γ1 =[val_m]> Γ3 :=
+  fun f g _ i => m_rename g _ (f _ i) .
 (*|
 The following bunch of notations will help us to keep the code readable:
 |*)
-Notation "f ᵣ⊛ₜ t" := (t_rename f t).
-Notation "f ᵣ⊛ᵥ v" := (v_rename f v).
-Notation "f ᵣ⊛ₑ π" := (e_rename f π) (at level 30, right associativity).
-Notation "f ᵣ⊛ₘ v" := (m_rename f _ v) (at level 30, right associativity).
-Notation "f ᵣ⊛ₛ s" := (s_rename f s) (at level 30, right associativity).
-Notation "f ᵣ⊛ g" := (a_ren f g).
+Notation "t ₜ⊛ᵣ r" := (t_rename r%asgn t) (at level 14).
+Notation "v ᵥ⊛ᵣ r" := (v_rename r%asgn v) (at level 14).
+Notation "π ₑ⊛ᵣ r" := (e_rename r%asgn π) (at level 14).
+Notation "v ₘ⊛ᵣ r" := (m_rename r%asgn v) (at level 14).
+Notation "s ₛ⊛ᵣ r" := (s_rename r%asgn s) (at level 14).
+Notation "a ⊛ᵣ r" := (a_ren r%asgn a) (at level 14) : asgn_scope.
 (*|
 The weakenings we will need for substitution..
 |*)
-Definition t_shift {Γ a} := @t_rename Γ (Γ ▶ a) r_pop.
-Definition m_shift {Γ a} := @m_rename Γ (Γ ▶ a) r_pop.
-Definition a_shift {Γ Δ a} (f : Γ =[val_m]> Δ) :=
-  s_map m_shift f ▶ₐ a_id a top .
+Definition t_shift1 {Γ a} := @t_rename Γ (Γ ▶ₓ a) r_pop.
+Definition m_shift1 {Γ a} := @m_rename Γ (Γ ▶ₓ a) r_pop.
+Definition a_shift1 {Γ Δ a} (f : Γ =[val_m]> Δ) :=
+  [ a_map f m_shift1 ,ₓ a_id a top ]%asgn .
+
+(*|
+Example terms.
+|*)
+Equations n_ctx : nat -> t_ctx :=
+  n_ctx O     := ∅ ;
+  n_ctx (S n) := n_ctx n ▶ₓ ⊕ .
+
+Notation var' n := (n_ctx n ∋ ⊕).
+Notation term' n := (term (n_ctx n)).
+
+Equations v_emb (n : nat) : var' (S n) :=
+  v_emb O     := top ;
+  v_emb (S n) := pop (v_emb n) .
+
+Equations v_lift {n} : var' n -> var' (S n) :=
+  @v_lift (S _) top     := top ;
+  @v_lift (S _) (pop i) := pop (v_lift i) .
+
+Equations mk_var (m : nat) : forall n, var' (m + S n) :=
+  mk_var O     := v_emb ;
+  mk_var (S m) := v_lift ∘ mk_var m .
+
+Definition mk_lam {m : nat} (f : (forall n, term' (m + S n)) -> term' (S m)) : term' m
+  := Val (Lam (f (Val ∘ Var ∘ mk_var m))).
+Arguments mk_lam {_} & _ .
+
+Declare Custom Entry lambda.
+Notation "✨ e ✨" := (e : term' 0) (e custom lambda at level 2).
+Notation "x" := (x _) (in custom lambda at level 0, x ident).
+Notation "( x )" := x (in custom lambda at level 0, x at level 2).
+Notation "x y" := (App x y)
+  (in custom lambda at level 1, left associativity).
+Notation "'λ' x .. y ⇒ U" :=
+  (mk_lam (fun x => .. (mk_lam (fun y => U)) ..))
+  (in custom lambda at level 1, x binder, y binder, U at level 2).
+
+Definition Delta := ✨ (λ x ⇒ x x) ✨ .
+Definition Omega := ✨ (λ x ⇒ x x) (λ x ⇒ x x) ✨ .
+Definition Upsilon := ✨ λ f ⇒ (λ x ⇒ f (x x)) (λ x ⇒ f (x x)) ✨.
+Definition Theta := ✨ (λ x f ⇒ f (x x f)) (λ x f ⇒ f (x x f)) ✨.
+
 (*|
 Substitutions
 ^^^^^^^^^^^^^
@@ -132,38 +175,36 @@ Equations t_subst {Γ Δ} : Γ =[val_m]> Δ -> term Γ -> term Δ :=
   t_subst f (App t1 t2) := App (t_subst f t1) (t_subst f t2) ;
 with v_subst {Γ Δ} : Γ =[val_m]> Δ -> val Γ -> val Δ :=
   v_subst f (Var i) := f _ i ;
-  v_subst f (Lam t) := Lam (t_subst (a_shift f) t) .
+  v_subst f (Lam t) := Lam (t_subst (a_shift1 f) t) .
 
 Equations e_subst {Γ Δ} : Γ =[val_m]> Δ -> ev_ctx Γ -> ev_ctx Δ :=
   e_subst f (K0 i)   := f _ i ;
   e_subst f (K1 t π) := K1 (t_subst f t) (e_subst f π) ;
   e_subst f (K2 v π) := K2 (v_subst f v) (e_subst f π) .
 
-Equations s_subst {Γ Δ} : Γ =[val_m]> Δ -> state Γ -> state Δ :=
-  s_subst f (Cut t π) := Cut (t_subst f t) (e_subst f π).
+Notation "t `ₜ⊛ a" := (t_subst a%asgn t) (at level 30).
+Notation "v `ᵥ⊛ a" := (v_subst a%asgn v) (at level 30).
+Notation "π `ₑ⊛ a" := (e_subst a%asgn π) (at level 30).
 
-Equations m_subst {Γ Δ} : Γ =[val_m]> Δ -> val_m Γ ⇒ᵢ val_m Δ :=
-  m_subst f (⊕) v := v_subst f v ;
-  m_subst f (⊖) π := e_subst f π .
+Equations m_subst : val_m ⇒₁ ⟦ val_m , val_m ⟧₁ :=
+  m_subst _ (⊕) v _ f := v `ᵥ⊛ f ;
+  m_subst _ (⊖) π _ f := π `ₑ⊛ f .
+
+Definition s_subst : state ⇒₀ ⟦ val_m , state ⟧₀ :=
+  fun _ '(Cut t π) _ f => Cut (t `ₜ⊛ f) (π `ₑ⊛ f) .
+
 (*|
-Like renaming, substitution is recast as composition of assigments.
+We can now instanciate the substitution monoid and module structures.
 |*)
-Definition a_comp {Γ1 Γ2 Γ3} (f : Γ2 =[val_m]> Γ3) (g : Γ1 =[val_m]> Γ2)
-  : Γ1 =[val_m]> Γ3 := s_map (m_subst f) g .
-(*|
-A couple more notations.
-|*)
-Notation "f ⊛ₜ t" := (t_subst f t).
-Notation "f ⊛ᵥ v" := (v_subst f v).
-Notation "f ⊛ₑ π" := (e_subst f π) (at level 30, right associativity).
-Notation "f ⊛ₘ v" := (m_subst f _ v) (at level 30, right associativity).
-Notation "f ⊛ₛ s" := (s_subst f s) (at level 30, right associativity).
-Notation "f ⊛ g" := (a_comp f g).
+#[global] Instance val_m_monoid : subst_monoid val_m :=
+  {| v_var := @a_id ; v_sub := m_subst |} .
+#[global] Instance state_module : subst_module val_m state :=
+  {| c_sub := s_subst |} .
 (*|
 Single-variable substitution.
 |*)
-Definition assign1 {Γ a} v : (Γ ▶ a) =[val_m]> Γ := a_id ▶ₐ v .
-Definition t_subst1 {Γ a} (t : term _) v := @assign1 Γ a v ⊛ₜ t.
+Definition assign1 {Γ a} v : (Γ ▶ₓ a) =[val_m]> Γ := a_id ▶ₐ v .
+Definition t_subst1 {Γ a} (t : term _) v := t `ₜ⊛ @assign1 Γ a v.
 Notation "t /[ v ]" := (t_subst1 t v) (at level 50, left associativity).
 (*|
 An Evaluator
@@ -186,8 +227,13 @@ Observation still behave as binders, returning bind a term (what we are returnin
 applying binds a term (the argument) and a continuation.
 |*)
 Equations obs_dom {a} : obs a -> t_ctx :=
-  obs_dom (@ORet) := ∅ ▶ ⊕ ;
-  obs_dom (@OApp) := ∅ ▶ ⊕ ▶ ⊖ .
+  obs_dom (@ORet) := ∅ ▶ₓ ⊕ ;
+  obs_dom (@OApp) := ∅ ▶ₓ ⊕ ▶ₓ ⊖ .
+
+Definition obs_op : Oper ty t_ctx :=
+  {| o_op := obs ; o_dom := @obs_dom |} .
+Notation ORet' := (ORet : o_op obs_op _).
+Notation OApp' := (OApp : o_op obs_op _).
 (*|
 We now define applying an observation with arguments to a value.
 |*)
@@ -201,7 +247,7 @@ Normal forms
 Normal forms take the exact same form as for ULC: a head variable and an observation on it,
 with arguments.
 |*)
-Definition nf  (Γ : t_ctx) : Type := { a : ty & (Γ ∋ a) × { o : obs a & obs_dom o =[val_m]> Γ } } .
+Definition nf := c_var ∥ₛ (obs_op # val_m).
 (*|
 The CBV Machine
 ^^^^^^^^^^^^^^^
@@ -223,9 +269,9 @@ forms.
 |*)
 Equations eval_step {Γ : t_ctx} : state Γ -> (state Γ + nf Γ) :=
   eval_step (Cut (App t1 t2)   (π))      := inl (Cut t2 (K1 t1 π)) ;
-  eval_step (Cut (Val v)       (K0 i))   := inr (_ ,' (i, (ORet ,' (∅ₐ ▶ₐ v)))) ;
+  eval_step (Cut (Val v)       (K0 i))   := inr (i ⋅ ORet' ⦇ ! ▶ₐ v ⦈) ;
   eval_step (Cut (Val v)       (K1 t π)) := inl (Cut t (K2 v π)) ;
-  eval_step (Cut (Val (Var i)) (K2 v π)) := inr (_,' (i, (OApp ,' (∅ₐ ▶ₐ v ▶ₐ π)))) ;
+  eval_step (Cut (Val (Var i)) (K2 v π)) := inr (i ⋅ OApp' ⦇ ! ▶ₐ v ▶ₐ π ⦈) ;
   eval_step (Cut (Val (Lam t)) (K2 v π)) := inl (Cut (t /[ v ]) π) .
 
 Definition ulc_eval {Γ : t_ctx} : state Γ -> delay (nf Γ)
