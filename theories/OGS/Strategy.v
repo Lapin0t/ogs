@@ -200,9 +200,9 @@ Notions of equivalence.
   Lemma unfold_mstrat {Δ a} (x : m_strat_act Δ a) :
     m_strat a x
     ≊ subst_delay
-         (fun r => match r with
-          | inl m        => Ret' m
-          | inr (x ,' p) => Vis' x (fun r : ogs_e.(e_rsp) _ => m_strat _ (m_strat_resp p r))
+         (fun r => go match r with
+          | inl m        => RetF m
+          | inr (x ,' p) => VisF x (fun r : ogs_e.(e_rsp) _ => m_strat _ (m_strat_resp p r))
           end)
          (m_strat_play x).
   Proof.
