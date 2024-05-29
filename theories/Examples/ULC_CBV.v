@@ -14,7 +14,6 @@ From OGS.ITree Require Import ITree Delay.
 From OGS.OGS Require Import Soundness.
 Set Warnings "-notation-overridden".
 Set Warnings "-parsing".
-
 (*|
 Syntax
 ------
@@ -33,14 +32,15 @@ Variant ty : Type :=
 | Left : ty
 | Right : ty
 .
-Notation "⊕" := (Left) (at level 20) : ty_scope .
-Notation "⊖" := (Right) (at level 20) : ty_scope .
 (*| .. coq:: none |*)
 Declare Scope ty_scope .
 Derive NoConfusion for ty .
 Bind Scope ty_scope with ty .
 Open Scope ty_scope .
 (*||*)
+Notation "⊕" := (Left) (at level 20) : ty_scope .
+Notation "⊖" := (Right) (at level 20) : ty_scope .
+
 Definition t_ctx : Type := Ctx.ctx ty .
 Bind Scope ctx_scope with t_ctx .
 (*|

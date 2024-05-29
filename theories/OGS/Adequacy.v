@@ -32,18 +32,6 @@ appropriate axiomatization.
   Context {obs : obs_struct T C} {M : machine val conf obs} {ML : machine_laws val conf obs}.
   Context {VV : var_assumptions val}.
 
-  (*
-(*|
-Evaluate a configuration inside an environment (assignment), returning only the message part (the "positive" or "static" part).
-|*)
-  Definition eval_in_env {Γ Δ} (e : Γ =[val]> Δ) (c : conf Γ) : delay (obs∙ Δ) :=
-    evalₒ (c ₜ⊛ t) .
-
-  #[global] Instance eval_in_env_proper {Γ Δ} : Proper (ass_eq Γ Δ ==> eq ==> eq) (@eval_in_env Γ Δ).
-    intros ? ? H1 ? ? H2; unfold eval_in_env; now rewrite H1, H2.
-  Qed.
-*)
-
   Definition reduce {Δ} (x : reduce_t Δ)
     : delay (obs∙ Δ)
     := evalₒ (x.(red_act).(ms_conf)
@@ -51,10 +39,6 @@ Evaluate a configuration inside an environment (assignment), returning only the 
 
   Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => obs∙ Δ) i
     := fun 'T1_0 => reduce .
-
-  Check (it_eq_t_trans).
-
-  (*Tactic Notation "mytransitivity" := first [eapply @transitivity; [eapply it_eq_t_trans; fail | |] | etransitivity].*)
 
 (*|
 Equipped with eventually guarded equations, we are ready to prove the adequacy

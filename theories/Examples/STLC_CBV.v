@@ -855,7 +855,7 @@ of assigments, for which we now provide the proof of the laws.
 Configurations are instanciated with our states, and what we have proved
 earlier amounts to showing they are a right-module on values.
 |*)
-# [global] Instance stlc_conf_laws : subst_module_laws val_m state :=
+#[global] Instance stlc_conf_laws : subst_module_laws val_m state :=
   {| c_sub_proper := @s_sub_eq ;
      c_var_sub := @s_sub_id_l ;
      c_sub_sub := @s_sub_sub |} .
