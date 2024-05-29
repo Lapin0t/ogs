@@ -835,47 +835,30 @@ The Actual Instance
 
 Having proved all the basic syntactic properties of STLC, we are now ready to
 instanciate our framework!
-|*)
 
-(*|
 As we only have negative types, we instanciate the interaction specification
 with types and observations. Beware that in more involved cases, the notion of
-"types" we give to the interaction specification does not coincide with the
-"language types": you should only give the "non-shareable types".
-|*)
-(*#[global] Instance stlc_typ  : baseT := {| typ := ty |}.
-#[global] Instance stlc_val  : baseV := {| Subst.val := val_m |}.
-#[global] Instance stlc_conf : baseC := {| Subst.conf := state |}.
+"types" we give to the OGS construction does not coincide with the
+"language types": you should only give the negative types, or more intuitively,
+"non-shareable" types.
 
-#[global] Instance stlc_spec : observation_structure :=
-  {| Obs.obs := obs ;
-     dom := @obs_dom |} .
-
-(*|
 As hinted at the beginning, we instanciate the abstract value notion with our
 "machine values". They form a suitable monoid, which means we get a category
-of assigments.
+of assigments, for which we now provide the proof of the laws.
 |*)
-#[global] Instance stlc_val_mon : subst_monoid _ :=
-  {| v_var := @a_id ;
-     v_sub := @m_subst |} .
-*)
-
 #[global] Instance stlc_val_laws : subst_monoid_laws val_m :=
   {| v_sub_proper := @m_sub_eq ;
      v_sub_var := @m_sub_id_r ;
      v_var_sub := @m_sub_id_l ;
      Subst.v_sub_sub := @m_sub_sub |} .
-
 (*|
 Configurations are instanciated with our states, and what we have proved
 earlier amounts to showing they are a right-module on values.
 |*)
-#[global] Instance stlc_conf_laws : subst_module_laws val_m state :=
+# [global] Instance stlc_conf_laws : subst_module_laws val_m state :=
   {| c_sub_proper := @s_sub_eq ;
      c_var_sub := @s_sub_id_l ;
      c_sub_sub := @s_sub_sub |} .
-
 (*|
 In our generic theorem, there is a finicky lemma that is the counter-part to
 the exclusion of any "infinite chit-chat" that one finds in other accounts of
@@ -892,7 +875,6 @@ distinguish conveniently between values which are variables and others.
     all: apply No; intro H; dependent destruction H.
   - intros ?? [] v r H; induction v; dependent destruction H; exact (Vvar _).
 Qed.
-
 (*|
 We now instanciate the machine with `stlc_eval` as the active step ("compute
 the next observable action") and `obs_app` as the passive step ("resume from
@@ -907,8 +889,7 @@ technical lemma for the chit-chat problem are again coherence conditions
 between `eval` and `app` and the monoidal structure of values and
 configurations.
 
-As some proofs will concern the evaluator we pull in some tooling for
-coinductive reasoning on the delay monad.
+.. coq:: none
 |*)
 From Coinduction Require Import coinduction lattice rel tactics.
 From OGS.ITree Require Import Eq.
@@ -917,7 +898,7 @@ Ltac refold_eval :=
   change (Structure.iter _ _ ?a) with (stlc_eval a);
   change (Structure.subst (fun pat : T1 => let 'T1_0 := pat in ?f) T1_0 ?u)
     with (bind_delay' u f).
-
+(*||*)
 #[global] Instance stlc_machine_law : machine_laws val_m state obs_op.
   econstructor; cbn; intros.
 (*|
