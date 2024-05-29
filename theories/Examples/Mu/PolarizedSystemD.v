@@ -264,17 +264,21 @@ Definition a_shift2 {Γ Δ} [y z] (a : Γ =[val]> Δ) : (Γ ▶ₓ y ▶ₓ z) =
 (*|
 We also define two embeddings linking the various syntactical categories.
 |*)
-Equations v_of_w {Γ} : whn Γ ⇒ᵢ val Γ :=
-  v_of_w (@LTy pos _) v := v ;
-  v_of_w (@RTy pos _) u := Whn u ;
-  v_of_w (@LTy neg _) u := Whn u ;
-  v_of_w (@RTy neg _) k := k .
+Equations v_of_w Γ A : whn Γ A -> val Γ A :=
+  v_of_w _ (@LTy pos _) v := v ;
+  v_of_w _ (@RTy pos _) u := Whn u ;
+  v_of_w _ (@LTy neg _) u := Whn u ;
+  v_of_w _ (@RTy neg _) k := k .
+Arguments v_of_w {Γ A} v.
+#[global] Coercion v_of_w : whn >-> val.
 
-Equations t_of_v {Γ} : val Γ ⇒ᵢ term Γ :=
-  t_of_v (@LTy pos _) v := Whn v ;
-  t_of_v (@RTy pos _) u := u ;
-  t_of_v (@LTy neg _) u := u ;
-  t_of_v (@RTy neg _) k := Whn k .
+Equations t_of_v Γ A : val Γ A -> term Γ A :=
+  t_of_v _ (@LTy pos _) v := Whn v ;
+  t_of_v _ (@RTy pos _) u := u ;
+  t_of_v _ (@LTy neg _) u := u ;
+  t_of_v _ (@RTy neg _) k := Whn k .
+Arguments t_of_v {Γ A} v.
+#[global] Coercion t_of_v : val >-> term.
 
 (*|
 Substitution
@@ -288,7 +292,7 @@ Equations t_subst : term ⇒₁ ⟦ val , term ⟧₁ :=
   t_subst _ _ (Mu c)    _ f := Mu (s_subst _ c _ (a_shift1 f)) ;
   t_subst _ _ (RecL t)  _ f := RecL (t_subst _ _ t _ (a_shift1 f)) ;
   t_subst _ _ (RecR t)  _ f := RecR (t_subst _ _ t _ (a_shift1 f)) ;
-  t_subst _ _ (Whn v)   _ f := t_of_v _ (w_subst _ _ v _ f) ;
+  t_subst _ _ (Whn v)   _ f := w_subst _ _ v _ f ;
 with w_subst : whn ⇒₁ ⟦ val , val ⟧₁ :=
   w_subst _  _ (Var i)      _ f := f _ i ;
   w_subst _  _ (ZerL)       _ f := Whn ZerL ;
@@ -443,6 +447,7 @@ Equations w_of_p {a} (p : pat a) : whn (p_dom p) a :=
   w_of_p (PShiftN _)  := ShiftNL (Whn (Var top)) ;
   w_of_p (PNegP p)    := NegPR (w_of_p p) ;
   w_of_p (PNegN p)    := NegNL (w_of_p p) .
+#[global] Coercion w_of_p : pat >-> whn.
 (*|
 Now we explain how to split (some) weak head-normal forms into a pattern filled with
 values. I am sorry in advance for your CPU-cycles wasted to typechecking these quite
@@ -583,7 +588,7 @@ Definition eval {Γ : neg_ctx} : state Γ -> delay (nf Γ)
   := iter_delay (fun c => Ret' (eval_aux c)).
 
 Definition p_app {Γ A} (v : val Γ A) (m : pat A†) (e : p_dom m =[val]> Γ) : state Γ :=
-  Cut' (t_of_v _ v) (t_of_v _ (w_of_p m `ᵥ⊛ e)) .
+  Cut' v (m `ᵥ⊛ e) .
 (*|
 Metatheory
 ==========
@@ -994,7 +999,7 @@ Lemma a_comp_assoc {Γ1 Γ2 Γ3 Γ4} (u : Γ1 =[val]> Γ2) (v : Γ2 =[val]> Γ3)
 Qed.
 
 Definition t_sub_id_l_P Γ A (t : term Γ A) : Prop := t `ₜ⊛ var = t.
-Definition w_sub_id_l_P Γ A (v : whn Γ A) : Prop := v `ᵥ⊛ var = v_of_w _ v.
+Definition w_sub_id_l_P Γ A (v : whn Γ A) : Prop := v `ᵥ⊛ var = v.
 Definition s_sub_id_l_P Γ (s : state Γ) : Prop := s ₜ⊛ var = s.
 
 Lemma sub_id_l_prf : syn_ind_args t_sub_id_l_P w_sub_id_l_P s_sub_id_l_P.
@@ -1011,7 +1016,7 @@ Qed.
 Lemma t_sub_id_l {Γ} A (t : term Γ A) : t `ₜ⊛ var = t.
   now apply (term_ind_mut _ _ _ sub_id_l_prf).
 Qed.
-Lemma w_sub_id_l {Γ} A (v : whn Γ A) : v `ᵥ⊛ var = v_of_w _ v.
+Lemma w_sub_id_l {Γ} A (v : whn Γ A) : v `ᵥ⊛ var = v.
   now apply (whn_ind_mut _ _ _ sub_id_l_prf).
 Qed.
 Lemma s_sub_id_l {Γ} (s : state Γ) : s ₜ⊛ var = s.
@@ -1089,8 +1094,8 @@ Qed.
 
 Definition refold_id_aux_P (Γ : neg_ctx) p : pre_ty p -> Prop :=
   match p with
-  | pos => fun A => forall (v : whn Γ `+A), w_of_p (p_of_w_0p _ v) `ᵥ⊛ p_dom_of_w_0p _ v = v
-  | neg => fun A => forall (v : whn Γ `-A), w_of_p (p_of_w_0n _ v) `ᵥ⊛ p_dom_of_w_0n _ v = v
+  | pos => fun A => forall (v : whn Γ `+A), p_of_w_0p _ v `ᵥ⊛ p_dom_of_w_0p _ v = v
+  | neg => fun A => forall (v : whn Γ `-A), p_of_w_0n _ v `ᵥ⊛ p_dom_of_w_0n _ v = v
   end .
 
 Lemma refold_id_aux {Γ p} A : refold_id_aux_P Γ p A .
@@ -1120,12 +1125,12 @@ Lemma refold_id_aux {Γ p} A : refold_id_aux_P Γ p A .
 Qed.
 
 Lemma refold_id {Γ : neg_ctx} A (v : val Γ A)
-  : w_of_p (p_of_v A v) `ᵥ⊛ p_dom_of_v A v = v.
+  : p_of_v A v `ᵥ⊛ p_dom_of_v A v = v.
   destruct A as [ [] A | [] A ]; auto; exact (refold_id_aux A v).
 Qed.
 
 Equations p_of_w_eq_aux_p {Γ : neg_ctx} (A : pre_ty pos) (p : pat `+A) (e : p_dom p =[val]> Γ)
-          : p_of_w_0p A (w_of_p p `ᵥ⊛ e) = p
+          : p_of_w_0p A (p `ᵥ⊛ e) = p
           by struct p :=
   p_of_w_eq_aux_p (1)     (POne)       e := eq_refl ;
   p_of_w_eq_aux_p (A ⊗ B) (PTen p1 p2) e := f_equal2 PTen
@@ -1137,7 +1142,7 @@ Equations p_of_w_eq_aux_p {Γ : neg_ctx} (A : pre_ty pos) (p : pat `+A) (e : p_d
   p_of_w_eq_aux_p (⊖ A)   (PNegP p)    e := f_equal PNegP (p_of_w_eq_aux_n A p e) ;
 
 with p_of_w_eq_aux_n {Γ : neg_ctx} (A : pre_ty neg) (p : pat `-A) (e : p_dom p =[val]> Γ)
-         : p_of_w_0n A (w_of_p p `ᵥ⊛ e) = p
+         : p_of_w_0n A (p `ᵥ⊛ e) = p
          by struct p :=
   p_of_w_eq_aux_n (⊥)     (PBot)       e := eq_refl ;
   p_of_w_eq_aux_n (A ⅋ B) (PPar p1 p2) e := f_equal2 PPar
@@ -1151,9 +1156,9 @@ with p_of_w_eq_aux_n {Γ : neg_ctx} (A : pre_ty neg) (p : pat `-A) (e : p_dom p 
 Definition p_dom_of_w_eq_P (Γ : neg_ctx) p : pre_ty p -> Prop :=
   match p with
   | pos => fun A => forall (p : pat `+A) (e : p_dom p =[val]> Γ),
-      rew [fun p => p_dom p =[ val ]> Γ] p_of_w_eq_aux_p A p e in p_dom_of_w_0p A (w_of_p p `ᵥ⊛ e) ≡ₐ e
+      rew [fun p => p_dom p =[ val ]> Γ] p_of_w_eq_aux_p A p e in p_dom_of_w_0p A (p `ᵥ⊛ e) ≡ₐ e
   | neg => fun A => forall (p : pat `-A) (e : p_dom p =[val]> Γ),
-      rew [fun p => p_dom p =[ val ]> Γ] p_of_w_eq_aux_n A p e in p_dom_of_w_0n A (w_of_p p `ᵥ⊛ e) ≡ₐ e
+      rew [fun p => p_dom p =[ val ]> Γ] p_of_w_eq_aux_n A p e in p_dom_of_w_0n A (p `ᵥ⊛ e) ≡ₐ e
   end .
 
 Lemma p_dom_of_v_eq {Γ p} A : p_dom_of_w_eq_P Γ p A .
@@ -1236,8 +1241,8 @@ Definition dwn_kp {Γ} {A : pre_ty pos} : val Γ `-A -> term Γ `-A := fun v => 
 Definition dwn_vn {Γ} {A : pre_ty neg} : val Γ `+A -> term Γ `+A := fun v => v.
 Definition dwn_kn {Γ} {A : pre_ty neg} : val Γ `-A -> whn Γ `-A  := fun v => v.
 
-Lemma nf_eq_split_p {Γ : neg_ctx} {A : pre_ty pos} (i : Γ ∋ `-A) p γ
-  : nf_eq (i ⋅ v_split_p (dwn_vp (w_of_p p `ᵥ⊛ γ)))
+Lemma nf_eq_split_p {Γ : neg_ctx} {A : pre_ty pos} (i : Γ ∋ `-A) (p : pat `+A) γ
+  : nf_eq (i ⋅ v_split_p (dwn_vp (p `ᵥ⊛ γ)))
           (i ⋅ (p : o_op obs_op `-A) ⦇ γ ⦈).
   unfold v_split_p, dwn_vp; cbn.
   pose proof (p_dom_of_v_eq A p γ).
@@ -1246,8 +1251,8 @@ Lemma nf_eq_split_p {Γ : neg_ctx} {A : pre_ty pos} (i : Γ ∋ `-A) p γ
   remember a as a'; clear a Heqa'.
   revert a' H; rewrite H'; intros; now econstructor.
 Qed.
-Lemma nf_eq_split_n {Γ : neg_ctx} {A : pre_ty neg} (i : Γ ∋ `+A) p γ
-  : nf_eq (i ⋅ v_split_n (dwn_kn (w_of_p p `ᵥ⊛ γ)))
+Lemma nf_eq_split_n {Γ : neg_ctx} {A : pre_ty neg} (i : Γ ∋ `+A) (p : pat `-A) γ
+  : nf_eq (i ⋅ v_split_n (dwn_kn (p `ᵥ⊛ γ)))
           (i ⋅ (p : o_op obs_op `+A) ⦇ γ ⦈).
   unfold v_split_n, dwn_kn; cbn.
   pose proof (p_dom_of_v_eq A p γ).
@@ -1538,5 +1543,5 @@ Notation "x ≈⟦ciu Δ ⟧⁺≈ y" := (ciu_eq Δ x y) (at level 50).
 Theorem ciu_correct (Δ : neg_ctx) {Γ : neg_ctx} {A} (x y : term Γ `+A)
   : (name⁺ x) ≈⟦ogs Δ ⟧≈ (name⁺ y) -> x ≈⟦ciu Δ ⟧⁺≈ y.
   intros H σ k; rewrite 2 sub_csk.
-  now apply sysD_subst_correct.
+  now apply subst_correct.
 Qed.
