@@ -136,3 +136,30 @@ Qed.
 Proof.
   intros ?? Hu; unfold r_shift3; now rewrite Hu.
 Qed.
+
+Lemma r_shift1_id {X Γ a} : @r_shift1 X Γ Γ a r_id ≡ₐ r_id .
+  intros ? v; now repeat (dependent elimination v; auto).
+Qed.
+
+Lemma r_shift2_id {X Γ a b} : @r_shift2 X Γ Γ a b r_id ≡ₐ r_id .
+  intros ? v; now repeat (dependent elimination v; auto).
+Qed.
+
+Lemma r_shift3_id {X Γ a b c} : @r_shift3 X Γ Γ a b c r_id ≡ₐ r_id .
+  intros ? v; now repeat (dependent elimination v; auto).
+Qed.
+
+Lemma r_shift1_comp {X Γ1 Γ2 Γ3 a} (r1 : Γ1 ⊆ Γ2) (r2 : Γ2 ⊆ Γ3)
+      : @r_shift1 X Γ1 Γ3 a (r1 ᵣ⊛ r2) ≡ₐ r_shift1 r1 ᵣ⊛ r_shift1 r2 .
+  intros ? v; now repeat (dependent elimination v; auto).
+Qed.
+
+Lemma r_shift2_comp {X Γ1 Γ2 Γ3 a b} (r1 : Γ1 ⊆ Γ2) (r2 : Γ2 ⊆ Γ3)
+      : @r_shift2 X Γ1 Γ3 a b (r1 ᵣ⊛ r2) ≡ₐ r_shift2 r1 ᵣ⊛ r_shift2 r2 .
+  intros ? v; now repeat (dependent elimination v; auto).
+Qed.
+
+Lemma r_shift3_comp {X Γ1 Γ2 Γ3 a b c} (r1 : Γ1 ⊆ Γ2) (r2 : Γ2 ⊆ Γ3)
+      : @r_shift3 X Γ1 Γ3 a b c (r1 ᵣ⊛ r2) ≡ₐ r_shift3 r1 ᵣ⊛ r_shift3 r2 .
+  intros ? v; now repeat (dependent elimination v; auto).
+Qed.

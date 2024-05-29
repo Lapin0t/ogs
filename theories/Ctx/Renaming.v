@@ -84,7 +84,7 @@ Renaming assignments on the left by precomposition.
     := [ r1 ᵣ⊛ r_cat_l , r2 ᵣ⊛ r_cat_r ] .
   #[global] Arguments r_cat₂ _ _ _ _ _ _ _ _ /.
 
-  Definition r_shift {Γ Δ} R (r : Γ ⊆ Δ) : (Γ +▶ R) ⊆ (Δ +▶ R) := r_cat₂ r r_id . 
+  Definition r_shift {Γ Δ} R (r : Γ ⊆ Δ) : (Γ +▶ R) ⊆ (Δ +▶ R) := [ r ᵣ⊛ r_cat_l , r_cat_r ] .
   #[global] Arguments r_shift _ _ _ _ _ _ /.
 
   Lemma r_shift_id {Γ R} : r_shift R (@r_id Γ) ≡ₐ r_id .
