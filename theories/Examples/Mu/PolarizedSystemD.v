@@ -41,25 +41,25 @@ Syntax of types. We have a fully dual type system with:
 
 We opt for an explicit treatment of polarity, by indexing the family of types.
 |*)
-Inductive ty0 : pol -> Type :=
-| Zer : ty0 pos
-| Top : ty0 neg
-| One : ty0 pos
-| Bot : ty0 neg
-| Tens : ty0 pos -> ty0 pos -> ty0 pos
-| Par : ty0 neg -> ty0 neg -> ty0 neg
-| Or : ty0 pos -> ty0 pos -> ty0 pos
-| And : ty0 neg -> ty0 neg -> ty0 neg
-| ShiftP : ty0 neg -> ty0 pos
-| ShiftN : ty0 pos -> ty0 neg
-| NegP : ty0 neg -> ty0 pos
-| NegN : ty0 pos -> ty0 neg
+Inductive pre_ty : pol -> Type :=
+| Zer : pre_ty pos
+| Top : pre_ty neg
+| One : pre_ty pos
+| Bot : pre_ty neg
+| Tens : pre_ty pos -> pre_ty pos -> pre_ty pos
+| Par : pre_ty neg -> pre_ty neg -> pre_ty neg
+| Or : pre_ty pos -> pre_ty pos -> pre_ty pos
+| And : pre_ty neg -> pre_ty neg -> pre_ty neg
+| ShiftP : pre_ty neg -> pre_ty pos
+| ShiftN : pre_ty pos -> pre_ty neg
+| NegP : pre_ty neg -> pre_ty pos
+| NegN : pre_ty pos -> pre_ty neg
 .
 (*| .. coq:: none |*)
-Derive Signature NoConfusion NoConfusionHom for ty0.
+Derive Signature NoConfusion NoConfusionHom for pre_ty.
 Declare Scope ty_scope.
 Delimit Scope ty_scope with ty.
-Bind Scope ty_scope with ty0.
+Bind Scope ty_scope with pre_ty.
 (*||*)
 Notation "0" := (Zer) : ty_scope .
 Notation "1" := (One) : ty_scope .
@@ -81,16 +81,16 @@ not contain bare types but side-annotated types. A variable of type `A` will thu
 stored as `\`-A` in the context while a co-variable of type `A` will be stored as `\`-A`. 
 |*)
 Variant ty : Type :=
-| VTy {p} : ty0 p -> ty
-| KTy {p} : ty0 p -> ty
+| LTy {p} : pre_ty p -> ty
+| RTy {p} : pre_ty p -> ty
 .
 (*| .. coq:: none |*)
 Derive NoConfusion NoConfusionHom for ty.
 Bind Scope ty_scope with ty.
 Open Scope ty_scope.
 (*||*)
-Notation "'`+' t" := (VTy t) (at level 5) : ty_scope .
-Notation "'`-' t" := (KTy t) (at level 5) : ty_scope .
+Notation "'`+' t" := (LTy t) (at level 5) : ty_scope .
+Notation "'`-' t" := (RTy t) (at level 5) : ty_scope .
 
 Equations t_neg : ty -> ty :=
   t_neg `+a := `-a ;
@@ -119,8 +119,8 @@ disruption of the evaluation rules.
 |*)
 Inductive term : t_ctx -> ty -> Type :=
 | Mu {Γ A} : state (Γ ▶ₓ A†) -> term Γ A
-| RecL {Γ} {A : ty0 pos} : term (Γ ▶ₓ `-A) `-A -> term Γ `-A
-| RecR {Γ} {A : ty0 neg} : term (Γ ▶ₓ `+A) `+A -> term Γ `+A
+| RecL {Γ} {A : pre_ty pos} : term (Γ ▶ₓ `-A) `-A -> term Γ `-A
+| RecR {Γ} {A : pre_ty neg} : term (Γ ▶ₓ `+A) `+A -> term Γ `+A
 | Whn {Γ A} : whn Γ A -> term Γ A
 with whn : t_ctx -> ty -> Type :=
 | Var {Γ A} : Γ ∋ A -> whn Γ A
@@ -149,7 +149,7 @@ with whn : t_ctx -> ty -> Type :=
 | NegNR {Γ A} : state (Γ ▶ₓ `+A) -> whn Γ `+(¬ A)
 | NegNL {Γ A} : whn Γ `+A -> whn Γ `-(¬ A)
 with state : t_ctx -> Type :=
-| Cut {Γ} p {A : ty0 p} : term Γ `+A -> term Γ `-A -> state Γ
+| Cut {Γ} p {A : pre_ty p} : term Γ `+A -> term Γ `-A -> state Γ
 .
 
 Definition Cut' {Γ A} : term Γ A -> term Γ A† -> state Γ :=
@@ -161,7 +161,6 @@ Definition Cut' {Γ A} : term Γ A -> term Γ A† -> state Γ :=
 Derive Signature NoConfusion NoConfusionHom for term.
 Derive Signature NoConfusion NoConfusionHom for whn.
 Derive Signature NoConfusion NoConfusionHom for state.
-
 (*|
 Values are not exactly weak head-normal forms, but depend on the polarity of the type.
 As positive types have CBV evaluation, their values are weak head-normal forms, but their
@@ -170,19 +169,19 @@ Dually for negative types, values are delayed hence can be any term while co-val
 be weak head-normal form contexts.
 |*)
 Equations val : t_ctx -> ty -> Type :=
-  val Γ (@VTy pos A) := whn Γ `+A ;
-  val Γ (@KTy pos A) := term Γ `-A ;
-  val Γ (@VTy neg A) := term Γ `+A ;
-  val Γ (@KTy neg A) := whn Γ `-A .
+  val Γ (@LTy pos A) := whn Γ `+A ;
+  val Γ (@RTy pos A) := term Γ `-A ;
+  val Γ (@LTy neg A) := term Γ `+A ;
+  val Γ (@RTy neg A) := whn Γ `-A .
 Arguments val _ _ /.
 (*|
 We provide a 'smart-constructor' for variables, embedding variables in values.
 |*)
 Equations var : c_var ⇒₁ val :=
-  var _ (@VTy pos _) i := Var i ;
-  var _ (@KTy pos _) i := Whn (Var i) ;
-  var _ (@VTy neg _) i := Whn (Var i) ;
-  var _ (@KTy neg _) i := Var i .
+  var _ (@LTy pos _) i := Var i ;
+  var _ (@RTy pos _) i := Whn (Var i) ;
+  var _ (@LTy neg _) i := Whn (Var i) ;
+  var _ (@RTy neg _) i := Var i .
 #[global] Arguments var {Γ} [x] / i.
 (*|
 Renaming
@@ -231,10 +230,10 @@ with s_rename : state ⇒₀ ⟦ c_var , state ⟧₀ :=
 We extend it to values...
 |*)
 Equations v_rename : val ⇒₁ ⟦ c_var , val ⟧₁ :=
-  v_rename _ (@VTy pos a) := w_rename _ _ ;
-  v_rename _ (@KTy pos a) := t_rename _ _ ;
-  v_rename _ (@VTy neg a) := t_rename _ _ ;
-  v_rename _ (@KTy neg a) := w_rename _ _ .
+  v_rename _ (@LTy pos a) := w_rename _ _ ;
+  v_rename _ (@RTy pos a) := t_rename _ _ ;
+  v_rename _ (@LTy neg a) := t_rename _ _ ;
+  v_rename _ (@RTy neg a) := w_rename _ _ .
 (*|
 ... provide a couple infix notations...
 |*)
@@ -266,16 +265,16 @@ Definition a_shift2 {Γ Δ} [y z] (a : Γ =[val]> Δ) : (Γ ▶ₓ y ▶ₓ z) =
 We also define two embeddings linking the various syntactical categories.
 |*)
 Equations v_of_w {Γ} : whn Γ ⇒ᵢ val Γ :=
-  v_of_w (@VTy pos _) v := v ;
-  v_of_w (@KTy pos _) u := Whn u ;
-  v_of_w (@VTy neg _) u := Whn u ;
-  v_of_w (@KTy neg _) k := k .
+  v_of_w (@LTy pos _) v := v ;
+  v_of_w (@RTy pos _) u := Whn u ;
+  v_of_w (@LTy neg _) u := Whn u ;
+  v_of_w (@RTy neg _) k := k .
 
 Equations t_of_v {Γ} : val Γ ⇒ᵢ term Γ :=
-  t_of_v (@VTy pos _) v := Whn v ;
-  t_of_v (@KTy pos _) u := u ;
-  t_of_v (@VTy neg _) u := u ;
-  t_of_v (@KTy neg _) k := Whn k .
+  t_of_v (@LTy pos _) v := Whn v ;
+  t_of_v (@RTy pos _) u := u ;
+  t_of_v (@LTy neg _) u := u ;
+  t_of_v (@RTy neg _) k := Whn k .
 
 (*|
 Substitution
@@ -325,10 +324,10 @@ Notation "t `ₜ⊛ a" := (t_subst _ _ t _ a%asgn) (at level 30).
 Notation "w `ᵥ⊛ a" := (w_subst _ _ w _ a%asgn) (at level 30).
 
 Equations v_subst : val ⇒₁ ⟦ val , val ⟧₁ :=
-  v_subst _ (@VTy pos a) v _ f := v `ᵥ⊛ f ;
-  v_subst _ (@KTy pos a) t _ f := t `ₜ⊛ f ;
-  v_subst _ (@VTy neg a) t _ f := t `ₜ⊛ f ;
-  v_subst _ (@KTy neg a) k _ f := k `ᵥ⊛ f .
+  v_subst _ (@LTy pos a) v _ f := v `ᵥ⊛ f ;
+  v_subst _ (@RTy pos a) t _ f := t `ₜ⊛ f ;
+  v_subst _ (@LTy neg a) t _ f := t `ₜ⊛ f ;
+  v_subst _ (@RTy neg a) k _ f := k `ᵥ⊛ f .
 (*|
 With this in hand we can instanciate the relevant part of substitution monoid and module
 structures for values and states. This will provide us with the missing infix notations.
@@ -359,10 +358,10 @@ side-annotated types, mixing both type polarity and side annotation: a side-anno
 variable is positive iff it is a positive variable or a negative co-variable.
 |*)
 Equations is_neg : ty -> SProp :=
-  is_neg (@VTy pos a) := sEmpty ;
-  is_neg (@KTy pos a) := sUnit ;
-  is_neg (@VTy neg a) := sUnit ;
-  is_neg (@KTy neg a) := sEmpty .
+  is_neg (@LTy pos a) := sEmpty ;
+  is_neg (@RTy pos a) := sUnit ;
+  is_neg (@LTy neg a) := sUnit ;
+  is_neg (@RTy neg a) := sEmpty .
 (*|
 We define negative types as a subset of types, and negative contexts as a subset of
 contexts. Our generic infrastructure for contexts and variables really shines here as
@@ -383,8 +382,8 @@ Bind Scope ctx_scope with ctx.
 We can now define patterns...
 |*)
 Inductive pat : ty -> Type :=
-| PVarP (A : ty0 neg) : pat `+A
-| PVarN (A : ty0 pos) : pat `-A
+| PVarP (A : pre_ty neg) : pat `+A
+| PVarN (A : pre_ty pos) : pat `-A
 | POne : pat `+1
 | PBot : pat `-⊥
 | PTen {A B} : pat `+A -> pat `+B -> pat `+(A ⊗ B)
@@ -451,13 +450,13 @@ hard dependent pattern matchings. We start off by two helpers for refuting impos
 variables in negative context, which because of the use of `SProp` give trouble to
 `Equations` for deriving functional elimination principles if inlined.
 |*)
-Definition elim_var_p {Γ : neg_ctx} {A : ty0 pos} {X : Type} : Γ ∋ `+A -> X
+Definition elim_var_p {Γ : neg_ctx} {A : pre_ty pos} {X : Type} : Γ ∋ `+A -> X
   := fun i => match s_prf i with end .
 
-Definition elim_var_n {Γ : neg_ctx} {A : ty0 neg} {X : Type} : Γ ∋ `-A -> X
+Definition elim_var_n {Γ : neg_ctx} {A : pre_ty neg} {X : Type} : Γ ∋ `-A -> X
   := fun i => match s_prf i with end .
 
-Equations p_of_w_0p {Γ : neg_ctx} (A : ty0 pos) : whn Γ `+A -> pat `+A :=
+Equations p_of_w_0p {Γ : neg_ctx} (A : pre_ty pos) : whn Γ `+A -> pat `+A :=
   p_of_w_0p (0)     (Var i)      := elim_var_p i ;
   p_of_w_0p (1)     (Var i)      := elim_var_p i ;
   p_of_w_0p (A ⊗ B) (Var i)      := elim_var_p i ;
@@ -470,7 +469,7 @@ Equations p_of_w_0p {Γ : neg_ctx} (A : ty0 pos) : whn Γ `+A -> pat `+A :=
   p_of_w_0p (A ⊕ B) (OrR2 v)     := POr2 (p_of_w_0p B v) ;
   p_of_w_0p (↓ A)   (ShiftPR _)  := PShiftP A ;
   p_of_w_0p (⊖ A)   (NegPR k)    := PNegP (p_of_w_0n A k) ;
-with p_of_w_0n {Γ : neg_ctx} (A : ty0 neg) : whn Γ `-A -> pat `-A :=
+with p_of_w_0n {Γ : neg_ctx} (A : pre_ty neg) : whn Γ `-A -> pat `-A :=
   p_of_w_0n (⊤)     (Var i)      := elim_var_n i ;
   p_of_w_0n (⊥)     (Var i)      := elim_var_n i ;
   p_of_w_0n (A ⅋ B) (Var i)      := elim_var_n i ;
@@ -484,7 +483,7 @@ with p_of_w_0n {Γ : neg_ctx} (A : ty0 neg) : whn Γ `-A -> pat `-A :=
   p_of_w_0n (↑ A)   (ShiftNL _)  := PShiftN A ;
   p_of_w_0n (¬ A)   (NegNL v)    := PNegN (p_of_w_0p A v) .
 
-Equations p_dom_of_w_0p {Γ : neg_ctx} (A : ty0 pos) (v : whn Γ `+A)
+Equations p_dom_of_w_0p {Γ : neg_ctx} (A : pre_ty pos) (v : whn Γ `+A)
           : p_dom (p_of_w_0p A v) =[val]> Γ by struct A :=
   p_dom_of_w_0p (0)     (Var i)      := elim_var_p i ;
   p_dom_of_w_0p (1)     (Var i)      := elim_var_p i ;
@@ -498,7 +497,7 @@ Equations p_dom_of_w_0p {Γ : neg_ctx} (A : ty0 pos) (v : whn Γ `+A)
   p_dom_of_w_0p (A ⊕ B) (OrR2 v)     := p_dom_of_w_0p B v ;
   p_dom_of_w_0p (↓ A)   (ShiftPR x)  := a_append a_empty x ;
   p_dom_of_w_0p (⊖ A)   (NegPR k)    := p_dom_of_w_0n A k ;
-     with p_dom_of_w_0n {Γ : neg_ctx} (A : ty0 neg) (k : whn Γ `-A)
+     with p_dom_of_w_0n {Γ : neg_ctx} (A : pre_ty neg) (k : whn Γ `-A)
           : p_dom (p_of_w_0n A k) =[val]> Γ by struct A :=
   p_dom_of_w_0n (⊤)     (Var i)      := elim_var_n i ;
   p_dom_of_w_0n (⊥)     (Var i)      := elim_var_n i ;
@@ -517,16 +516,16 @@ We can now package up all these auxiliary functions into the following ones, abs
 polarity and side-annotation.
 |*)
 Equations p_of_v {Γ : neg_ctx} A : val Γ A -> pat A :=
-  p_of_v (@VTy pos A) v := p_of_w_0p A v ;
-  p_of_v (@KTy pos A) _ := PVarN A ;
-  p_of_v (@VTy neg A) _ := PVarP A ;
-  p_of_v (@KTy neg A) k := p_of_w_0n A k .
+  p_of_v (@LTy pos A) v := p_of_w_0p A v ;
+  p_of_v (@RTy pos A) _ := PVarN A ;
+  p_of_v (@LTy neg A) _ := PVarP A ;
+  p_of_v (@RTy neg A) k := p_of_w_0n A k .
 
 Equations p_dom_of_v {Γ : neg_ctx} A (v : val Γ A) : p_dom (p_of_v A v) =[val]> Γ :=
-  p_dom_of_v (@VTy pos A) v := p_dom_of_w_0p A v ;
-  p_dom_of_v (@KTy pos A) x := [ ! ,ₓ x ] ;
-  p_dom_of_v (@VTy neg A) x := [ ! ,ₓ x ] ;
-  p_dom_of_v (@KTy neg A) k := p_dom_of_w_0n A k .
+  p_dom_of_v (@LTy pos A) v := p_dom_of_w_0p A v ;
+  p_dom_of_v (@RTy pos A) x := [ ! ,ₓ x ] ;
+  p_dom_of_v (@LTy neg A) x := [ ! ,ₓ x ] ;
+  p_dom_of_v (@RTy neg A) k := p_dom_of_w_0n A k .
 
 Definition v_split_p {Γ : neg_ctx} {A} (v : whn Γ `+A) : (obs_op # val) Γ `-A
   := (p_of_w_0p A v : o_op obs_op `-A) ⦇ p_dom_of_w_0p A v ⦈.
@@ -590,7 +589,7 @@ Metatheory
 ==========
 
 Now comes a rather ugly part: the metatheory of our syntax. Comments will be rather more
-sparse. For a thorough explaination of its structure, see `Examples/Lambda/CBVTyped.v`.
+sparse. For a thorough explaination of its structure, see `Examples/Lambda/CBLTyped.v`.
 We will here be concerned with extensional equality preservation, identity and composition
 laws for renaming and substitution, and also refolding lemmas for splitting and embedding
 patterns. You are encouraged to just skip until line ~1300.
@@ -1088,7 +1087,7 @@ Qed.
   intros u1 u2 H; destruct A as [ [] | []]; cbn; now rewrite (w_sub_eq u1 u2 H).
 Qed.
 
-Definition refold_id_aux_P (Γ : neg_ctx) p : ty0 p -> Prop :=
+Definition refold_id_aux_P (Γ : neg_ctx) p : pre_ty p -> Prop :=
   match p with
   | pos => fun A => forall (v : whn Γ `+A), w_of_p (p_of_w_0p _ v) `ᵥ⊛ p_dom_of_w_0p _ v = v
   | neg => fun A => forall (v : whn Γ `-A), w_of_p (p_of_w_0n _ v) `ᵥ⊛ p_dom_of_w_0n _ v = v
@@ -1125,7 +1124,7 @@ Lemma refold_id {Γ : neg_ctx} A (v : val Γ A)
   destruct A as [ [] A | [] A ]; auto; exact (refold_id_aux A v).
 Qed.
 
-Equations p_of_w_eq_aux_p {Γ : neg_ctx} (A : ty0 pos) (p : pat `+A) (e : p_dom p =[val]> Γ)
+Equations p_of_w_eq_aux_p {Γ : neg_ctx} (A : pre_ty pos) (p : pat `+A) (e : p_dom p =[val]> Γ)
           : p_of_w_0p A (w_of_p p `ᵥ⊛ e) = p
           by struct p :=
   p_of_w_eq_aux_p (1)     (POne)       e := eq_refl ;
@@ -1137,7 +1136,7 @@ Equations p_of_w_eq_aux_p {Γ : neg_ctx} (A : ty0 pos) (p : pat `+A) (e : p_dom 
   p_of_w_eq_aux_p (↓ A)   (PShiftP _)  e := eq_refl ;
   p_of_w_eq_aux_p (⊖ A)   (PNegP p)    e := f_equal PNegP (p_of_w_eq_aux_n A p e) ;
 
-with p_of_w_eq_aux_n {Γ : neg_ctx} (A : ty0 neg) (p : pat `-A) (e : p_dom p =[val]> Γ)
+with p_of_w_eq_aux_n {Γ : neg_ctx} (A : pre_ty neg) (p : pat `-A) (e : p_dom p =[val]> Γ)
          : p_of_w_0n A (w_of_p p `ᵥ⊛ e) = p
          by struct p :=
   p_of_w_eq_aux_n (⊥)     (PBot)       e := eq_refl ;
@@ -1149,7 +1148,7 @@ with p_of_w_eq_aux_n {Γ : neg_ctx} (A : ty0 neg) (p : pat `-A) (e : p_dom p =[v
   p_of_w_eq_aux_n (↑ A)   (PShiftN _)  e := eq_refl ;
   p_of_w_eq_aux_n (¬ A)   (PNegN p)    e := f_equal PNegN (p_of_w_eq_aux_p A p e) .
 
-Definition p_dom_of_w_eq_P (Γ : neg_ctx) p : ty0 p -> Prop :=
+Definition p_dom_of_w_eq_P (Γ : neg_ctx) p : pre_ty p -> Prop :=
   match p with
   | pos => fun A => forall (p : pat `+A) (e : p_dom p =[val]> Γ),
       rew [fun p => p_dom p =[ val ]> Γ] p_of_w_eq_aux_p A p e in p_dom_of_w_0p A (w_of_p p `ᵥ⊛ e) ≡ₐ e
@@ -1228,16 +1227,16 @@ Lemma p_dom_of_v_eq {Γ p} A : p_dom_of_w_eq_P Γ p A .
 Qed.
 
 (* coq unification drives me crazy!! *)
-Definition upg_vp {Γ} {A : ty0 pos} : whn Γ `+A  -> val Γ `+A := fun v => v.
-Definition upg_kp {Γ} {A : ty0 pos} : term Γ `-A -> val Γ `-A := fun v => v.
-Definition upg_vn {Γ} {A : ty0 neg} : term Γ `+A -> val Γ `+A := fun v => v.
-Definition upg_kn {Γ} {A : ty0 neg} : whn Γ `-A  -> val Γ `-A := fun v => v.
-Definition dwn_vp {Γ} {A : ty0 pos} : val Γ `+A -> whn Γ `+A  := fun v => v.
-Definition dwn_kp {Γ} {A : ty0 pos} : val Γ `-A -> term Γ `-A := fun v => v.
-Definition dwn_vn {Γ} {A : ty0 neg} : val Γ `+A -> term Γ `+A := fun v => v.
-Definition dwn_kn {Γ} {A : ty0 neg} : val Γ `-A -> whn Γ `-A  := fun v => v.
+Definition upg_vp {Γ} {A : pre_ty pos} : whn Γ `+A  -> val Γ `+A := fun v => v.
+Definition upg_kp {Γ} {A : pre_ty pos} : term Γ `-A -> val Γ `-A := fun v => v.
+Definition upg_vn {Γ} {A : pre_ty neg} : term Γ `+A -> val Γ `+A := fun v => v.
+Definition upg_kn {Γ} {A : pre_ty neg} : whn Γ `-A  -> val Γ `-A := fun v => v.
+Definition dwn_vp {Γ} {A : pre_ty pos} : val Γ `+A -> whn Γ `+A  := fun v => v.
+Definition dwn_kp {Γ} {A : pre_ty pos} : val Γ `-A -> term Γ `-A := fun v => v.
+Definition dwn_vn {Γ} {A : pre_ty neg} : val Γ `+A -> term Γ `+A := fun v => v.
+Definition dwn_kn {Γ} {A : pre_ty neg} : val Γ `-A -> whn Γ `-A  := fun v => v.
 
-Lemma nf_eq_split_p {Γ : neg_ctx} {A : ty0 pos} (i : Γ ∋ `-A) p γ
+Lemma nf_eq_split_p {Γ : neg_ctx} {A : pre_ty pos} (i : Γ ∋ `-A) p γ
   : nf_eq (i ⋅ v_split_p (dwn_vp (w_of_p p `ᵥ⊛ γ)))
           (i ⋅ (p : o_op obs_op `-A) ⦇ γ ⦈).
   unfold v_split_p, dwn_vp; cbn.
@@ -1247,7 +1246,7 @@ Lemma nf_eq_split_p {Γ : neg_ctx} {A : ty0 pos} (i : Γ ∋ `-A) p γ
   remember a as a'; clear a Heqa'.
   revert a' H; rewrite H'; intros; now econstructor.
 Qed.
-Lemma nf_eq_split_n {Γ : neg_ctx} {A : ty0 neg} (i : Γ ∋ `+A) p γ
+Lemma nf_eq_split_n {Γ : neg_ctx} {A : pre_ty neg} (i : Γ ∋ `+A) p γ
   : nf_eq (i ⋅ v_split_n (dwn_kn (w_of_p p `ᵥ⊛ γ)))
           (i ⋅ (p : o_op obs_op `+A) ⦇ γ ⦈).
   unfold v_split_n, dwn_kn; cbn.
@@ -1514,23 +1513,23 @@ Qed.
 Finally it does not cost much to recover the more standard CIU equivalence, which we
 derive here for the case of terms (not co-terms).
 |*)
-Definition c_of_t {Γ : neg_ctx} {A : ty0 pos} (t : term Γ `+A)
+Definition c_of_t {Γ : neg_ctx} {A : pre_ty pos} (t : term Γ `+A)
            : state_n (Γ ▶ₛ {| sub_elt := `-A ; sub_prf := stt |}) :=
   Cut _ (t_shift1 _ t) (Whn (Var Ctx.top)) .
 Notation "'name⁺'" := c_of_t.
 
-Definition a_of_sk {Γ Δ : neg_ctx} {A : ty0 pos} (s : Γ =[val]> Δ) (k : term Δ `-A)
+Definition a_of_sk {Γ Δ : neg_ctx} {A : pre_ty pos} (s : Γ =[val]> Δ) (k : term Δ `-A)
   : (Γ ▶ₛ {| sub_elt := `-A ; sub_prf := stt |}) =[val_n]> Δ :=
   [ s ,ₓ k : val Δ `-A ].
 
-Lemma sub_csk {Γ Δ : neg_ctx} {A : ty0 pos} (t : term Γ `+A) (s : Γ =[val]> Δ)
+Lemma sub_csk {Γ Δ : neg_ctx} {A : pre_ty pos} (t : term Γ `+A) (s : Γ =[val]> Δ)
   (k : term Δ `-A)
   : Cut _ (t `ₜ⊛ s) k = c_of_t t ₜ⊛ a_of_sk s k.
 Proof.
   cbn; f_equal; unfold t_shift1; rewrite t_sub_ren; now apply t_sub_eq.
 Qed.
 
-Definition ciu_eq (Δ : neg_ctx) {Γ} {A : ty0 pos} : relation (term Γ `+A) :=
+Definition ciu_eq (Δ : neg_ctx) {Γ} {A : pre_ty pos} : relation (term Γ `+A) :=
   fun u v =>
     forall (σ : Γ =[val]> Δ) (k : term Δ `-A),
       evalₒ (Cut _ (u `ₜ⊛ σ) k : state_n Δ) ≈ evalₒ (Cut _ (v `ₜ⊛ σ) k : state_n Δ) .
