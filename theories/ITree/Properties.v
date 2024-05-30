@@ -1,26 +1,24 @@
 (*|
 Interaction Trees: Theory of the structure
 ==========================================
+
 We collect in these file the main lemmas capturing the applicative,
 monadic, and iterative structure of itrees.
 
 .. coq:: none
 |*)
-
 From Coinduction Require Import coinduction tactics.
 
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Rel.
 From OGS.ITree Require Import Event ITree Structure Eq.
-
 (*|
-
-.. coq::
 |*)
-
 Section withE.
   Context {I} {E : event I I}.
-
+(*|
+``fmap`` respects strong bisimilarity.
+|*)
   #[global] Instance fmap_eq {X RX Y RY} :
     Proper (dpointwise_relation (fun i => RX i ==> RY i)
               ==> dpointwise_relation (fun i => it_eq RX (i:=i) ==> it_eq RY (i:=i)))
@@ -33,7 +31,9 @@ Section withE.
     cbn in *; cbv [observe] in h; dependent destruction h; simpl_depind; eauto.
     econstructor; now apply H1.
   Qed.
-
+(*|
+``fmap`` respects weak bisimilarity.
+|*)
   #[global] Instance fmap_weq {X RX Y RY} :
     Proper (dpointwise_relation (fun i => RX i ==> RY i)
               ==> dpointwise_relation (fun i => it_wbisim RX i ==> it_wbisim RY i))
@@ -79,7 +79,9 @@ Section withE.
       + econstructor.
         intro r; now apply CIH.
   Qed.
-
+(*|
+``subst`` respects weak bisimilarity.
+|*)
   #[global] Instance subst_eq {X Y} {RX : relᵢ X X} {RY : relᵢ Y Y} :
     Proper (dpointwise_relation (fun i => RX i ==> it_eq RY (i:=i))
               ==> dpointwise_relation (fun i => it_eq RX (i:=i) ==> it_eq RY (i:=i)))
@@ -96,9 +98,12 @@ Section withE.
     2: intro.
     all: now apply (gfp_t (it_eq_map E RY)).
   Qed.
-
-  Lemma bind_ret {X Y} {RX : relᵢ Y Y} {_ : Reflexiveᵢ RX} (f : X ⇒ᵢ Y) {i} (t : itree E X i) :
-    it_eq RX (fmap f i t) (bind t (fun i x => Ret' (f i x))).
+(*|
+A slight generalization of the monad law ``t ≊ t >>= η``.
+|*)
+  Lemma bind_ret {X Y} {RX : relᵢ Y Y} {_ : Reflexiveᵢ RX} (f : X ⇒ᵢ Y) {i}
+    (t : itree E X i)
+    : it_eq RX (fmap f i t) (bind t (fun i x => Ret' (f i x))).
   Proof.
     revert i t; unfold it_eq; coinduction R CIH; intros i t.
     cbn; destruct (_observe t); auto.
@@ -112,7 +117,9 @@ Section withE.
     remember (_observe y) as _y eqn:Hy; clear Hy.
     dependent induction H; now econstructor.
   Qed.
-
+(*|
+Composition law of ``bind``.
+|*)
   Lemma bind_bind_com {X Y Z RZ} `{Reflexiveᵢ RZ}
     {f : X ⇒ᵢ itree E Y} {g : Y ⇒ᵢ itree E Z} {i} {x : itree E X i} :
     it_eq RZ (bind (bind x f) g) (bind x (kcomp f g)).
@@ -122,7 +129,9 @@ Section withE.
     destruct ((f i r).(_observe)); eauto.
     destruct ((g i r0).(_observe)); eauto.
   Qed.
-
+(*|
+Composition law of ``fmap``.
+|*)
   Lemma fmap_fmap_com {X Y Z RZ} `{Reflexiveᵢ RZ}
     {f : X ⇒ᵢ Y} {g : Y ⇒ᵢ Z} {i} {x : itree E X i} :
     it_eq RZ (fmap g i (fmap f i x)) (fmap (fun i x => g i (f i x)) i x).
@@ -130,7 +139,9 @@ Section withE.
     revert i x; unfold it_eq; coinduction R CIH; intros i x.
     cbn; destruct (x.(_observe)); eauto.
   Qed.
-
+(*|
+``bind`` and ``fmap`` interaction.
+|*)
   Lemma fmap_bind_com {X Y Z RZ} `{Reflexiveᵢ RZ}
     {f : X ⇒ᵢ Y} {g : Y ⇒ᵢ itree E Z} {i} {x : itree E X i} :
     it_eq RZ (bind (fmap f _ x) g) (bind x (fun i x => g i (f i x))).
@@ -148,12 +159,17 @@ Section withE.
     cbn; destruct (x.(_observe)); eauto.
     destruct ((f i r).(_observe)); eauto.
   Qed.
-
+(*|
+Rewording composition law of ``bind``.
+|*)
   Lemma subst_subst {X Y Z}
     (f : Y ⇒ᵢ itree E Z) (g : X ⇒ᵢ itree E Y) {i} (x : itree E X i) :
     ((x >>= g) >>= f) ≊ (x >>= (g >=> f)) .
   Proof. apply bind_bind_com. Qed.
-
+(*|
+Proof of the up-to ``bind`` principle: we may close bisimulation candidates by prefixing
+related elements by bisimilar computations.
+|*)
   Variant bindR {X1 X2 Y1 Y2} (RX : relᵢ X1 X2)
     (R : relᵢ (itree E X1) (itree E X2))
     (S : relᵢ (itree E Y1) (itree E Y2)) :
@@ -164,7 +180,9 @@ Section withE.
       : bindR RX R S i (t1 >>= k1) (t2 >>= k2).
   Arguments BindR {X1 X2 Y1 Y2 RX R S i t1 t2 k1 k2}.
   Hint Constructors bindR : core.
-
+(*|
+Up-to ``bind`` is valid for strong bisimilarity.
+|*)
   Program Definition bindR_eq_map {X1 X2 Y1 Y2} (RX : relᵢ X1 X2) : mon (relᵢ (itree E Y1) (itree E Y2)) :=
     {| body S := bindR RX (@it_eq _ E _ _ RX) S ;
        Hbody _ _ H _ _ _ '(BindR u v) := BindR u (fun i _ _ r => H _ _ _ (v i _ _ r)) |}.
@@ -182,7 +200,9 @@ Section withE.
     - econstructor; intros r; apply (fTf_Tf (it_eq_map E RY)).
       refine (BindR (k_rel r) (fun i _ _ r => b_T (it_eq_map E RY) _ _ _ _ _ (v i _ _ r))).
   Qed.
-
+(*|
+Up-to ``bind`` is valid for weak bisimilarity.
+|*)
   Program Definition bindR_w_map {X1 X2 Y1 Y2} (RX : relᵢ X1 X2) : mon (relᵢ (itree E Y1) (itree E Y2)) :=
     {| body S := bindR RX (@it_wbisim _ E _ _ RX) S ;
        Hbody _ _ H _ _ _ '(BindR u v) := BindR u (fun i _ _ r => H _ _ _ (v i _ _ r)) |}.
@@ -211,7 +231,9 @@ Section withE.
      apply (fTf_Tf (it_wbisim_map E RY)).
      econstructor; [ apply k_rel | intros; now apply (b_T (it_wbisim_map E RY)), v ].
  Qed.
-
+(*|
+Bisimilar equations have bisimilar iteration (weakly and strongly).
+|*)
   Lemma iter_cong_strong {X1 X2 Y1 Y2} {RX : relᵢ X1 X2} {RY : relᵢ Y1 Y2}
     f g (_ : forall i a b, RX i a b ->  it_eq (sumᵣ RX RY) (f i a) (g i b)) :
     forall i a b, RX i a b -> it_eq (E:=E) RY (iter f i a) (iter g i b).
@@ -280,7 +302,9 @@ Section withE.
               ==> dpointwise_relation (fun i => RX i ==> it_wbisim RY i))
       (@iter I E X Y)
     := iter_cong_weak.
-
+(*|
+Iteration is a strong fixed point of the folowing guarded equation.
+|*)
   Lemma iter_unfold {X Y RY} `{Reflexiveᵢ RY} (f : X ⇒ᵢ itree E (X +ᵢ Y)) {i x} :
     it_eq RY
       (iter f i x)
@@ -292,7 +316,11 @@ Section withE.
     cbn; destruct (_observe (f i x)); auto.
     destruct r; eauto.
   Qed.
-
+(*|
+Iteration is the unique such fixed point w.r.t. strong bisimilarity. Note that this
+is again not w.r.t. the initial equation but the alternate one which is trivially
+guarded. See example 6.14 in the paper.
+|*)
   Lemma iter_uniq {X Y RY} `{Equivalenceᵢ RY}
     (f : X ⇒ᵢ itree E (X +ᵢ Y)) (g : X ⇒ᵢ itree E Y)
     (EQ : forall i x, it_eq RY (g i x) (bind (f i x) (fun _ r => go (match r with
@@ -312,9 +340,10 @@ Section withE.
     now apply CIH.
     reflexivity.
   Qed.
-
 End withE.
-
+(*|
+Misc. utilities.
+|*)
 Variant is_tau' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
   | IsTau {t : itree E X i} : is_tau' (TauF t) .
 Definition is_tau {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_tau' t.(_observe).
