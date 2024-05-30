@@ -1,43 +1,60 @@
 (*|
-Substitution (§ 4.3)
-=====================
+Substitution structures (§ 4.3)
+===============================
+
+In this file we axiomatize what it means for a family to support substitution.
+
+.. coq:: none
 |*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel.
 From OGS.Ctx Require Import All.
 
 Open Scope ctx_scope.
-
 (*|
 Substitution Monoid (Def. 4.9)
-==============================
+------------------------------
 
 The specification of an evaluator will be separated in several steps. First we will ask
 for a family of values, i.e. objects that can be substituted for variables. We formalize
 well-typed well-scoped substitutions in the monoidal style of Fiore et al and Allais et al.
-|*)
+Here we are generic over a notion of context, treating lists and DeBruijn indices in the
+usual well-typed well-scoped style, but also other similar notions. See
+`Ctx/Abstract.v <Abstract.html>`_ for more background on notions of variables and contexts
+and for the categorical presentation of substitution.
 
+.. coq::
+   :name: submonoid
+|*)
 Class subst_monoid `{CC : context T C} (val : Fam₁ T C) := {
   v_var : c_var ⇒₁ val ;
   v_sub : val ⇒₁ ⟦ val , val ⟧₁ ;
 }.
+(*|
+.. coq:: none
+|*)
 #[global] Arguments v_var {T _ _ val _ Γ} [x].
 #[global] Arguments v_sub {T _ _ val _} [Γ x] v {Δ} a.
+(*|
+|*)
 #[global] Notation "v ᵥ⊛ a" := (v_sub v a%asgn) (at level 30).
-
 Notation a_id := v_var.
+(*|
+By pointwise lifting of substitution we can define composition of assignments.
+|*)
 Definition a_comp `{subst_monoid T C val} {Γ1 Γ2 Γ3}
   : Γ1 =[val]> Γ2 -> Γ2 =[val]> Γ3 -> Γ1 =[val]> Γ3
   := fun u v _ i => u _ i ᵥ⊛ v.
 #[global] Infix "⊛" := a_comp (at level 14) : asgn_scope.
+(*|
+.. coq:: none
+|*)
 #[global] Arguments a_comp _ _ _ _ _ _ _ _ _ _ _ /.
-
 (*|
 The laws for monoids and modules are pretty straightforward. A specificity is that
 assignments are represented by functions from variables to values, as such their
 well-behaved equality is pointwise equality and we require substitution to respect it.
 |*)
-
 Class subst_monoid_laws `{CC : context T C} (val : Fam₁ T C) {VM : subst_monoid val} := {
   v_sub_proper :: Proper (∀ₕ Γ, ∀ₕ _, eq ==> ∀ₕ Δ, asgn_eq Γ Δ ==> eq) v_sub ;
   v_sub_var {Γ1 Γ2 x} (i : Γ1 ∋ x) (p : Γ1 =[val]> Γ2)
@@ -47,26 +64,38 @@ Class subst_monoid_laws `{CC : context T C} (val : Fam₁ T C) {VM : subst_monoi
   v_sub_sub {Γ1 Γ2 Γ3 x} (v : val Γ1 x) (a : Γ1 =[val]> Γ2) (b : Γ2 =[val]> Γ3)
    : v ᵥ⊛ (a ⊛ b) = (v ᵥ⊛ a) ᵥ⊛ b ;
 } .
+(*|
+.. coq:: none
+|*)
 #[global] Arguments subst_monoid_laws {T C CC} val {VM}.
-
+(*|
+|*)
 #[global] Instance v_sub_proper_a `{subst_monoid_laws T C val}
           {Γ1 Γ2 x} {v : val Γ1 x} : Proper (asgn_eq Γ1 Γ2 ==> eq) (v_sub v).
 Proof. now apply v_sub_proper. Qed.
-
 (*|
 Substitution Module (Def. 4.11)
-===============================
+-------------------------------
 
 Next, we ask for a module over the monoid of values, to represent the configurations
 of the machine.
-|*)
 
+.. coq::
+   :name: submodule
+|*)
 Class subst_module `{CC : context T C} (val : Fam₁ T C) (conf : Fam₀ T C) := {
   c_sub : conf ⇒₀ ⟦ val , conf ⟧₀ ;
 }.
+(*|
+.. coq:: none
+|*)
 #[global] Arguments c_sub {T C CC val conf _} [Γ] c {Δ} a.
+(*|
+|*)
 #[global] Notation "c ₜ⊛ a" := (c_sub c a%asgn) (at level 30).
-
+(*|
+Again the laws should not be surprising.
+|*)
 Class subst_module_laws `{CC : context T C} (val : Fam₁ T C) (conf : Fam₀ T C)
       {VM : subst_monoid val} {CM : subst_module val conf} := {
   c_sub_proper :: Proper (∀ₕ Γ, eq ==> ∀ₕ Δ, asgn_eq Γ Δ ==> eq) c_sub ;
@@ -78,29 +107,38 @@ Class subst_module_laws `{CC : context T C} (val : Fam₁ T C) (conf : Fam₀ T 
 #[global] Instance c_sub_proper_a `{subst_module_laws T C val conf}
           {Γ1 Γ2 c} : Proper (asgn_eq Γ1 Γ2 ==> eq) (c_sub c).
 Proof. now apply c_sub_proper. Qed.
-
 (*|
-Derived notions: renamings.
+Now that we know that our families have a substitution operation and variables, we
+can readily derive a renaming operation. While we could have axiomatized it, together with
+its compatibility with substitution, allowing for possibly more efficient implementations,
+we prefer simplicity and work with this generic implementation in terms of substitution.
 |*)
-
 Section renaming.
   Context `{CC : context T C} {val : Fam₁ T C} {conf : Fam₀ T C}.
   Context {VM : subst_monoid val} {VML : subst_monoid_laws val}.
   Context {CM : subst_module val conf} {CML : subst_module_laws val conf}.
-
+(*|
+By post-composing with the substitution identity, we can embed renamings into assignments.
+|*)
   Definition r_emb {Γ Δ} (r : Γ ⊆ Δ) : Γ =[val]> Δ
     := fun _ i => v_var (r _ i).
   #[global] Arguments r_emb {_ _} _ _ /.
 
-  (* equal to respectively `v_sub ⦿₁ hom_precomp₁ v_var` and
-     `c_sub ⦿₀ hom_precomp₀ v_var` but a bit pedantic *)
+(*|
+Renaming is now simply a matter of substituting by the embedded renaming. We could have
+gone full on category theory and defined them respectively as
+``v_sub ⦿₁ hom_precomp₁ v_var`` and ``c_sub ⦿₀ hom_precomp₀ v_var`` but on top of being a
+bit pedantic, this would not behave nicely with unfolding.
+|*)
   Definition v_ren : val ⇒₁ ⟦ c_var , val ⟧₁
     := fun _ _ v _ r => v ᵥ⊛ r_emb r.
   Definition c_ren : conf ⇒₀ ⟦ c_var , conf ⟧₀
     := fun _ c _ r => c ₜ⊛ r_emb r.
   #[global] Arguments v_ren [Γ x] v [Δ] r /.
   #[global] Arguments c_ren [Γ] v [Δ] r /.
-
+(*|
+Finally we can rename assignments on the right.
+|*)
   Definition a_ren_r {Γ1 Γ2 Γ3} : Γ1 =[val]> Γ2 -> Γ2 ⊆ Γ3 -> Γ1 =[val]> Γ3
     := fun a r => (a ⊛ (r_emb r))%asgn.
   #[global] Arguments a_ren_r _ _ _ _ _ _ /.
@@ -108,20 +146,28 @@ End renaming.
 #[global] Notation "v ᵥ⊛ᵣ r" := (v_ren v r%asgn) (at level 14).
 #[global] Notation "c ₜ⊛ᵣ r" := (c_ren c r%asgn) (at level 14).
 #[global] Notation "a ⊛ᵣ r" := (a_ren_r a r) (at level 14) : asgn_scope.
-
 (*|
-Additional assumptions on how variables behave. We basically ask that the identity
-assignment is injective, that being in its image is stable by renaming and that its
-image is decidable.
-|*)
+Something which we have absolutely pushed under the rug in the paper is a couple more
+mild technical hypotheses on the substitution monoid of values: since in the
+`eventual guardedness proof <CompGuarded.html>`_ we need to case split on whether
+or not a value is a variable, we need to ask for that to be possible! As such,
+we need the following additional assumptions:
 
+- ``v_var`` has decidable fibers
+- ``v_var`` is injective
+- the fibers of ``v_var`` pull back along renamings
+
+We first define the fibers of ``v_var``.
+|*)
 Variant is_var `{VM : subst_monoid T C val} {Γ x} : val Γ x -> Type :=
 | Vvar (i : Γ ∋ x) : is_var (v_var i)
 .
 
 Equations is_var_get `{VM : subst_monoid T C val} {Γ x} {v : val Γ x} : is_var v -> Γ ∋ x :=
   is_var_get (Vvar i) := i .
-
+(*|
+Which are obviously stable under renamings.
+|*)
 Lemma ren_is_var `{VM : subst_monoid_laws T C val} {Γ1 Γ2} (r : Γ1 ⊆ Γ2) {x} {v : val Γ1 x} 
       : is_var v -> is_var (v ᵥ⊛ᵣ r).
 Proof.
@@ -129,18 +175,17 @@ Proof.
   cbn; rewrite v_sub_var.
   econstructor.
 Qed.
-
-Variant is_var_ren_view `{VM : subst_monoid_laws T C val} {Γ1 Γ2 x}
-  (v : val Γ1 x) (r : Γ1 ⊆ Γ2) : is_var (v ᵥ⊛ᵣ r) -> Type :=
-| Vvren (H : is_var v) : is_var_ren_view v r (ren_is_var r H) .
-
-
+(*|
+At last we define our last assumptions on variables.
+|*)
 Class var_assumptions `{CC : context T C} (val : Fam₁ T C) {VM : subst_monoid val} := {
   v_var_inj {Γ x} : injective (@v_var _ _ _ _ _ Γ x) ;
   is_var_dec {Γ x} (v : val Γ x) : decidable (is_var v) ;
   is_var_ren {Γ1 Γ2 x} (v : val Γ1 x) (r : Γ1 ⊆ Γ2) : is_var (v ᵥ⊛ᵣ r) -> is_var v ;
 }.
-
+(*|
+Here we derive a couple helpers around these new assumptions.
+|*)
 Section variables.
   Context `{CC : context T C} {val : Fam₁ T C}.
   Context {VM : subst_monoid val} {VML : subst_monoid_laws val}.
@@ -160,6 +205,10 @@ Section variables.
   Lemma is_var_simpl {Γ x} {i : Γ ∋ x} (p : is_var (v_var i)) : p = Vvar i.
   Proof. apply is_var_irr. Qed.
 
+  Variant is_var_ren_view {Γ1 Γ2 x}
+    (v : val Γ1 x) (r : Γ1 ⊆ Γ2) : is_var (v ᵥ⊛ᵣ r) -> Type :=
+  | Vvren (H : is_var v) : is_var_ren_view v r (ren_is_var r H) .
+
   Lemma view_is_var_ren {Γ1 Γ2 x} (v : val Γ1 x) (r : Γ1 ⊆ Γ2) (H : is_var (v ᵥ⊛ᵣ r))
     : is_var_ren_view v r H .
   Proof.
@@ -178,11 +227,9 @@ Section variables.
   Lemma is_var_get_eq {Γ x} {v : val Γ x} (H : is_var v) : v = v_var (is_var_get H) .
   Proof. now destruct H. Qed.
 End variables.
-
 (*|
-A couple derived properties on the constructed operations.
+Finally we end with a couple derived property on assignments.
 |*)
-
 Section properties.
   Context {T C} {CC : context T C} (val : Fam₁ T C).
   Context {VM : subst_monoid val} {VML : subst_monoid_laws val}.

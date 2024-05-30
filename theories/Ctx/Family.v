@@ -51,6 +51,9 @@ Record Oper T C := {
 (*|
 Now a first combinator: the formal cut of two families. This takes two 1-indexed families
 and returns the 0-indexed family consisting pairs of matching elements.
+
+.. coq::
+   :name: formalcut
 |*)
 Record f_cut {T C} (F G : Fam₁ T C) (Γ : C) :=
   Cut { cut_ty : T ; cut_l : F Γ cut_ty ; cut_r : G Γ cut_ty }. 

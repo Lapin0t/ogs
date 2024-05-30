@@ -4,14 +4,15 @@ Adequacy (Def 6.1)
 
 We prove in this module that the composition of strategy is adequate.
 The proof essentially proceeds by showing that "evaluating and observing",
-i.e., [reduce], is a solution of the same equations as is the composition
+i.e., ``reduce``, is a solution of the same equations as is the composition
 of strategies.
 
 This argument assumes we can rely on the unicity of such a solution:
 we prove this fact by proving that these equations are eventually
-guarded in [OGS/CompGuarded.v].
-|*)
+guarded in `OGS/CompGuarded.v <CompGuarded.html>`_.
 
+.. coq:: none
+|*)
 (* for some reason we need this for some instance resolution *)
 From Coinduction Require Import coinduction.
 
@@ -31,7 +32,12 @@ appropriate axiomatization.
   Context {conf} {CM : subst_module val conf} {CML : subst_module_laws val conf}.
   Context {obs : obs_struct T C} {M : machine val conf obs} {ML : machine_laws val conf obs}.
   Context {VV : var_assumptions val}.
+(*|
+We define ``reduce``, called "zip-then-eval-then-observe" in the paper.
 
+.. coq::
+   :name: zeobs
+|*)
   Definition reduce {Δ} (x : reduce_t Δ)
     : delay (obs∙ Δ)
     := evalₒ (x.(red_act).(ms_conf)
@@ -39,9 +45,11 @@ appropriate axiomatization.
 
   Definition reduce' {Δ} : forall i, reduce_t Δ -> itree ∅ₑ (fun _ : T1 => obs∙ Δ) i
     := fun 'T1_0 => reduce .
-
 (*|
-Equipped with eventually guarded equations, we are ready to prove the adequacy
+Equipped with eventually guarded equations, we are ready to prove the adequacy.
+
+First a technical lemma, rewriting one step of compo, then reduce to a simpler
+more explicit form.
 |*)
   Lemma compo_reduce_simpl {Δ} (x : reduce_t Δ) :
     (compo_body x >>= fun _ r =>
@@ -63,7 +71,10 @@ Equipped with eventually guarded equations, we are ready to prove the adequacy
     unfold m_strat_wrap; cbn.
     now destruct (c_view_cat i).
   Qed.
-
+(*|
+Next we derive a variant of "evaluation respects substitution", working with
+partial assignments ``[ a_id , e ]`` instead of full assignments.
+|*)
   Definition eval_split_sub {Γ Δ} (c : conf (Δ +▶ Γ)) (e : Γ =[val]> Δ)
     : delay (nf obs val Δ)
     := eval c >>= fun 'T1_0 n =>
@@ -87,14 +98,12 @@ Equipped with eventually guarded equations, we are ready to prove the adequacy
     + rewrite app_sub, v_sub_var.
       cbn; now rewrite c_view_cat_simpl_r.
   Qed.
-
 (*|
-Note the use of [iter_evg_uniq]: the proof of adequacy is proved by unicity
+Note the use of ``iter_evg_uniq``: the proof of adequacy is proved by unicity
 of the fixed point, which is made possible by equivalently viewing the fixpoint
 combinator used to define the composition of strategy as a fixpoint of eventually
 guarded equations.
 |*)
-
   Lemma adequacy_gen {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a) :
     reduce (RedT c e) ≊ (c ∥g e).
   Proof.
@@ -135,9 +144,11 @@ guarded equations.
       change (bicollapse v _ _ _ ⊙ o ⦗ _ ⦘) with xx in H |- *.
       now rewrite H.
   Qed.
-
 (*|
-Adequacy (Def 6.1) holds
+Adequacy (Def 6.1) holds.
+
+.. coq::
+   :name: adequacy
 |*)
   Lemma adequacy {Γ Δ} (c : conf Γ) (e : Γ =[val]> Δ) :
     evalₒ (c ₜ⊛ e) ≊ (inj_init_act Δ c ∥g inj_init_pas e).
@@ -148,4 +159,3 @@ Adequacy (Def 6.1) holds
           a_ren_comp, a_cat_proj_l, a_comp_id.
   Qed.
 End with_param.
-

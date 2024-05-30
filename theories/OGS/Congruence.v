@@ -2,11 +2,25 @@
 Congruence (Def 6.1)
 =====================
 
-We prove in this module that weak bisimilarity is a congruence
-for composition.
-The proof makes a slight technical side step: we prove the composition to be equivalent to an alternate definition, [compo0], for which proving congruence is slightly easier.
-|*)
+We prove in this module that weak bisimilarity is a congruence for composition. The proof
+makes a slight technical side step: we prove the composition to be equivalent to an
+alternate definition, dully named ``compo_alt``.
 
+Indeed, congruence is a very easy result, demanding basically no assumption. What is
+actually hard, is to manage weak bisimilarity proofs, which in contrast to strong
+bisimilarity can be hard to tame: instead of synchronizing, at every step they can eat
+any number of ``Tau`` node on either side, forcing us to do complex inductions in the
+middle of our bisimilarity proofs.
+
+Because of this, since our main definition ``compo`` is the specific case of composition
+of two instances of the machine strategy in the OGS game, we know much more than what we
+actually care about. Hence we define the much more general ``compo_alt`` composing
+*any two abstract strategy* for the OGS game and prove that one congruent w.r.t. weak
+bisimilarity. We then connect these two alternative definitions with a strong bisimilarity,
+much more structured, hence easy to prove.
+
+.. coq:: none
+|*)
 From Coinduction Require Import coinduction tactics.
 
 From OGS Require Import Prelude.
@@ -23,12 +37,11 @@ appropriate axiomatization.
   Context {T C} {CC : context T C} {CL : context_laws T C}.
   Context {val} {VM : subst_monoid val} {VML : subst_monoid_laws val}.
   Context {conf} {CM : subst_module val conf} {CML : subst_module_laws val conf}.
-  Context {obs : obs_struct T C} {M : machine val conf obs} {ML : machine_laws val conf obs}.
-  Context {VV : var_assumptions val}.
-
-  (* Alternative definition of the composition easier to prove
-  congruence (respecting weak bisimilarity). *)
-
+  Context {obs : obs_struct T C} {M : machine val conf obs}.
+  Context {ML : machine_laws val conf obs} {VV : var_assumptions val}.
+(*|
+We start off by defining this new, *opaque* composition.
+|*)
   Record compo_alt_t (Δ : C) : Type := AltT {
     alt_ctx : ogs_ctx ;
     alt_act : ogs_act (obs:=obs) Δ alt_ctx ;
@@ -50,7 +63,9 @@ appropriate axiomatization.
 
   Definition compo_alt {Δ a} (u : ogs_act Δ a) (v : ogs_pas Δ a) : delay (obs∙ Δ)
     := iter_delay compo_alt_body (AltT u v).
-
+(*|
+Now we define our bisimulation candidates, for weak and strong bisimilarity.
+|*)
   Variant alt_t_weq Δ : relation (compo_alt_t Δ) :=
   | AltWEq {Φ u1 u2 v1 v2}
     : u1 ≈ u2
@@ -62,7 +77,9 @@ appropriate axiomatization.
     : u1 ≊ u2
       -> h_pasvR ogs_hg (it_eq (eqᵢ _)) _ v1 v2
       -> alt_t_seq Δ (AltT (Φ:=Φ) u1 v1) (AltT (Φ:=Φ) u2 v2).
-
+(*|
+And prove the tedious but direct weak congruence.
+|*)
   #[global] Instance compo_alt_proper {Δ a}
     : Proper (it_wbisim (eqᵢ _) a
                 ==> h_pasvR ogs_hg (it_wbisim (eqᵢ _)) a
@@ -106,10 +123,15 @@ appropriate axiomatization.
         induction r2; [ now rewrite H | auto ].
       * unshelve (do 3 econstructor); eauto.
    Qed.
-
+(*|
+We can inject pairs of machine-strategy states into pairs of opaque states, this will help
+us define our next bisimulation candidate.
+|*)
   Definition reduce_t_inj {Δ} (x : reduce_t Δ) : compo_alt_t Δ
      := AltT (m_strat _ x.(red_act)) (m_stratp _ x.(red_pas)) .
-
+(*|
+Now we relate the normal composition and the opaque composition of opacified states.
+|*)
   Lemma compo_compo_alt {Δ} {x : reduce_t Δ}
         : iter_delay compo_alt_body (reduce_t_inj x) ≊ iter_delay compo_body x .
   Proof.
