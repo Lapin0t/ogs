@@ -26,6 +26,7 @@ Relevant definitions can be found:
 - for guarded iteration (§ 6.2), in `ITree/Guarded.v <Guarded.html>`_.
 
 .. coq::
+   :name: delay
 |*)
 Definition delay (X : Type) : Type := itree ∅ₑ (fun _ => X) T1_0.
 
@@ -61,6 +62,9 @@ Definition bind_delay {I} {E : event I I} {X Y i}
   := fun x f => bind (emb_delay x) (fun _ '(Fib x) => f x) .
 (*|
 Simpler definition of bind when the conclusion is again in delay.
+
+.. coq::
+   :name: delaybind
 |*)
 Definition bind_delay' {X Y}
   : delay X -> (X -> delay Y) -> delay Y

@@ -104,6 +104,9 @@ Class machine_laws val conf obs {M : machine val conf obs} {VM : subst_monoid va
 (*|
 ``oapp`` commutes with substitutions, presented as part of "evaluation respects
 substitution" (Def 4.26) in the paper.
+
+.. coq::
+   :name: evalrespsub
 |*)
    app_sub {Γ1 Γ2 x} (v : val Γ1 x) (o : obs x) (a : dom o =[val]> Γ1) (b : Γ1 =[val]> Γ2)
    : (v ⊙ o⦗a⦘) ₜ⊛ b = (v ᵥ⊛ b) ⊙ o⦗a ⊛ b⦘ ;

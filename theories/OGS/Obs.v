@@ -42,6 +42,9 @@ rename their domain ``o_dom`` to just ``dom``.
 Pointed observations consist of a pair of a variable and a matching observation.
 We construct them using the generic formal cut combinator on families defined
 in `Ctx/Family.v <Family.html#formalcut>`_.
+
+.. coq::
+   :name: pointedobs
 |*)
 Definition pointed_obs `{CC : context T C} (O : Oper T C) : Fam₀ T C
   := c_var ∥ₛ ⦉O⦊.

@@ -79,6 +79,9 @@ Now we define our bisimulation candidates, for weak and strong bisimilarity.
       -> alt_t_seq Δ (AltT (Φ:=Φ) u1 v1) (AltT (Φ:=Φ) u2 v2).
 (*|
 And prove the tedious but direct weak congruence.
+
+.. coq::
+   :name: congruence
 |*)
   #[global] Instance compo_alt_proper {Δ a}
     : Proper (it_wbisim (eqᵢ _) a

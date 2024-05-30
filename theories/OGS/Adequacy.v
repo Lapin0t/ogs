@@ -103,6 +103,9 @@ Note the use of ``iter_evg_uniq``: the proof of adequacy is proved by unicity
 of the fixed point, which is made possible by equivalently viewing the fixpoint
 combinator used to define the composition of strategy as a fixpoint of eventually
 guarded equations.
+
+.. coq::
+   :name: zeo-fix
 |*)
   Lemma adequacy_gen {Δ a} (c : m_strat_act Δ a) (e : m_strat_pas Δ a) :
     reduce (RedT c e) ≊ (c ∥g e).

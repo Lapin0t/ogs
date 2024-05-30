@@ -399,6 +399,9 @@ Equations eval_step {Γ : t_ctx} : state Γ -> sum (state Γ) (nf Γ) :=
 Having defined the transition function, we can now iterate it inside the delay
 monad. This constructs a possibly non-terminating computation ending with
 a normal form.
+
+.. coq::
+   :name: stlceval
 |*)
 Definition stlc_eval {Γ : t_ctx} : state Γ -> delay (nf Γ)
   := iter_delay (ret_delay ∘ eval_step).

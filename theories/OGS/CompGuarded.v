@@ -227,6 +227,9 @@ enables us to call our other induction hypothesis.
 (*|
 Now the actual proof of eventual guardedness is just about unfolding a bit of the beginning
 of the interactions until we attain a resume and can apply our main lemma.
+
+.. coq::
+   :name: compoevguarded
 |*)
   Lemma compo_body_guarded {Δ} : eqn_ev_guarded (fun 'T1_0 => compo_body (Δ := Δ)).
   Proof.

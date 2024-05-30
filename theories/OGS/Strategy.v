@@ -276,6 +276,9 @@ A technical lemma explaining how the infinite strategy unfolds.
 Next we construct the initial states. The active initial state is given by simply a
 configuration from the language machine while a passive initial state is given by
 an assignment into the final context Δ.
+
+.. coq::
+   :name: initstate
 |*)
    Definition inj_init_act Δ {Γ} (c : conf Γ) : m_strat_act Δ (∅ₓ ▶ₓ Γ) :=
     {| ms_conf := c ₜ⊛ᵣ (r_cat_r ᵣ⊛ r_cat_r) ; ms_env := ε⁻ ;⁺ |}.

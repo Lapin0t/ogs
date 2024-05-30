@@ -51,6 +51,9 @@ Monadic bind.
     fun i x => bind (f i x) g.
 (*|
 Iteration operator.
+
+.. coq::
+   :name: iter
 |*)
   Definition iter {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) : X ⇒ᵢ itree E Y :=
     cofix _iter _ x :=
