@@ -21,10 +21,12 @@ Meta
 - License:  GPLv3
 - Compatible Coq versions: 8.17
 - Additional dependencies:
+
   - dune
   - `Equations <https://github.com/mattam82/Coq-Equations>`_
   - `Coinduction <https://github.com/damien-pous/coinduction>`_
   - `Alectryon <https://github.com/cpitclaudel/alectryon>`_
+
 - Coq namespace: ``OGS``
 - Documentation: TODO
 
@@ -61,7 +63,7 @@ or manually:
 Building the project
 ^^^^^^^^^^^^^^^^^^^^
 
-... code:: shell
+.. code:: shell
 
     dune build
 
@@ -75,7 +77,7 @@ To build the html documentation, first install Alectryon:
    opam install "coq-serapi==8.17.0+0.17.1"
    python3 -m pip install --user alectryon
 
-The build with:
+Then build with:
 
 .. code:: shell
 
@@ -150,7 +152,7 @@ Axioms
 ^^^^^^
 
 The whole development relies only on axiom K, a conventional and sound axiom
-from Coq's standard library (more precisely, :coqid:`Coq.Eqdep.Eq_rect_eq.eq_rect_eq`).
+from Coq's standard library (more precisely, :coqid:`Coq.Logic.Eqdep#Eq_rect_eq.eq_rect_eq`).
 
 This can be double checked as follows:
 

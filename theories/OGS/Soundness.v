@@ -89,5 +89,5 @@ to provide with several examples:
 
 The second command will explicit if any axiom has been used to establish the
 result. As stated in the `prelude <Prelude.html>`_, we exclusively use
-:coqid:`Coq.Eqdep.Eq_rect_eq.eq_rect_eq`, ie Streicher's axiom K.
+:coqid:`Coq.Logic.Eqdep#Eq_rect_eq.eq_rect_eq`, ie Streicher's axiom K.
 |*)
