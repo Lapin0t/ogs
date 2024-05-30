@@ -1,3 +1,6 @@
+_alectryon
+_build
+html
 **/.Makefile.coq
 **/.Makefile.coq.d
 **/.makefile.coq.conf
@@ -12,7 +15,6 @@
 **.cmi
 **.cmx
 **.null
-**/_build
 **.v~
 **.log
 **.aux
