@@ -2,7 +2,7 @@ From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel.
 From OGS.Ctx Require Import All Ctx.
 From OGS.OGS Require Import Subst Obs Machine Game.
-From OGS.ITree Require Import Event ITree Eq Structure Delay. (*Properties Guarded.*)
+From OGS.ITree Require Import Event ITree Eq Structure Delay.
 
 Reserved Notation "'ε⁺'".
 Reserved Notation "'ε⁻'".

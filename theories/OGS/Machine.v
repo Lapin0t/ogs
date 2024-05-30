@@ -35,7 +35,6 @@ and how to stitch one back together from the data sent by Opponent.
 |*)
 Class machine (val : Fam₁ T C) (conf : Fam₀ T C) (obs : obs_struct T C) := {
   eval : conf ⇒₀ (delay ∘ nf obs val) ;
-  (*app : (val ∥ obs#val) ⇒₀ conf ;*)
   oapp [Γ x] (v : val Γ x) (o : obs x) : dom o =[val]> Γ -> conf Γ ;
 }.
 #[global] Arguments eval {_ _ _ _} [_].

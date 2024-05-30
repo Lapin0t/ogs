@@ -7,7 +7,6 @@ From OGS.ITree Require Import Event ITree Delay Eq Properties.
 Open Scope ctx_scope.
 Reserved Notation "O ∙" (at level 5).
 Reserved Notation "'dom∙' o" (at level 5).
-(*Reserved Notation "i ⋅ o ⦉ a ⦊" (at level 30).*)
 Reserved Notation "u ≋ v" (at level 40).
 
 (*|
