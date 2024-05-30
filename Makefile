@@ -7,7 +7,7 @@ check:
 doc:
 	alectryon \
 		--cache-directory _alectryon \
-		--output-directory html \
+		--output-directory docs \
 		--frontend coq+rst \
 		--coq-driver sertop \
 		--webpage-style windowed \
@@ -15,8 +15,8 @@ doc:
 		theories/**/*.v
 
 serve:
-	python3 -m http.server -d html
+	python3 -m http.server -d docs
 
 
 clean:
-	rm -rf _build _alectryon html
+	rm -rf _build _alectryon docs
