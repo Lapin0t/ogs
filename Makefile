@@ -11,6 +11,7 @@ doc:
 		--frontend coq+rst \
 		--coq-driver sertop \
 		--webpage-style windowed \
+		--long-line-threshold 100 \
 		-Q _build/default/theories OGS \
 		theories/**/*.v
 
