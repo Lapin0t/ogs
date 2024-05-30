@@ -28,24 +28,32 @@ presheaf category. We then ask that
 
 Our category of contexts is basically the image of ``𝐯``, which has the structure of a
 commutative monoid. Then, given a family ``X : C → 𝐀``, it is easy to define
-assignments as::
+assignments as:
+
+.. code::
 
   Γ =[X]> Δ ≔ 𝐀[ 𝐯 Γ , X Δ ]
 
-And renamings as::
+And renamings as:
+
+.. code::
 
   Γ ⊆ Δ ≔ Γ =[ 𝐯 ]> Δ
         ≔ 𝐀[ 𝐯 Γ , 𝐯 Δ ]
 
 Assuming ``𝐀`` is (co-)powered over ``Set``, the substitution tensor product and substitution
-internal hom in ``C → 𝐀`` are given by:: 
+internal hom in ``C → 𝐀`` are given by:
+
+.. code::
 
   ( X ⊗ Y ) Γ ≔ ∫^Δ  X Δ × (Δ =[ Y ]> Γ)
   ⟦ X , Y ⟧ Γ ≔ ∫_Δ  (Γ =[ X ]> Δ) → Y Δ
 
 More generally, given a category ``𝐁`` (co-)powered over ``Set`` we can define the the
 following functors, generalizing the substitution tensor and hom to heretogeneous
-settings::
+settings:
+
+.. code::
 
   ( - ⊗ - ) : (C → 𝐁) → (C → 𝐀) → (C → 𝐁)
   ( X ⊗ Y ) Γ ≔ ∫^Δ  X Δ × (Δ =[ Y ]> Γ)

@@ -189,7 +189,7 @@ Furthermore, w.r.t. weak bisimilarity, we compute the same solution as what ``it
   Qed.
 
   Definition guarded_cong {X Y} {i} (s t : itree E (X +ᵢ Y) i)
-    (EQ : s ≊ t) (g : guarded s) : guarded t :=
+    (EQ : s ≊ t) (g : guarded s) : guarded t
     := guarded_cong' s.(_observe) t.(_observe) (it_eq_step _ _ _ EQ) g .
 (*|
 .. coq::
@@ -361,7 +361,7 @@ Once again, we establish the expected unfolding lemma, for eventually guarded it
    :name: iterevguardedfix
 |*)
   Lemma iter_evg_unfold {X Y RY} {_ : Equivalenceᵢ RY}
-    (f : eqn Y X X) (EG : eqn_ev_guarded f) {i x} :
+    (f : eqn Y X X) (EG : eqn_ev_guarded f) {i x}
     : it_eq RY
         (iter_ev_guarded f EG i x)
         (f i x >>= fun _ r => match r with

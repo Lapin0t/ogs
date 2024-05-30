@@ -20,26 +20,27 @@ We use a lot of implicit variable declaration around typeclasses.
 #[global] Generalizable All Variables.
 (*|
 Import the Equations_ library by Matthieu Sozeau, for Agda-like dependent pattern-matching.
-We hook it with axiom K (equivalent to unicity of identity proofs, UIP), for even more
-powerful matching.
 
 .. _Equations: https://github.com/mattam82/Coq-Equations
 |*)
 From Equations Require Export Equations.
 #[global] Set Equations Transparent.
 #[global] Set Equations With UIP.
+(*|
+We import dependent induction tactics and inline rewriting notations from the Coq
+standard library.
+
+Also we hook up Equations with axiom K (equivalent to unicity of identity proofs, UIP),
+for even more powerful matching.
+|*)
+Require Export Coq.Program.Equality.
+Export EqNotations.
 
 Lemma YesUIP : forall X : Type, UIP X.
   intro; apply EqdepFacts.eq_dep_eq__UIP, EqdepFacts.eq_rect_eq__eq_dep_eq.
   exact (Eqdep.Eq_rect_eq.eq_rect_eq _).
 Qed.
 #[global] Existing Instance YesUIP.
-(*|
-We import dependent induction tactics and inline rewriting notations from the Coq
-standard library.
-|*)
-Require Export Coq.Program.Equality.
-Export EqNotations.
 (*|
 We import basic definition for the use of the universe of strict proposition `SProp`.
 |*)
