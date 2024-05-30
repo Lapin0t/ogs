@@ -1,9 +1,16 @@
 # An abstract, certified account of operational game semantics
 
-The main contribution of this library are:
-- an independent implementation of an indexed counterpart to the itree library with support for guarded and eventually guarded recursion
-- an abstract OGS model of an axiomatised language proven sound w.r.t. substitution equivalence
-- several instantiations of this abstract result to concrete languages: typed and untyped cbv lambda calculus with fix, Downen and Ariola's polarized system D and system L.
+This is the companion artifact to the paper. The main contributions of
+this library are:
+
+- an independent implementation of an indexed counterpart to the itree
+  library with support for guarded and eventually guarded recursion
+- an abstract OGS model of an axiomatised language proven sound w.r.t.
+  substitution equivalence
+- several instantiations of this abstract result to concrete
+  languages: simply-typed lambda-calculus with recursive functions,
+  untyped lambda calculus, Downen and Ariola\'s polarized system D and
+  system L.
 
 ## Meta
 
@@ -12,34 +19,41 @@ The main contribution of this library are:
   - Tom Hirschowitz
   - Guilhem Jaber
   - Yannick Zakowski
-- License:  GPLv3
+- License: GPLv3
 - Compatible Coq versions: 8.17
 - Additional dependencies:
   - dune
   - [Equations](https://github.com/mattam82/Coq-Equations)
   - [Coinduction](https://github.com/damien-pous/coinduction)
+  - [Alectryon](https://github.com/cpitclaudel/alectryon)
 - Coq namespace: `OGS`
+- [Documentation](https://ogs-artifact.github.io/ogs-artifact/Readme.html)
 
 ## Building instructions
 
-### Obtaining the project
-
-```shell
-git clone TODO
-cd ogs
-```
-
 ### Installing dependencies
 
-We stress that the development has been only checked to compile against these specific dependencies.
-In particular, it does not compiled at the moment against latest version of coq-coinduction due to major changes in the interface.
+Download the project with
+
+``` shell
+git clone https://github.com/ogs-artifact/ogs-artifact.git
+cd ogs-artifact
+```
+
+We stress that the development has been only checked to compile against
+these specific dependencies. In particular, it does not compiled at the
+moment against latest version of coq-coinduction due to major changes in
+the interface.
 
 Installing the opam dependencies automatically:
-```shell
+
+``` shell
 opam install --deps-only .
 ```
+
 or manually:
-```shell
+
+``` shell
 opam pin coq 8.17
 opam pin coq-equations 1.3
 opam pin coq-coinduction 1.6
@@ -47,52 +61,106 @@ opam pin coq-coinduction 1.6
 
 ### Building the project
 
-```shell
+``` shell
 dune build
 ```
 
-## Paper to artifact correspondence
+### Alectryon documentation
+
+To build the html documentation, first install Alectryon:
+
+``` shell
+opam install "coq-serapi==8.17.0+0.17.1"
+python3 -m pip install --user alectryon
+```
+
+Then build with:
+
+``` shell
+make doc
+```
+
+You can start a local web server to view it with:
+
+``` shell
+make serve
+```
+
+## Content
 
 ### Structure of the repository
 
-- [Utils](./theories/Utils/) : General utilities
-  + [Rel](./theories/Utils/Rel.v) : Generalities for relations over indexed types
-  + [Psh](./theories/Utils/Psh.v) : Generalities for type families
-  + [Ctx](./theories/Utils/Ctx.v) : Well-scoped contexts
-- [ITree](./theories/ITree/) : Implementation of a variant of Interaction Trees over indexed types
-  + [Event](./theories/ITree/EVent.v) : Indexed events parameterizing the interactions of an itree
-  + [ITree](./theories/ITree/ITree.v) : Data-structure
-  + [Structure](./theories/ITree/Structure.v) : Combinators (definitions)
-  + [Eq](./theories/ITree/Eq.v) : Strong (≅) and weak bisimilarity (≈) over trees
-  + [Properties](./theories/ITree/Properties.v) : General theory
-  + [Guarded](./theories/ITree/Guarded.v) : (Eventually) Guarded equations and iterations over them (Section 7.4)
-  + [Delay](./theories/ITree/Delay.v) : The Delay Monad (Section 1, Remark 1) is taken as the type of trees over the empty signature in the development.
-- [OGS](./theories/OGS/) : Construction of a sound OGS for an abstract language
-  + [Subst](./theories/OGS/Subst.v) : Substitution monoid, substitution module
-  + [Obs](./theories/OGS/Obs.v) : Observation Structure
-  + [Machine](./theories/Machine.v) : Evaluation Structure, finishing the definition of the abstract machine
-  + [Game](./theories/OGS/Game.v) : OGS game
-  + [Strategy](./theories/OGS/Strategy.v) : OGS strategies and composition of strategies
-  + [CompGuarded](./theories/OGS/CompGuarded.v) : Proof of eventual guardedness of the composition of strategies
-  + [Adequacy](./theories/OGS/Adequacy.v) : Proof of adequacy of the composition
-  + [Congruence](./theories/OGS/Congruence.v) : Proof that weak bismilarity is a congruence for composition
-  + [Soundness](./theories/OGS/Soundness.v) : Proof of soundness of the OGS
-- [Examples](./theories/Examples/) : Concrete instances of the abstract construction
-  + [CBVTyped](./theories/Examples/Lambda/CBVTyped.v) : Typed, call by value, lambda calculus
-  + [CBVUntyped](./theories/Examples/Lambda/CBVUntyped.v) : Untyped, call by value, lambda calculus
-  + [CBVSystemL](./theories/Examples/Lambda/CBVUntyped.v) : Untyped, call by value, lambda calculus
-  + [CBVSystemL](./theories/Examples/Mu/CBVSystemL.v) : SystemL, call by value
-  + [PolarizedSystemD](./theories/Examples/Mu/PolarizedSystemD.v) : SystemD, polarized
-  + [PolarizedSystemL](./theories/Examples/Mu/PolyrizedSystemL.v) : SystemL, polarized
+The Coq development is contained in the theory directory, which has the
+following structure, in approximate order of dependency.
+
+- [Readme.v](https://ogs-artifact.github.io/ogs-artifact/Readme.html): this file
+- [Prelude.v](https://ogs-artifact.github.io/ogs-artifact/Prelude.html): imports and setup
+- Utils directory: general utilities
+  - [Rel.v](https://ogs-artifact.github.io/ogs-artifact/Rel.html): generalities for relations over indexed types
+  - [Psh.v](https://ogs-artifact.github.io/ogs-artifact/Psh.html): generalities for type families
+- Ctx directory: general theory of contexts and variables
+  - [Family.v](https://ogs-artifact.github.io/ogs-artifact/Family.html): definition of scoped and sorted
+    families
+  - [Abstract.v](https://ogs-artifact.github.io/ogs-artifact/Abstract.html): definition of context and variable
+    structure
+  - [Assignment.v](https://ogs-artifact.github.io/ogs-artifact/Assignment.html): generic definition of
+    assignments
+  - [Renaming.v](https://ogs-artifact.github.io/ogs-artifact/Renaming.html): generic definition of renamings
+  - [Ctx.v](https://ogs-artifact.github.io/ogs-artifact/Ctx.html): definition of concrete contexts and DeBruijn
+    indices
+  - [Covering.v](https://ogs-artifact.github.io/ogs-artifact/Covering.html): concrete context structure for
+    Ctx.v
+  - [DirectSum.v](https://ogs-artifact.github.io/ogs-artifact/DirectSum.html): direct sum of context structures
+  - [Subset.v](https://ogs-artifact.github.io/ogs-artifact/Subset.html): sub context structure
+- ITree directory: implementation of a variant of interaction trees
+  over indexed types
+  - [Event.v](https://ogs-artifact.github.io/ogs-artifact/Event.html): indexed events parameterizing the
+    interactions of an itree
+  - [ITree.v](https://ogs-artifact.github.io/ogs-artifact/ITree.html): coinductive definition
+  - [Eq.v](https://ogs-artifact.github.io/ogs-artifact/Eq.html): strong and weak bisimilarity over interaction
+    trees
+  - [Structure.v](https://ogs-artifact.github.io/ogs-artifact/Structure.html): combinators (definitions)
+  - [Properties.v](https://ogs-artifact.github.io/ogs-artifact/Properties.html): general theory
+  - [Guarded.v](https://ogs-artifact.github.io/ogs-artifact/Guarded.html): (eventually) guarded equations and
+    iterations over them
+  - [Delay.v](https://ogs-artifact.github.io/ogs-artifact/Delay.html): definition of the delay monad (as a
+    special case of trees)
+- OGS directory: construction of a sound OGS model for an abstract
+  language
+  - [Subst.v](https://ogs-artifact.github.io/ogs-artifact/Subst.html): axiomatization of substitution monoid,
+    substitution module
+  - [Obs.v](https://ogs-artifact.github.io/ogs-artifact/Obs.html): axiomatization of observation structure,
+    normal forms
+  - [Machine.v](https://ogs-artifact.github.io/ogs-artifact/Machine.html): axiomatization of evaluation
+    structures, language machine
+  - [Game.v](https://ogs-artifact.github.io/ogs-artifact/Game.html): abstract game and OGS game definition
+  - [Strategy.v](https://ogs-artifact.github.io/ogs-artifact/Strategy.html): machine strategy and composition
+  - [CompGuarded.v](https://ogs-artifact.github.io/ogs-artifact/CompGuarded.html): proof of eventual guardedness
+    of the composition of strategies
+  - [Adequacy.v](https://ogs-artifact.github.io/ogs-artifact/Adequacy.html): proof of adequacy of composition
+  - [Congruence.v](https://ogs-artifact.github.io/ogs-artifact/Congruence.html): proof of congruence of
+    composition
+  - [Soundness.v](https://ogs-artifact.github.io/ogs-artifact/Soundness.html): proof of soundness of the OGS
+- Examples directory: concrete instances of the generic construction
+  - [STLC_CBV.v](https://ogs-artifact.github.io/ogs-artifact/STLC_CBV.html): simply typed, call by value, lambda
+    calculus
+  - [ULC_CBV.v](https://ogs-artifact.github.io/ogs-artifact/ULC_CBV.html): untyped, call by value, lambda
+    calculus
+  - [SystemL_CBV.v](https://ogs-artifact.github.io/ogs-artifact/SystemL_CBV.html): mu-mu-tilde calculus variant
+    System L, in call by value
+  - [SystemD.v](https://ogs-artifact.github.io/ogs-artifact/SystemD.html): mu-mu-tilde calculus variant System
+    D, polarized
 
 ### Axioms
 
-The whole development relies only on axiom K, a conventional and sound axiom from Coq's standard library (more precisely, [Eqdep.Eq_rect_eq.eq_rect_eq]).
+The whole development relies only on axiom K, a conventional and sound
+axiom from Coq\'s standard library (more precisely,
+[`Eq_rect_eq.rect_eq`](https://coq.inria.fr/doc/V8.19.0/stdlib/Coq.Logic.Eqdep.html#Eq_rect_eq.eq_rect_eq).
+
 This can be double checked as follows:
-- for the abstract result of soundness of the OGS by running [Print Assumptions ogs_correction.] at the end of [OGS/Soundness.v]
-- for any particular example, for instance by running [Print Assumptions stlc_ciu_correct.] at the end of [Example/CBVTyped.v]
 
-### Warning
-
-The output of compilation is slightly cluttered with warnings: in particular when dealing with SProp, Equations fails to generate induction principles. Unfortunately, there is no convenient way to silence these warnings at the moment. They are naturally completely harmless w.r.t. to the formalization.
-
+-   for the abstract result of soundness of the OGS by running
+    `Print Assumptions ogs_correction.` at the end of OGS/Soundness.v
+-   for any particular example, for instance by running
+    `Print Assumptions stlc_ciu_correct.` at the end of
+    Example/CBVTyped.v

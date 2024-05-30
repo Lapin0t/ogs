@@ -17,7 +17,13 @@ library are:
 Meta
 ----
 
-- Author(s): ANONYMISED
+- Author(s):
+
+  - Peio Borthelle
+  - Tom Hirschowitz
+  - Guilhem Jaber
+  - Yannick Zakowski
+
 - License:  GPLv3
 - Compatible Coq versions: 8.17
 - Additional dependencies:
@@ -28,7 +34,7 @@ Meta
   - `Alectryon <https://github.com/cpitclaudel/alectryon>`_
 
 - Coq namespace: ``OGS``
-- Documentation: TODO
+- `Documentation <https://ogs-artifact.github.io/ogs-artifact/Readme.html>`
 
 Building instructions
 ---------------------
@@ -40,8 +46,8 @@ Download the project with
 
 .. code:: shell
 
-   git clone TODO
-   cd ogs
+   git clone https://github.com/ogs-artifact/ogs-artifact.git
+   cd ogs-artifact
 
 We stress that the development has been only checked to compile against these specific dependencies.
 In particular, it does not compiled at the moment against latest version of coq-coinduction due to major changes in the interface.
@@ -98,6 +104,7 @@ Structure of the repository
 The Coq development is contained in the theory directory, which has the following structure,
 in approximate order of dependency.
 
+- `Readme.v <Readme.html>`_: this file
 - `Prelude.v <Prelude.html>`_: imports and setup
 - Utils directory: general utilities
 
