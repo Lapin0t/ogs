@@ -13,7 +13,7 @@ doc:
 		--webpage-style windowed \
 		--long-line-threshold 100 \
 		-Q _build/default/theories OGS \
-		theories/**/*.v
+		theories/*.v theories/**/*.v
 
 serve:
 	python3 -m http.server -d docs
