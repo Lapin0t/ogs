@@ -1,3 +1,16 @@
+(*|
+Covering for free contexts
+==========================
+
+In `Ctx/Ctx.v <Ctx.html>`_ we have instanciated the relevant part of the abstract interface
+for concrete contexts. Here we tackle the rest of the structure. Basically, we need to
+provide case-splitting for deciding if a variable ``i : (Γ +▶ Δ) ∋ x`` is in ``Γ`` or in
+``Δ``. We could do this directly but we prove a slight generalization, going through the
+definition of coverings, a ternary relationship on concrete contexts witnessing that a
+context is *covered* by the two others (respecting order).
+
+.. coq:: none
+|*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel.
 From OGS.Ctx Require Import All Ctx.
@@ -11,9 +24,11 @@ Reserved Notation "[ u , H , v ]" (at level 9).
 Section with_param.
   Context {X : Type} {F : Fam₁ X (ctx X)}.
 (*|
-Covering:
----------
-Predicate for splitting a context into a disjoint union
+A covering
+----------
+
+This inductive family provides proofs that some context ``zs`` is obtained by "zipping"
+together two other contexts ``xs`` and ``ys``.
 |*)
   Inductive cover : ctx X -> ctx X -> ctx X -> Type :=
   | CNil : ∅ₓ ⊎ ∅ₓ  ≡ ∅ₓ
@@ -25,7 +40,7 @@ Predicate for splitting a context into a disjoint union
 |*)
   Derive Signature NoConfusion NoConfusionHom for cover.
 (*|
-.. coq::
+Basic useful coverings.
 |*)
   Equations cover_nil_r xs : xs ⊎ ∅ₓ ≡ xs :=
     cover_nil_r ∅ₓ        := CNil ;
@@ -36,12 +51,16 @@ Predicate for splitting a context into a disjoint union
     cover_nil_l ∅ₓ        := CNil ;
     cover_nil_l (xs ▶ₓ _) := CRight (cover_nil_l xs) .
   #[global] Arguments cover_nil_l {xs}.
-
+(*|
+This is the crucial one: the concatenation is covered by its two components.
+|*)
   Equations cover_cat {xs} ys : xs ⊎ ys ≡ (xs +▶ ys) :=
     cover_cat ∅ₓ        := cover_nil_r ;
     cover_cat (ys ▶ₓ _) := CRight (cover_cat ys) .
   #[global] Arguments cover_cat {xs ys}.
-
+(*|
+A covering gives us two injective renamings, left embedding and right embedding.
+|*)
   Equations r_cover_l {xs ys zs} : xs ⊎ ys ≡ zs -> xs ⊆ zs :=
     r_cover_l (CLeft c)  _ top     := top ;
     r_cover_l (CLeft c)  _ (pop i) := pop (r_cover_l c _ i) ;
@@ -51,7 +70,9 @@ Predicate for splitting a context into a disjoint union
     r_cover_r (CLeft c)  _ i       := pop (r_cover_r c _ i) ;
     r_cover_r (CRight c) _ top     := top ;
     r_cover_r (CRight c) _ (pop i) := pop (r_cover_r c _ i) .
-
+(*|
+Injectivity.
+|*)
   Lemma r_cover_l_inj {xs ys zs} (p : xs ⊎ ys ≡ zs) [x] (i j : xs ∋ x)
     (H : r_cover_l p _ i = r_cover_l p _ j) : i = j .
   Proof.
@@ -74,7 +95,9 @@ Predicate for splitting a context into a disjoint union
       apply noConfusion_inv in H.
       f_equal; now apply IHp.
   Qed.
-
+(*|
+The two embeddings have disjoint images.
+|*)
   Lemma r_cover_disj {xs ys zs} (p : xs ⊎ ys ≡ zs) [a] (i : xs ∋ a) (j : ys ∋ a)
     (H : r_cover_l p _ i = r_cover_r p _ j) : T0.
   Proof.
@@ -89,14 +112,19 @@ Predicate for splitting a context into a disjoint union
       + apply noConfusion_inv in H; cbn in H.
         exact (IHp i v H).
   Qed.
-
+(*|
+Now we can start proving that the copairing of the two embeddings has non-empty fibers,
+ie, we can case split.
+|*)
   Variant cover_view {xs ys zs} (p : xs ⊎ ys ≡ zs) [z] : zs ∋ z -> Type :=
   | Vcov_l  (i : xs ∋ z) : cover_view p (r_cover_l p _ i)
   | Vcov_r (j : ys ∋ z) : cover_view p (r_cover_r p _ j)
   .
   #[global] Arguments Vcov_l {xs ys zs p z}.
   #[global] Arguments Vcov_r {xs ys zs p z}.
-
+(*|
+Indeed!
+|*)
   Lemma view_cover {xs ys zs} (p : xs ⊎ ys ≡ zs) [z] (i : zs ∋ z) : cover_view p i.
   Proof.
     revert xs ys p; induction zs; intros xs ys p; dependent elimination i.
@@ -106,7 +134,7 @@ Predicate for splitting a context into a disjoint union
       * destruct (IHzs v _ _ c0); [ exact (Vcov_l i) | exact (Vcov_r (pop j)) ].
   Qed.
 (*|
-Finishing the instanciation of the abstract interface for `ctx X`.
+Finishing the instanciation of the abstract interface for ``ctx X``.
 |*)
   #[global] Instance free_context_cat_wkn : context_cat_wkn X (ctx X) :=
     {| r_cat_l _ _ := r_cover_l cover_cat ;

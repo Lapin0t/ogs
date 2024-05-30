@@ -2,8 +2,8 @@
 Type families
 ===============
 
-This file is dully-named `Psh.v` but in fact is actually about
-type families, that is maps `I → Type` for some `I : Type`.
+This file is dully-named ``Psh.v`` but in fact is actually about
+type families, that is maps ``I → Type`` for some ``I : Type``.
 
 .. coq:: none
 |*)
@@ -45,7 +45,7 @@ Definition fib_constr {A B} {f : A -> B} a : forall b (p : f a = b), fiber f b :
   eq_rect (f a) (fiber f) (Fib a).
 
 (*|
-These next two functions form an isomorphism `(fiber f ⇒ᵢ X) ≅ (∀ a → X (f a))`
+These next two functions form an isomorphism ``(fiber f ⇒ᵢ X) ≅ (∀ a → X (f a))``
 |*)
 Equations fib_into {A B} {f : A -> B} X (h : forall a, X (f a)) : fiber f ⇒ᵢ X :=
   fib_into _ h _ (Fib a) := h a .
@@ -54,7 +54,7 @@ Definition fib_from {A B} {f : A -> B} X (h : fiber f ⇒ᵢ X) a : X (f a) :=
 (*|
 Using the fiber construction, we can define a "sparse" type family which will
 be equal to some set at one point of the index and empty otherwise. This will
-enable us to have an isomorphism `(X @ i ⇒ᵢ Y) ≅ (X → Y i)`.
+enable us to have an isomorphism ``(X @ i ⇒ᵢ Y) ≅ (X → Y i)``.
 
 See the functional pearl by Conor McBride "Kleisli arrows of outrageous fortune"
 for background on this construction and its use.

@@ -3,8 +3,8 @@ Scoped and sorted families
 ==========================
 
 In this file we bootstrap the abstract theory of contexts, variables and substitution
-by defining a special case of type-families: families indexed by a set of contexts `C`
-and possibly a number of times by a set of types `T`.
+by defining a special case of type-families: families indexed by a set of contexts ``C``
+and possibly a number of times by a set of types ``T``.
 
 .. coq:: none
 |*)
@@ -21,22 +21,27 @@ Reserved Notation "u ⦿₂ v" (at level 40).
 Reserved Notation "F ∥ₛ G" (at level 40).
 Reserved Notation "u ⋅ v" (at level 50).
 Reserved Notation "⦉ S ⦊" .
-(*||*)
+(*|
+.. coq::
+   :name: sfam
+|*)
 Definition Fam₀ (T C : Type) := C -> Type .
 Definition Fam₁ (T C : Type) := C -> T -> Type .
 Definition Fam₂ (T C : Type) := C -> T -> T -> Type .
 (*|
 Additionally, to represent binders we use the following alternative to sorted families
-`Fam₁`. In this definition, the set of binders is indexed by the set of types `T` but
-not by the set of contexts `C`. Instead, we have a *projection* into `C`. This is important
-for reasons of bidirectional typing information flow. We could go with `Fam₁` instead, but
+``Fam₁``. In this definition, the set of binders is indexed by the set of types ``T`` but
+not by the set of contexts ``C``. Instead, we have a *projection* into ``C``. This is important
+for reasons of bidirectional typing information flow. We could go with ``Fam₁`` instead, but
 this would entail quite a bit of equality dance when manipulating it.
+
+.. coq::
+   :name: oper
 |*)
 Record Oper T C := {
   o_op : T -> Type ;
   o_dom : forall x, o_op x -> C ;
 }.
-
 (*|
 .. coq:: none
 |*)

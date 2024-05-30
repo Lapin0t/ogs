@@ -1,3 +1,13 @@
+(*|
+Free context structure
+======================
+
+Here we instanciate our abstract notion of context structure with the most common example:
+lists and DeBruijn indices. More pedantically, this is the free context structure over
+a given set ``X``.
+
+.. coq:: none
+|*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel.
 From OGS.Ctx Require Import All.
@@ -9,6 +19,9 @@ Contexts
 
 Contexts are simply lists, with the purely aesthetic choice of representing cons as
 coming from the right. Note on paper: we write here "Γ ▶ x" instead of "Γ , x".
+
+.. coq::
+   :name: concretectx
 |*)
 Inductive ctx (X : Type) : Type :=
 | cnil : ctx X
@@ -20,12 +33,14 @@ Inductive ctx (X : Type) : Type :=
 #[global] Arguments ccon {X} Γ x.
 Derive NoConfusion for ctx.
 #[global] Bind Scope ctx_scope with ctx.
+(*|
+|*)
 #[global] Notation "∅ₓ" := (cnil) : ctx_scope.
 #[global] Notation "Γ ▶ₓ x" := (ccon Γ%ctx x) (at level 40, left associativity) : ctx_scope.
 (*|
 We wish to manipulate intrinsically typed terms. We hence need a tightly typed notion of
-position in the context: rather than a loose index, [var x Γ] is a proof of membership of
-[x] to [Γ].
+position in the context: rather than a loose index, ``var x Γ`` is a proof of membership
+of ``x`` to ``Γ``: a well-scoped and well-typed DeBruijn index.
 |*)
 Inductive var {X} (x : X) : ctx X -> Type :=
 | top {Γ} : var x (Γ ▶ₓ x)
@@ -52,7 +67,7 @@ Equations c_map {X Y} : (X -> Y) -> ctx X -> ctx Y :=
   c_map f ∅ₓ       := cnil ;
   c_map f (Γ ▶ₓ x) := c_map f Γ ▶ₓ f x .
 (*|
-Implementation of the abstract context interface.
+Implementation of the revelant part of the abstract context interface.
 |*)
 #[global] Instance free_context {X} : context X (ctx X) :=
   {| c_emp := cnil ; c_cat := ccat ; c_var := cvar |}.
@@ -106,7 +121,10 @@ Proof.
   - exact Hx.
   - now apply Hu.
 Qed.
-
+(*|
+These concrete definition of shifts compute better than their `generic counterpart
+<Renaming.html#rshift>`_.
+|*)
 Definition r_shift1 {X} {Γ Δ : ctx X} {a} (f : Γ ⊆ Δ)
   : (Γ ▶ₓ a) ⊆ (Δ ▶ₓ a)
   := [ f ᵣ⊛ r_pop ,ₓ top ].
@@ -163,3 +181,8 @@ Lemma r_shift3_comp {X Γ1 Γ2 Γ3 a b c} (r1 : Γ1 ⊆ Γ2) (r2 : Γ2 ⊆ Γ3)
       : @r_shift3 X Γ1 Γ3 a b c (r1 ᵣ⊛ r2) ≡ₐ r_shift3 r1 ᵣ⊛ r_shift3 r2 .
   intros ? v; now repeat (dependent elimination v; auto).
 Qed.
+(*|
+This is the end for now, but we have not yet instanciated the rest of the abstract
+context structure. This is a bit more work, it takes place in another file:
+`Ctx/Covering.v <Covering.html>`_
+|*)

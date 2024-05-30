@@ -1,3 +1,15 @@
+(*|
+Renamings
+=========
+
+As explained in the `abstract theory <Abstract.html>`_, renamings are a particular kind
+of `assignements <Assignment.html#asgn>`_, where variables are mapped to variables.
+
+In this file we define renamings for a given abstract context structure and provide
+all their properties that we will use throughout the development.
+
+.. coq:: none
+|*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel.
 From OGS.Ctx Require Import Abstract Family Assignment.
@@ -7,22 +19,23 @@ Reserved Notation "u ᵣ⊛ v" (at level 14).
 
 Section with_param.
   Context {T C : Type} {CC : context T C} {CL : context_laws T C}.
-
 (*|
-Renaming
----------
-Context inclusion is defined as an assignment of variables in Γ to variables in Δ.
+Definition
+----------
+Context inclusion, or renaming is defined as an assignment of variables in Γ to
+variables in Δ.
+
+.. coq::
+   :name: ren
 |*)
   Notation "Γ ⊆ Δ" := (@assignment T C CC c_var Γ%ctx Δ%ctx).
-
 (*|
 The identity inclusion, whose renaming is the identity.
 |*)
   Definition r_id {Γ} : Γ ⊆ Γ := fun _ i => i .
   #[global] Arguments r_id _ _ /.
-
 (*|
-Renaming assignments on the left by precomposition.
+Renaming assignments on the left by precomposition
 |*)
   Definition a_ren_l {F Γ1 Γ2 Γ3} : Γ1 ⊆ Γ2 -> Γ2 =[F]> Γ3 -> Γ1 =[F]> Γ3 := a_map.
   #[global] Arguments a_ren_l _ _ _ _ _ _ _ /.
@@ -39,7 +52,9 @@ Renaming assignments on the left by precomposition.
   Lemma a_ren_l_comp {F Γ1 Γ2 Γ3 Γ4} (u : Γ1 ⊆ Γ2) (v : Γ2 ⊆ Γ3) (w : Γ3 =[F]> Γ4) 
         : (u ᵣ⊛ v) ᵣ⊛ w ≡ₐ u ᵣ⊛ (v ᵣ⊛ w).
   Proof. reflexivity. Qed.
-
+(*|
+The fiber of the inclusion ``c_var (Γ +▶ Δ) ↪ c_var Γ + c_var Δ`` is a subsingleton.
+|*)
   Lemma view_cat_irr {Γ1 Γ2 x i} (a b : c_cat_view Γ1 Γ2 x i) : a = b .
   Proof.
     dependent elimination a; dependent induction b.
@@ -50,7 +65,9 @@ Renaming assignments on the left by precomposition.
     - apply r_cat_r_inj in x1.
       now rewrite x1 in x |-; rewrite x.
   Qed.
-
+(*|
+Simplifications of the embedding.
+|*)
   Lemma c_view_cat_simpl_l {Γ1 Γ2 x} (i : Γ1 ∋ x)
         : c_view_cat (r_cat_l i) = (Vcat_l i : c_cat_view Γ1 Γ2 x _) .
   Proof. apply view_cat_irr. Qed.
@@ -58,7 +75,9 @@ Renaming assignments on the left by precomposition.
   Lemma c_view_cat_simpl_r {Γ1 Γ2 x} (i : Γ2 ∋ x)
         : c_view_cat (r_cat_r i) = (Vcat_r i : c_cat_view Γ1 Γ2 x _) .
   Proof. apply view_cat_irr. Qed.
-
+(*|
+Simplifying copairing.
+|*)
   Lemma a_cat_proj_l {F Γ1 Γ2 Δ} (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
        : r_cat_l ᵣ⊛ [ u , v ] ≡ₐ u .
   Proof. intros ? i; cbn; now rewrite c_view_cat_simpl_l. Qed.
@@ -66,7 +85,9 @@ Renaming assignments on the left by precomposition.
   Lemma a_cat_proj_r {F Γ1 Γ2 Δ} (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ)
        : r_cat_r ᵣ⊛ [ u , v ] ≡ₐ v .
   Proof. intros ? i; cbv; now rewrite c_view_cat_simpl_r. Qed.
-
+(*|
+Universal property of copairing.
+|*)
   Lemma a_cat_uniq {F Γ1 Γ2 Δ}
     (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ) (w : (Γ1 +▶ Γ2) =[F]> Δ)
     (H1 : u ≡ₐ r_cat_l ᵣ⊛ w)
@@ -76,15 +97,26 @@ Renaming assignments on the left by precomposition.
     intros ? i; cbv.
     destruct (c_view_cat i); [ exact (H1 _ i) | exact (H2 _ j) ].
   Qed.
-
+(*|
+Identity copairing.
+|*)
   Lemma a_cat_id {Γ1 Γ2} : [ r_cat_l , r_cat_r ] ≡ₐ @r_id (Γ1 +▶ Γ2)%ctx  .
   Proof. now apply a_cat_uniq. Qed.
-
-  Definition r_cat₂ {Γ1 Γ2 Δ1 Δ2} (r1 : Γ1 ⊆ Δ1) (r2 : Γ2 ⊆ Δ2) : (Γ1 +▶ Γ2) ⊆ (Δ1 +▶ Δ2)
+(*|
+Action of concatenation on maps.
+|*)
+  Definition r_cat₂ {Γ1 Γ2 Δ1 Δ2} (r1 : Γ1 ⊆ Δ1) (r2 : Γ2 ⊆ Δ2)
+    : (Γ1 +▶ Γ2) ⊆ (Δ1 +▶ Δ2)
     := [ r1 ᵣ⊛ r_cat_l , r2 ᵣ⊛ r_cat_r ] .
   #[global] Arguments r_cat₂ _ _ _ _ _ _ _ _ /.
+(*|
+Shifting renamings on the right.
 
-  Definition r_shift {Γ Δ} R (r : Γ ⊆ Δ) : (Γ +▶ R) ⊆ (Δ +▶ R) := [ r ᵣ⊛ r_cat_l , r_cat_r ] .
+.. coq::
+   :name: rshift
+|*)
+  Definition r_shift {Γ Δ} R (r : Γ ⊆ Δ) : (Γ +▶ R) ⊆ (Δ +▶ R)
+    := [ r ᵣ⊛ r_cat_l , r_cat_r ] .
   #[global] Arguments r_shift _ _ _ _ _ _ /.
 
   Lemma r_shift_id {Γ R} : r_shift R (@r_id Γ) ≡ₐ r_id .
@@ -104,7 +136,9 @@ Renaming assignments on the left by precomposition.
     intros ?? H ? i; cbv; destruct (c_view_cat i); eauto.
     now rewrite H.
   Qed.
-
+(*|
+A bunch of shorthands for useful renamings.
+|*)
   Definition r_cat_rr {Γ1 Γ2 Γ3} : Γ3 ⊆ (Γ1 +▶ (Γ2 +▶ Γ3)) :=
     r_cat_r ᵣ⊛ r_cat_r .
 
@@ -122,7 +156,9 @@ Renaming assignments on the left by precomposition.
 
   Definition r_assoc_l {Γ1 Γ2 Γ3} : (Γ1 +▶ (Γ2 +▶ Γ3)) ⊆ ((Γ1 +▶ Γ2) +▶ Γ3)
     := [ r_cat_l ᵣ⊛ r_cat_l , r_cat3_3 ] .
-
+(*|
+Misc. laws.
+|*)
   Lemma r_cat3_1_simpl {F Γ1 Γ2 Γ3 Δ} (u : Γ1 =[F]> Δ) (v : Γ2 =[F]> Δ) (w : Γ3 =[F]> Δ)
         : r_cat3_1 ᵣ⊛ [ u , [ v , w ] ] ≡ₐ [ u , v ] .
   Proof.
@@ -146,7 +182,11 @@ Renaming assignments on the left by precomposition.
     - now rewrite c_view_cat_simpl_l, c_view_cat_simpl_r.
     - now rewrite c_view_cat_simpl_r.
   Qed.
-
+(*|
+These last two are pretty interesting, they are the proofs witnessing the associativity
+isomorphism ``Γ₁ +▶ (Γ₂ +▶ Γ₃) ≈ (Γ₁ +▶ Γ₂) +▶ Γ₃``. Here isomorphism means isomorphism
+of the set of variables.
+|*)
   Lemma r_assoc_rl {Γ1 Γ2 Γ3} : @r_assoc_l Γ1 Γ2 Γ3 ᵣ⊛ @r_assoc_r Γ1 Γ2 Γ3 ≡ₐ r_id .
   Proof.
     intros ? i; cbv; destruct (c_view_cat i).
@@ -165,7 +205,9 @@ Renaming assignments on the left by precomposition.
     - now rewrite 2 c_view_cat_simpl_r.
   Qed.
 End with_param.
-
+(*|
+Misc.
+|*)
 Ltac asgn_unfold :=
   repeat unfold a_empty, a_cat, a_map, r_id, a_ren_l, a_cat, r_cat₂, r_shift, r_cat3_1,
     r_cat3_2, r_cat3_3, r_assoc_r, r_assoc_l.

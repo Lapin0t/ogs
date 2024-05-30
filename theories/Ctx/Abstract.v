@@ -18,58 +18,58 @@ Nicolas Pouillard.
 Theory
 ------
 
-Categorically, it very simple. Contexts are represented by a set `C`, a distinguished
-element `∅` and a binary operation `- +▶ -`. Additionally it has a map representing
-variable `𝓋 : C → 𝒜` where `𝒜` is a sufficiently well-behaved category, typically a
+Categorically, it very simple. Contexts are represented by a set ``C``, a distinguished
+element ``∅`` and a binary operation ``- +▶ -``. Additionally it has a map representing
+variable ``𝐯 : C → 𝐀`` where ``𝐀`` is a sufficiently well-behaved category, typically a
 presheaf category. We then ask that
 
-- `𝓋 ∅ ≈ ⊥`, where `⊥` is the initial object in `𝒜` and
-- `𝓋 (Γ +▶ Δ) ≈ 𝓋 Γ + 𝓋 Δ` where `+` is the coproduct in `𝒜`.
+- ``𝐯 ∅ ≈ ⊥``, where ``⊥`` is the initial object in ``𝐀`` and
+- ``𝐯 (Γ +▶ Δ) ≈ 𝐯 Γ + 𝐯 Δ`` where `+` is the coproduct in ``𝐀``.
 
-Our category of contexts is basically the image of `𝓋`, which has the structure of a
-commutative monoid. Then, given a family `𝒳 : C → 𝒜`, it is easy to define
+Our category of contexts is basically the image of ``𝐯``, which has the structure of a
+commutative monoid. Then, given a family ``X : C → 𝐀``, it is easy to define
 assignments as::
 
-  Γ =[𝒳]> Δ ≔ 𝒜[ 𝓋 Γ , 𝒳 Δ ]
+  Γ =[X]> Δ ≔ 𝐀[ 𝐯 Γ , X Δ ]
 
 And renamings as::
 
-  Γ ⊆ Δ ≔ Γ =[ 𝓋 ]> Δ
-        ≔ 𝒜[ 𝓋 Γ , 𝓋 Δ ]
+  Γ ⊆ Δ ≔ Γ =[ 𝐯 ]> Δ
+        ≔ 𝐀[ 𝐯 Γ , 𝐯 Δ ]
 
-Assuming `𝒜` is (co-)powered over `Set`, the substitution tensor product and substitution
-internal hom in `C → 𝒜` are given by:: 
+Assuming ``𝐀`` is (co-)powered over ``Set``, the substitution tensor product and substitution
+internal hom in ``C → 𝐀`` are given by:: 
 
-  ( 𝒳 ⊗ 𝒴 ) Γ ≔ ∫^Δ  𝒳 Δ × (Δ =[ 𝒴 ]> Γ)
-  ⟦ 𝒳 , 𝒴 ⟧ Γ ≔ ∫_Δ  (Γ =[ 𝒳 ]> Δ) → 𝒴 Δ
+  ( X ⊗ Y ) Γ ≔ ∫^Δ  X Δ × (Δ =[ Y ]> Γ)
+  ⟦ X , Y ⟧ Γ ≔ ∫_Δ  (Γ =[ X ]> Δ) → Y Δ
 
-More generally, given a category `ℬ` (co-)powered over `Set` we can define the the
+More generally, given a category ``𝐁`` (co-)powered over ``Set`` we can define the the
 following functors, generalizing the substitution tensor and hom to heretogeneous
 settings::
 
-  ( - ⊗ - ) : (C → ℬ) → (C → 𝒜) → (C → ℬ)
-  ( 𝒳 ⊗ 𝒴 ) Γ ≔ ∫^Δ  𝒳 Δ × (Δ =[ 𝒴 ]> Γ)
+  ( - ⊗ - ) : (C → 𝐁) → (C → 𝐀) → (C → 𝐁)
+  ( X ⊗ Y ) Γ ≔ ∫^Δ  X Δ × (Δ =[ Y ]> Γ)
 
-  ⟦ - , - ⟧ : (C → 𝒜) → (C → ℬ) → (C → ℬ)
-  ⟦ 𝒳 , 𝒴 ⟧ Γ ≔ ∫_Δ  (Γ =[ 𝒳 ]> Δ) → 𝒴 Δ
+  ⟦ - , - ⟧ : (C → 𝐀) → (C → 𝐁) → (C → 𝐁)
+  ⟦ X , Y ⟧ Γ ≔ ∫_Δ  (Γ =[ X ]> Δ) → Y Δ
 
 Concretely
 ----------  
 
-We here apply the above theory to the case where `𝓐` is the family category `T → Set` for
-some set `T`. Taking `T` to the set of types of some object language, families `C → 𝒜`, ie
-`C → T → Set`, model nicely well-scoped and well-typed families. To capture non-typed
-syntactic categories, indexed only by a scope, we develop the special case where `ℬ` is
-just `Set`.
+We here apply the above theory to the case where ``𝐀`` is the family category ``T → Set``
+for some set ``T``. Taking ``T`` to the set of types of some object language, families
+``C → 𝐀``, ie ``C → T → Set``, model nicely well-scoped and well-typed families. To
+capture non-typed syntactic categories, indexed only by a scope, we develop the special
+case where ``𝐁`` is just ``Set``.
 
 We then instanciate this abstract structure with the usual lists and DeBruijn indices,
-but also with two useful instances: the direct sum, where the notion of variables `𝓋` is
-the pointwise coproduct and the subset, where the notion of variables is preserved.
+but also with two useful instances: the direct sum, where the notion of variables ``𝐯``
+is the pointwise coproduct and the subset, where the notion of variables is preserved.
 
 In further work we wish to tacle this in more generality, notable treating the case for
-the idiomatic presentation of well-scoped untyped syntax where `𝒜` is `Set`, `C` is `ℕ`
-and `𝓋` is `Fin`. Currently, we do treat untyped syntax, but using the non-idiomatic
-"unityped" presentation.
+the idiomatic presentation of well-scoped untyped syntax where ``𝐀`` is ``Set``, ``C``
+is ``ℕ`` and ``𝐯`` is ``Fin``. Currently, we do treat untyped syntax, but using the
+non-idiomatic "unityped" presentation.
 
 .. coq:: none
 |*)
