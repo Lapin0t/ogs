@@ -183,4 +183,7 @@ Section translation.
     - change (ₐ↓ ival_var) with (a_id (Γ:=ᵥ↓Γ2)).
       now rewrite e_hole_fill, e_sub_id.
   Qed.
+
+  Lemma ciu_is_subst_eq {Δ y Γ x} (a b : term Γ x)
+        : (forall (e : ectx Δ x y) (γ : Γ =[val]> Δ), )
 End translation.
