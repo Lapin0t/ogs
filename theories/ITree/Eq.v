@@ -602,4 +602,44 @@ We now do the same for up-to eating.
     * revert rr; apply it_eqF_mon.
       intros; econstructor; try econstructor; auto.
   Qed.
+
+  Variant tau_clo (RR : relᵢ X X) (R : relᵢ (itree E X) (itree E X))
+    i (x y : itree E X i) :=
+    | TauClo : it_wbisimF E RR R i (TauF x) (TauF y) -> tau_clo RR R i x y
+  .
+  #[global] Arguments TauClo {RR R i x y}.
+
+  Definition tau_clo_map (RR : relᵢ X X) : mon (relᵢ (itree E X) (itree E X)) :=
+    {| body R := tau_clo RR R ;
+       Hbody _ _ H _ _ _ '(TauClo r) :=
+         TauClo ((it_wbisim_map _ _).(Hbody) _ _ H _ (Tau' _) (Tau' _) r) |}.
+
+  Lemma it_wbisim_up2tau {ERX : Equivalenceᵢ RX} : tau_clo_map RX <= it_wbisim_t E RX.
+  Proof.
+    intros R ??? [[]].
+    dependent elimination r1; dependent elimination r2.
+    + dependent elimination rr.
+      apply (rule_done (it_wbisim_map _ _) _ _ (fun _ _ _ x => x)); exact t_rel.
+    + dependent elimination rr.
+      unshelve eapply (ft_t (it_wbisim_up2eat)).
+      econstructor;
+        [ exact EatRefl |
+        | apply (rule_done (it_wbisim_map _ _) _ _ (fun _ _ _ x => x)); exact t_rel ].
+      unfold it_eat'; unfold observe in i;
+        remember (_observe t1); clear - i.
+      dependent induction i; [ do 2 econstructor | ].
+      econstructor; now eapply IHi.
+    + dependent elimination rr.
+      unshelve eapply (ft_t (it_wbisim_up2eat)).
+      econstructor;
+        [ | exact EatRefl
+        | apply (rule_done (it_wbisim_map _ _) _ _ (fun _ _ _ x => x)); exact t_rel ].
+      unfold it_eat'; unfold observe in i;
+        remember (_observe t1); clear - i.
+      dependent induction i; [ do 2 econstructor | ].
+      econstructor; now eapply IHi.
+    + eapply (b_t (it_wbisim_map _ _)).
+      econstructor; [ exact i | exact i0 | exact rr ].
+Qed.
+  
 End wbisim_facts_hom.
