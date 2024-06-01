@@ -34,7 +34,7 @@ Meta
   - `Alectryon <https://github.com/cpitclaudel/alectryon>`_
 
 - Coq namespace: ``OGS``
-- `Documentation <https://lapin0t.github.io/ogs/Readme.html>`
+- `Documentation <https://lapin0t.github.io/ogs/Readme.html>`_
 
 Building instructions
 ---------------------
