@@ -34,7 +34,7 @@ Meta
   - `Alectryon <https://github.com/cpitclaudel/alectryon>`_
 
 - Coq namespace: ``OGS``
-- `Documentation <https://ogs-artifact.github.io/ogs-artifact/Readme.html>`
+- `Documentation <https://lapin0t.github.io/ogs/Readme.html>`
 
 Building instructions
 ---------------------
@@ -46,8 +46,8 @@ Download the project with
 
 .. code:: shell
 
-   git clone https://github.com/ogs-artifact/ogs-artifact.git
-   cd ogs-artifact
+   git clone https://github.com/lapin0t/ogs.git
+   cd ogs
 
 We stress that the development has been only checked to compile against these specific dependencies.
 In particular, it does not compiled at the moment against latest version of coq-coinduction due to major changes in the interface.

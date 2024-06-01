@@ -27,7 +27,7 @@ this library are:
   - [Coinduction](https://github.com/damien-pous/coinduction)
   - [Alectryon](https://github.com/cpitclaudel/alectryon)
 - Coq namespace: `OGS`
-- [Documentation](https://ogs-artifact.github.io/ogs-artifact/Readme.html)
+- [Documentation](https://lapin0t.github.io/ogs/Readme.html)
 
 ## Building instructions
 
@@ -36,8 +36,8 @@ this library are:
 Download the project with
 
 ``` shell
-git clone https://github.com/ogs-artifact/ogs-artifact.git
-cd ogs-artifact
+git clone https://github.com/lapin0t/ogs.git
+cd ogs
 ```
 
 We stress that the development has been only checked to compile against
@@ -93,62 +93,62 @@ make serve
 The Coq development is contained in the theory directory, which has the
 following structure, in approximate order of dependency.
 
-- [Readme.v](https://ogs-artifact.github.io/ogs-artifact/Readme.html): this file
-- [Prelude.v](https://ogs-artifact.github.io/ogs-artifact/Prelude.html): imports and setup
+- [Readme.v](https://lapin0t.github.io/ogs/Readme.html): this file
+- [Prelude.v](https://lapin0t.github.io/ogs/Prelude.html): imports and setup
 - Utils directory: general utilities
-  - [Rel.v](https://ogs-artifact.github.io/ogs-artifact/Rel.html): generalities for relations over indexed types
-  - [Psh.v](https://ogs-artifact.github.io/ogs-artifact/Psh.html): generalities for type families
+  - [Rel.v](https://lapin0t.github.io/ogs/Rel.html): generalities for relations over indexed types
+  - [Psh.v](https://lapin0t.github.io/ogs/Psh.html): generalities for type families
 - Ctx directory: general theory of contexts and variables
-  - [Family.v](https://ogs-artifact.github.io/ogs-artifact/Family.html): definition of scoped and sorted
+  - [Family.v](https://lapin0t.github.io/ogs/Family.html): definition of scoped and sorted
     families
-  - [Abstract.v](https://ogs-artifact.github.io/ogs-artifact/Abstract.html): definition of context and variable
+  - [Abstract.v](https://lapin0t.github.io/ogs/Abstract.html): definition of context and variable
     structure
-  - [Assignment.v](https://ogs-artifact.github.io/ogs-artifact/Assignment.html): generic definition of
+  - [Assignment.v](https://lapin0t.github.io/ogs/Assignment.html): generic definition of
     assignments
-  - [Renaming.v](https://ogs-artifact.github.io/ogs-artifact/Renaming.html): generic definition of renamings
-  - [Ctx.v](https://ogs-artifact.github.io/ogs-artifact/Ctx.html): definition of concrete contexts and DeBruijn
+  - [Renaming.v](https://lapin0t.github.io/ogs/Renaming.html): generic definition of renamings
+  - [Ctx.v](https://lapin0t.github.io/ogs/Ctx.html): definition of concrete contexts and DeBruijn
     indices
-  - [Covering.v](https://ogs-artifact.github.io/ogs-artifact/Covering.html): concrete context structure for
+  - [Covering.v](https://lapin0t.github.io/ogs/Covering.html): concrete context structure for
     Ctx.v
-  - [DirectSum.v](https://ogs-artifact.github.io/ogs-artifact/DirectSum.html): direct sum of context structures
-  - [Subset.v](https://ogs-artifact.github.io/ogs-artifact/Subset.html): sub context structure
+  - [DirectSum.v](https://lapin0t.github.io/ogs/DirectSum.html): direct sum of context structures
+  - [Subset.v](https://lapin0t.github.io/ogs/Subset.html): sub context structure
 - ITree directory: implementation of a variant of interaction trees
   over indexed types
-  - [Event.v](https://ogs-artifact.github.io/ogs-artifact/Event.html): indexed events parameterizing the
+  - [Event.v](https://lapin0t.github.io/ogs/Event.html): indexed events parameterizing the
     interactions of an itree
-  - [ITree.v](https://ogs-artifact.github.io/ogs-artifact/ITree.html): coinductive definition
-  - [Eq.v](https://ogs-artifact.github.io/ogs-artifact/Eq.html): strong and weak bisimilarity over interaction
+  - [ITree.v](https://lapin0t.github.io/ogs/ITree.html): coinductive definition
+  - [Eq.v](https://lapin0t.github.io/ogs/Eq.html): strong and weak bisimilarity over interaction
     trees
-  - [Structure.v](https://ogs-artifact.github.io/ogs-artifact/Structure.html): combinators (definitions)
-  - [Properties.v](https://ogs-artifact.github.io/ogs-artifact/Properties.html): general theory
-  - [Guarded.v](https://ogs-artifact.github.io/ogs-artifact/Guarded.html): (eventually) guarded equations and
+  - [Structure.v](https://lapin0t.github.io/ogs/Structure.html): combinators (definitions)
+  - [Properties.v](https://lapin0t.github.io/ogs/Properties.html): general theory
+  - [Guarded.v](https://lapin0t.github.io/ogs/Guarded.html): (eventually) guarded equations and
     iterations over them
-  - [Delay.v](https://ogs-artifact.github.io/ogs-artifact/Delay.html): definition of the delay monad (as a
+  - [Delay.v](https://lapin0t.github.io/ogs/Delay.html): definition of the delay monad (as a
     special case of trees)
 - OGS directory: construction of a sound OGS model for an abstract
   language
-  - [Subst.v](https://ogs-artifact.github.io/ogs-artifact/Subst.html): axiomatization of substitution monoid,
+  - [Subst.v](https://lapin0t.github.io/ogs/Subst.html): axiomatization of substitution monoid,
     substitution module
-  - [Obs.v](https://ogs-artifact.github.io/ogs-artifact/Obs.html): axiomatization of observation structure,
+  - [Obs.v](https://lapin0t.github.io/ogs/Obs.html): axiomatization of observation structure,
     normal forms
-  - [Machine.v](https://ogs-artifact.github.io/ogs-artifact/Machine.html): axiomatization of evaluation
+  - [Machine.v](https://lapin0t.github.io/ogs/Machine.html): axiomatization of evaluation
     structures, language machine
-  - [Game.v](https://ogs-artifact.github.io/ogs-artifact/Game.html): abstract game and OGS game definition
-  - [Strategy.v](https://ogs-artifact.github.io/ogs-artifact/Strategy.html): machine strategy and composition
-  - [CompGuarded.v](https://ogs-artifact.github.io/ogs-artifact/CompGuarded.html): proof of eventual guardedness
+  - [Game.v](https://lapin0t.github.io/ogs/Game.html): abstract game and OGS game definition
+  - [Strategy.v](https://lapin0t.github.io/ogs/Strategy.html): machine strategy and composition
+  - [CompGuarded.v](https://lapin0t.github.io/ogs/CompGuarded.html): proof of eventual guardedness
     of the composition of strategies
-  - [Adequacy.v](https://ogs-artifact.github.io/ogs-artifact/Adequacy.html): proof of adequacy of composition
-  - [Congruence.v](https://ogs-artifact.github.io/ogs-artifact/Congruence.html): proof of congruence of
+  - [Adequacy.v](https://lapin0t.github.io/ogs/Adequacy.html): proof of adequacy of composition
+  - [Congruence.v](https://lapin0t.github.io/ogs/Congruence.html): proof of congruence of
     composition
-  - [Soundness.v](https://ogs-artifact.github.io/ogs-artifact/Soundness.html): proof of soundness of the OGS
+  - [Soundness.v](https://lapin0t.github.io/ogs/Soundness.html): proof of soundness of the OGS
 - Examples directory: concrete instances of the generic construction
-  - [STLC_CBV.v](https://ogs-artifact.github.io/ogs-artifact/STLC_CBV.html): simply typed, call by value, lambda
+  - [STLC_CBV.v](https://lapin0t.github.io/ogs/STLC_CBV.html): simply typed, call by value, lambda
     calculus
-  - [ULC_CBV.v](https://ogs-artifact.github.io/ogs-artifact/ULC_CBV.html): untyped, call by value, lambda
+  - [ULC_CBV.v](https://lapin0t.github.io/ogs/ULC_CBV.html): untyped, call by value, lambda
     calculus
-  - [SystemL_CBV.v](https://ogs-artifact.github.io/ogs-artifact/SystemL_CBV.html): mu-mu-tilde calculus variant
+  - [SystemL_CBV.v](https://lapin0t.github.io/ogs/SystemL_CBV.html): mu-mu-tilde calculus variant
     System L, in call by value
-  - [SystemD.v](https://ogs-artifact.github.io/ogs-artifact/SystemD.html): mu-mu-tilde calculus variant System
+  - [SystemD.v](https://lapin0t.github.io/ogs/SystemD.html): mu-mu-tilde calculus variant System
     D, polarized
 
 ### Axioms
