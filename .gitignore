@@ -1,6 +1,5 @@
 _alectryon
 _build
-docs
 **/.Makefile.coq
 **/.Makefile.coq.d
 **/.makefile.coq.conf
