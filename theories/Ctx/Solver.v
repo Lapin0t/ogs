@@ -220,7 +220,7 @@ Section with_param.
 End with_param.
 
 Ltac quote_ctx t :=
- match eval hnf in t with
+ lazymatch eval hnf in t with
  | c_emp => constr:(CE_emp)
  | c_cat ?x ?y =>
      let x' := quote_ctx x in
@@ -230,8 +230,7 @@ Ltac quote_ctx t :=
  end.
 
 Ltac quote_ren t :=
-  lazymatch eval cbv beta iota zeta
-          delta - [ a_empty a_cat a_ren_l r_id r_cat_l r_cat_r ]
+  lazymatch eval cbv - [ a_empty a_cat a_ren_l r_id r_cat_l r_cat_r ]
         in t with
  | a_empty => constr:(RE_emp)
  | a_cat ?x ?y =>
@@ -260,18 +259,18 @@ Ltac exact_quote_ctx t := let t' := quote_ctx t in exact t'.
 Ltac exact_quote_ren t := let t' := quote_ren t in exact t'.
 
 Ltac ren_norm :=
-  match goal with
+  lazymatch goal with
   | [ |- ?r ≡ₐ ?s ] =>
       let r' := quote_ren r in
       let s' := quote_ren s in
       refine (r_norm_sound r' s' _)
+  | _ => fail "goal must be an assignment equivalence"
   end.
 Ltac ren_auto := ren_norm; reflexivity.
 
 (* test *)
 Goal forall T C (CC : context T C) (CL : context_laws T C) Γ1 Γ2 Γ3,
-       @r_assoc_l _ _ _ _ Γ1 Γ2 Γ3 ᵣ⊛ @r_assoc_r _ _ _ _ Γ1 Γ2 Γ3 ≡ₐ r_id  .
+       @r_assoc_l _ _ _ _ Γ1 Γ2 Γ3 ᵣ⊛ @r_assoc_r _ _ _ _ Γ1 Γ2 Γ3 ≡ₐ r_id .
   intros.
-  unfold r_assoc_l, r_assoc_r, r_cat3_1, r_cat3_3.
   ren_auto.
 Qed.
