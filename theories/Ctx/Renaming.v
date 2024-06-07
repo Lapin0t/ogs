@@ -44,7 +44,11 @@ Renaming assignments on the left by precomposition
   #[global] Instance a_ren_l_eq {F Γ1 Γ2 Γ3}
     : Proper (asgn_eq _ _ ==> asgn_eq _ _ ==> asgn_eq _ _)
              (@a_ren_l F Γ1 Γ2 Γ3) .
-  Proof. intros ?? H1 ?? H2 ??; cbn; now rewrite H1, H2. Qed.
+  Proof.
+    intros ?? H1 ?? H2 ??; cbn.
+    etransitivity; [ apply H2 | ].
+    f_equal; apply H1.
+  Qed.
 
   Lemma a_ren_l_id {F Γ1 Γ2} (a : Γ1 =[F]> Γ2) : r_id ᵣ⊛ a ≡ₐ a .
   Proof. reflexivity. Qed.
