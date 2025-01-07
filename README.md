@@ -1,10 +1,11 @@
 # An abstract, certified account of operational game semantics
 
-This is the companion artifact to the paper. The main contributions of
+This is the companion artifact to the ESOP paper. The main contributions of
 this library are:
 
-- an independent implementation of an indexed counterpart to the itree
-  library with support for guarded and eventually guarded recursion
+- an independent implementation of an indexed counterpart to the
+  InteractionTree Coq library with support for guarded and eventually guarded
+  recursion
 - an abstract OGS model of an axiomatised language proven sound w.r.t.
   substitution equivalence
 - several instantiations of this abstract result to concrete
@@ -29,20 +30,20 @@ this library are:
 - Coq namespace: `OGS`
 - [Documentation](https://lapin0t.github.io/ogs/Readme.html)
 
-## Building instructions
+## Getting Started
 
-### Installing dependencies
+### Installing the dependencies
 
 Download the project with
 
 ``` shell
-git clone https://github.com/lapin0t/ogs.git
+git clone -b esop25 https://github.com/lapin0t/ogs.git
 cd ogs
 ```
 
 We stress that the development has been only checked to compile against
 these specific dependencies. In particular, it does not compiled at the
-moment against latest version of coq-coinduction due to major changes in
+moment against latest version of `coq-coinduction` due to major changes in
 the interface.
 
 Installing the opam dependencies automatically:
@@ -59,13 +60,13 @@ opam pin coq-equations 1.3
 opam pin coq-coinduction 1.6
 ```
 
-### Building the project
+### Typechecking the Coq code
 
 ``` shell
 dune build
 ```
 
-### Alectryon documentation
+### Generating the Alectryon documentation
 
 To build the html documentation, first install Alectryon:
 
