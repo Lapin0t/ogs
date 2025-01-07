@@ -9,8 +9,8 @@ Having defined the `OGS game <Game.html>`_ and axiomatized the
 |*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel.
-From OGS.Ctx Require Import All Ctx.
-From OGS.OGS Require Import Subst Obs Machine Game.
+From OGS.Ctx Require Import All Ctx Subst.
+From OGS.OGS Require Import Obs Machine Game.
 From OGS.ITree Require Import Event ITree Eq Structure Delay.
 
 Reserved Notation "'ε⁺'".

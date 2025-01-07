@@ -29,8 +29,8 @@ Section with_param.
   Context {T C : Type} {CC : context T C} {CL : context_laws T C}.
 
 (*|
-Definition of assignments
--------------------------
+Definition of assignments (Def. 5)
+----------------------------------
 
 We distinguish assignments, mapping variables in a context to terms, from
 substitutions, applying an assignment to a term. Assignments are intrinsically

@@ -26,7 +26,7 @@ presheaf category. We then ask that
 - ``𝐯 ∅ ≈ ⊥``, where ``⊥`` is the initial object in ``𝐀`` and
 - ``𝐯 (Γ +▶ Δ) ≈ 𝐯 Γ + 𝐯 Δ`` where `+` is the coproduct in ``𝐀``.
 
-Our category of contexts is basically the image of ``𝐯``, which has the structure of a
+Our category of contexts is then the full image of ``𝐯``, which has the structure of a
 commutative monoid. Then, given a family ``X : C → 𝐀``, it is easy to define
 assignments as:
 

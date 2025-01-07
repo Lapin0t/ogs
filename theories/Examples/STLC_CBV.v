@@ -15,9 +15,9 @@ CIU-equivalence.
 |*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel.
-From OGS.Ctx Require Import All Ctx Covering.
+From OGS.Ctx Require Import All Ctx Covering Subst.
 From OGS.ITree Require Import ITree Delay.
-From OGS.OGS Require Import Subst Obs Soundness.
+From OGS.OGS Require Import Obs Soundness.
 (*|
 Syntax
 ------

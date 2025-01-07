@@ -12,8 +12,8 @@ indeed eventually guarded. As described in §6.3, the proof relies crucially on 
 |*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Psh Rel.
-From OGS.Ctx Require Import All Ctx.
-From OGS.OGS Require Import Subst Obs Machine Game Strategy.
+From OGS.Ctx Require Import All Ctx Subst.
+From OGS.OGS Require Import Obs Machine Game Strategy.
 From OGS.ITree Require Import Event ITree Eq Delay Structure Properties Guarded.
 
 Require Import Coq.Arith.PeanoNat.

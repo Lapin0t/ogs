@@ -12,8 +12,8 @@ of weak bisimilarity for composition, very little remains to do here.
 From Coinduction Require Import coinduction.
 
 From OGS Require Import Prelude.
-From OGS.Ctx Require Import All.
-From OGS.OGS Require Export Subst Obs Machine Game Strategy CompGuarded Adequacy Congruence.
+From OGS.Ctx Require Import All Subst.
+From OGS.OGS Require Export Obs Machine Game Strategy CompGuarded Adequacy Congruence.
 From OGS.ITree Require Import Eq Guarded.
 
 Section with_param.

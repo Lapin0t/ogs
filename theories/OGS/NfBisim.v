@@ -1,8 +1,8 @@
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Rel.
-From OGS.Ctx Require Import All Ctx Covering.
+From OGS.Ctx Require Import All Ctx Covering Subst.
 From OGS.ITree Require Import Event ITree Eq Delay.
-From OGS.OGS Require Import Subst Obs Game Machine.
+From OGS.OGS Require Import Obs Game Machine.
 
 Section with_param.
   Context `{CC : context T C} {CL : context_laws T C} (obs : obs_struct T C).

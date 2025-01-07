@@ -21,8 +21,7 @@ provide specific utilities on top.
 |*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Rel.
-From OGS.Ctx Require Import All.
-From OGS.OGS Require Import Subst.
+From OGS.Ctx Require Import All Subst.
 From OGS.ITree Require Import Event ITree Delay Eq Properties.
 
 Open Scope ctx_scope.

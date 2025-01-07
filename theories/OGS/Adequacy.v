@@ -18,8 +18,8 @@ From Coinduction Require Import coinduction.
 
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Rel.
-From OGS.Ctx Require Import All Ctx.
-From OGS.OGS Require Import Subst Obs Machine Strategy CompGuarded.
+From OGS.Ctx Require Import All Ctx Subst.
+From OGS.OGS Require Import Obs Machine Strategy CompGuarded.
 From OGS.ITree Require Import Event ITree Eq Delay Structure Properties Guarded.
 
 Section with_param.

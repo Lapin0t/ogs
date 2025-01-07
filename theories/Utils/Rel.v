@@ -40,11 +40,13 @@ Variant sumᵣ {I} {X1 X2 Y1 Y2 : psh I} (R : relᵢ X1 X2) (S : relᵢ Y1 Y2) :
 .
 #[global] Hint Constructors sumᵣ : core.
 
-#[global] Instance sum_equiv {I} {X Y : psh I} {R : relᵢ X X} (_ : Equivalenceᵢ R) {S : relᵢ Y Y} (_ : Equivalenceᵢ S): Equivalenceᵢ (sumᵣ R S).
-econstructor.
-- intros []; eauto.
-- intros ? ? []; econstructor; symmetry; eauto.
-- intros ? ? ? ? ?. dependent destruction H1; dependent destruction H2; econstructor; etransitivity; eauto.
+#[global] Instance sum_equiv {I} {X Y : psh I} {R : relᵢ X X} (_ : Equivalenceᵢ R) {S : relᵢ Y Y} (_ : Equivalenceᵢ S) : Equivalenceᵢ (sumᵣ R S).
+Proof.
+  econstructor.
+  - intros []; eauto.
+  - intros ? ? []; econstructor; symmetry; eauto.
+  - intros ? ? ? ? ?. dependent destruction H1;
+    dependent destruction H2; econstructor; etransitivity; eauto.
 Qed.
 
 Definition seqᵢ {I} {X Y Z : psh I} (R0 : relᵢ X Y) (R1 : relᵢ Y Z) : relᵢ X Z :=

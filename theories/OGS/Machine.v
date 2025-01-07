@@ -27,8 +27,8 @@ straightforward.
 |*)
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Rel.
-From OGS.Ctx Require Import All.
-From OGS.OGS Require Import Subst Obs.
+From OGS.Ctx Require Import All Subst.
+From OGS.OGS Require Import Obs.
 From OGS.ITree Require Import Event Eq Delay.
 
 Section with_param.
