@@ -40,7 +40,7 @@ Derive NoConfusion for ctx.
 (*|
 We wish to manipulate intrinsically typed terms. We hence need a tightly typed notion of
 position in the context: rather than a loose index, ``var x Γ`` is a proof of membership
-of ``x`` to ``Γ``: a well-scoped and well-typed DeBruijn index.
+of ``x`` to ``Γ``: a well-scoped and well-typed DeBruijn index. See Ex. 5.
 .. coq::
    :name: concretevar
 |*)

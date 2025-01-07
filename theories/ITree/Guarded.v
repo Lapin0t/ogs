@@ -14,8 +14,8 @@ powerful tool to prove the equivalence of two computations.
 Through this file, we recover uniqueness by introducing an alternate
 combinator ``iter_guarded`` restricted to so-called *guarded* sets of equations:
 they cannot be reduced to immediately returning a new index to iterate over.
-Both combinators agree over guarded equations, but the new one satisfies
-uniqueness.
+Both combinators agree over guarded equations (w.r.t. to weak bisimilarity), but
+the new one satisfies uniqueness.
 
 Then, we refine the result to allow more sets of equations: not all must
 be guarded, but they must always finitely lead to a guarded one.
@@ -35,7 +35,7 @@ Section guarded.
   Context {I} {E : event I I}.
 (*|
 A set of equations is an (indexed) family of computations, i.e. body fed to the
-combinator.
+combinator (Def. 30).
 
 .. coq::
    :name: equation
@@ -56,7 +56,8 @@ strong bisimilarity. It therefore may:
 - produce a silent step
 - produce an external event
 
-A set of equation is then said to be guarded if all its equations are guarded.
+A set of equation is then said to be guarded if all its equations are guarded
+(Def. 33).
 
 .. coq::
    :name: guarded
@@ -95,6 +96,8 @@ a new index, which we can here rule out via ``elim_guarded``.
             | inr y => RetF y
             end .
 (*|
+A better iteration for guarded equations.
+
 .. coq::
    :name: iterguarded
 |*)
@@ -133,6 +136,7 @@ one.
     all: intros ? ? x2 ->; destruct x2; auto.
   Qed.
 (*|
+Guarded iteration is a fixed point of the equation w.r.t. strong bisimilarity.
 .. coq::
    :name: iterguardedfix
 |*)
@@ -152,7 +156,7 @@ one.
   Qed.
 (*|
 The payoff: ``iter_guarded`` does not only deliver a solution to the equations,
-but it also is unique.
+but it also is the unique such.
 
 .. coq::
    :name: iterguardeduniq
@@ -237,14 +241,16 @@ Eventually guarded iteration
 For our purpose, proving the soundness of the ogs, guardedness is a bit too
 restrictive: while not all equations are guarded, they all inductively lead
 to a guarded one. We capture this intuition via the notion of "eventually
-guarded" set of equations, and establish similar result to ones in the guarded case.
+guarded" set of equations, and establish similar result to ones in the
+guarded case (these properties are collectively refered to as Prop. 5 in the
+paper).
 |*)
 Section eventually_guarded.
 
   Context {I} {E : event I I}.
 (*|
 A set of equations is eventually guarded if they all admit an inductive path following
-its non-guarded indirections that leads to a guarded equation.
+its non-guarded indirections that leads to a guarded equation (Def. 34).
 
 .. coq::
    :name: evguarded

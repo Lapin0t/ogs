@@ -3,7 +3,7 @@ Interaction Trees: Theory of the structure
 ==========================================
 
 We collect in these file the main lemmas capturing the applicative,
-monadic, and iterative structure of itrees.
+monadic, and (unguarded) iteration structure of itrees.
 
 .. coq:: none
 |*)
@@ -16,6 +16,15 @@ From OGS.ITree Require Import Event ITree Structure Eq.
 |*)
 Section withE.
   Context {I} {E : event I I}.
+
+  Lemma skip_tau {X i} (t : itree E X i) : Tau' t ≈ t .
+  Proof.
+    eapply (gfp_fp (it_wbisim_map E (eqᵢ _))); econstructor.
+    - apply EatStep, EatRefl.
+    - apply EatRefl.
+    - destruct (observe t); now econstructor.
+  Qed.
+
 (*|
 ``fmap`` respects strong bisimilarity.
 |*)
@@ -80,7 +89,7 @@ Section withE.
         intro r; now apply CIH.
   Qed.
 (*|
-``subst`` respects weak bisimilarity.
+``subst`` respects strong bisimilarity.
 |*)
   #[global] Instance subst_eq {X Y} {RX : relᵢ X X} {RY : relᵢ Y Y} :
     Proper (dpointwise_relation (fun i => RX i ==> it_eq RY (i:=i))
@@ -160,7 +169,7 @@ Composition law of ``fmap``.
     destruct ((f i r).(_observe)); eauto.
   Qed.
 (*|
-Rewording composition law of ``bind``.
+Rewording the composition law of ``bind``.
 |*)
   Lemma subst_subst {X Y Z}
     (f : Y ⇒ᵢ itree E Z) (g : X ⇒ᵢ itree E Y) {i} (x : itree E X i) :
@@ -232,7 +241,7 @@ Up-to ``bind`` is valid for weak bisimilarity.
      econstructor; [ apply k_rel | intros; now apply (b_T (it_wbisim_map E RY)), v ].
  Qed.
 (*|
-Bisimilar equations have bisimilar iteration (weakly and strongly).
+Pointwise strongly bisimilar equations have strongly bisimilar iteration.
 |*)
   Lemma iter_cong_strong {X1 X2 Y1 Y2} {RX : relᵢ X1 X2} {RY : relᵢ Y1 Y2}
     f g (_ : forall i a b, RX i a b ->  it_eq (sumᵣ RX RY) (f i a) (g i b)) :
@@ -258,7 +267,9 @@ Bisimilar equations have bisimilar iteration (weakly and strongly).
               ==> dpointwise_relation (fun i => RX i ==> it_eq RY (i:=i)))
       (@iter I E X Y)
     := iter_cong_strong.
-
+(*|
+Pointwise weakly bisimilar equations have weakly bisimilar iteration.
+|*)
   Lemma iter_cong_weak {X1 X2 Y1 Y2} {RX : relᵢ X1 X2} {RY : relᵢ Y1 Y2}
     f g (_ : forall i a b, RX i a b -> it_wbisim (sumᵣ RX RY) i (f i a) (g i b)) :
     forall i a b, RX i a b -> it_wbisim (E:=E) RY i (iter f i a) (iter g i b).
@@ -317,28 +328,20 @@ Iteration is a strong fixed point of the folowing guarded equation.
     destruct r; eauto.
   Qed.
 (*|
-Iteration is the unique such fixed point w.r.t. strong bisimilarity. Note that this
-is again not w.r.t. the initial equation but the alternate one which is trivially
-guarded. See example 6.14 in the paper.
+Iteration is a weak fixed point of the equation (Prop. 3).
 |*)
-  Lemma iter_uniq {X Y RY} `{Equivalenceᵢ RY}
-    (f : X ⇒ᵢ itree E (X +ᵢ Y)) (g : X ⇒ᵢ itree E Y)
-    (EQ : forall i x, it_eq RY (g i x) (bind (f i x) (fun _ r => go (match r with
-                                                             | inl x => TauF (g _ x)
-                                                             | inr y => RetF y end)))) :
-    forall i x, it_eq RY (g i x) (iter f i x).
+  Lemma iter_fix {X Y} (f : X ⇒ᵢ itree E (X +ᵢ Y)) {i x} :
+      (iter f i x)
+      ≈
+      (bind (f i x) (fun _ r => match r with
+                             | inl x => iter f _ x
+                             | inr y => Ret' y end)).
   Proof.
-    unfold it_eq; coinduction R CIH; intros i x.
-    apply (bt_tbt (it_eq_map E RY)).
-    etransitivity.
-    now unshelve eapply (Hbody (it_eq_t E RY) _ _ _ _ _ _ (EQ i x)).
-    etransitivity; cycle 1.
-    symmetry; now unshelve eapply (Hbody (it_eq_t E RY) _ _ _ _ _ _ (iter_unfold f)).
-    eapply (it_eq_up2bind_t (eqᵢ (X +ᵢ Y)) RY).
-    econstructor. reflexivity.
-    intros ? ? [] ->; econstructor.
-    now apply CIH.
-    reflexivity.
+    rewrite iter_unfold.
+    apply (tt_t (it_wbisim_map E _)); cbn.
+    apply (it_wbisim_up2bind_t (eqᵢ (X +ᵢ Y)) _).
+    econstructor; eauto; intros ?? [] ->; auto.
+    exact (skip_tau _).
   Qed.
 End withE.
 (*|
@@ -347,14 +350,3 @@ Misc. utilities.
 Variant is_tau' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
   | IsTau {t : itree E X i} : is_tau' (TauF t) .
 Definition is_tau {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_tau' t.(_observe).
-
-Variant is_ret' {I} {E : event I I} {X i} : itree' E X i -> Prop :=
-  | IsRet {x : X i} : is_ret' (RetF x) .
-Definition is_ret {I} {E : event I I} {X i} (t : itree E X i) : Prop := is_ret' t.(_observe).
-
-Definition is_ret_get {I} {E : event I I} {X i} {t : itree E X i} : is_ret t -> X i .
-Proof.
-  unfold is_ret.
-  destruct (_observe t); intro p; try dependent elimination p.
-  exact r.
-Defined.

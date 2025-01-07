@@ -1,5 +1,5 @@
 (*|
-Substitution structures (§ 4.3)
+Substitution structures (§ 4.1)
 ===============================
 
 In this file we axiomatize what it means for a family to support substitution.
@@ -12,8 +12,8 @@ From OGS.Ctx Require Import All.
 
 Open Scope ctx_scope.
 (*|
-Substitution Monoid (Def. 4.9)
-------------------------------
+Substitution Monoid (Def. 7)
+----------------------------
 
 The specification of an evaluator will be separated in several steps. First we will ask
 for a family of values, i.e. objects that can be substituted for variables. We formalize
@@ -74,8 +74,8 @@ Class subst_monoid_laws `{CC : context T C} (val : Fam₁ T C) {VM : subst_monoi
           {Γ1 Γ2 x} {v : val Γ1 x} : Proper (asgn_eq Γ1 Γ2 ==> eq) (v_sub v).
 Proof. now apply v_sub_proper. Qed.
 (*|
-Substitution Module (Def. 4.11)
--------------------------------
+Substitution Module (Def. 8)
+----------------------------
 
 Next, we ask for a module over the monoid of values, to represent the configurations
 of the machine.
@@ -125,10 +125,7 @@ By post-composing with the substitution identity, we can embed renamings into as
   #[global] Arguments r_emb {_ _} _ _ /.
 
 (*|
-Renaming is now simply a matter of substituting by the embedded renaming. We could have
-gone full on category theory and defined them respectively as
-``v_sub ⦿₁ hom_precomp₁ v_var`` and ``c_sub ⦿₀ hom_precomp₀ v_var`` but on top of being a
-bit pedantic, this would not behave nicely with unfolding.
+Renaming is now simply a matter of substituting by the embedded renaming.
 |*)
   Definition v_ren : val ⇒₁ ⟦ c_var , val ⟧₁
     := fun _ _ v _ r => v ᵥ⊛ r_emb r.
@@ -157,6 +154,8 @@ we need the following additional assumptions:
 - ``v_var`` is injective
 - the fibers of ``v_var`` pull back along renamings
 
+These assumptions are named "clear-cut" in the paper (Def. 27).
+
 We first define the fibers of ``v_var``.
 |*)
 Variant is_var `{VM : subst_monoid T C val} {Γ x} : val Γ x -> Type :=
@@ -176,7 +175,7 @@ Proof.
   econstructor.
 Qed.
 (*|
-At last we define our last assumptions on variables.
+At last we define our last assumptions on variables (Def. 28).
 |*)
 Class var_assumptions `{CC : context T C} (val : Fam₁ T C) {VM : subst_monoid val} := {
   v_var_inj {Γ x} : injective (@v_var _ _ _ _ _ Γ x) ;

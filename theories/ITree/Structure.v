@@ -16,13 +16,6 @@ From OGS.ITree Require Import Event ITree.
 |*)
 Section monad.
   Context {I} {E : event I I}.
-
-  Definition eat_one_tau {X i} (t : itree E X i) : itree E X i :=
-    go match t.(_observe) with
-       | RetF x => RetF x
-       | TauF t => t.(_observe)
-       | VisF q k => VisF q k
-       end .
 (*|
 Functorial action on maps.
 |*)
@@ -50,7 +43,7 @@ Monadic bind.
   Definition kcomp {X Y Z} (f : X ⇒ᵢ itree E Y) (g : Y ⇒ᵢ itree E Z) : X ⇒ᵢ itree E Z :=
     fun i x => bind (f i x) g.
 (*|
-Iteration operator.
+Iteration operator (Def. 31).
 
 .. coq::
    :name: iter
@@ -67,16 +60,3 @@ End monad.
 #[global] Notation "x >>= f" := (bind x f) (at level 30).
 #[global] Notation "f =<< x" := (subst f _ x) (at level 30).
 #[global] Notation "f >=> g" := (kcomp f g) (at level 30).
-(*|
-Given a map between events, we can translate the interaction trees. This exhibits
-``itree`` itself as a functor from the category of events to the category of endofunctors
-on indexed sets.
-|*)
-Definition emap {I} {A B : event I I} (F : A ⇒ₑ B) {X} : itree A X ⇒ᵢ itree B X :=
-  cofix _emap _ u :=
-      go match u.(_observe) with
-         | RetF r => RetF r
-         | TauF t => TauF (_emap _ t)
-         | VisF e k => VisF (F.(ea_qry) e)
-                           (fun r => _emap _ (rew (F.(ea_nxt)) in k (F.(ea_rsp) r)))
-         end.

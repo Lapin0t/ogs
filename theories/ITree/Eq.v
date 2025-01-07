@@ -75,7 +75,7 @@ Definition it_eq_map {I} E {X1 X2} RX : mon (relᵢ (@itree I E X1) (@itree I E 
   Hbody _ _ H _ _ _ r := it_eqF_mon _ _ H _ _ _ r ;
 |}.
 (*|
-Now the definition of the bisimilarity itself as greatest fixed point.
+Now the definition of the bisimilarity itself as greatest fixed point. See Def. 10.
 
 .. coq::
    :name: sbisim
@@ -265,7 +265,7 @@ Section wbisim.
     |}.
 (*|
 And this is it, we can define heterogeneous weak bisimilarity by ``it_wbisim RR`` for some
-value relation ``RR``.
+value relation ``RR``. See Def. 10.
 
 .. coq::
    :name: wbisim

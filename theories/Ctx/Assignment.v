@@ -77,7 +77,8 @@ for any functor category ``ctx → C``, which we do here for Fam₀ and Fam₂ (
 bisorted, scoped families). This will be helpful to define what it means to
 substitute other kinds of syntactic objects.
 
-See `Ctx/Abstract.v <Abstract.html>`_ for more details on the theory.
+See `Ctx/Abstract.v <Abstract.html>`_ for more details on the theory. This is called
+the _power object_ (Def. 6) in the paper.
 
 .. coq::
    :name: ihom
@@ -98,24 +99,6 @@ See `Ctx/Abstract.v <Abstract.html>`_ for more details on the theory.
   #[global] Arguments internal_hom₀ _ _ _ /.
   #[global] Arguments internal_hom₁ _ _ _ _ /.
   #[global] Arguments internal_hom₂ _ _ _ _ _ /.
-(*|
-Experimental. The left action on maps of the internal hom bifunctor.
-|*)
-  Definition hom_precomp₀ {F1 F2 : Fam₁ T C} {G} (m : F1 ⇒₁ F2)
-    : ⟦ F2 , G ⟧₀ ⇒₀ ⟦ F1 , G ⟧₀
-    := fun _ f _ a => f _ (fun _ i => m _ _ (a _ i)).
-  Definition hom_precomp₁ {F1 F2 : Fam₁ T C} {G} (m : F1 ⇒₁ F2)
-    : ⟦ F2 , G ⟧₁ ⇒₁ ⟦ F1 , G ⟧₁
-    := fun _ _ f _ a => f _ (fun _ i => m _ _ (a _ i)).
-  Definition hom_precomp₂ {F1 F2 : Fam₁ T C} {G} (m : F1 ⇒₁ F2)
-    : ⟦ F2 , G ⟧₂ ⇒₂ ⟦ F1 , G ⟧₂
-    := fun _ _ _ f _ a => f _ (fun _ i => m _ _ (a _ i)).
-(*|
-.. coq:: none
-|*)
-  #[global] Arguments hom_precomp₀ _ _ _ _ _ _ /.
-  #[global] Arguments hom_precomp₁ _ _ _ _ _ _ _ /.
-  #[global] Arguments hom_precomp₂ _ _ _ _ _ _ _ _ /.
 (*|
 Constructing a sorted family of operations from O with arguments taken from the family F.
 

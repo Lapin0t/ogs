@@ -15,7 +15,7 @@ From OGS.Utils Require Import Psh Rel.
 From OGS.ITree Require Import Event ITree Structure Eq.
 
 (*|
-The delay monad (Def 4.5) is formalized as an itree over an empty signature: in the
+The delay monad (Def. 9) is formalized as an itree over an empty signature: in the
 absence of events, ``Tau`` and ``Ret`` are the only possible transitions.
 
 Relevant definitions can be found:
@@ -31,7 +31,7 @@ Relevant definitions can be found:
 Definition delay (X : Type) : Type := itree ∅ₑ (fun _ => X) T1_0.
 
 (*|
-Embedding [delay] into itrees over arbitrary signatures.
+Embedding ``delay`` into itrees over arbitrary signatures.
 |*)
 Definition emb_delay {I} {E : event I I} {X i} : delay X -> itree E (X @ i) i :=
   cofix _emb_delay x :=
@@ -62,6 +62,7 @@ Definition bind_delay {I} {E : event I I} {X Y i}
   := fun x f => bind (emb_delay x) (fun _ '(Fib x) => f x) .
 (*|
 Simpler definition of bind when the conclusion is again in delay.
+See Not. 4.
 
 .. coq::
    :name: delaybind
