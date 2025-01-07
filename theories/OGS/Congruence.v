@@ -1,6 +1,6 @@
 (*|
-Congruence (Def 6.1)
-=====================
+Congruence (Prop. 4)
+====================
 
 We prove in this module that weak bisimilarity is a congruence for composition. The proof
 makes a slight technical side step: we prove the composition to be equivalent to an
@@ -177,5 +177,18 @@ Now we relate the normal composition and the opaque composition of opacified sta
         now apply CIH.
       + destruct q.
     - destruct q.
+  Qed.
+
+  #[global] Instance compo_proper {Δ a}
+    : Proper (m_strat_act_eqv a
+                ==> m_strat_pas_eqv a
+                ==> it_wbisim (eqᵢ _) T1_0)
+        (compo (Δ:=Δ) (a:=a)).
+  Proof.
+    intros ?? Ha ?? Hp.
+    unfold compo; rewrite <- 2 compo_compo_alt.
+    apply compo_alt_proper.
+    exact Ha.
+    exact Hp.
   Qed.
 End with_param.

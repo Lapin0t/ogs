@@ -48,11 +48,11 @@ the induced LTS are bisimilar when composed with the passive interpretation of `
 Barbed equivalence is sound w.r.t. substitution equivalence, by swapping the naive
 composition with the guarded one and then applying adequacy.
 |*)
-  Theorem barb_correction {Γ} Δ (x y : conf Γ) : x ≈⟦barb Δ ⟧≈ y -> x ≈⟦sub Δ ⟧≈ y.
+  Theorem barb_correction {Γ} Δ (x y : conf Γ) : x ≈⟦barb Δ⟧≈ y -> x ≈⟦sub Δ⟧≈ y.
   Proof.
     intros H e.
-    rewrite (it_eq_wbisim _ _ _ (adequacy x e)), (it_eq_wbisim _ _ _ (adequacy y e)).
-    unfold compo_ev_guarded; rewrite 2 iter_evg_iter; apply H.
+    rewrite (adequacy x e), (adequacy y e).
+    apply H.
   Qed.
 (*|
 Our main theorem: bisimilarity of induced OGS machine strategies is sound w.r.t.
@@ -62,12 +62,12 @@ composition with the `opaque one <Congruence.html>`_ and then applying congruenc
 .. coq::
    :name: soundness
 |*)
-  Theorem ogs_correction {Γ} Δ (x y : conf Γ) : x ≈⟦ogs Δ ⟧≈ y -> x ≈⟦sub Δ ⟧≈ y.
+  Theorem ogs_correction {Γ} Δ (x y : conf Γ) : x ≈⟦ogs Δ⟧≈ y -> x ≈⟦sub Δ⟧≈ y.
   Proof.
     intro H; apply barb_correction.
-    intro e; unfold compo.
-    rewrite <- 2 (compo_compo_alt (x := RedT _ _)).
-    apply compo_alt_proper; [ exact H | intro; reflexivity ].
+    intro e.
+    apply compo_proper; auto.
+    intros ?; unfold m_strat_act_eqv; reflexivity.
   Qed.
 End with_param.
 (*|

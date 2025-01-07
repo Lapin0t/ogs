@@ -1,5 +1,5 @@
 (*|
-Adequacy (Def 6.1)
+Adequacy (Prop. 7)
 ==================
 
 We prove in this module that the composition of strategy is adequate.
@@ -7,9 +7,9 @@ The proof essentially proceeds by showing that "evaluating and observing",
 i.e., ``reduce``, is a solution of the same equations as is the composition
 of strategies.
 
-This argument assumes we can rely on the unicity of such a solution:
-we prove this fact by proving that these equations are eventually
-guarded in `OGS/CompGuarded.v <CompGuarded.html>`_.
+This argument assumes we can rely on the unicity of such a solution (Prop. 6):
+we prove this fact by proving that these equations are eventually guarded in
+`OGS/CompGuarded.v <CompGuarded.html>`_.
 
 .. coq:: none
 |*)
@@ -19,7 +19,7 @@ From Coinduction Require Import coinduction.
 From OGS Require Import Prelude.
 From OGS.Utils Require Import Rel.
 From OGS.Ctx Require Import All Ctx Subst.
-From OGS.OGS Require Import Obs Machine Strategy CompGuarded.
+From OGS.OGS Require Import Obs Machine Strategy CompGuarded Congruence.
 From OGS.ITree Require Import Event ITree Eq Delay Structure Properties Guarded.
 
 Section with_param.
@@ -33,7 +33,7 @@ appropriate axiomatization.
   Context {obs : obs_struct T C} {M : machine val conf obs} {ML : machine_laws val conf obs}.
   Context {VV : var_assumptions val}.
 (*|
-We define ``reduce``, called "zip-then-eval-then-observe" in the paper.
+We define ``reduce``, called "zip-then-eval-then-observe" (``z-e-obs``) in the paper.
 
 .. coq::
    :name: zeobs
@@ -48,7 +48,7 @@ We define ``reduce``, called "zip-then-eval-then-observe" in the paper.
 (*|
 Equipped with eventually guarded equations, we are ready to prove the adequacy.
 
-First a technical lemma, rewriting one step of compo, then reduce to a simpler
+First a technical lemma, which unfolds one step of composition, then reduce to a simpler
 more explicit form.
 |*)
   Lemma compo_reduce_simpl {Δ} (x : reduce_t Δ) :
@@ -102,7 +102,8 @@ partial assignments ``[ a_id , e ]`` instead of full assignments.
 Note the use of ``iter_evg_uniq``: the proof of adequacy is proved by unicity
 of the fixed point, which is made possible by equivalently viewing the fixpoint
 combinator used to define the composition of strategy as a fixpoint of eventually
-guarded equations.
+guarded equations. We here prove the generalization of adequacy, namely that
+``reduce`` is a fixed point of the composition equation.
 
 .. coq::
    :name: zeo-fix
@@ -126,7 +127,7 @@ guarded equations.
                   = ((ₐ↓ red_pas cut_ty j ᵥ⊛ r_emb r_cat3_1) ⊙ o ⦗ r_cat_rr ᵣ⊛ a_id ⦘
        ₜ⊛ [a_id, [bicollapse v red_pas, a ⊛ [a_id, bicollapse v red_pas]]])).             
         rewrite app_sub, <- v_sub_sub.
-      
+
         (* AAAAA setoid rewriting!!!! *)
         etransitivity; cycle 1.
         unshelve erewrite v_sub_proper.
@@ -148,17 +149,19 @@ guarded equations.
       now rewrite H.
   Qed.
 (*|
-Adequacy (Def 6.1) holds.
+Adequacy (Prop. 7) holds.
 
 .. coq::
    :name: adequacy
 |*)
   Lemma adequacy {Γ Δ} (c : conf Γ) (e : Γ =[val]> Δ) :
-    evalₒ (c ₜ⊛ e) ≊ (inj_init_act Δ c ∥g inj_init_pas e).
+    evalₒ (c ₜ⊛ e) ≈ (inj_init_act Δ c ∥ inj_init_pas e).
   Proof.
+    transitivity (inj_init_act Δ c ∥g inj_init_pas e).
     rewrite <- adequacy_gen; unfold reduce; cbn.
     now rewrite <- c_sub_sub, a_ren_r_simpl,
           a_ren_l_comp, 2 a_cat_proj_r,
           a_ren_comp, a_cat_proj_l, a_comp_id.
+    apply iter_evg_iter.
   Qed.
 End with_param.

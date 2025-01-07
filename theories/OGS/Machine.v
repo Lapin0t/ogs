@@ -10,14 +10,15 @@ Note that we have here a minor mismatch between the formalization and the paper:
 we have realized a posteriori a more elegant way to decompose the abstract
 machine as exposed in the paper.
 
-Here, instead of only requiring an embedding of normal forms into configurations,
-we require an application function ``oapp`` describing how to rebuild a configuration
-from a value, an observation, and an assignment. This less minimalist axiomatization puts
-the dependencies of our modules slightly backwards compared to the paper's Section 4.
-
-Here, evaluation structures, dubbed ``machines``, are parameterized by a substitution
-monoid of values, a substitution module of configurations, and an observation structure,
-instead of coming first.
+Here, instead of only requiring an embedding of normal forms into
+configurations (``refold``, from Def. 11), we require an _observation
+application_ function ``oapp`` describing how to build a configuration
+from a value, an observation, and an assignment. Since normal forms are triples
+of a variable, an observation and an assignment, the sole difference is in the
+first component: instead of just a variable, ``oapp`` takes any value. Both
+are easily interdefineable. While ``refold`` is more compact to introduce,
+it is slightly more cumbersome to work with, which is why we axiomatize ``oapp``
+directly.
 
 Patching the development to follow more closely the paper's presentation would be slightly
 technical due to the technicality of the mechanized proofs involved, but essentially
@@ -34,7 +35,7 @@ From OGS.ITree Require Import Event Eq Delay.
 Section with_param.
   Context `{CC : context T C}.
 (*|
-We here define what is called an evaluation structure in the paper (Def 4.7). It tells
+We here define what is called an evaluation structure in the paper (Def. 11). It tells
 us how to evaluate a configuration to a normal form and how to stitch one back together
 from the data sent by Opponent. 
 
@@ -51,7 +52,7 @@ Class machine (val : Fam₁ T C) (conf : Fam₀ T C) (obs : obs_struct T C) := {
 #[global] Arguments eval {_ _ _ _} [_].
 #[global] Arguments oapp {_ _ _ _} [_ _].
 (*|
-Next we define "evaluating then observing".
+Next we define "evaluating then observing" (Def. 14).
 
 .. coq::
    :name: evalobs
@@ -67,7 +68,8 @@ Definition evalₒ `{machine val conf obs}
 |*)
 Notation "v ⊙ o ⦗ a ⦘" := (oapp v o a) (at level 20).
 (*|
-We can readily define the embedding from normal forms to configurations.
+We can readily define the embedding from normal forms to configurations (i.e., we can
+derive what is called ``refold`` in the paper).
 
 .. coq::
    :name: embed
@@ -80,7 +82,7 @@ Definition emb `{machine val conf obs} {_ : subst_monoid val}
 |*)
 #[global] Arguments emb {_ _ _ _ _} [_].
 (*|
-Next we define the "bad instanciation" relation (Def 6.21).
+Next we define the "bad instanciation" relation (Def. 28).
 
 .. coq::
    :name: badinst
@@ -93,7 +95,7 @@ Variant head_inst_nostep `{machine val conf obs} {VM : subst_monoid val}
     -> head_inst_nostep u (y ,' o) .
 (*|
 Finally we define the structure containing all the remaining axioms of a language
-machine.
+machine (Def. 13).
 |*)
 Class machine_laws val conf obs {M : machine val conf obs} {VM : subst_monoid val}
       {CM : subst_module val conf} := {
@@ -102,8 +104,8 @@ Class machine_laws val conf obs {M : machine val conf obs} {VM : subst_monoid va
 |*)
    oapp_proper {Γ x} {v : val Γ x} {o} :: Proper (asgn_eq (dom o) Γ ==> eq) (oapp v o) ;
 (*|
-``oapp`` commutes with substitutions, presented as part of "evaluation respects
-substitution" (Def 4.26) in the paper.
+``oapp`` commutes with substitutions. This is the equivalent of the second
+equation at the end of Def. 13, in terms of ``oapp`` instead of ``refold``.
 
 .. coq::
    :name: evalrespsub
@@ -111,20 +113,21 @@ substitution" (Def 4.26) in the paper.
    app_sub {Γ1 Γ2 x} (v : val Γ1 x) (o : obs x) (a : dom o =[val]> Γ1) (b : Γ1 =[val]> Γ2)
    : (v ⊙ o⦗a⦘) ₜ⊛ b = (v ᵥ⊛ b) ⊙ o⦗a ⊛ b⦘ ;
 (*|
-Second part of "evaluation respects substitution". This is the core hypothesis of the OGS
+"evaluation respects substitution". This is the core hypothesis of the OGS
 soundness, stating essentially "substituting, then evaluating" is equivalent to
-"evaluating, then substituting, then evaluating once more".
+"evaluating, then substituting, then evaluating once more". It is the equvalent
+of the first equation at the end of Def. 13.
 |*)
    eval_sub {Γ Δ} (c : conf Γ) (a : Γ =[val]> Δ)
    : eval (c ₜ⊛ a) ≋ bind_delay' (eval c) (fun n => eval (emb n ₜ⊛ a)) ;
 (*|
 Evaluating the embedding of a normal form is equivalent to returning the normal
-form. This is part of the evaluation structure (Def. 4.7) in the paper.
+form. This is part of the evaluation structure (Def. 11) in the paper.
 |*)
    eval_nf_ret {Γ} (u : nf obs val Γ)
    : eval (emb u) ≋ ret_delay u ;
 (*|
-At last the mystery hypothesis, stating that the machine has finite redexes (Def. 6.21).
+At last the mystery hypothesis, stating that the machine has focused redexes (Def. 28).
 It is necessary for establishing that the composition can be defined by eventually
 guarded iteration.
 |*)
