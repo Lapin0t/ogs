@@ -18,6 +18,9 @@ doc:
 serve:
 	python3 -m http.server -d docs
 
+docker:
+	docker build -t coq-ogs:latest .
+
 
 clean:
 	rm -rf _build _alectryon docs
