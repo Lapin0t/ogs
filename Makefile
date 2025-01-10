@@ -18,8 +18,10 @@ doc:
 serve:
 	python3 -m http.server -d docs
 
-docker:
+docker-build:
 	docker build -t coq-ogs:latest .
+
+docker-save:
 	docker image save coq-ogs:latest | gzip > docker_coq-ogs.tar.gz
 
 

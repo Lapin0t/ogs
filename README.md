@@ -33,34 +33,50 @@ this library are:
 ## Getting Started
 
 To simply typecheck the Coq proofs, we provide a Docker image preloaded with
-all the dependencies as `docker_coq-ogs.tar.gz`. The instructions to run it are
-given below. If instead you want to manually install the OGS library on your
-own system, follow the instructions from the section "Local Installation" at
-the end of the file.
+all the dependencies. The instructions to run it are given below. If instead
+you want to manually install the OGS library on your own system, follow the
+instructions from the section "Local Installation" at the end of the file.
 
-Ensure that your docker daemon is running and load the provided image with
-the following command.
+First, ensure that your docker daemon is running.
+
+We recommend building the docker image from source, by executing the following
+command from the root of the repository. Note that this requires network access
+and will download around 1.5GiB from `hub.docker.com`.
 
 ``` shell
-docker image load -i docker_coq-ogs.tar.gz
-docker image ls coq-ogs
+make docker-build
 ```
 
-The second command should produce a two line output listing the image. This
-image contains the code repository in the directory `/home/coq/ogs`. The
+Alternatively, if you prefer, you can download the precompiled image
+`docker_coq-ogs.tar.gz` from the
+[Zenodo archive](https://doi.org/10.5281/zenodo.14627318) of this artifact, and
+load it into docker with the following command.
+
+``` shell
+docker image load -i path/to/docker_coq-ogs.tar.gz
+```
+
+After the image is built or loaded from the file, verify that it is indeed
+listed by the following command.
+
+``` shell
+docker image ls coq-ogs:latest
+```
+
+This image contains the full code artifact in the directory `/home/coq/ogs`. The
 default command for the image typechecks the whole repository. Run it with a
 tty to see the progress with the following command. This should take around
 3-5min and conclude by displaying information about several soudness theorems.
 
 ``` shell
-docker run --tty coq-ogs
+docker run --tty coq-ogs:latest
 ```
 
 ## Step-by-Step Reproduction
 
-In the above "Getting Started" section already describes how to typecheck the
-whole repository, validating our claims of certification from the paper.
-The concluding output comes from a special file which we have included,
+The above "Getting Started" section already describes how to typecheck the
+whole repository, validating our claims of certification from the paper. The
+concluding output arises from a special file which we have included,
 `theories/Checks.v`, which imports core theorems, displays their type and list
 of arguments, as well as the assumptions (axioms) they depend on.
 
@@ -68,16 +84,16 @@ If you wish to further inspect the repository, the following command will
 start an interactive shell inside the container.
 
 ``` shell
-docker run --tty --interactive coq-ogs
+docker run --tty --interactive coq-ogs:latest
 ```
 
 The following section details in more precision the content of each file
 and their relationship to the paper. We have furthermore tried to thoroughly
-document most parts of the development. If you prefer to navigate the code
+comment most parts of the development. If you prefer to navigate the code
 in a web browser, an HTML rendering of the whole code together with the proof
 state during intermediate steps is provided at the following URL:
 
-  https://lapin0t.github.io/ogs/Readme.html
+https://lapin0t.github.io/ogs/Readme.html
 
 ## Content
 
