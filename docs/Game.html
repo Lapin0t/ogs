@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Game.v</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document">
+
+
+<div class="section" id="the-ogs-game-5-1-and-5-2">
+<h1>The OGS Game (§ 5.1 and 5.2)</h1>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">From</span> OGS <span class="kn">Require Import</span> Prelude.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">From</span> OGS.Utils <span class="kn">Require Import</span> Rel.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">From</span> OGS.Ctx <span class="kn">Require Import</span> All Ctx.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">From</span> OGS.OGS <span class="kn">Require Import</span> Obs.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">From</span> OGS.ITree <span class="kn">Require Import</span> Event ITree.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Reserved Notation</span> <span class="s2">&quot;↓⁺ Ψ&quot;</span> (<span class="kn">at level</span> <span class="mi">9</span>).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Reserved Notation</span> <span class="s2">&quot;↓⁻ Ψ&quot;</span> (<span class="kn">at level</span> <span class="mi">9</span>).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Reserved Notation</span> <span class="s2">&quot;↓[ p ] Ψ&quot;</span> (<span class="kn">at level</span> <span class="mi">9</span>).</span></span></pre></div>
+<div class="section" id="games-5-1">
+<h1>Games (§ 5.1)</h1>
+<p>Levy and Staton's general notion of game.</p>
+<p>An half games (Def 5.1) is composed of &quot;moves&quot; as an indexed family of types,
+and a &quot;next&quot; map computing the next index following a move.</p>
+<pre class="alectryon-io highlight" id="halfgame"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Record</span> <span class="nf">half_game</span> (<span class="nv">I</span> <span class="nv">J</span> : <span class="kt">Type</span>) := {
+ g_move : I -&gt; <span class="kt">Type</span> ;
+ g_next : <span class="kr">forall</span> <span class="nv">i</span>, g_move i -&gt; J
+}.</span></span></pre><p>Action (h_actv) and reaction (h_pasv) functors (Def 5.8)</p>
+<pre class="alectryon-io highlight" id="actionreaction"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">h_actv</span> {<span class="nv">I</span> <span class="nv">J</span>} (<span class="nv">H</span> : half_game I J) (<span class="nv">X</span> : psh J) : psh I :=
+  <span class="kr">fun</span> <span class="nv">i</span> =&gt; { m : H.(g_move) i &amp; X (H.(g_next) m) } .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">h_actvR</span> {<span class="nv">I</span> <span class="nv">J</span>} (<span class="nv">H</span> : half_game I J) {<span class="nv">X</span> <span class="nv">Y</span> : psh J} (<span class="nv">R</span> : relᵢ X Y)
+  : relᵢ (h_actv H X) (h_actv H Y) :=
+  <span class="kr">fun</span> <span class="nv">i</span> <span class="nv">u</span> <span class="nv">v</span> =&gt; <span class="kr">exists</span> <span class="nv">p</span> : projT1 u = projT1 v , R _ (rew p <span class="kr">in</span> projT2 u) (projT2 v) .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">h_pasv</span> {<span class="nv">I</span> <span class="nv">J</span>} (<span class="nv">H</span> : half_game I J) (<span class="nv">X</span> : psh J) : psh I :=
+  <span class="kr">fun</span> <span class="nv">i</span> =&gt; <span class="kr">forall</span> (<span class="nv">m</span> : H.(g_move) i), X (H.(g_next) m) .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">h_pasvR</span> {<span class="nv">I</span> <span class="nv">J</span>} (<span class="nv">H</span> : half_game I J) {<span class="nv">X</span> <span class="nv">Y</span> : psh J} (<span class="nv">R</span> : relᵢ X Y)
+  : relᵢ (h_pasv H X) (h_pasv H Y) := <span class="kr">fun</span> <span class="nv">i</span> <span class="nv">u</span> <span class="nv">v</span> =&gt; <span class="kr">forall</span> <span class="nv">m</span>, R _ (u m) (v m) .</span></span></pre><p>A game (Def 5.4) is composed of two compatible half games.</p>
+<pre class="alectryon-io highlight" id="game"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Record</span> <span class="nf">game</span> (<span class="nv">I</span> <span class="nv">J</span> : <span class="kt">Type</span>) : <span class="kt">Type</span> := {
+  g_client : half_game I J ;
+  g_server : half_game J I
+}.</span></span></pre><p>Given a game, we can construct an <tt class="docutils literal">event</tt>. See <a class="reference external" href="Event.html">ITree/Event.v</a></p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">e_of_g</span> {<span class="nv">I</span> <span class="nv">J</span>} (<span class="nv">G</span> : game I J) : event I I :=
+  {| e_qry := <span class="kr">fun</span> <span class="nv">i</span> =&gt; G.(g_client).(g_move) i ;
+     e_rsp := <span class="kr">fun</span> <span class="nv">i</span> <span class="nv">q</span> =&gt; G.(g_server).(g_move) (G.(g_client).(g_next) q) ;
+     e_nxt := <span class="kr">fun</span> <span class="nv">i</span> <span class="nv">q</span> <span class="nv">r</span> =&gt; G.(g_server).(g_next) r |} .</span></span></pre></div>
+<div class="section" id="the-ogs-game-5-2">
+<h1>The OGS Game (§ 5.2)</h1>
+<p>First let us define a datatype for polarities, active and passive (called &quot;waiting&quot;) in
+the paper.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Variant</span> <span class="nf">polarity</span> : <span class="kt">Type</span> := Act | Pas .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Derive</span> <span class="nf">NoConfusion</span> <span class="kr">for</span> polarity.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">p_switch</span> : polarity -&gt; polarity :=
+  p_switch Act := Pas ;
+  p_switch Pas := Act .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;p ^&quot;</span> := (p_switch p) (<span class="kn">at level</span> <span class="mi">5</span>).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Section</span> <span class="nf">with_param</span>.</span></span></pre><p>We consider an observation structure, given by a set of types <tt class="docutils literal">T</tt>, a notion of contexts
+<tt class="docutils literal">C</tt> and a operator giving the observations and their domain. See
+<a class="reference external" href="Family.html#oper">Ctx/Family.v</a> and <a class="reference external" href="Obs.html">OGS/Obs.v</a>.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Context</span> `{CC : <span class="kp">context</span> T C} {obs : obs_struct T C}.</span></span></pre><p>Interleaved contexts (Def 5.12) are given by the free context structure over <tt class="docutils literal">C</tt>.</p>
+<pre class="alectryon-io highlight" id="ogsctx"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">ogs_ctx</span> := ctx C.</span></span></pre><p>We define the collapsing functions (Def 5.13).</p>
+<pre class="alectryon-io highlight" id="ctxcollapse"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">join_pol</span> : polarity -&gt; ogs_ctx -&gt; C :=
+    join_pol Act ∅ₓ       := ∅ ;
+    join_pol Act (Ψ ▶ₓ Γ) := join_pol Pas Ψ +▶ Γ ;
+    join_pol Pas ∅ₓ       := ∅ ;
+    join_pol Pas (Ψ ▶ₓ Γ) := join_pol Act Ψ .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;↓⁺ Ψ&quot;</span> := (join_pol Act Ψ).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;↓⁻ Ψ&quot;</span> := (join_pol Pas Ψ).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;↓[ p ] Ψ&quot;</span> := (join_pol p Ψ).</span></span></pre><p>Finally we define the OGS half-game and game (Def 5.15).</p>
+<pre class="alectryon-io highlight" id="ogsgame"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">ogs_hg</span> : half_game ogs_ctx ogs_ctx :=
+    {| g_move Ψ := obs∙ ↓⁺Ψ ;
+       g_next Ψ m := Ψ ▶ₓ m_dom m |} .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">ogs_g</span> : game ogs_ctx ogs_ctx :=
+    {| g_client := ogs_hg ;
+       g_server := ogs_hg  |} .</span></span></pre><p>We define the event of OGS moves.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">ogs_e</span> : event ogs_ctx ogs_ctx := e_of_g ogs_g.</span></span></pre><p>And finally we define active OGS strategies and passive OGS strategies.</p>
+<pre class="alectryon-io highlight" id="ogsstrat"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">ogs_act</span> (<span class="nv">Δ</span> : C) : psh ogs_ctx := itree ogs_e (<span class="kr">fun</span> <span class="nv">_</span> =&gt; obs∙ Δ).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">ogs_pas</span> (<span class="nv">Δ</span> : C) : psh ogs_ctx := h_pasv ogs_hg (ogs_act Δ).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">End</span> <span class="nf">with_param</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;↓⁺ Ψ&quot;</span> := (join_pol Act Ψ).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;↓⁻ Ψ&quot;</span> := (join_pol Pas Ψ).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;↓[ p ] Ψ&quot;</span> := (join_pol p Ψ).</span></span></pre></div>
+</div>
+</div></body>
+</html>

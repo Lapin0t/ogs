@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Eventual guardedness of the composition (Prop. 6)</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="eventual-guardedness-of-the-composition-prop-6">
+<h1 class="title">Eventual guardedness of the composition (Prop. 6)</h1>
+
+<p>We want to prove adequacy by unicity of solutions to the set of equations defining the
+composition. To do so, we rely on the notion of guarded iteration introduced in
+<a class="reference external" href="Guarded.html">ITree/Guarded.v</a>. Through this file, we prove that the composition is
+indeed eventually guarded. The proof relies crucially on the &quot;focused redex&quot; assumption
+(Def. 28, here denoted by the law <tt class="docutils literal">eval_app_not_var</tt>).</p>
+<p>We consider a language abstractly captured as a machine satisfying an
+appropriate axiomatization.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Context</span> `{CC : <span class="kp">context</span> T C} {CL : context_laws T C}.
+  <span class="kn">Context</span> {<span class="nv">val</span>} {<span class="nv">VM</span> : subst_monoid val} {<span class="nv">VML</span> : subst_monoid_laws val}.
+  <span class="kn">Context</span> {<span class="nv">conf</span>} {<span class="nv">CM</span> : subst_module val conf} {<span class="nv">CML</span> : subst_module_laws val conf}.
+  <span class="kn">Context</span> {<span class="nv">obs</span> : obs_struct T C} {<span class="nv">M</span> : machine val conf obs}.
+  <span class="kn">Context</span> {<span class="nv">ML</span> : machine_laws val conf obs} {<span class="nv">VV</span> : var_assumptions val}.
+
+  <span class="kn">Notation</span> <span class="nf">ogs_ctx</span> := (ogs_ctx (C:=C)).</span></pre><p>A central elements in the proof lies in ensuring that there exists a unique solution
+to <tt class="docutils literal">compo_body</tt>. Since the composition of strategies is defined as such a solution,
+adequacy can be established by proving that evaluating and observing the substituted
+term is also a solution of <tt class="docutils literal">compo_body</tt>.</p>
+<p>By <tt class="docutils literal">iter_evg_uniq</tt>, we know that eventually guarded equations admit a unique fixed point:
+we hence start by proving this eventual guardedness, captured in lemma
+<tt class="docutils literal">compo_body_guarded</tt>.</p>
+<p>This proof will among other be using an induction on the <em>age</em> of a variable, ie it's
+height in the OGS position Φ. We provide this definition and utilities.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Equations</span> <span class="nf">var_height</span> <span class="nv">Φ</span> <span class="nv">p</span> {<span class="nv">x</span>} : ↓[p]Φ ∋ x -&gt; nat :=
+    var_height ∅ₓ       Pas i <span class="kr">with</span> c_view_emp i := { | ! } ;
+    var_height ∅ₓ       Act i <span class="kr">with</span> c_view_emp i := { | ! } ;
+    var_height (Φ ▶ₓ Γ) Pas i := var_height Φ Act i ;
+    var_height (Φ ▶ₓ Γ) Act i <span class="kr">with</span> c_view_cat i := {
+      | Vcat_l j := var_height Φ Pas j ;
+      | Vcat_r j := <span class="mi">1</span> + c_length Φ } .
+  #[<span class="kn">global</span>] <span class="kn">Arguments</span> var_height {Φ p x} i.
+
+  <span class="kn">Lemma</span> <span class="nf">var_height_pos</span> {<span class="nv">Φ</span> <span class="nv">p</span> <span class="nv">x</span>} (<span class="nv">i</span> : ↓[p]Φ ∋ x) : <span class="mi">0</span> &lt; var_height i .
+  <span class="kn">Proof</span>.
+    funelim (var_height i).
+    - <span class="nb">apply</span> H.
+    - <span class="nb">rewrite</span> &lt;- Heqcall; <span class="nb">apply</span> H.
+    - <span class="nb">rewrite</span> &lt;- Heqcall; <span class="nb">apply</span> Nat.lt_0_succ.
+  <span class="kn">Qed</span>.
+
+  <span class="kn">Equations</span> <span class="nf">lt_bound</span> : polarity -&gt; relation nat :=
+    lt_bound Act := lt ;
+    lt_bound Pas := le .
+
+  <span class="kn">Lemma</span> <span class="nf">var_height_bound</span> {<span class="nv">Φ</span> <span class="nv">p</span> <span class="nv">x</span>} (<span class="nv">i</span> : ↓[p]Φ ∋ x)
+    : lt_bound p (var_height i) (<span class="mi">1</span> + c_length Φ).
+  <span class="kn">Proof</span>.
+    funelim (var_height i); <span class="nb">cbn</span>.
+    - <span class="bp">now</span> <span class="nb">apply</span> Nat.lt_succ_r, Nat.le_le_succ_r, Nat.le_le_succ_r.
+    - <span class="nb">rewrite</span> Heq; <span class="bp">now</span> <span class="nb">apply</span> Nat.lt_succ_r.
+    - <span class="nb">rewrite</span> Heq; <span class="nb">apply</span> Nat.lt_succ_diag_r.
+  <span class="kn">Qed</span>.
+
+  <span class="kn">Equations</span> <span class="nf">var_height&#39;</span> {<span class="nv">Δ</span> <span class="nv">Φ</span> <span class="nv">p</span> <span class="nv">x</span>} : Δ +▶ ↓[p]Φ ∋ x -&gt; nat :=
+    var_height&#39; i <span class="kr">with</span> c_view_cat i := {
+      | Vcat_l j := O ;
+      | Vcat_r j := var_height j } .</span></pre><p>This is the main theorem about height: if we lookup a variable in an OGS environment and
+obtain another variable, then this new variable is strictly lower than the first one.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Lemma</span> <span class="nf">height_decrease</span> {<span class="nv">Δ</span> <span class="nv">Φ</span> <span class="nv">p</span>} (<span class="nv">v</span> : ogs_env Δ p Φ) {<span class="nv">x</span>}
+        (<span class="nv">j</span> : ↓[p^] Φ ∋ x)
+        (<span class="nv">H</span> :  <span class="nb">is_var</span> (ₐ↓v _ j))
+        : var_height&#39; (is_var_get H) &lt; var_height j.
+  <span class="kn">Proof</span>.
+    <span class="nb">revert</span> H; <span class="nb">rewrite</span> lookup_collapse; <span class="nb">intro</span> H.
+    <span class="nb">destruct</span> (view_is_var_ren _ _ H).
+    <span class="nb">rewrite</span> ren_is_var_get; <span class="nb">cbn</span>.
+    <span class="nb">remember</span> (lookup v j).
+    <span class="nb">destruct</span> H; <span class="nb">cbn</span>; <span class="nb">destruct</span> (c_view_cat i).
+    - <span class="nb">unfold</span> var_height&#39;; <span class="nb">rewrite</span> c_view_cat_simpl_l; <span class="nb">apply</span> var_height_pos.
+    - <span class="nb">unfold</span> var_height&#39;; <span class="nb">rewrite</span> c_view_cat_simpl_r; <span class="nb">cbn</span>.
+      <span class="nb">remember</span> (r_ctx_dom j).
+      funelim (r_ctx_dom j); <span class="kp">try</span> <span class="nb">clear</span> Heqcall.
+      + <span class="nb">cbn</span>; <span class="nb">rewrite</span> c_view_cat_simpl_l; <span class="nb">cbn</span>.
+        <span class="nb">dependent destruction</span> v; <span class="bp">now</span> <span class="nb">apply</span> (H _ v).
+      + <span class="nb">dependent destruction</span> v.
+        <span class="nb">revert</span> j1 Heqv0; <span class="nb">cbn</span>; <span class="nb">rewrite</span> Heq; <span class="nb">cbn</span>; <span class="nb">intros</span> j1 Heqv.
+        <span class="bp">now</span> <span class="nb">apply</span> (H _ v).
+      + <span class="nb">dependent destruction</span> v; <span class="nb">clear</span> Heqv0.
+        <span class="nb">revert</span> j1; <span class="nb">cbn</span>; <span class="nb">rewrite</span> Heq; <span class="bp">exact</span> var_height_bound.
+  <span class="kn">Qed</span>.</span></pre><p>We are now ready to prove eventual guardedness. In fact the main lemma will have a slightly
+different statement, considering a particular kind of pair of OGS states: the ones we
+obtain when restarting after an interaction. As the statement is quite long we factor
+it in a definition first.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Definition</span> <span class="nf">compo_body_guarded_aux_stmt</span> {<span class="nv">Δ</span> <span class="nv">Φ</span>} (<span class="nv">u</span> : ogs_env Δ Act Φ) (<span class="nv">v</span> : ogs_env Δ Pas Φ)
+    {<span class="nv">x</span>} (<span class="nv">o</span> : obs x) (<span class="nv">γ</span> : dom o =[val]&gt; (Δ +▶ ↓⁺ Φ)) (<span class="nv">j</span> : ↓⁺ Φ ∋ x) : <span class="kt">Prop</span>
+    := ev_guarded
+         (<span class="kr">fun</span> <span class="nv">&#39;T1_0</span> =&gt; compo_body)
+         (compo_body (RedT (MS ((ₐ↓v _ j ᵥ⊛ᵣ r_cat3_1) ⊙ o⦗r_cat_rr ᵣ⊛ a_id⦘)
+                               (v ;⁺))
+                           (u ;⁻ γ))) .</span></pre><p>Now the main proof.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><input class="alectryon-toggle" id="compguarded-v-chk0" style="display: none" type="checkbox"><label class="alectryon-input" for="compguarded-v-chk0"><span class="kn">Lemma</span> <span class="nf">compo_body_guarded_aux</span>
+    {<span class="nv">Δ</span> <span class="nv">Φ</span>} (<span class="nv">u</span> : ogs_env Δ Act Φ) (<span class="nv">v</span> : ogs_env Δ Pas Φ)
+    {<span class="nv">x</span>} (<span class="nv">o</span> : obs x) <span class="nv">γ</span> <span class="nv">j</span> : compo_body_guarded_aux_stmt u v o γ j .</label><small class="alectryon-output"><div><div class="alectryon-messages"><blockquote class="alectryon-message">The reference ogs_env was not found <span class="kr">in</span> the current
+environment.</blockquote></div></div></small><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Proof</span>.</span></span></pre><p>First we setup an induction on the accessibility of the current observation in the relation
+given by the &quot;no-infinite redex&quot; property.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">revert</span> Φ u v γ j.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">pose</span> (o&#39; := (x ,&#39; o)); <span class="nb">change</span> x <span class="kr">with</span> (projT1 o&#39;); <span class="nb">change</span> o <span class="kr">with</span> (projT2 o&#39;).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">generalize</span> o&#39;; <span class="nb">clear</span> x o o&#39;; <span class="nb">intro</span> o.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">pose</span> (<span class="kn">wf</span> := eval_app_not_var o); <span class="nb">induction</span> <span class="kn">wf</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">destruct</span> x <span class="kr">as</span> [ x o ]; <span class="nb">cbn</span> [ projT1 projT2 ] <span class="kr">in</span> *.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">clear</span> H; <span class="nb">rename</span> H0 <span class="nb">into</span> IHred; <span class="nb">intros</span> Φ u v γ j.</span></span></pre><p>Next we setup an induction on the height of the current variable we have restarted on.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">pose</span> (h := lt_wf (var_height j)); <span class="nb">remember</span> (var_height j) <span class="kr">as</span> n.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">revert</span> Φ u v γ j Heqn; <span class="nb">induction</span> h.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">clear</span> H; <span class="nb">rename</span> x0 <span class="nb">into</span> n, H0 <span class="nb">into</span> IHvar; <span class="nb">intros</span> Φ u v γ j Heqn.</span></span></pre><p>Then we case split on whether <tt class="docutils literal">ₐ↓ v x j</tt> is a variable or not.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">unfold</span> compo_body_guarded_aux_stmt.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    <span class="nb">pose</span> (vv := ₐ↓ v x j); <span class="nb">fold</span> vv.
+    <span class="nb">destruct</span> (is_var_dec vv).</span></pre><p>Case 1: it is a variable.</p>
+<p>First, some shenenigans to extract the variable.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">rewrite</span> (is_var_get_eq i); <span class="nb">unfold</span> vv <span class="kr">in</span> *; <span class="nb">clear</span> vv.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">      </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">unfold</span> v_ren; <span class="nb">rewrite</span> v_sub_var; <span class="nb">unfold</span> r_emb.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">      </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">unfold</span> ev_guarded; <span class="nb">cbn</span>.</span></span></pre><p>Next, we are evaluating a normal form, so we know by hypothesis <tt class="docutils literal">eval_nf_ret</tt> that it
+will reduce to the same normal form. We need some trickery to rewrite by this bisimilarity.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">      <span class="nb">pose proof</span> (Heval :=
+                    eval_nf_ret ((r_cat3_1 x (is_var_get i)) ⋅ o ⦇ r_cat_rr ᵣ⊛ a_id  ⦈)).
+      <span class="nb">unfold</span> comp_eq <span class="kr">in</span> Heval; <span class="nb">apply</span> it_eq_step <span class="kr">in</span> Heval.
+      <span class="nb">change</span> (<span class="kp">eval</span> _) <span class="kr">with</span>
+        (<span class="kp">eval</span> (a_id (r_cat3_1 x (is_var_get i)) ⊙ o ⦗ r_cat_rr ᵣ⊛ a_id ⦘))
+        <span class="kr">in</span> Heval.
+      <span class="nb">remember</span> (<span class="kp">eval</span> (a_id (r_cat3_1 x (is_var_get i)) ⊙ o ⦗ r_cat_rr ᵣ⊛ a_id ⦘))
+        <span class="kr">as</span> tt; <span class="nb">clear</span> Heqtt.
+      <span class="nb">remember</span> (r_cat3_1 x (is_var_get i) ⋅ o ⦇ r_cat_rr ᵣ⊛ a_id ⦈) <span class="kr">as</span> ttn.
+      <span class="nb">cbn</span> <span class="kr">in</span> Heval; <span class="nb">dependent destruction</span> Heval.
+      <span class="nb">rewrite</span> Heqttn <span class="kr">in</span> r_rel; <span class="nb">clear</span> Heqttn.
+      dependent elimination r_rel.
+      <span class="nb">unfold</span> observe <span class="kr">in</span> x; <span class="nb">rewrite</span> &lt;- x; <span class="nb">clear</span> x; <span class="nb">cbn</span>.
+      <span class="nb">unfold</span> m_strat_wrap, r_cat3_1; <span class="nb">cbn</span>.
+      <span class="nb">remember</span> (ₐ↓v _ j) <span class="kr">as</span> vv.</span></pre><p>Now, we case split to see whether this variable was a final variable or one given by
+the opponent.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">      </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">destruct</span> i; <span class="nb">cbn</span>; <span class="nb">destruct</span> (c_view_cat i).</span></span></pre><p>In case of a final variable the composition is ended, hence guarded, hence eventually
+guarded.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">      </span><span class="alectryon-sentence"><span class="alectryon-input">+</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">rewrite</span> c_view_cat_simpl_l; <span class="bp">now</span> <span class="kp">do</span> <span class="mi">2</span> <span class="nb">econstructor</span>.</span></span></pre><p>In the other case, there is an interaction. Since we have looked-up a variable and
+obtained another variable, we know it is strictly older and use our induction hypothesis
+on the height of the current variable.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">      </span><span class="alectryon-sentence"><span class="alectryon-input">+</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">rewrite</span> c_view_cat_simpl_r; <span class="nb">cbn</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">        </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">refine</span> (GNext _).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">        </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">unshelve</span> <span class="nb">refine</span> (IHvar _ _ _ _ _ _ _ eq_refl).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">        </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">rewrite</span> Heqn; <span class="nb">clear</span> Heqn; <span class="nb">unfold</span> cut_l.</span></span></pre><p>There is some trickery to apply <tt class="docutils literal">height_decrease</tt>.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">        </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">clear</span> tt ttn a1 a.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">        <span class="nb">assert</span> (i : <span class="nb">is_var</span> (ₐ↓v _ j)).
+          <span class="nb">rewrite</span> &lt;- Heqvv.
+          <span class="bp">now</span> <span class="nb">econstructor</span>.
+        <span class="nb">eapply</span> Nat.lt_le_trans; [ | <span class="bp">exact</span> (height_decrease (p:=Pas) _ j i) ].
+        <span class="nb">destruct</span> i; <span class="nb">cbn</span>.
+        <span class="nb">apply</span> v_var_inj <span class="kr">in</span> Heqvv.
+        <span class="nb">rewrite</span> &lt;- Heqvv; <span class="nb">unfold</span> var_height&#39;.
+        <span class="nb">rewrite</span> c_view_cat_simpl_l, c_view_cat_simpl_r; <span class="nb">cbn</span>.
+        <span class="bp">now</span> <span class="nb">apply</span> Nat.lt_succ_diag_r.</span></pre><p>Case 2: the looked-up value is not a variable. In this case we look at one step of the
+evaluation. If there is a redex we are happy. Else, our resumed configuration was
+still a normal form and we can exhibit a proof of the bad instanciation relation, which
+enables us to call our other induction hypothesis.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">unfold</span> ev_guarded; <span class="nb">cbn</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">      <span class="nb">remember</span> (<span class="kp">eval</span> ((vv ᵥ⊛ r_emb r_cat3_1) ⊙ o ⦗ r_cat_rr ᵣ⊛ a_id ⦘)) <span class="kr">as</span> tt.
+      <span class="nb">remember</span> (_observe tt) <span class="kr">as</span> ot.
+      <span class="nb">destruct</span> ot; <span class="kp">try</span> <span class="bp">now</span> <span class="kp">do</span> <span class="mi">2</span> <span class="nb">econstructor</span>.
+      <span class="nb">destruct</span> r <span class="kr">as</span> [ nx ni [ no narg ] ]; <span class="nb">unfold</span> m_strat_wrap; <span class="nb">cbn</span>.
+      <span class="nb">destruct</span> (c_view_cat ni); <span class="kp">try</span> <span class="bp">now</span> <span class="kp">do</span> <span class="mi">2</span> <span class="nb">econstructor</span>.
+      <span class="nb">refine</span> (GNext (IHred (_ ,&#39; _) _ _ _ _ _ _)).
+
+      <span class="nb">refine</span> (HeadInst (_ ,&#39; _) (vv ᵥ⊛ r_emb r_cat3_1) o
+                (r_cat_rr ᵣ⊛ a_id) (r_cat_r j0) (t ∘ (is_var_ren _ _)) _).
+      <span class="nb">apply</span> it_eq_unstep; <span class="nb">cbn</span>.
+      <span class="nb">rewrite</span> Heqtt <span class="kr">in</span> Heqot; <span class="nb">rewrite</span> &lt;- Heqot.
+      <span class="bp">now</span> <span class="nb">econstructor</span>.
+  <span class="kn">Qed</span>.</span></pre><p>Now the actual proof of eventual guardedness is just about unfolding a bit of the beginning
+of the interactions until we attain a resume and can apply our main lemma.</p>
+<pre class="alectryon-io highlight" id="compoevguarded"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Lemma</span> <span class="nf">compo_body_guarded</span> {<span class="nv">Δ</span>} : eqn_ev_guarded (<span class="kr">fun</span> <span class="nv">&#39;T1_0</span> =&gt; compo_body (Δ := Δ)).
+  <span class="kn">Proof</span>.
+    <span class="nb">intros</span> [] [ Γ [ c u ] v ]; <span class="nb">unfold</span> m_strat_pas <span class="kr">in</span> v.
+    <span class="nb">unfold</span> ev_guarded; <span class="nb">cbn</span>.
+    <span class="nb">pose</span> (ot := _observe (<span class="kp">eval</span> c)); <span class="nb">change</span> (_observe (<span class="kp">eval</span> c)) <span class="kr">with</span> ot.
+    <span class="nb">destruct</span> ot; <span class="kp">try</span> <span class="bp">now</span> <span class="kp">do</span> <span class="mi">2</span> <span class="nb">econstructor</span>.
+    <span class="nb">destruct</span> r <span class="kr">as</span> [ x i [ o a ] ]; <span class="nb">unfold</span> m_strat_wrap; <span class="nb">cbn</span>.
+    <span class="nb">destruct</span> (c_view_cat i); <span class="kp">try</span> <span class="bp">now</span> <span class="kp">do</span> <span class="mi">2</span> <span class="nb">econstructor</span>.
+    <span class="nb">refine</span> (GNext _); <span class="nb">apply</span> compo_body_guarded_aux.
+  <span class="kn">Qed</span>.</span></pre><p>From the previous proof we can directly apply the strong fixed point construction on
+eventually guarded equations and obtain a composition operator without any <tt class="docutils literal">Tau</tt> node
+at interaction points (Prop. 6).</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Definition</span> <span class="nf">compo_ev_guarded</span> {<span class="nv">Δ</span> <span class="nv">a</span>} (<span class="nv">u</span> : m_strat_act Δ a) (<span class="nv">v</span> : m_strat_pas Δ a)
+    : delay (obs∙ Δ)
+    := iter_ev_guarded _ compo_body_guarded T1_0 (RedT u v).
+
+<span class="kn">End</span> <span class="nf">with_param</span>.
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;u ∥g v&quot;</span> := (compo_ev_guarded u v) (<span class="kn">at level</span> <span class="mi">40</span>).</span></pre>
+</div>
+</div></body>
+</html>

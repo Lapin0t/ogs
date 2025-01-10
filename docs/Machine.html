@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Evaluation structure and language machine</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="evaluation-structure-and-language-machine">
+<h1 class="title">Evaluation structure and language machine</h1>
+
+<p>In this file we pull everything together and define evaluation structures and
+the abstract characterization of a language machine, together with all the associated
+laws.</p>
+<p>Note that we have here a minor mismatch between the formalization and the paper:
+we have realized a posteriori a more elegant way to decompose the abstract
+machine as exposed in the paper.</p>
+<p>Here, instead of only requiring an embedding of normal forms into
+configurations (<tt class="docutils literal">refold</tt>, from Def. 11), we require an <em>observation
+application</em> function <tt class="docutils literal">oapp</tt> describing how to build a configuration
+from a value, an observation, and an assignment. Since normal forms are triples
+of a variable, an observation and an assignment, the sole difference is in the
+first component: instead of just a variable, <tt class="docutils literal">oapp</tt> takes any value. Both
+are easily interdefineable. While <tt class="docutils literal">refold</tt> is more compact to introduce,
+it is slightly more cumbersome to work with, which is why we axiomatize <tt class="docutils literal">oapp</tt>
+directly.</p>
+<p>Patching the development to follow more closely the paper's presentation would be slightly
+technical due to the technicality of the mechanized proofs involved, but essentially
+straightforward.</p>
+<p>We here define what is called an evaluation structure in the paper (Def. 11). It tells
+us how to evaluate a configuration to a normal form and how to stitch one back together
+from the data sent by Opponent.</p>
+<pre class="alectryon-io highlight" id="machine"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Class</span> <span class="nf">machine</span> (<span class="nv">val</span> : Fam₁ T C) (<span class="nv">conf</span> : Fam₀ T C) (<span class="nv">obs</span> : obs_struct T C) := {
+  <span class="kp">eval</span> : conf ⇒<span class="err">₀</span> (delay ∘ nf obs val) ;
+  oapp [Γ x] (v : val Γ x) (o : obs x) : dom o =[val]&gt; Γ -&gt; conf Γ ;
+}.</span></pre><p>Next we define &quot;evaluating then observing&quot; (Def. 14).</p>
+<pre class="alectryon-io highlight" id="evalobs"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">evalₒ</span> `{machine val conf obs}
+  : conf ⇒<span class="err">₀</span> (delay ∘ obs∙) :=
+  <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">t</span> =&gt; then_to_obs (<span class="kp">eval</span> t) .</span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Notation</span> <span class="s2">&quot;v ⊙ o ⦗ a ⦘&quot;</span> := (oapp v o a) (<span class="kn">at level</span> <span class="mi">20</span>).</span></pre><p>We can readily define the embedding from normal forms to configurations (i.e., we can
+derive what is called <tt class="docutils literal">refold</tt> in the paper).</p>
+<pre class="alectryon-io highlight" id="embed"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">emb</span> `{machine val conf obs} {_ : subst_monoid val}
+  : nf obs val ⇒<span class="err">₀</span> conf
+  := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">n</span> =&gt; oapp (v_var (nf_var n)) (nf_obs n) (nf_args n) .</span></pre><p>Next we define the &quot;bad instanciation&quot; relation (Def. 28).</p>
+<pre class="alectryon-io highlight" id="badinst"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Variant</span> <span class="nf">head_inst_nostep</span> `{machine val conf obs} {VM : subst_monoid val} 
+        (u : sigT obs) : sigT obs -&gt; <span class="kt">Prop</span> :=
+| HeadInst {Γ y} (v : val Γ y) (o : obs y) (a : dom o =[val]&gt; Γ) (i : Γ ∋ projT1 u)
+    : ¬(<span class="nb">is_var</span> v)
+    -&gt; evalₒ (v ⊙ o⦗a⦘) ≊ ret_delay (i ⋅ projT2 u)
+    -&gt; head_inst_nostep u (y ,&#39; o) .</span></pre><p>Finally we define the structure containing all the remaining axioms of a language
+machine (Def. 13).</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Class</span> <span class="nf">machine_laws</span> <span class="nv">val</span> <span class="nv">conf</span> <span class="nv">obs</span> {<span class="nv">M</span> : machine val conf obs}
+  {<span class="nv">VM</span> : subst_monoid val} {<span class="nv">CM</span> : subst_module val conf} := {</span></pre><p><tt class="docutils literal">oapp</tt> respects pointwise equality of assignments.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">   oapp_proper {Γ x} {v : val Γ x} {o} :: Proper (asgn_eq (dom o) Γ ==&gt; eq) (oapp v o) ;</span></pre><p><tt class="docutils literal">oapp</tt> commutes with substitutions. This is the equivalent of the second
+equation at the end of Def. 13, in terms of <tt class="docutils literal">oapp</tt> instead of <tt class="docutils literal">refold</tt>.</p>
+<pre class="alectryon-io highlight" id="evalrespsub"><!-- Generator: Alectryon --><span class="alectryon-wsp">   app_sub {Γ1 Γ2 x} (v : val Γ1 x) (o : obs x) (a : dom o =[val]&gt; Γ1) (b : Γ1 =[val]&gt; Γ2)
+   : (v ⊙ o⦗a⦘) ₜ⊛ b = (v ᵥ⊛ b) ⊙ o⦗a ⊛ b⦘ ;</span></pre><p>&quot;evaluation respects substitution&quot;. This is the core hypothesis of the OGS
+soundness, stating essentially &quot;substituting, then evaluating&quot; is equivalent to
+&quot;evaluating, then substituting, then evaluating once more&quot;. It is the equvalent
+of the first equation at the end of Def. 13.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">   eval_sub {Γ Δ} (c : conf Γ) (a : Γ =[val]&gt; Δ)
+   : <span class="kp">eval</span> (c ₜ⊛ a) ≋ bind_delay&#39; (<span class="kp">eval</span> c) (<span class="kr">fun</span> <span class="nv">n</span> =&gt; <span class="kp">eval</span> (emb n ₜ⊛ a)) ;</span></pre><p>Evaluating the embedding of a normal form is equivalent to returning the normal
+form. This is part of the evaluation structure (Def. 11) in the paper.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">   eval_nf_ret {Γ} (u : nf obs val Γ)
+   : <span class="kp">eval</span> (emb u) ≋ ret_delay u ;</span></pre><p>At last the mystery hypothesis, stating that the machine has focused redexes (Def. 28).
+It is necessary for establishing that the composition can be defined by eventually
+guarded iteration.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">    eval_app_not_var : well_founded head_inst_nostep ;
+  } .
+<span class="kn">End</span> <span class="nf">with_param</span>.</span></pre><p>Finally we define a cute notation for applying an observation to a value.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;v ⊙ o ⦗ a ⦘&quot;</span> := (oapp v o a) (<span class="kn">at level</span> <span class="mi">20</span>).</span></pre>
+</div>
+</div></body>
+</html>

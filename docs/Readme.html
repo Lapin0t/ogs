@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>An abstract, certified account of operational game semantics</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running . Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="an-abstract-certified-account-of-operational-game-semantics">
+<h1 class="title">An abstract, certified account of operational game semantics</h1>
+
+<p>This is the companion artifact to the ESOP paper. The main contributions of
+this library are:</p>
+<ul class="simple">
+<li>an independent implementation of an indexed counterpart to the
+InteractionTree Coq library with support for guarded and eventually guarded
+recursion</li>
+<li>an abstract OGS model of an axiomatised language proven sound w.r.t.
+substitution equivalence</li>
+<li>several instantiations of this abstract result to concrete
+languages: simply-typed lambda-calculus with recursive functions,
+untyped lambda calculus, Downen and Ariola's polarized system D and
+system L.</li>
+</ul>
+<div class="section" id="meta">
+<h1>Meta</h1>
+<ul class="simple">
+<li>Author(s):<ul>
+<li>Peio Borthelle</li>
+<li>Tom Hirschowitz</li>
+<li>Guilhem Jaber</li>
+<li>Yannick Zakowski</li>
+</ul>
+</li>
+<li>License:  GPLv3</li>
+<li>Compatible Coq versions: 8.17</li>
+<li>Additional dependencies:<ul>
+<li>dune</li>
+<li><a class="reference external" href="https://github.com/mattam82/Coq-Equations">Equations</a></li>
+<li><a class="reference external" href="https://github.com/damien-pous/coinduction">Coinduction</a></li>
+<li><a class="reference external" href="https://github.com/cpitclaudel/alectryon">Alectryon</a></li>
+</ul>
+</li>
+<li>Coq namespace: <tt class="docutils literal">OGS</tt></li>
+<li><a class="reference external" href="https://lapin0t.github.io/ogs/Readme.html">Documentation</a></li>
+</ul>
+</div>
+<div class="section" id="getting-started">
+<h1>Getting Started</h1>
+<p>To simply typecheck the Coq proofs, we provide a Docker image preloaded with
+all the dependencies. The instructions to run it are given below. If instead
+you want to manually install the OGS library on your own system, follow the
+instructions from the section &quot;Local Installation&quot; at the end of the file.</p>
+<p>First, ensure that your docker daemon is running.</p>
+<p>We recommend building the docker image from source, by executing the following
+command from the root of the repository. Note that this requires network access
+and will download around 1.5GiB from <tt class="docutils literal">hub.docker.com</tt>.</p>
+<pre class="code shell literal-block">
+make<span class="w"> </span>docker-build
+</pre>
+<p>Alternatively, if you prefer, you can download the precompiled image
+<tt class="docutils literal"><span class="pre">docker_coq-ogs.tar.gz</span></tt> from the
+<a class="reference external" href="https://doi.org/10.5281/zenodo.14627318">Zenodo archive</a> of this artifact,
+and load it into docker with the following command.</p>
+<pre class="code shell literal-block">
+docker<span class="w"> </span>image<span class="w"> </span>load<span class="w"> </span>-i<span class="w"> </span>path/to/docker_coq-ogs.tar.gz
+</pre>
+<p>After the image is built or loaded from the file, verify that it is indeed
+listed by the following command.</p>
+<pre class="code shell literal-block">
+docker<span class="w"> </span>image<span class="w"> </span>ls<span class="w"> </span>coq-ogs:latest
+</pre>
+<p>This image contains the full code artifact in the directory <tt class="docutils literal">/home/coq/ogs</tt>. The
+default command for the image typechecks the whole repository. Run it with a
+tty to see the progress with the following command. This should take around
+3-5min and conclude by displaying information about several soudness theorems.</p>
+<pre class="code shell literal-block">
+docker<span class="w"> </span>run<span class="w"> </span>--tty<span class="w"> </span>coq-ogs:latest
+</pre>
+</div>
+<div class="section" id="step-by-step-reproduction">
+<h1>Step-by-Step Reproduction</h1>
+<p>The above &quot;Getting Started&quot; section already describes how to typecheck the
+whole repository, validating our claims of certification from the paper. The
+concluding output arises from a special file which we have included,
+<a class="reference external" href="Checks.html">Checks.v</a>, which imports core theorems, displays their type and list
+of arguments, as well as the assumptions (axioms) they depend on.</p>
+<p>If you wish to further inspect the repository, the following command will
+start an interactive shell inside the container.</p>
+<pre class="code shell literal-block">
+docker<span class="w"> </span>run<span class="w"> </span>--tty<span class="w"> </span>--interactive<span class="w"> </span>coq-ogs:latest
+</pre>
+<p>The following section details in more precision the content of each file
+and their relationship to the paper. We have furthermore tried to thoroughly
+comment most parts of the development. If you prefer to navigate the code
+in a web browser, an HTML rendering of the whole code together with the proof
+state during intermediate steps is provided at the following URL:</p>
+<p><a class="reference external" href="https://lapin0t.github.io/ogs/Readme.html">https://lapin0t.github.io/ogs/Readme.html</a></p>
+</div>
+<div class="section" id="content">
+<h1>Content</h1>
+<div class="section" id="structure-of-the-repository">
+<h2>Structure of the repository</h2>
+<p>The Coq source code is contained in the <tt class="docutils literal">theory/</tt> directory, which has the
+following structure, in approximate order of dependency.</p>
+<ul class="simple">
+<li><a class="reference external" href="Readme.html">Readme.v</a>: This file.</li>
+<li><a class="reference external" href="Prelude.html">Prelude.v</a>: Imports and setup.</li>
+<li><tt class="docutils literal">Utils/</tt> directory: general utilities.<ul>
+<li>[Rel.v](<a class="reference external" href="https://lapin0t.github.io/ogs/Rel.html">https://lapin0t.github.io/ogs/Rel.html</a>): Generalities for relations
+over type families.</li>
+<li>[Psh.v](<a class="reference external" href="https://lapin0t.github.io/ogs/Psh.html">https://lapin0t.github.io/ogs/Psh.html</a>): Generalities for type
+families.</li>
+</ul>
+</li>
+<li><tt class="docutils literal">Ctx/</tt> directory: general metatheory of substitution. This material has been
+largely left untold in the paper, and as explained in the artifact report, we
+introduce a novel gadget for abstracting over scope and variable
+representations.<ul>
+<li><a class="reference external" href="Family.html">Family.v</a>: Definition of scoped
+and sorted families (Def. 4).</li>
+<li><a class="reference external" href="Abstract.html">Abstract.v</a>: Definition of
+scope structures. The comments make this file a good entry-point to the
+understand the constructions from this directory.</li>
+<li><a class="reference external" href="Assignment.html">Assignment.v</a>: Generic
+definition of assignments (Def. 5 and 6).</li>
+<li><a class="reference external" href="Renaming.html">Renaming.v</a>: Generic
+definition of renamings as variable assignments, together with their
+important equational laws.</li>
+<li><a class="reference external" href="Ctx.html">Ctx.v</a>: Definition of concrete
+contexts (lists) and dependently-typed DeBruijn indices.</li>
+<li><a class="reference external" href="Covering.html">Covering.v</a>: Instanciation of
+the scope structure for concrete contexts from
+<a class="reference external" href="Ctx.html">Ctx.v</a>.</li>
+<li><a class="reference external" href="DirectSum.html">DirectSum.v</a>: Direct sum of
+scope structures.</li>
+<li><a class="reference external" href="Subset.html">Subset.v</a>: Sub-scope structure.</li>
+<li><a class="reference external" href="Subst.html">Subst.v</a>: Axiomatization of
+substitution monoid and substitution module (Def. 7 and 8), axiomatization of
+clear-cut variables (Def. 27).</li>
+</ul>
+</li>
+<li><tt class="docutils literal">ITree/</tt> directory: implementation of a variant of interaction trees
+over indexed types.<ul>
+<li><a class="reference external" href="Event.html">Event.v</a>: Indexed events (i.e.,
+indexed containers) parameterizing the interactions of an itree.</li>
+<li><a class="reference external" href="ITree.html">ITree.v</a>: Coinductive definition.</li>
+<li><a class="reference external" href="Eq.html">Eq.v</a>: Strong and weak bisimilarity
+over interaction trees.</li>
+<li><a class="reference external" href="Structure.html">Structure.v</a>: Combinators
+(definitions) for the monadic structure and unguarded iteration (Def. 31).</li>
+<li><a class="reference external" href="Properties.html">Properties.v</a>: General
+properties of the combinators (Prop. 3).</li>
+<li><a class="reference external" href="Guarded.html">Guarded.v</a>: (Eventually)
+guarded equations and iterations over them, together with their unicity
+property (Def. 30, 33 and 34 and Prop. 5).</li>
+<li><a class="reference external" href="Delay.html">Delay.v</a>: Definition of the
+delay monad (as a special case of interaction trees over the empty event)
+(Def. 9 and 10).</li>
+</ul>
+</li>
+<li><tt class="docutils literal">OGS/</tt> directory: construction of a sound OGS model for an abstract language
+machine.<ul>
+<li><a class="reference external" href="Obs.html">Obs.v</a>: Axiomatization of
+observation structure (Def. 12) and normal forms (part of Def. 13).</li>
+<li><a class="reference external" href="Machine.html">Machine.v</a>: Axiomatization of
+evaluation structures (Def. 11), language machines (Def. 13) and focused
+redexes (Def. 28).</li>
+<li><a class="reference external" href="Game.html">Game.v</a>: Abstract games (Def. 16
+and 18) and OGS game definition (Def. 21--23).</li>
+<li><a class="reference external" href="Strategy.html">Strategy.v</a>: Machine strategy
+(Def. 24--26) and composition.</li>
+<li><a class="reference external" href="CompGuarded.html">CompGuarded.v</a>: Proof of
+eventual guardedness of the equation defining the composition of strategies
+(Prop. 6).</li>
+<li><a class="reference external" href="Adequacy.html">Adequacy.v</a>: Proof of
+adequacy of composition (Prop. 7).</li>
+<li><a class="reference external" href="Congruence.html">Congruence.v</a>: Proof of
+congruence of composition (Prop. 4).</li>
+<li><a class="reference external" href="Soundness.html">Soundness.v</a>: Proof of
+soundness of the OGS (Thm. 8).</li>
+</ul>
+</li>
+<li><tt class="docutils literal">Examples/</tt> directory: concrete language machines instanciating the generic
+construction and soundness theorem.<ul>
+<li><a class="reference external" href="STLC_CBV.html">STLC_CBV.v</a>: Simply typed,
+call-by-value, lambda calculus, with a unit type and recursive functions.
+This example is the most commented, with a complete walk-through of the
+instanciation.</li>
+<li><a class="reference external" href="ULC_CBV.html">ULC_CBV.v</a>: Pure, untyped,
+call-by-value, lambda calculus. This example demonstrate that the
+intrinsically typed and scoped approach still handles untyped calculi, by
+treating them as &quot;unityped&quot;.</li>
+<li><a class="reference external" href="SystemD.html">SystemD.v</a>: Mu-mu-tilde
+calculus variant System D from Downen and Ariola, polarized. This is
+our &quot;flagship&quot; example, as it is a very expressive calculus. We have
+dropped existential and universal type quantifier as our framework only
+captures simple types. We have added a slightly ad-hoc construction to
+enable general recursion, making the calculus non-normalizing.</li>
+<li><a class="reference external" href="SystemL_CBV.html">SystemL_CBV.v</a>:
+mu-mu-tilde calculus variant System L, in call by value
+(i.e., lambda-bar-mu-mu-tilde-Q calculus from Herbelin and Curien).</li>
+</ul>
+</li>
+<li><a class="reference external" href="Checks.html">Checks.v</a>: Interactively display
+information about the most important theorems.</li>
+</ul>
+</div>
+</div>
+<div class="section" id="axioms">
+<h1>Axioms</h1>
+<p>The whole development relies only on axiom K, a conventional and sound axiom
+from Coq's standard library (more precisely, <a class="reference external" href="https://coq.inria.fr/library/Coq.Logic.Eqdep.html#Eq_rect_eq.eq_rect_eq">Eq_rect_eq.eq_rect_eq</a>).
+It is used by <tt class="docutils literal">Equations</tt> to perform some dependent pattern matching.</p>
+<p>This fact can be verified from the output of typechecking <a class="reference external" href="Checks.html">Checks.v</a>. It can
+also be double checked in an interactive mode.</p>
+<ul class="simple">
+<li>For the abstract result of soundness of the OGS by running
+<tt class="docutils literal">Print Assumptions ogs_correction.</tt> at the end of
+<a class="reference external" href="Soundness.html">Soundness.v</a>.</li>
+<li>For any particular example, for instance by running
+<tt class="docutils literal">Print Assumptions stlc_ciu_correct.</tt> at the end of
+<a class="reference external" href="STLC_CBV.html">STLC_CBV.v</a>.</li>
+</ul>
+</div>
+<div class="section" id="local-installation">
+<h1>Local Installation</h1>
+<p>The most convenient way to experiment and develop with this library is to
+install Coq locally and use some IDE such as emacs. To do so, first ensure you
+have the source code for the project or download it with the following command.</p>
+<pre class="code shell literal-block">
+git<span class="w"> </span>clone<span class="w"> </span>-b<span class="w"> </span>esop25<span class="w"> </span>https://github.com/lapin0t/ogs.git<span class="w">
+</span><span class="nb">cd</span><span class="w"> </span>ogs
+</pre>
+<p>To install the Coq dependencies, first ensure you have a working opam
+installation. This should usually be obtained from your systems package
+distribution, see <a class="reference external" href="https://opam.ocaml.org/doc/Install.html">https://opam.ocaml.org/doc/Install.html</a> for further
+information.</p>
+<p>Check if you have added the <tt class="docutils literal"><span class="pre">coq-released</span></tt> package repository with the command
+<tt class="docutils literal">opam repo</tt>. If it does not appear, add it with the following command.</p>
+<pre class="code shell literal-block">
+opam<span class="w"> </span>repo<span class="w"> </span>add<span class="w"> </span>coq-released<span class="w"> </span>https://coq.inria.fr/opam/released
+</pre>
+<p>Then, from the root of the repository, install the dependencies with
+the following command</p>
+<pre class="code shell literal-block">
+opam<span class="w"> </span>install<span class="w"> </span>--deps-only<span class="w"> </span>.
+</pre>
+<p>We stress that the development has been only checked to compile against these
+specific dependencies. In particular, it does not compiled at the moment
+against latest version of <tt class="docutils literal"><span class="pre">coq-coinduction</span></tt> due to major changes in the API.</p>
+<p>Finally, typecheck the code with the following command, again from the root of
+the repository. This should take around 3-5min.</p>
+<pre class="code shell literal-block">
+dune<span class="w"> </span>build
+</pre>
+</div>
+<div class="section" id="generating-the-alectryon-documentation">
+<h1>Generating the Alectryon documentation</h1>
+<p>To build the html documentation, first install Alectryon:</p>
+<pre class="code shell literal-block">
+opam<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;coq-serapi==8.17.0+0.17.3&quot;</span><span class="w">
+</span>python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--user<span class="w"> </span>alectryon
+</pre>
+<p>Then build the documentation with the following command.</p>
+<pre class="code shell literal-block">
+make<span class="w"> </span>doc
+</pre>
+<p>The html should now be generated in the <tt class="docutils literal">docs</tt> folder. You can start a
+local web server to view it with:</p>
+<pre class="code shell literal-block">
+make<span class="w"> </span>serve
+</pre>
+</div>
+</div>
+</div></body>
+</html>

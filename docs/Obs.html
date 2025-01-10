@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Observation Structure (§ 4.4)</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="observation-structure-4-4">
+<h1 class="title">Observation Structure (§ 4.4)</h1>
+
+<p>The messages that player and opponent exchange in the OGS
+arise from splitting normal forms into the head variable
+on which it is stuck, an observation, and an assignment.
+An <em>observation structure</em> axiomatizes theses observations
+of the language. They consist of:</p>
+<ul class="simple">
+<li>a family <code class="highlight coq"><span class="n">o_obs</span></code> indexed by the types of the language and,</li>
+<li>a projection from observations to contexts of the language.</li>
+</ul>
+<p>In fact as these make sense quite generally, we have already defined
+them along with generic combinators on sorted families in
+<a class="reference external" href="Family.html">Ctx/Family.v</a>. Much of the content of this file will
+be to wrap these generic definitions with more suitable names and
+provide specific utilities on top.</p>
+<p>As explained above, observation structures are just <a class="reference external" href="Family.html#oper">operators</a>. We
+rename their domain <tt class="docutils literal">o_dom</tt> to just <tt class="docutils literal">dom</tt>.</p>
+<pre class="alectryon-io highlight" id="obsstruct"><!-- Generator: Alectryon --><span class="alectryon-wsp">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="nf">obs_struct</span> T C := (Oper T C).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="nf">dom</span> := o_dom.</span></pre><div class="system-message">
+<p class="system-message-title">System Message: WARNING/2 (<tt class="docutils">theories/OGS/Obs.v</tt>, line 3); <em><a href="#ctx-family-v-1">backlink</a></em></p>
+Duplicate explicit target name: &quot;ctx/family.v&quot;.</div>
+<p>Pointed observations consist of a pair of a variable and a matching observation.
+We construct them using the generic formal cut combinator on families defined
+in <a class="reference external" href="Family.html#formalcut">Ctx/Family.v</a>.</p>
+<pre class="alectryon-io highlight" id="pointedobs"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">pointed_obs</span> `{CC : <span class="kp">context</span> T C} (O : Oper T C) : Fam₀ T C
+  := c_var ∥ₛ ⦉O⦊.
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;O ∙&quot;</span> := (pointed_obs O).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="nf">m_var</span> o := (o.(cut_l)).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="nf">m_obs</span> o := (o.(cut_r)).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="nf">m_dom</span> o := (o_dom o.(cut_r)).</span></pre><p>Next we define normal forms, as triplets of a variable, an observation
+and an assignment filling the domain of the observation. For this we again
+use the formal cut combinator and the &quot;observation filling&quot; combinator,
+defined in <a class="reference external" href="Assignment.html#filledop">Ctx/Assignment.v</a>.</p>
+<pre class="alectryon-io highlight" id="nf"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">nf</span> `{CC : <span class="kp">context</span> T C} (O : obs_struct T C) (X : Fam₁ T C) : Fam₀ T C
+  := c_var ∥ₛ (O # X).</span></pre><p>We now define two utilities for projecting normal forms to pointed observations.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">nf_to_obs</span> `{CC : <span class="kp">context</span> T C} {O} {X : Fam₁ T C} : <span class="kr">forall</span> <span class="nv">Γ</span>, nf O X Γ -&gt; O∙ Γ
+  := f_cut_map f_id₁ forget_args.
+#[<span class="kn">global</span>] <span class="kn">Coercion</span> <span class="nf">nf_to_obs</span> : nf &gt;-&gt; pointed_obs.
+
+<span class="kn">Definition</span> <span class="nf">then_to_obs</span> `{CC : <span class="kp">context</span> T C} {O} {X : Fam₁ T C} {Γ}
+  : delay (nf O X Γ) -&gt; delay (O∙ Γ)
+  := fmap_delay (nf_to_obs Γ).</span></pre><p>Next, we define shortcuts for projecting normal forms into their various components.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Section</span> <span class="nf">with_param</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  <span class="kn">Context</span> `{CC : <span class="kp">context</span> T C} {O : obs_struct T C} {X : Fam₁ T C}.
+
+  <span class="kn">Definition</span> <span class="nf">nf_ty</span> {<span class="nv">Γ</span>} (<span class="nv">n</span> : nf O X Γ) : T
+    := n.(cut_ty).
+  <span class="kn">Definition</span> <span class="nf">nf_var</span> {<span class="nv">Γ</span>} (<span class="nv">n</span> : nf O X Γ) : Γ ∋ nf_ty n
+    := n.(cut_l).
+  <span class="kn">Definition</span> <span class="nf">nf_obs</span> {<span class="nv">Γ</span>} (<span class="nv">n</span> : nf O X Γ) : O (nf_ty n)
+    := n.(cut_r).(fill_op).
+  <span class="kn">Definition</span> <span class="nf">nf_dom</span> {<span class="nv">Γ</span>} (<span class="nv">n</span> : nf O X Γ) : C
+    := dom n.(cut_r).(fill_op).
+  <span class="kn">Definition</span> <span class="nf">nf_args</span> {<span class="nv">Γ</span>} (<span class="nv">n</span> : nf O X Γ) : nf_dom n =[X]&gt; Γ
+    := n.(cut_r).(fill_args).</span></pre><p>As normal forms contain an assignment, Coq's equality is not the right notion of
+equivalence: we wish to consider two normal forms as equivalent even if their assignment
+are merely <em>pointwise equal</em>.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Variant</span> <span class="nf">nf_eq</span> {<span class="nv">Γ</span>} : nf O X Γ -&gt; nf O X Γ -&gt; <span class="kt">Prop</span> :=
+  | NfEq {t} {i : Γ ∋ t} {o a1 a2} : a1 ≡ₐ a2 -&gt; nf_eq (i⋅o⦇a1⦈) (i⋅o⦇a2⦈).
+
+  #[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">nf_eq_Equivalence</span> {<span class="nv">Γ</span>} : Equivalence (@nf_eq Γ).
+  <span class="kn">Proof</span>.
+    <span class="nb">split</span>.
+    - <span class="nb">intros</span> ?; <span class="bp">now</span> <span class="nb">econstructor</span>.
+    - <span class="nb">intros</span> ?? []; <span class="bp">now</span> <span class="nb">econstructor</span>.
+    - <span class="nb">intros</span> ??? [] h2; <span class="nb">dependent induction</span> h2.
+      <span class="nb">econstructor</span>; <span class="bp">now</span> <span class="nb">transitivity</span> a2.
+  <span class="kn">Qed</span>.</span></pre><p>We lift this notion of equivalence to computations returning normal forms.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><input class="alectryon-toggle" id="obs-v-chk0" style="display: none" type="checkbox"><label class="alectryon-input" for="obs-v-chk0"><span class="kn">Definition</span> <span class="nf">comp_eq</span> {<span class="nv">Γ</span>} : relation (delay (nf O X Γ))
+    := it_eq (<span class="kr">fun</span> <span class="nv">_</span> : T1 =&gt; nf_eq) (i := T1_0).</label><small class="alectryon-output"><div><div class="alectryon-messages"><blockquote class="alectryon-message">The reference delay was not found <span class="kr">in</span> the current
+environment.</blockquote></div></div></small><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">then_to_obs_proper</span> {<span class="nv">Γ</span>}
+    : Proper (@comp_eq Γ ==&gt; it_eq (eqᵢ _) (i:=_)) then_to_obs.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Proof</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">intros</span> a b; <span class="nb">unfold</span> comp_eq, then_to_obs, fmap_delay; <span class="nb">cbn</span>; <span class="nb">intros</span> H.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">eapply</span> fmap_eq; [ | <span class="bp">exact</span> H ].</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="bp">now</span> <span class="nb">intros</span> [] ?? [].</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Qed</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp"><span class="kn">End</span> <span class="nf">with_param</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;u ≋ v&quot;</span> := (comp_eq u v).</span></pre>
+</div>
+</div></body>
+</html>

@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Strategy.v</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document">
+
+
+<div class="section" id="the-machine-strategy-5-3">
+<h1>The Machine Strategy (§ 5.3)</h1>
+<p>Having defined the <a class="reference external" href="Game.html">OGS game</a> and axiomatized the
+<a class="reference external" href="Machine.v">language machine</a>, we are now ready to construct the <em>machine strategy</em>.</p>
+<p>We consider a language abstractly captured as a machine.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Context</span> `{CC : <span class="kp">context</span> T C} {CL : context_laws T C}.
+  <span class="kn">Context</span> {<span class="nv">val</span>} {<span class="nv">VM</span> : subst_monoid val} {<span class="nv">VML</span> : subst_monoid_laws val}.
+  <span class="kn">Context</span> {<span class="nv">conf</span>} {<span class="nv">CM</span> : subst_module val conf} {<span class="nv">CML</span> : subst_module_laws val conf}.
+  <span class="kn">Context</span> {<span class="nv">obs</span> : obs_struct T C} {<span class="nv">M</span> : machine val conf obs}.</span></pre><p>We start off by defining active and passive OGS assignments (Def 5.16). This datastructure
+will hold the memory part of a strategy state, remembering the values which we have
+hidden from Opponent and given as fresh variables.</p>
+<pre class="alectryon-io highlight" id="ogsenv"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Inductive</span> <span class="nf">ogs_env</span> (<span class="nv">Δ</span> : C) : polarity -&gt; ogs_ctx -&gt; <span class="kt">Type</span> :=
+  | ENilA : ogs_env Δ Act ∅ₓ
+  | ENilP : ogs_env Δ Pas ∅ₓ
+  | EConA {Φ Γ} : ogs_env Δ Pas Φ -&gt; ogs_env Δ Act (Φ ▶ₓ Γ)
+  | EConP {Φ Γ} : ogs_env Δ Act Φ -&gt; Γ =[val]&gt; (Δ +▶ ↓⁺Φ) -&gt; ogs_env Δ Pas (Φ ▶ₓ Γ)
+  .</span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Notation</span> <span class="s2">&quot;&#39;ε⁺&#39;&quot;</span> := (ENilA).
+  <span class="kn">Notation</span> <span class="s2">&quot;&#39;ε⁻&#39;&quot;</span> := (ENilP).
+  <span class="kn">Notation</span> <span class="s2">&quot;u ;⁺&quot;</span> := (EConA u).
+  <span class="kn">Notation</span> <span class="s2">&quot;u ;⁻ e&quot;</span> := (EConP u e).</span></pre><p>Next we define the collapsing function on OGS assignments (Def 5.18).</p>
+<pre class="alectryon-io highlight" id="envcollapse"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Equations</span> <span class="nf">collapse</span> {<span class="nv">Δ</span> <span class="nv">p</span> <span class="nv">Φ</span>} : ogs_env Δ p Φ -&gt; ↓[p^]Φ =[val]&gt; (Δ +▶ ↓[p]Φ) :=
+    collapse ε⁺       := ! ;
+    collapse ε⁻       := ! ;
+    collapse (u ;⁺)   := collapse u ⊛ᵣ r_cat3_1 ;
+    collapse (u ;⁻ e) := [ collapse u , e ] .
+  <span class="kn">Notation</span> <span class="s2">&quot;ₐ↓ γ&quot;</span> := (collapse γ).</span></pre><p>We readily define the zipping function (Def 6.10).</p>
+<pre class="alectryon-io highlight" id="zip"><!-- Generator: Alectryon --><span class="alectryon-wsp">  #[derive(eliminator=no)]
+  <span class="kn">Equations</span> <span class="nf">bicollapse</span> {<span class="nv">Δ</span>} <span class="nv">Φ</span> : ogs_env Δ Act Φ -&gt; ogs_env Δ Pas Φ -&gt; <span class="kr">forall</span> <span class="nv">p</span>, ↓[p]Φ =[val]&gt; Δ :=
+    bicollapse ∅ₓ       (ε⁺)     (ε⁻)     Act   := ! ;
+    bicollapse ∅ₓ       (ε⁺)     (ε⁻)     Pas   := ! ;
+    bicollapse (Φ ▶ₓ _) (u ;⁺)   (v ;⁻ γ) Act :=
+          [ bicollapse Φ v u Pas , γ ⊛ [ a_id , bicollapse Φ v u Act ] ] ;
+    bicollapse (Φ ▶ₓ _) (v ;⁺)   (u ;⁻ e) Pas := bicollapse Φ u v Act .
+  #[<span class="kn">global</span>] <span class="kn">Arguments</span> bicollapse {Δ Φ} u v {p}.</span></pre><p>And the fixpoint property linking collapsing and zipping (Prop 6.13).</p>
+<pre class="alectryon-io highlight" id="collapsezip"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Lemma</span> <span class="nf">collapse_fix_aux</span> {<span class="nv">Δ</span> <span class="nv">Φ</span>} (<span class="nv">u</span> : ogs_env Δ Act Φ) (<span class="nv">v</span> : ogs_env Δ Pas Φ)
+    :  ₐ↓u ⊛ [ a_id , bicollapse u v ] ≡ₐ bicollapse u v
+     /\ ₐ↓v ⊛ [ a_id , bicollapse u v ] ≡ₐ bicollapse u v .
+  <span class="kn">Proof</span>.
+    <span class="nb">induction</span> Φ; <span class="nb">dependent destruction</span> u; <span class="nb">dependent destruction</span> v.
+    - <span class="nb">split</span>; <span class="nb">intros</span> ? i; <span class="bp">now</span> <span class="nb">destruct</span> (c_view_emp i).
+    - <span class="nb">split</span>; <span class="nb">cbn</span>; simp collapse; simp bicollapse.
+      + <span class="nb">intros</span> ? i; <span class="nb">cbn</span>; <span class="nb">rewrite</span> &lt;- v_sub_sub, a_ren_r_simpl, r_cat3_1_simpl.
+        <span class="bp">now</span> <span class="nb">apply</span> IHΦ.
+        <span class="bp">exact</span> _. <span class="c">(* wtf typeclass?? *)</span>
+      + <span class="nb">intros</span> ? i; <span class="nb">cbn</span>; <span class="nb">destruct</span> (c_view_cat i); <span class="nb">eauto</span>.
+        <span class="bp">now</span> <span class="nb">apply</span> IHΦ.
+  <span class="kn">Qed</span>.
+
+  <span class="kn">Lemma</span> <span class="nf">collapse_fix_act</span> {<span class="nv">Δ</span> <span class="nv">Φ</span>} (<span class="nv">u</span> : ogs_env Δ Act Φ) (<span class="nv">v</span> : ogs_env Δ Pas Φ)
+    : ₐ↓u ⊛ [ a_id , bicollapse u v ] ≡ₐ bicollapse u v .
+  <span class="kn">Proof</span>. <span class="bp">now</span> <span class="nb">apply</span> collapse_fix_aux. <span class="kn">Qed</span>.
+
+  <span class="kn">Lemma</span> <span class="nf">collapse_fix_pas</span> {<span class="nv">Δ</span> <span class="nv">Φ</span>} (<span class="nv">u</span> : ogs_env Δ Act Φ) (<span class="nv">v</span> : ogs_env Δ Pas Φ)
+    : ₐ↓v ⊛ [ a_id , bicollapse u v ] ≡ₐ bicollapse u v .
+  <span class="kn">Proof</span>. <span class="bp">now</span> <span class="nb">apply</span> collapse_fix_aux. <span class="kn">Qed</span>.</span></pre><p>Here we provide an alternative definition to the collapsing functions, using a more
+precisely typed lookup function. This is more practical to use when reasoning about
+the height of a variable, in the <a class="reference external" href="CompGuarded.html">eventual guardedness proof</a>.</p>
+<p>First we compute actual useful subset of the context used by a particular variable.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Equations</span> <span class="nf">ctx_dom</span> <span class="nv">Φ</span> <span class="nv">p</span> {<span class="nv">x</span>} : ↓[p^]Φ ∋ x -&gt; C :=
+    ctx_dom ∅ₓ       Act i <span class="kr">with</span> c_view_emp i := { | ! } ;
+    ctx_dom ∅ₓ       Pas i <span class="kr">with</span> c_view_emp i := { | ! } ;
+    ctx_dom (Φ ▶ₓ Γ) Act i := ctx_dom Φ Pas i ;
+    ctx_dom (Φ ▶ₓ Γ) Pas i <span class="kr">with</span> c_view_cat i := {
+      | Vcat_l j := ctx_dom Φ Act j ;
+      | Vcat_r j := ↓[Act]Φ } .
+  #[<span class="kn">global</span>] <span class="kn">Arguments</span> ctx_dom {Φ p x} i.</span></pre><p>Next we provide a renaming from this precise domain to the actual current allowed context.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Equations</span> <span class="nf">r_ctx_dom</span> <span class="nv">Φ</span> <span class="nv">p</span> {<span class="nv">x</span>} (<span class="nv">i</span> : ↓[p^]Φ ∋ x) : ctx_dom i ⊆ ↓[p]Φ :=
+    r_ctx_dom ∅ₓ       Act i <span class="kr">with</span> c_view_emp i := { | ! } ;
+    r_ctx_dom ∅ₓ       Pas i <span class="kr">with</span> c_view_emp i := { | ! } ;
+    r_ctx_dom (Φ ▶ₓ Γ) Act i := r_ctx_dom Φ Pas i ᵣ⊛ r_cat_l ;
+    r_ctx_dom (Φ ▶ₓ Γ) Pas i <span class="kr">with</span> c_view_cat i := {
+      | Vcat_l j := r_ctx_dom Φ Act j ;
+      | Vcat_r j := r_id } .
+  #[<span class="kn">global</span>] <span class="kn">Arguments</span> r_ctx_dom {Φ p x} i.</span></pre><p>We can write this more precise lookup function, returning a value in just the necessary
+context.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Equations</span> <span class="nf">lookup</span> {<span class="nv">Δ</span> <span class="nv">p</span> <span class="nv">Φ</span>} (<span class="nv">γ</span> : ogs_env Δ p Φ) [x] (i : ↓[p^]Φ ∋ x)
+            : val (Δ +▶ ctx_dom i) x :=
+    lookup ε⁺       i <span class="kr">with</span> c_view_emp i := { | ! } ;
+    lookup ε⁻       i <span class="kr">with</span> c_view_emp i := { | ! } ;
+    lookup (γ ;⁺)   i := lookup γ i ;
+    lookup (γ ;⁻ e) i <span class="kr">with</span> c_view_cat i := {
+      | Vcat_l j := lookup γ j ;
+      | Vcat_r j := e _ j } .</span></pre><p>We relate the precise lookup with the previously defined collapse.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Lemma</span> <span class="nf">lookup_collapse</span> {<span class="nv">Δ</span> <span class="nv">p</span> <span class="nv">Φ</span>} (<span class="nv">γ</span> : ogs_env Δ p Φ) :
+    collapse γ ≡ₐ (<span class="kr">fun</span> <span class="nv">x</span> <span class="nv">i</span> =&gt; lookup γ i ᵥ⊛ᵣ [ r_cat_l , r_ctx_dom i ᵣ⊛ r_cat_r ]).
+  <span class="kn">Proof</span>.
+    <span class="nb">intros</span> ? i; funelim (lookup γ i).
+    - <span class="nb">cbn</span>; <span class="nb">rewrite</span> H.
+      <span class="nb">unfold</span> v_ren; <span class="nb">rewrite</span> &lt;- v_sub_sub.
+      <span class="nb">apply</span> v_sub_proper; <span class="nb">eauto</span>.
+      <span class="nb">intros</span> ? j; <span class="nb">cbn</span>; <span class="nb">rewrite</span> v_sub_var; <span class="nb">cbn</span>; <span class="nb">f_equal</span>.
+      <span class="nb">unfold</span> r_cat3_1; <span class="nb">destruct</span> (c_view_cat j); <span class="nb">cbn</span>.
+      + <span class="bp">now</span> <span class="nb">rewrite</span> c_view_cat_simpl_l.
+      + <span class="bp">now</span> <span class="nb">rewrite</span> c_view_cat_simpl_r.
+    - <span class="nb">cbn</span>; <span class="nb">rewrite</span> <span class="mi">2</span> c_view_cat_simpl_l; <span class="bp">exact</span> H.
+    - <span class="nb">cbn</span>; <span class="nb">rewrite</span> <span class="mi">2</span> c_view_cat_simpl_r.
+      <span class="nb">cbn</span>; <span class="nb">rewrite</span> a_ren_l_id, a_cat_id.
+      <span class="nb">symmetry</span>; <span class="nb">apply</span> v_var_sub.
+  <span class="kn">Qed</span>.</span></pre></div>
+<div class="section" id="machine-strategy-def-5-19">
+<h1>Machine Strategy (Def 5.19)</h1>
+<p>We define active and passive states of the machine strategy. Active states consist of
+the pair of a language configuration and an active OGS assignement. Passive states consist
+solely of a passive OGS assignement.</p>
+<pre class="alectryon-io highlight" id="machinestate"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Record</span> <span class="nf">m_strat_act</span> <span class="nv">Δ</span> (<span class="nv">Φ</span> : ogs_ctx) : <span class="kt">Type</span> := MS {
+    ms_conf : conf (Δ +▶ ↓⁺Φ) ;
+    ms_env : ogs_env Δ Act Φ ;
+  }.
+  #[<span class="kn">global</span>] <span class="kn">Arguments</span> MS {Δ Φ}.
+  #[<span class="kn">global</span>] <span class="kn">Arguments</span> ms_conf {Δ Φ}.
+  #[<span class="kn">global</span>] <span class="kn">Arguments</span> ms_env {Δ Φ}.
+
+  <span class="kn">Definition</span> <span class="nf">m_strat_pas</span> <span class="nv">Δ</span> : psh ogs_ctx := ogs_env Δ Pas.</span></pre><p>Next we define the action and reaction morphisms of the machine strategy. First
+<tt class="docutils literal">m_strat_wrap</tt> provides the active transition given an already evaluated normal form,
+such that the action morphism <tt class="docutils literal">m_strat_play</tt> only has to evaluate the active part
+of the state. <tt class="docutils literal">m_strat_resp</tt> mostly is a wrapper around <tt class="docutils literal">oapp</tt>, our analogue to
+the embedding from normal forms to language configurations present in the paper.</p>
+<pre class="alectryon-io highlight" id="machineplay"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Definition</span> <span class="nf">m_strat_wrap</span> {<span class="nv">Δ</span> <span class="nv">Φ</span>} (<span class="nv">γ</span> : ogs_env Δ Act Φ)
+     : nf _ _ (Δ +▶ ↓⁺ Φ) -&gt; (obs∙ Δ + h_actv ogs_hg (m_strat_pas Δ) Φ) :=
+      <span class="kr">fun</span> <span class="nv">n</span> =&gt;
+        <span class="kr">match</span> c_view_cat (nf_var n) <span class="kr">with</span>
+        | Vcat_l i =&gt; inl (i ⋅ nf_obs n)
+        | Vcat_r j =&gt; inr ((j ⋅ nf_obs n) ,&#39; (γ ;⁻ nf_args n))
+        <span class="kr">end</span> .
+
+  <span class="kn">Definition</span> <span class="nf">m_strat_play</span> {<span class="nv">Δ</span> <span class="nv">Φ</span>} (<span class="nv">ms</span> : m_strat_act Δ Φ)
+    : delay (obs∙ Δ + h_actv ogs_hg (m_strat_pas Δ) Φ)
+    := fmap_delay (m_strat_wrap ms.(ms_env)) (<span class="kp">eval</span> ms.(ms_conf)).
+
+  <span class="kn">Definition</span> <span class="nf">m_strat_resp</span> {<span class="nv">Δ</span> <span class="nv">Φ</span>} (<span class="nv">γ</span> : m_strat_pas Δ Φ)
+    : h_pasv ogs_hg (m_strat_act Δ) Φ
+    := <span class="kr">fun</span> <span class="nv">m</span> =&gt;
+         {| ms_conf := (ₐ↓γ _ (m_var m) ᵥ⊛ᵣ r_cat3_1) ⊙ (m_obs m)⦗r_cat_rr ᵣ⊛ a_id⦘ ;
+            ms_env := γ ;⁺ |} .</span></pre><p>These action and reaction morphisms define a coalgebra, which we now embed into the
+final coalgebra by looping them coinductively. This constructs the indexed interaction
+tree arising from starting the machine strategy at a given state.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">   </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">m_strat</span> {<span class="nv">Δ</span>} : m_strat_act Δ ⇒ᵢ ogs_act Δ :=
+    <span class="kr">cofix</span> _m_strat Φ e :=
+       subst_delay
+         (<span class="kr">fun</span> <span class="nv">r</span> =&gt; go <span class="kr">match</span> r <span class="kr">with</span>
+          | inl m        =&gt; RetF m
+          | inr (x ,&#39; p) =&gt; VisF x (<span class="kr">fun</span> <span class="nv">r</span> : ogs_e.(e_rsp) _ =&gt; _m_strat _ (m_strat_resp p r))
+          <span class="kr">end</span>)
+         (m_strat_play e).</span></span></pre><p>We also provide a wrapper for the passive version of the above map.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">m_stratp</span> {<span class="nv">Δ</span>} : m_strat_pas Δ ⇒ᵢ ogs_pas Δ :=
+    <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">x</span> <span class="nv">m</span> =&gt; m_strat _ (m_strat_resp x m).</span></span></pre><p>We define the notion of equivalence on machine-strategy states given by the weak
+bisimilarity of the induced infinite trees. There is an active version, and a passive
+version, working pointwise.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Definition</span> <span class="nf">m_strat_act_eqv</span> {<span class="nv">Δ</span>} : relᵢ (m_strat_act Δ) (m_strat_act Δ) :=
+    <span class="kr">fun</span> <span class="nv">i</span> <span class="nv">x</span> <span class="nv">y</span> =&gt; m_strat i x ≈ m_strat i y.
+  <span class="kn">Notation</span> <span class="s2">&quot;x ≈ₐ y&quot;</span> := (m_strat_act_eqv _ x y).
+
+  <span class="kn">Definition</span> <span class="nf">m_strat_pas_eqv</span> {<span class="nv">Δ</span>} : relᵢ (m_strat_pas Δ) (m_strat_pas Δ) :=
+    <span class="kr">fun</span> <span class="nv">i</span> <span class="nv">x</span> <span class="nv">y</span> =&gt; <span class="kr">forall</span> <span class="nv">m</span>, m_strat_resp x m ≈ₐ m_strat_resp y m .
+  <span class="kn">Notation</span> <span class="s2">&quot;x ≈ₚ y&quot;</span> := (m_strat_pas_eqv _ x y).
+
+  #[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">m_strat_act_eqv_refl</span> {<span class="nv">Δ</span>} : Reflexiveᵢ (@m_strat_act_eqv Δ).
+  <span class="kn">Proof</span>. <span class="nb">intros</span> ??; <span class="nb">unfold</span> m_strat_act_eqv; <span class="bp">reflexivity</span>. <span class="kn">Qed</span>.
+  #[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">m_strat_pas_eqv_refl</span> {<span class="nv">Δ</span>} : Reflexiveᵢ (@m_strat_pas_eqv Δ).
+  <span class="kn">Proof</span>. <span class="nb">intros</span> ???; <span class="bp">reflexivity</span>. <span class="kn">Qed</span>.</span></pre><p>A technical lemma explaining how the infinite strategy unfolds.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Lemma</span> <span class="nf">unfold_mstrat</span> {<span class="nv">Δ</span> <span class="nv">a</span>} (<span class="nv">x</span> : m_strat_act Δ a) :
+    m_strat a x
+    ≊ subst_delay
+         (<span class="kr">fun</span> <span class="nv">r</span> =&gt; go <span class="kr">match</span> r <span class="kr">with</span>
+          | inl m        =&gt; RetF m
+          | inr (x ,&#39; p) =&gt; VisF x (<span class="kr">fun</span> <span class="nv">r</span> : ogs_e.(e_rsp) _ =&gt; m_strat _ (m_strat_resp p r))
+          <span class="kr">end</span>)
+         (m_strat_play x).
+  <span class="kn">Proof</span>.
+    <span class="nb">apply</span> it_eq_unstep; <span class="nb">cbn</span>.
+    <span class="nb">destruct</span> (_observe (<span class="kp">eval</span> (ms_conf x))); <span class="nb">cbn</span>.
+    - <span class="nb">destruct</span> (m_strat_wrap (ms_env x) r); <span class="nb">cbn</span>.
+      <span class="bp">now</span> <span class="nb">econstructor</span>.
+      <span class="nb">destruct</span> h; <span class="nb">econstructor</span>; <span class="nb">intro</span>.
+      <span class="nb">apply</span> it_eq_t_equiv.
+    - <span class="nb">econstructor</span>; <span class="nb">apply</span> (subst_delay_eq (RX := eq)).
+      <span class="nb">intros</span> ? ? &lt;-; <span class="nb">apply</span> it_eq_unstep; <span class="nb">cbn</span>.
+      <span class="nb">destruct</span> x0; <span class="nb">cbn</span>.
+      + <span class="bp">now</span> <span class="nb">econstructor</span>.
+      + <span class="nb">destruct</span> s; <span class="nb">econstructor</span>; <span class="nb">intro</span>; <span class="bp">now</span> <span class="nb">apply</span> it_eq_t_equiv.
+      + <span class="bp">now</span> <span class="nb">apply</span> it_eq_t_equiv.
+    - <span class="nb">destruct</span> q.
+  <span class="kn">Qed</span>.</span></pre><p>Next we construct the initial states. The active initial state is given by simply a
+configuration from the language machine while a passive initial state is given by
+an assignment into the final context Δ.</p>
+<pre class="alectryon-io highlight" id="initstate"><!-- Generator: Alectryon --><span class="alectryon-wsp">   <span class="kn">Definition</span> <span class="nf">inj_init_act</span> <span class="nv">Δ</span> {<span class="nv">Γ</span>} (<span class="nv">c</span> : conf Γ) : m_strat_act Δ (∅ₓ ▶ₓ Γ) :=
+    {| ms_conf := c ₜ⊛ᵣ (r_cat_r ᵣ⊛ r_cat_r) ; ms_env := ε⁻ ;⁺ |}.
+
+  <span class="kn">Definition</span> <span class="nf">inj_init_pas</span> {<span class="nv">Δ</span> <span class="nv">Γ</span>} (<span class="nv">γ</span> : Γ =[val]&gt; Δ) : m_strat_pas Δ (∅ₓ ▶ₓ Γ) :=
+    ε⁺ ;⁻ (γ ⊛ᵣ r_cat_l).</span></pre><p>This defines a notion of equivalence on the configurations of the language: bisimilarity
+of the induced strategies.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Definition</span> <span class="nf">m_conf_eqv</span> <span class="nv">Δ</span> : relᵢ conf conf :=
+    <span class="kr">fun</span> <span class="nv">Γ</span> <span class="nv">u</span> <span class="nv">v</span> =&gt; inj_init_act Δ u ≈ₐ inj_init_act Δ v .</span></pre><p>Finally we define composition of two matching machine-strategy states.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Record</span> <span class="nf">reduce_t</span> (<span class="nv">Δ</span> : C) : <span class="kt">Type</span> := RedT {
+    red_ctx : ogs_ctx ;
+    red_act : m_strat_act Δ red_ctx ;
+    red_pas : m_strat_pas Δ red_ctx
+  } .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Arguments</span> RedT {Δ Φ} u v : <span class="nb">rename</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Arguments</span> red_ctx {Δ}.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Arguments</span> red_act {Δ}.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Arguments</span> red_pas {Δ}.</span></span></pre><p>First the composition equation.</p>
+<pre class="alectryon-io highlight" id="compeqn"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Definition</span> <span class="nf">compo_body</span> {<span class="nv">Δ</span>} (<span class="nv">x</span> : reduce_t Δ)
+    : delay (reduce_t Δ + obs∙ Δ)
+    := fmap_delay (<span class="kr">fun</span> <span class="nv">r</span> =&gt; <span class="kr">match</span> r <span class="kr">with</span>
+                  | inl r =&gt; inr r
+                  | inr e =&gt; inl (RedT (m_strat_resp x.(red_pas) (projT1 e)) (projT2 e))
+                  <span class="kr">end</span>)
+                  (m_strat_play x.(red_act)).</span></pre><p>Then its naive fixpoint.</p>
+<pre class="alectryon-io highlight" id="componaive"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Definition</span> <span class="nf">compo</span> {<span class="nv">Δ</span> <span class="nv">a</span>} (<span class="nv">u</span> : m_strat_act Δ a) (<span class="nv">v</span> : m_strat_pas Δ a)
+    : delay (obs∙ Δ)
+    := iter_delay compo_body (RedT u v).
+<span class="kn">End</span> <span class="nf">with_param</span>.</span></pre><p>Finally we expose a bunch of notations to make everything more readable.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;&#39;ε⁺&#39;&quot;</span> := (ENilA).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;&#39;ε⁻&#39;&quot;</span> := (ENilP).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;u ;⁺&quot;</span> := (EConA u).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;u ;⁻ e&quot;</span> := (EConP u e).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;ₐ↓ γ&quot;</span> := (collapse γ).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;u ∥ v&quot;</span> := (compo u v).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;x ≈ₐ y&quot;</span> := (m_strat_act_eqv _ x y).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;x ≈ₚ y&quot;</span> := (m_strat_pas_eqv _ x y).
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;x ≈⟦ogs Δ ⟧≈ y&quot;</span> := (m_conf_eqv Δ _ x y).</span></pre></div>
+</div>
+</div></body>
+</html>

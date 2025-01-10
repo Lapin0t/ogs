@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Game event</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="game-event">
+<h1 class="title">Game event</h1>
+
+<p>In order to specify the set of visible moves of an indexed interaction tree, we use the
+notion of indexed polynomial functor. See &quot;Indexed Containers&quot; by Thorsten Altenkirch,
+Neil Ghani, Peter Hancock, Conor McBride, and Peter Morris.</p>
+<p>In our interaction-oriented nomenclature, an indexed container consists of a family of
+queries <tt class="docutils literal">e_qry</tt>, a family of responses <tt class="docutils literal">e_rsp</tt> and a function assigning the next
+index to each response <tt class="docutils literal">e_nxt</tt>.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Record</span> <span class="nf">event</span> (<span class="nv">I</span> <span class="nv">J</span> : <span class="kt">Type</span>) : <span class="kt">Type</span> := Event {
+  e_qry : I -&gt; <span class="kt">Type</span> ;
+  e_rsp : <span class="kr">forall</span> <span class="nv">i</span>, e_qry i -&gt; <span class="kt">Type</span> ;
+  e_nxt : <span class="kr">forall</span> <span class="nv">i</span> (<span class="nv">q</span> : e_qry i), e_rsp i q -&gt; J
+}.</span></span></pre><p>Finally we can interpret an <tt class="docutils literal">event</tt> as a functor from families over <tt class="docutils literal">J</tt> to families
+over <tt class="docutils literal">I</tt>.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">e_interp</span> {<span class="nv">I</span> <span class="nv">J</span>} (<span class="nv">E</span> : event I J) (<span class="nv">X</span> : psh J) : psh I :=
+  <span class="kr">fun</span> <span class="nv">i</span> =&gt; { q : E.(e_qry) i &amp; <span class="kr">forall</span> (<span class="nv">r</span> : E.(e_rsp) q), X (E.(e_nxt) r) } .</span></span></pre><p>We define the empty event.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">emptyₑ</span> {<span class="nv">I</span>} : event I I :=
+  {| e_qry := <span class="kr">fun</span> <span class="nv">_</span> =&gt; T0 ;
+     e_rsp := <span class="kr">fun</span> <span class="nv">_</span> =&gt; ex_falso ;
+     e_nxt := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">x</span> =&gt; ex_falso x |}.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;∅ₑ&quot;</span> := (emptyₑ).</span></span></pre>
+</div>
+</div></body>
+</html>

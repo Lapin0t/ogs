@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Scoped and sorted families</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="scoped-and-sorted-families">
+<h1 class="title">Scoped and sorted families</h1>
+
+<p>In this file we bootstrap the abstract theory of contexts, variables and substitution
+by defining a special case of type-families: families indexed by a set of contexts <tt class="docutils literal">C</tt>
+and possibly a number of times by a set of types <tt class="docutils literal">T</tt>.</p>
+<pre class="alectryon-io highlight" id="sfam"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">Fam₀</span> (<span class="nv">T</span> <span class="nv">C</span> : <span class="kt">Type</span>) := C -&gt; <span class="kt">Type</span> .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">Fam₁</span> (<span class="nv">T</span> <span class="nv">C</span> : <span class="kt">Type</span>) := C -&gt; T -&gt; <span class="kt">Type</span> .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">Fam₂</span> (<span class="nv">T</span> <span class="nv">C</span> : <span class="kt">Type</span>) := C -&gt; T -&gt; T -&gt; <span class="kt">Type</span> .</span></span></pre><p>Additionally, to represent binders we use the following alternative to sorted families
+<tt class="docutils literal">Fam₁</tt>. In this definition, the set of binders is indexed by the set of types <tt class="docutils literal">T</tt> but
+not by the set of contexts <tt class="docutils literal">C</tt>. Instead, we have a <em>projection</em> into <tt class="docutils literal">C</tt>. This is important
+for reasons of bidirectional typing information flow. We could go with <tt class="docutils literal">Fam₁</tt> instead, but
+this would entail quite a bit of equality dance when manipulating it.</p>
+<pre class="alectryon-io highlight" id="oper"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Record</span> <span class="nf">Oper</span> <span class="nv">T</span> <span class="nv">C</span> := {
+  o_op : T -&gt; <span class="kt">Type</span> ;
+  o_dom : <span class="kr">forall</span> <span class="nv">x</span>, o_op x -&gt; C ;
+}.</span></span></pre><p>Now a first combinator: the formal cut of two families. This takes two 1-indexed families
+and returns the 0-indexed family consisting pairs of matching elements.</p>
+<pre class="alectryon-io highlight" id="formalcut"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Record</span> <span class="nf">f_cut</span> {<span class="nv">T</span> <span class="nv">C</span>} (<span class="nv">F</span> <span class="nv">G</span> : Fam₁ T C) (<span class="nv">Γ</span> : C) :=
+  Cut { cut_ty : T ; cut_l : F Γ cut_ty ; cut_r : G Γ cut_ty }.</span><span class="alectryon-wsp"> </span></span></pre><p>We embed binder descriptions into sorted families, by dropping the context.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">bare_op</span> {<span class="nv">T</span> <span class="nv">C</span>} (<span class="nv">O</span> : Oper T C) : Fam₁ T C := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">x</span> =&gt; O x.</span></span></pre><p>We define maps of these families, their identity and composition.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">arr_fam₀</span> (<span class="nv">F</span> <span class="nv">G</span> : Fam₀ T C) := <span class="kr">forall</span> <span class="nv">Γ</span>, F Γ -&gt; G Γ.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">arr_fam₁</span> (<span class="nv">F</span> <span class="nv">G</span> : Fam₁ T C) := <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">x</span>, F Γ x -&gt; G Γ x.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">arr_fam₂</span> (<span class="nv">F</span> <span class="nv">G</span> : Fam₂ T C) := <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">x</span> <span class="nv">y</span>, F Γ x y -&gt; G Γ x y.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;F ⇒₀ G&quot;</span> := (arr_fam₀ F G).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;F ⇒₁ G&quot;</span> := (arr_fam₁ F G).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;F ⇒₂ G&quot;</span> := (arr_fam₂ F G).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">f_id₀</span> {<span class="nv">F</span> : Fam₀ T C} : F ⇒<span class="err">₀</span> F := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">a</span> =&gt; a.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">f_id₁</span> {<span class="nv">F</span> : Fam₁ T C} : F ⇒<span class="err">₁</span> F := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">_</span> <span class="nv">a</span> =&gt; a.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">f_id₂</span> {<span class="nv">F</span> : Fam₂ T C} : F ⇒<span class="err">₂</span> F := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">_</span> <span class="nv">_</span> <span class="nv">a</span> =&gt; a.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">f_comp₀</span> {<span class="nv">F</span> <span class="nv">G</span> <span class="nv">H</span> : Fam₀ T C} (<span class="nv">u</span> : G ⇒<span class="err">₀</span> H) (<span class="nv">v</span> : F ⇒<span class="err">₀</span> G) : F ⇒<span class="err">₀</span> H
+    := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">x</span> =&gt; u _ (v _ x).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">f_comp₁</span> {<span class="nv">F</span> <span class="nv">G</span> <span class="nv">H</span> : Fam₁ T C} (<span class="nv">u</span> : G ⇒<span class="err">₁</span> H) (<span class="nv">v</span> : F ⇒<span class="err">₁</span> G) : F ⇒<span class="err">₁</span> H
+    := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">_</span> <span class="nv">x</span> =&gt; u _ _ (v _ _ x).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">f_comp₂</span> {<span class="nv">F</span> <span class="nv">G</span> <span class="nv">H</span> : Fam₂ T C} (<span class="nv">u</span> : G ⇒<span class="err">₂</span> H) (<span class="nv">v</span> : F ⇒<span class="err">₂</span> G) : F ⇒<span class="err">₂</span> H
+    := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">_</span> <span class="nv">_</span> <span class="nv">x</span> =&gt; u _ _ _ (v _ _ _ x).</span></span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">f_cut_map</span> {<span class="nv">F1</span> <span class="nv">F2</span> <span class="nv">G1</span> <span class="nv">G2</span> : Fam₁ T C} (<span class="nv">f</span> : F1 ⇒<span class="err">₁</span> F2) (<span class="nv">g</span> : G1 ⇒<span class="err">₁</span> G2)
+    : (f_cut F1 G1) ⇒<span class="err">₀</span> (f_cut F2 G2)
+    := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">c</span> =&gt; Cut (f _ _ c.(cut_l)) (g _ _ c.(cut_r)).</span></span></pre><p>Now a bunch of notations for our constructions.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;u ⦿₀ v&quot;</span> := (f_comp₀ u v).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;u ⦿₁ v&quot;</span> := (f_comp₁ u v).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;u ⦿₂ v&quot;</span> := (f_comp₂ u v).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;F ∥ₛ G&quot;</span> := (f_cut F G).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;u ⋅ v&quot;</span> := (Cut u v).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;⦉ S ⦊&quot;</span> := (bare_op S) .</span></span></pre>
+</div>
+</div></body>
+</html>

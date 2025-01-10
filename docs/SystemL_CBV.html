@@ -1,0 +1,1139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>SystemL_CBV.v</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document">
+
+
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">From</span> OGS <span class="kn">Require Import</span> Prelude.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">From</span> OGS.Utils <span class="kn">Require Import</span> Psh Rel.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp"><span class="kn">From</span> OGS.Ctx <span class="kn">Require Import</span> All Ctx Covering Subset Subst.
+<span class="kn">From</span> OGS.ITree <span class="kn">Require Import</span> Event ITree Eq Delay <span class="kn">Structure</span> <span class="nf">Properties</span>.
+<span class="kn">From</span> OGS.OGS <span class="kn">Require Import</span> Soundness.
+<span class="kt">Set</span> <span class="kn">Equations</span> <span class="nf">Transparent</span>.
+
+<span class="kn">Inductive</span> <span class="nf">pre_ty</span> : <span class="kt">Type</span> :=
+| Zer : pre_ty
+| One : pre_ty
+| Prod : pre_ty -&gt; pre_ty -&gt; pre_ty
+| Sum : pre_ty -&gt; pre_ty -&gt; pre_ty
+| Arr : pre_ty -&gt; pre_ty -&gt; pre_ty
+.</span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Notation</span> <span class="s2">&quot;`0&quot;</span> := (Zer) : ty_scope.
+<span class="kn">Notation</span> <span class="s2">&quot;`1&quot;</span> := (One) : ty_scope.
+<span class="kn">Notation</span> <span class="s2">&quot;A `× B&quot;</span> := (Prod A B) (<span class="kn">at level</span> <span class="mi">40</span>) : ty_scope.
+<span class="kn">Notation</span> <span class="s2">&quot;A `+ B&quot;</span> := (Sum A B) (<span class="kn">at level</span> <span class="mi">40</span>) : ty_scope.
+<span class="kn">Notation</span> <span class="s2">&quot;A `→ B&quot;</span> := (Arr A B) (<span class="kn">at level</span> <span class="mi">40</span>) : ty_scope .
+
+<span class="kn">Variant</span> <span class="nf">ty</span> : <span class="kt">Type</span> :=
+| LTy : pre_ty -&gt; ty
+| RTy : pre_ty -&gt; ty
+.
+<span class="kn">Derive</span> <span class="nf">NoConfusion</span> <span class="kr">for</span> ty.
+<span class="kn">Bind Scope</span> ty_scope <span class="kr">with</span> ty.
+#[<span class="kn">global</span>] <span class="kn">Coercion</span> <span class="nf">LTy</span> : pre_ty &gt;-&gt; ty.
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;↑ t&quot;</span> := (LTy t) (<span class="kn">at level</span> <span class="mi">5</span>) : ty_scope .
+#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;¬ t&quot;</span> := (RTy t) (<span class="kn">at level</span> <span class="mi">5</span>) : ty_scope .
+<span class="kn">Open Scope</span> ty_scope.
+
+<span class="kn">Equations</span> <span class="nf">t_neg</span> : ty -&gt; ty :=
+  t_neg ↑a := ¬a ;
+  t_neg ¬a := ↑a .
+<span class="kn">Notation</span> <span class="s2">&quot;a †&quot;</span> := (t_neg a) (<span class="kn">at level</span> <span class="mi">5</span>) : ty_scope.
+
+<span class="kn">Definition</span> <span class="nf">t_ctx</span> : <span class="kt">Type</span> := ctx ty.
+<span class="kn">Bind Scope</span> ctx_scope <span class="kr">with</span> t_ctx.
+
+<span class="kn">Inductive</span> <span class="nf">term</span> : t_ctx -&gt; ty -&gt; <span class="kt">Type</span> :=
+| Val {Γ A} : whn Γ A -&gt; term Γ ↑A
+| Mu {Γ A} : state (Γ ▶ₓ ¬A) -&gt; term Γ ↑A
+
+| VarR {Γ A} : Γ ∋ ¬A -&gt; term Γ ¬A
+| MuT {Γ A} : state (Γ ▶ₓ ↑A) -&gt; term Γ ¬A
+
+| Boom {Γ} : term Γ ¬`<span class="mi">0</span>
+| Case {Γ A B} : state (Γ ▶ₓ ↑A) -&gt; state (Γ ▶ₓ ↑B) -&gt; term Γ ¬(A `+ B)
+
+| Fst {Γ A B} : term Γ ¬A -&gt; term Γ ¬(A `× B)
+| Snd {Γ A B} : term Γ ¬B -&gt; term Γ ¬(A `× B)
+| App {Γ A B} : whn Γ A -&gt; term Γ ¬B -&gt; term Γ ¬(A `→ B)
+
+<span class="kr">with</span> whn : t_ctx -&gt; pre_ty -&gt; <span class="kt">Type</span> :=
+| VarL {Γ A} : Γ ∋ ↑A -&gt; whn Γ A
+
+| Inl {Γ A B} : whn Γ A -&gt; whn Γ (A `+ B)
+| Inr {Γ A B} : whn Γ B -&gt; whn Γ (A `+ B)
+
+| Tt {Γ} : whn Γ `<span class="mi">1</span>
+| Pair {Γ A B} : state (Γ ▶ₓ ¬A) -&gt; state (Γ ▶ₓ ¬B) -&gt; whn Γ (A `× B)
+| Lam {Γ A B} : state (Γ ▶ₓ ↑(A `→ B) ▶ₓ ↑A ▶ₓ ¬B) -&gt; whn Γ (A `→ B)
+
+<span class="kr">with</span> state : t_ctx -&gt; <span class="kt">Type</span> :=
+| Cut {Γ A} : term Γ ↑A -&gt; term Γ ¬A -&gt; state Γ
+.
+
+<span class="kn">Definition</span> <span class="nf">Cut&#39;</span> {<span class="nv">Γ</span> <span class="nv">A</span>} : term Γ A -&gt; term Γ A† -&gt; state Γ
+  := <span class="kr">match</span> A <span class="kr">with</span>
+     | ↑_ =&gt; <span class="kr">fun</span> <span class="nv">x</span> <span class="nv">y</span> =&gt; Cut x y
+     | ¬_ =&gt; <span class="kr">fun</span> <span class="nv">x</span> <span class="nv">y</span> =&gt; Cut y x
+     <span class="kr">end</span> .
+
+<span class="kn">Equations</span> <span class="nf">val</span> : t_ctx -&gt; ty -&gt; <span class="kt">Type</span> :=
+  val Γ ↑A := whn Γ A ;
+  val Γ ¬A := term Γ ¬A .
+
+<span class="kn">Equations</span> <span class="nf">Var</span> <span class="nv">Γ</span> <span class="nv">A</span> : Γ ∋ A -&gt; val Γ A :=
+  Var _ ↑_ i := VarL i ;
+  Var _ ¬_ i := VarR i .
+<span class="kn">Arguments</span> Var {Γ} [A] i.
+
+<span class="kn">Equations</span> <span class="nf">t_of_v</span> <span class="nv">Γ</span> <span class="nv">A</span> : val Γ A -&gt; term Γ A :=
+  t_of_v _ ↑_ v := Val v ;
+  t_of_v _ ¬_ k := k .
+<span class="kn">Arguments</span> t_of_v [Γ A] v.
+<span class="kn">Coercion</span> <span class="nf">t_of_v</span> : val &gt;-&gt; term.
+
+<span class="kn">Equations</span> <span class="nf">t_rename</span> : term ⇒<span class="err">₁</span> ⟦ c_var , term ⟧<span class="err">₁</span> :=
+  t_rename _ _ (Mu c)     _ f := Mu (s_rename _ c _ (r_shift1 f)) ;
+  t_rename _ _ (Val v)    _ f := Val (w_rename _ _ v _ f) ;
+  t_rename _ _ (VarR i)   _ f := VarR (f _ i) ;
+  t_rename _ _ (MuT c)    _ f := MuT (s_rename _ c _ (r_shift1 f)) ;
+  t_rename _ _ (Boom)     _ f := Boom ;
+  t_rename _ _ (App u k)  _ f := App (w_rename _ _ u _ f) (t_rename _ _ k _ f) ;
+  t_rename _ _ (Fst k)    _ f := Fst (t_rename _ _ k _ f) ;
+  t_rename _ _ (Snd k)    _ f := Snd (t_rename _ _ k _ f) ;
+  t_rename _ _ (Case u v) _ f :=
+    Case (s_rename _ u _ (r_shift1 f))
+         (s_rename _ v _ (r_shift1 f))
+<span class="kr">with</span> w_rename : whn ⇒<span class="err">₁</span> ⟦ c_var , val ⟧<span class="err">₁</span> :=
+  w_rename _ _ (VarL i)   _ f := VarL (f _ i) ;
+  w_rename _ _ (Tt)       _ f := Tt ;
+  w_rename _ _ (Lam u)    _ f := Lam (s_rename _ u _ (r_shift3 f)) ;
+  w_rename _ _ (Pair u v) _ f :=
+    Pair (s_rename _ u _ (r_shift1 f))
+         (s_rename _ v _ (r_shift1 f)) ;
+  w_rename _ _ (Inl u)    _ f := Inl (w_rename _ _ u _ f) ;
+  w_rename _ _ (Inr u)    _ f := Inr (w_rename _ _ u _ f)
+<span class="kr">with</span> s_rename : state ⇒<span class="err">₀</span> ⟦ c_var , state ⟧<span class="err">₀</span> :=
+   s_rename _ (Cut v k) _ f := Cut (t_rename _ _ v _ f) (t_rename _ _ k _ f) .
+
+<span class="kn">Equations</span> <span class="nf">v_rename</span> : val ⇒<span class="err">₁</span> ⟦ c_var , val ⟧<span class="err">₁</span> :=
+  v_rename _ ↑_ v _ f := w_rename _ _ v _ f ;
+  v_rename _ ¬_ k _ f := t_rename _ _ k _ f .
+
+<span class="kn">Notation</span> <span class="s2">&quot;t ₜ⊛ᵣ r&quot;</span> := (t_rename _ _ t _ r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;w `ᵥ⊛ᵣ r&quot;</span> := (w_rename _ _ w _ r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;v ᵥ⊛ᵣ r&quot;</span> := (v_rename _ _ v _ r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;s ₛ⊛ᵣ r&quot;</span> := (s_rename _ s _ r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>).
+
+<span class="kn">Definition</span> <span class="nf">a_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} : Γ1 =[val]&gt; Γ2 -&gt; Γ2 ⊆ Γ3 -&gt; Γ1 =[val]&gt; Γ3 :=
+  <span class="kr">fun</span> <span class="nv">f</span> <span class="nv">g</span> <span class="nv">_</span> <span class="nv">i</span> =&gt; v_rename _ _ (f _ i) _ g .
+<span class="kn">Arguments</span> a_ren {_ _ _} _ _ _ _ /.
+<span class="kn">Notation</span> <span class="s2">&quot;a ⊛ᵣ r&quot;</span> := (a_ren a r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>) : asgn_scope.
+
+<span class="kn">Definition</span> <span class="nf">t_shift1</span> {<span class="nv">Γ</span> <span class="nv">A</span>} : term Γ  ⇒ᵢ term (Γ ▶ₓ A) := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">t</span> =&gt; t ₜ⊛ᵣ r_pop.
+<span class="kn">Definition</span> <span class="nf">w_shift1</span> {<span class="nv">Γ</span> <span class="nv">A</span>} : whn Γ   ⇒ᵢ whn (Γ ▶ₓ A)  := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">w</span> =&gt; w `ᵥ⊛ᵣ r_pop.
+<span class="kn">Definition</span> <span class="nf">s_shift1</span> {<span class="nv">Γ</span> <span class="nv">A</span>} : state Γ -&gt; state (Γ ▶ₓ A) := <span class="kr">fun</span> <span class="nv">s</span> =&gt; s ₛ⊛ᵣ r_pop.
+<span class="kn">Definition</span> <span class="nf">v_shift1</span> {<span class="nv">Γ</span> <span class="nv">A</span>} : val Γ   ⇒ᵢ val (Γ ▶ₓ A)  := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">v</span> =&gt; v ᵥ⊛ᵣ r_pop.
+<span class="kn">Definition</span> <span class="nf">v_shift3</span> {<span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">C</span>} : val Γ ⇒ᵢ val (Γ ▶ₓ A ▶ₓ B ▶ₓ C)
+  := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">v</span> =&gt; v ᵥ⊛ᵣ (r_pop ᵣ⊛ r_pop ᵣ⊛ r_pop).
+<span class="kn">Definition</span> <span class="nf">a_shift1</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} [A] (a : Γ =[val]&gt; Δ) : (Γ ▶ₓ A) =[val]&gt; (Δ ▶ₓ A)
+  := [ <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">i</span> =&gt; v_shift1 _ (a _ i) ,ₓ Var top ].
+<span class="kn">Definition</span> <span class="nf">a_shift3</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} [A B C] (a : Γ =[val]&gt; Δ)
+  : (Γ ▶ₓ A ▶ₓ B ▶ₓ C) =[val]&gt; (Δ ▶ₓ A ▶ₓ B ▶ₓ C)
+  := [ [ [ <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">i</span> =&gt; v_shift3 _ (a _ i) ,ₓ
+           Var (pop (pop top)) ] ,ₓ
+         Var (pop top) ] ,ₓ
+       Var top ].
+
+<span class="kn">Equations</span> <span class="nf">t_subst</span> : term ⇒<span class="err">₁</span> ⟦ val , term ⟧<span class="err">₁</span> :=
+  t_subst _ _ (Mu c)     _ f := Mu (s_subst _ c _ (a_shift1 f)) ;
+  t_subst _ _ (Val v)    _ f := Val (w_subst _ _ v _ f) ;
+  t_subst _ _ (VarR i)   _ f := f _ i ;
+  t_subst _ _ (MuT c)    _ f := MuT (s_subst _ c _ (a_shift1 f)) ;
+  t_subst _ _ (Boom)     _ f := Boom ;
+  t_subst _ _ (App u k)  _ f := App (w_subst _ _ u _ f) (t_subst _ _ k _ f) ;
+  t_subst _ _ (Fst k)    _ f := Fst (t_subst _ _ k _ f) ;
+  t_subst _ _ (Snd k)    _ f := Snd (t_subst _ _ k _ f) ;
+  t_subst _ _ (Case u v) _ f :=
+    Case (s_subst _ u _ (a_shift1 f))
+          (s_subst _ v _ (a_shift1 f))
+<span class="kr">with</span> w_subst : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span>, whn Γ A -&gt; <span class="kr">forall</span> <span class="nv">Δ</span>, Γ =[val]&gt; Δ -&gt; whn Δ A :=
+  w_subst _ _ (VarL i)   _ f := f _ i ;
+  w_subst _ _ (Tt)       _ f := Tt ;
+  w_subst _ _ (Lam u)    _ f := Lam (s_subst _ u _ (a_shift3 f)) ;
+  w_subst _ _ (Pair u v) _ f := Pair (s_subst _ u _ (a_shift1 f))
+                                     (s_subst _ v _ (a_shift1 f)) ;
+  w_subst _ _ (Inl u)    _ f := Inl (w_subst _ _ u _ f) ;
+  w_subst _ _ (Inr u)    _ f := Inr (w_subst _ _ u _ f)
+<span class="kr">with</span> s_subst : state ⇒<span class="err">₀</span> ⟦ val , state ⟧<span class="err">₀</span> :=
+   s_subst _ (Cut v k) _ f := Cut (t_subst _ _ v _ f) (t_subst _ _ k _ f) .
+
+<span class="kn">Notation</span> <span class="s2">&quot;t `ₜ⊛ a&quot;</span> := (t_subst _ _ t _ a%asgn) (<span class="kn">at level</span> <span class="mi">30</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;w `ᵥ⊛ a&quot;</span> := (w_subst _ _ w _ a%asgn) (<span class="kn">at level</span> <span class="mi">30</span>).
+
+<span class="kn">Equations</span> <span class="nf">v_subst</span> : val ⇒<span class="err">₁</span> ⟦ val , val ⟧<span class="err">₁</span> :=
+  v_subst _ ↑_ v _ f := v `ᵥ⊛ f ;
+  v_subst _ ¬_ k _ f := k `ₜ⊛ f .
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">val_monoid</span> : subst_monoid val :=
+  {| v_var := @Var ; v_sub := v_subst |} .
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">state_module</span> : subst_module val state :=
+  {| c_sub := s_subst |} .
+
+<span class="kn">Definition</span> <span class="nf">asgn1</span> {<span class="nv">Γ</span> <span class="nv">A</span>} (<span class="nv">v</span> : val Γ A) : (Γ ▶ₓ A) =[val]&gt; Γ
+  := [ Var ,ₓ v ] .
+<span class="kn">Definition</span> <span class="nf">asgn3</span> {<span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">C</span>} (<span class="nv">v1</span> : val Γ A) (<span class="nv">v2</span> : val Γ B) (<span class="nv">v3</span> : val Γ C)
+  : (Γ ▶ₓ A ▶ₓ B ▶ₓ C) =[val]&gt; Γ
+  := [ [ [ Var ,ₓ v1 ] ,ₓ v2 ] ,ₓ v3 ].
+<span class="kn">Arguments</span> asgn1 {_ _} &amp; _.
+<span class="kn">Arguments</span> asgn3 {_ _ _ _} &amp; _ _.
+
+<span class="kn">Notation</span> <span class="s2">&quot;₁[ v ]&quot;</span> := (asgn1 v).
+<span class="kn">Notation</span> <span class="s2">&quot;₃[ v1 , v2 , v3 ]&quot;</span> := (asgn3 v1 v2 v3).
+
+<span class="c">(*</span>
+<span class="c">Variant forcing0 (Γ : t_ctx) : pre_ty -&gt; Type :=</span>
+<span class="c">| FBoom : forcing0 Γ Zer</span>
+<span class="c">| FApp {a b} : whn Γ a -&gt; term Γ ¬b -&gt; forcing0 Γ (a `→ b)</span>
+<span class="c">| FFst {a b} : term Γ ¬a -&gt; forcing0 Γ (a `× b)</span>
+<span class="c">| FSnd {a b} : term Γ ¬b -&gt; forcing0 Γ (a `× b)</span>
+<span class="c">| FCase {a b} : state (Γ ▶ₓ ↑a) -&gt; state (Γ ▶ₓ ↑b) -&gt; forcing0 Γ (a `+ b)</span>
+<span class="c">.</span>
+<span class="c">Arguments FBoom {Γ}.</span>
+<span class="c">Arguments FApp {Γ a b}.</span>
+<span class="c">Arguments FFst {Γ a b}.</span>
+<span class="c">Arguments FSnd {Γ a b}.</span>
+<span class="c">Arguments FCase {Γ a b}.</span>
+
+<span class="c">Equations f0_subst {Γ Δ} : Γ =[val]&gt; Δ -&gt; forcing0 Γ ⇒ᵢ forcing0 Δ :=</span>
+<span class="c">  f0_subst f a (FBoom)        := FBoom ;</span>
+<span class="c">  f0_subst f a (FApp v k)     := FApp (w_subst f _ v) (t_subst f _ k) ;</span>
+<span class="c">  f0_subst f a (FFst k)       := FFst (t_subst f _ k) ;</span>
+<span class="c">  f0_subst f a (FSnd k)       := FSnd (t_subst f _ k) ;</span>
+<span class="c">  f0_subst f a (FCase s1 s2) := FCase (s_subst (a_shift1 f) s1) (s_subst (a_shift1 f) s2) .</span>
+
+<span class="c">Equations forcing : t_ctx -&gt; ty -&gt; Type :=</span>
+<span class="c">  forcing Γ (t+ a) := whn Γ a ;</span>
+<span class="c">  forcing Γ (t- a) := forcing0 Γ a .</span>
+
+<span class="c">Equations f_subst {Γ Δ} : Γ =[val]&gt; Δ -&gt; forcing Γ ⇒ᵢ forcing Δ :=</span>
+<span class="c">  f_subst s (t+ a) v := w_subst s a v ;</span>
+<span class="c">  f_subst s (t- a) f := f0_subst s a f .</span>
+<span class="c">*)</span>
+
+<span class="kn">Equations</span> <span class="nf">is_neg_pre</span> : pre_ty -&gt; <span class="kt">SProp</span> :=
+  is_neg_pre `<span class="mi">0</span>       := sEmpty ;
+  is_neg_pre `<span class="mi">1</span>       := sUnit ;
+  is_neg_pre (_ `× _) := sUnit ;
+  is_neg_pre (_ `+ _) := sEmpty ;
+  is_neg_pre (_ `→ _) := sUnit .
+
+<span class="kn">Equations</span> <span class="nf">is_neg</span> : ty -&gt; <span class="kt">SProp</span> :=
+  is_neg ↑a := is_neg_pre a ;
+  is_neg ¬a := sUnit .
+
+<span class="kn">Definition</span> <span class="nf">neg_ty</span> : <span class="kt">Type</span> := sigS is_neg.
+<span class="kn">Definition</span> <span class="nf">neg_coe</span> : neg_ty -&gt; ty := sub_elt.
+<span class="kn">Global Coercion</span> <span class="nf">neg_coe</span> : neg_ty &gt;-&gt; ty.
+
+<span class="kn">Definition</span> <span class="nf">neg_ctx</span> : <span class="kt">Type</span> := ctxS ty t_ctx is_neg.
+<span class="kn">Definition</span> <span class="nf">neg_c_coe</span> : neg_ctx -&gt; ctx ty := sub_elt.
+<span class="kn">Global Coercion</span> <span class="nf">neg_c_coe</span> : neg_ctx &gt;-&gt; ctx.
+
+<span class="kn">Bind Scope</span> ctx_scope <span class="kr">with</span> neg_ctx.
+<span class="kn">Bind Scope</span> ctx_scope <span class="kr">with</span> ctx.
+
+<span class="kn">Inductive</span> <span class="nf">pat</span> : ty -&gt; <span class="kt">Type</span> :=
+| PTt : pat ↑`<span class="mi">1</span>
+| PPair {a b} : pat ↑(a `× b)
+| PInl {a b} : pat ↑a -&gt; pat ↑(a `+ b)
+| PInr {a b} : pat ↑b -&gt; pat ↑(a `+ b)
+| PLam {a b} : pat ↑(a `→ b)
+| PFst {a b} : pat ¬(a `× b)
+| PSnd {a b} : pat ¬(a `× b)
+| PApp {a b} : pat ↑a -&gt; pat ¬(a `→ b)
+.
+
+<span class="kn">Equations</span> <span class="nf">pat_dom</span> {<span class="nv">t</span>} : pat t -&gt; neg_ctx :=
+  pat_dom (PInl u) := pat_dom u ;
+  pat_dom (PInr u) := pat_dom u ;
+  pat_dom (PTt) := ∅ₛ ▶ₛ {| sub_elt := ↑`<span class="mi">1</span> ; sub_prf := stt |} ;
+  pat_dom (@PLam a b) := ∅ₛ ▶ₛ {| sub_elt := ↑(a `→ b) ; sub_prf := stt |} ;
+  pat_dom (@PPair a b) := ∅ₛ ▶ₛ {| sub_elt := ↑(a `× b) ; sub_prf := stt |} ;
+  pat_dom (@PApp a b v) := pat_dom v ▶ₛ {| sub_elt := ¬b ; sub_prf := stt |} ;
+  pat_dom (@PFst a b) := ∅ₛ ▶ₛ {| sub_elt := ¬a ; sub_prf := stt |} ;
+  pat_dom (@PSnd a b) := ∅ₛ ▶ₛ {| sub_elt := ¬b ; sub_prf := stt |} .
+
+<span class="kn">Definition</span> <span class="nf">op_pat</span> : Oper ty neg_ctx :=
+  {| o_op a := pat a ; o_dom _ p := (pat_dom p) |} .
+
+<span class="kn">Definition</span> <span class="nf">op_copat</span> : Oper ty neg_ctx :=
+  {| o_op a := pat (t_neg a) ; o_dom _ p := (pat_dom p) |} .
+
+<span class="kn">Definition</span> <span class="nf">bare_copat</span> := op_copat∙ .
+
+<span class="kn">Equations</span> <span class="nf">v_of_p</span> {<span class="nv">A</span>} (<span class="nv">p</span> : pat A) : val (pat_dom p) A :=
+  v_of_p (PInl u) := Inl (v_of_p u) ;
+  v_of_p (PInr u) := Inr (v_of_p u) ;
+  v_of_p (PTt) := VarL top ;
+  v_of_p (PLam) := VarL top ;
+  v_of_p (PPair) := VarL top ;
+  v_of_p (PApp v) := App (v_shift1 _ (v_of_p v)) (VarR top) ;
+  v_of_p (PFst) := Fst (VarR top) ;
+  v_of_p (PSnd) := Snd (VarR top) .
+<span class="kn">Coercion</span> <span class="nf">v_of_p</span> : pat &gt;-&gt; val.
+
+<span class="kn">Definition</span> <span class="nf">elim_var_zer</span> {<span class="nv">A</span> : <span class="kt">Type</span>} {<span class="nv">Γ</span> : neg_ctx} (<span class="nv">i</span> : Γ ∋ ↑ `<span class="mi">0</span>) : A
+  := <span class="kr">match</span> s_prf i <span class="kr">with</span> <span class="kr">end</span> .
+<span class="kn">Definition</span> <span class="nf">elim_var_sum</span> {<span class="nv">A</span> : <span class="kt">Type</span>} {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">s</span> <span class="nv">t</span>} (<span class="nv">i</span> : Γ ∋ ↑ (s `+ t)) : A
+  := <span class="kr">match</span> s_prf i <span class="kr">with</span> <span class="kr">end</span> .
+
+<span class="kn">Equations</span> <span class="nf">p_of_w</span> {<span class="nv">Γ</span> : neg_ctx} <span class="nv">a</span> : whn Γ a -&gt; pat ↑a :=
+  p_of_w (`<span class="mi">0</span>)     (VarL i) := elim_var_zer i ;
+  p_of_w (a `+ b) (VarL i) := elim_var_sum i ;
+  p_of_w (a `+ b) (Inl v)  := PInl (p_of_w _ v) ;
+  p_of_w (a `+ b) (Inr v)  := PInr (p_of_w _ v) ;
+  p_of_w (`<span class="mi">1</span>)     _        := PTt ;
+  p_of_w (a `× b) _        := PPair ;
+  p_of_w (a `→ b) _        := PLam .
+
+<span class="kn">Equations</span> <span class="nf">p_dom_of_w</span> {<span class="nv">Γ</span> : neg_ctx} <span class="nv">a</span> (<span class="nv">v</span> : whn Γ a) : pat_dom (p_of_w a v) =[val]&gt; Γ :=
+  p_dom_of_w (`<span class="mi">0</span>)     (VarL i) := elim_var_zer i ;
+  p_dom_of_w (a `+ b) (VarL i) := elim_var_sum i ;
+  p_dom_of_w (a `+ b) (Inl v)  := p_dom_of_w a v ;
+  p_dom_of_w (a `+ b) (Inr v)  := p_dom_of_w b v ;
+  p_dom_of_w (`<span class="mi">1</span>)     v        := [ ! ,ₓ v ] ;
+  p_dom_of_w (a `→ b) v        := [ ! ,ₓ v ] ;
+  p_dom_of_w (a `× b) v        := [ ! ,ₓ v ] .
+
+<span class="kn">Program Definition</span> <span class="nf">w_split</span> {<span class="nv">Γ</span> : neg_ctx} <span class="nv">a</span> (<span class="nv">v</span> : whn Γ a) : (op_copat # val) Γ ¬a
+  := p_of_w _ v ⦇ p_dom_of_w _ v ⦈ .
+
+<span class="kn">Definition</span> <span class="nf">L_nf</span> : Fam₀ ty neg_ctx := c_var ∥ₛ (op_copat # val ).
+
+<span class="c">(*</span>
+<span class="c">Definition n_rename {Γ Δ : neg_ctx} : Γ ⊆ Δ -&gt; L_nf Γ -&gt; L_nf Δ</span>
+<span class="c">  := fun r n =&gt; r _ (nf_var n) ⋅ nf_obs n ⦇ a_ren r (nf_args n) ⦈.</span>
+<span class="c">*)</span>
+
+<span class="c">(*</span>
+<span class="c">Definition nf0_eq {Γ a} : relation (nf0 Γ a) :=</span>
+<span class="c">  fun a b =&gt; exists H : projT1 a = projT1 b, rew H in projT2 a ≡ₐ projT2 b .</span>
+
+<span class="c">Definition nf_eq {Γ} : relation (nf Γ) :=</span>
+<span class="c">  fun a b =&gt; exists H : projT1 a = projT1 b,</span>
+<span class="c">      (rew H in fst (projT2 a) = fst (projT2 b)) /\ (nf0_eq (rew H in snd (projT2 a)) (snd (projT2 b))).</span>
+
+<span class="c">#[global] Instance nf0_eq_rfl {Γ t} : Reflexive (@nf0_eq Γ t) .</span>
+<span class="c">  intros [ m a ]; unshelve econstructor; auto.</span>
+<span class="c">Qed.</span>
+
+<span class="c">#[global] Instance nf0_eq_sym {Γ t} : Symmetric (@nf0_eq Γ t) .</span>
+<span class="c">  intros [ m1 a1 ] [ m2 a2 ] [ p q ]; unshelve econstructor; cbn in *.</span>
+<span class="c">  - now symmetry.</span>
+<span class="c">  - revert a1 q ; rewrite p; intros a1 q.</span>
+<span class="c">    now symmetry.</span>
+<span class="c">Qed.</span>
+
+<span class="c">#[global] Instance nf0_eq_tra {Γ t} : Transitive (@nf0_eq Γ t) .</span>
+<span class="c">  intros [ m1 a1 ] [ m2 a2 ] [ m3 a3 ] [ p1 q1 ] [ p2 q2 ]; unshelve econstructor; cbn in *.</span>
+<span class="c">  - now transitivity m2.</span>
+<span class="c">  - transitivity (rew [fun p : pat (t_neg t) =&gt; pat_dom p =[ val ]&gt; Γ] p2 in a2); auto.</span>
+<span class="c">    now rewrite &lt;- p2.</span>
+<span class="c">Qed.</span>
+
+<span class="c">#[global] Instance nf_eq_rfl {Γ} : Reflexiveᵢ (fun _ : T1 =&gt; @nf_eq Γ) .</span>
+<span class="c">  intros _ [ x [ i n ] ].</span>
+<span class="c">  unshelve econstructor; auto.</span>
+<span class="c">Qed.</span>
+
+<span class="c">#[global] Instance nf_eq_sym {Γ} : Symmetricᵢ (fun _ : T1 =&gt; @nf_eq Γ) .</span>
+<span class="c">  intros _ [ x1 [ i1 n1 ] ] [ x2 [ i2 n2 ] ] [ p [ q1 q2 ] ].</span>
+<span class="c">  unshelve econstructor; [ | split ]; cbn in *.</span>
+<span class="c">  - now symmetry.</span>
+<span class="c">  - revert i1 q1; rewrite p; intros i1 q1; now symmetry.</span>
+<span class="c">  - revert n1 q2; rewrite p; intros n1 q2; now symmetry.</span>
+<span class="c">Qed.</span>
+
+<span class="c">#[global] Instance nf_eq_tra {Γ} : Transitiveᵢ (fun _ : T1 =&gt; @nf_eq Γ) .</span>
+<span class="c">  intros _ [ x1 [ i1 n1 ] ] [ x2 [ i2 n2 ] ] [ x3 [ i3 n3 ] ] [ p1 [ q1 r1 ] ] [ p2 [ q2 r2 ] ].</span>
+<span class="c">  unshelve econstructor; [ | split ]; cbn in *.</span>
+<span class="c">  - now transitivity x2.</span>
+<span class="c">  - transitivity (rew [has Γ] p2 in i2); auto.</span>
+<span class="c">    now rewrite &lt;- p2.</span>
+<span class="c">  - transitivity (rew [nf0 Γ] p2 in n2); auto.</span>
+<span class="c">    now rewrite &lt;- p2.</span>
+<span class="c">Qed.</span>
+
+<span class="c">Definition comp_eq {Γ} : relation (delay (nf Γ)) :=</span>
+<span class="c">  it_eq (fun _ : T1 =&gt; nf_eq) (i := T1_0) .</span>
+<span class="c">Notation &quot;u ≋ v&quot; := (comp_eq u v) (at level 40) .</span>
+
+<span class="c">Definition pat_of_nf : nf ⇒ᵢ pat&#39; :=</span>
+<span class="c">  fun Γ u =&gt; (projT1 u ,&#39; (fst (projT2 u) , projT1 (snd (projT2 u)))) .</span>
+<span class="c">*)</span>
+
+<span class="kn">Program Definition</span> <span class="nf">app_nf</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">a</span> <span class="nv">b</span>} (<span class="nv">i</span> : Γ ∋ ↑(a `→ b))
+  (<span class="nv">v</span> : whn Γ a) (<span class="nv">k</span> : term Γ ¬b) : L_nf Γ
+  := i ⋅ PApp (p_of_w _ v) ⦇ [ p_dom_of_w _ v ,ₓ (k : val _ ¬_) ] ⦈ .
+
+<span class="kn">Program Definition</span> <span class="nf">fst_nf</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">a</span> <span class="nv">b</span>} (<span class="nv">i</span> : Γ ∋ ↑(a `× b))
+  (<span class="nv">k</span> : term Γ ¬a) : L_nf Γ
+  := i ⋅ PFst ⦇ [ ! ,ₓ (k : val _ ¬_) ] ⦈ .
+
+<span class="kn">Program Definition</span> <span class="nf">snd_nf</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">a</span> <span class="nv">b</span>} (<span class="nv">i</span> : Γ ∋ ↑(a `× b))
+  (<span class="nv">k</span> : term Γ ¬b) : L_nf Γ
+  := i ⋅ PSnd ⦇ [ ! ,ₓ (k : val _ ¬_) ] ⦈ .
+
+<span class="kn">Equations</span> <span class="nf">eval_aux</span> {<span class="nv">Γ</span> : neg_ctx} : state Γ -&gt; (state Γ + L_nf Γ) :=
+  eval_aux (Cut (Mu s)           (k))        := inl (s ₜ⊛ <span class="err">₁</span>[ k ]) ;
+  eval_aux (Cut (Val v)          (MuT s))    := inl (s ₜ⊛ <span class="err">₁</span>[ v ]) ;
+
+  eval_aux (Cut (Val v)          (VarR i))   := inr (s_var_upg i ⋅ w_split _ v) ;
+
+  eval_aux (Cut (Val (VarL i))   (Boom))     := elim_var_zer i ;
+  eval_aux (Cut (Val (VarL i))   (Case s t)) := elim_var_sum i ;
+
+  eval_aux (Cut (Val (VarL i))   (App v k))  := inr (app_nf i v k) ;
+  eval_aux (Cut (Val (VarL i))   (Fst k))    := inr (fst_nf i k) ;
+  eval_aux (Cut (Val (VarL i))   (Snd k))    := inr (snd_nf i k) ;
+
+
+  eval_aux (Cut (Val (Lam s))    (App v k))  := inl (s ₜ⊛ <span class="err">₃</span>[ Lam s , v , k ]) ;
+  eval_aux (Cut (Val (Pair s t)) (Fst k))    := inl (s ₜ⊛ <span class="err">₁</span>[ k ]) ;
+  eval_aux (Cut (Val (Pair s t)) (Snd k))    := inl (t ₜ⊛ <span class="err">₁</span>[ k ]) ;
+  eval_aux (Cut (Val (Inl u))    (Case s t)) := inl (s ₜ⊛ <span class="err">₁</span>[ u ]) ;
+  eval_aux (Cut (Val (Inr u))    (Case s t)) := inl (t ₜ⊛ <span class="err">₁</span>[ u ]) .
+
+<span class="kn">Definition</span> <span class="nf">eval</span> {<span class="nv">Γ</span> : neg_ctx} : state Γ -&gt; delay (L_nf Γ)
+  := iter_delay (<span class="kr">fun</span> <span class="nv">c</span> =&gt; Ret&#39; (eval_aux c)).
+
+<span class="c">(*</span>
+<span class="c">Definition refold {Γ : neg_ctx} (p : nf Γ)</span>
+<span class="c">  : (Γ ∋ (projT1 p) * val Γ (t_neg (projT1 p)))%type.</span>
+<span class="c">destruct p as [x [i [ p s ]]]; cbn in *.</span>
+<span class="c">exact (i , v_subst s _ (v_of_p p)).</span>
+<span class="c">Defined.</span>
+<span class="c">*)</span>
+
+<span class="kn">Definition</span> <span class="nf">p_app</span> {<span class="nv">Γ</span> <span class="nv">A</span>} (<span class="nv">v</span> : val Γ A) (<span class="nv">m</span> : pat A†) (<span class="nv">e</span> : pat_dom m =[val]&gt; Γ) : state Γ
+  := Cut&#39; v (m `ₜ⊛ e) .
+
+<span class="c">(*</span>
+<span class="c">Definition emb {Γ} (m : pat&#39; Γ) : state (Γ +▶ₓ pat_dom&#39; Γ m) .</span>
+<span class="c">  destruct m as [a [i v]]; cbn in *.</span>
+<span class="c">  destruct a.</span>
+<span class="c">  - refine (Cut _ _).</span>
+<span class="c">    + refine (Val (VarL (r_concat_l _ i))).</span>
+<span class="c">    + refine (t_rename r_concat_r _ (v_of_p v)).</span>
+<span class="c">  - refine (Cut _ _).</span>
+<span class="c">    + refine (Val (v_rename r_concat_r _ (v_of_p v))).</span>
+<span class="c">    + refine (VarR (r_concat_l _ i)).</span>
+<span class="c">Defined.</span>
+<span class="c">*)</span>
+
+<span class="kn">Scheme</span> <span class="nf">term_mut</span> := <span class="kn">Induction for</span> term <span class="kn">Sort</span> <span class="kt">Prop</span>
+  <span class="kr">with</span> whn_mut := <span class="kn">Induction for</span> whn <span class="kn">Sort</span> <span class="kt">Prop</span>
+  <span class="kr">with</span> state_mut := <span class="kn">Induction for</span> state <span class="kn">Sort</span> <span class="kt">Prop</span>.
+
+<span class="kn">Record</span> <span class="nf">syn_ind_args</span> (<span class="nv">Pt</span> : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span>, term Γ A -&gt; <span class="kt">Prop</span>)
+                    (<span class="nv">Pv</span> : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span>, whn Γ A -&gt; <span class="kt">Prop</span>)
+                    (<span class="nv">Ps</span> : <span class="kr">forall</span> <span class="nv">Γ</span>, state Γ -&gt; <span class="kt">Prop</span>) :=
+{
+  ind_s_mu : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">s</span>, Ps _ s -&gt; Pt Γ ↑A (Mu s) ;
+  ind_s_val : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">v</span>, Pv _ _ v -&gt; Pt Γ ↑A (Val v) ;
+  ind_s_varn : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">i</span>, Pt Γ ¬A (VarR i) ;
+  ind_s_mut : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">s</span>, Ps _ s -&gt; Pt Γ ¬A (MuT s) ;
+  ind_s_zer : <span class="kr">forall</span> <span class="nv">Γ</span>, Pt Γ ¬`<span class="mi">0</span> Boom ;
+  ind_s_app : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span>, <span class="kr">forall</span> <span class="nv">v</span>, Pv _ _ v -&gt; <span class="kr">forall</span> <span class="nv">k</span>, Pt _ _ k -&gt; Pt Γ ¬(A `→ B) (App v k) ;
+  ind_s_fst : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span>, <span class="kr">forall</span> <span class="nv">k</span>, Pt _ _ k -&gt; Pt Γ ¬(A `× B) (Fst k) ;
+  ind_s_snd : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span>, <span class="kr">forall</span> <span class="nv">k</span>, Pt _ _ k -&gt; Pt Γ ¬(A `× B) (Snd k) ;
+  ind_s_match : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span>, <span class="kr">forall</span> <span class="nv">s</span>, Ps _ s -&gt; <span class="kr">forall</span> <span class="nv">t</span>, Ps _ t -&gt; Pt Γ ¬(A `+ B) (Case s t) ;
+  ind_s_varp : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">i</span>, Pv Γ A (VarL i) ;
+  ind_s_inl : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">v</span>, Pv _ _ v -&gt; Pv Γ (A `+ B) (Inl v) ;
+  ind_s_inr : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">v</span>, Pv _ _ v -&gt; Pv Γ (A `+ B) (Inr v) ;
+  ind_s_onei : <span class="kr">forall</span> <span class="nv">Γ</span>, Pv Γ `<span class="mi">1</span> Tt ;
+  ind_s_lam : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">s</span>, Ps _ s -&gt; Pv Γ (A `→ B) (Lam s) ;
+  ind_s_pair : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span>, <span class="kr">forall</span> <span class="nv">s</span>, Ps _ s -&gt; <span class="kr">forall</span> <span class="nv">t</span>, Ps _ t -&gt; Pv Γ (A `× B) (Pair s t) ;
+  ind_s_cut : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span>, <span class="kr">forall</span> <span class="nv">u</span>, Pt _ _ u -&gt; <span class="kr">forall</span> <span class="nv">v</span>, Pt _ _ v -&gt; Ps Γ (@Cut _ A u v)
+} .
+
+<span class="kn">Lemma</span> <span class="nf">term_ind_mut</span> <span class="nv">Pt</span> <span class="nv">Pv</span> <span class="nv">Ps</span> (<span class="nv">arg</span> : syn_ind_args Pt Pv Ps) <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">u</span> : Pt Γ A u.
+  <span class="nb">destruct</span> arg; <span class="bp">now</span> <span class="nb">apply</span> (term_mut Pt Pv Ps).
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">whn_ind_mut</span> <span class="nv">Pt</span> <span class="nv">Pv</span> <span class="nv">Ps</span> (<span class="nv">arg</span> : syn_ind_args Pt Pv Ps) <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">v</span> : Pv Γ A v.
+  <span class="nb">destruct</span> arg; <span class="bp">now</span> <span class="nb">apply</span> (whn_mut Pt Pv Ps).
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">state_ind_mut</span> <span class="nv">Pt</span> <span class="nv">Pv</span> <span class="nv">Ps</span> (<span class="nv">arg</span> : syn_ind_args Pt Pv Ps) <span class="nv">Γ</span> <span class="nv">s</span> : Ps Γ s.
+  <span class="nb">destruct</span> arg; <span class="bp">now</span> <span class="nb">apply</span> (state_mut Pt Pv Ps).
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_ren_proper_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ ⊆ Δ), f1 ≡ₐ f2 -&gt; t ₜ⊛ᵣ f1 = t ₜ⊛ᵣ f2 .
+<span class="kn">Definition</span> <span class="nf">w_ren_proper_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ ⊆ Δ), f1 ≡ₐ f2 -&gt; v `ᵥ⊛ᵣ f1 = v `ᵥ⊛ᵣ f2 .
+<span class="kn">Definition</span> <span class="nf">s_ren_proper_P</span> <span class="nv">Γ</span> (<span class="nv">s</span> : state Γ) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ ⊆ Δ), f1 ≡ₐ f2 -&gt; s ₛ⊛ᵣ f1 = s ₛ⊛ᵣ f2 .
+<span class="kn">Lemma</span> <span class="nf">ren_proper_prf</span> : syn_ind_args t_ren_proper_P w_ren_proper_P s_ren_proper_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_proper_P, w_ren_proper_P, s_ren_proper_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">cbn</span>; <span class="nb">eauto</span>.
+  <span class="kp">all</span>: <span class="kp">try</span> <span class="bp">now</span> <span class="nb">apply</span> H.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">apply</span> H | <span class="nb">apply</span> H0 | <span class="nb">apply</span> H1 | <span class="nb">apply</span> H2 ]; <span class="nb">auto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">apply</span> r_shift1_eq | <span class="nb">apply</span> r_shift3_eq ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">t_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">t</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (t_rename Γ a t Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">w_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">v</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (w_rename Γ a v Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ ren_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">s_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">s</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (s_rename Γ s Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ ren_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">v_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">v</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (v_rename Γ a v Δ).
+  <span class="nb">destruct</span> a.
+  <span class="bp">now</span> <span class="nb">apply</span> w_ren_eq.
+  <span class="bp">now</span> <span class="nb">apply</span> t_ren_eq.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">a_ren_eq</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>}
+  : Proper (asgn_eq _ _ ==&gt; asgn_eq _ _ ==&gt; asgn_eq _ _) (@a_ren Γ1 Γ2 Γ3).
+  <span class="nb">intros</span> r1 r2 H1 a1 a2 H2 ? i; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> H1, (v_ren_eq _ _ H2).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">a_shift1_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span>} : Proper (asgn_eq _ _ ==&gt; asgn_eq _ _) (@a_shift1 Γ Δ A).
+  <span class="nb">intros</span> ? ? H ? h.
+  dependent elimination h; <span class="nb">auto</span>; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> H.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">a_shift3_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">C</span>}
+  : Proper (asgn_eq _ _ ==&gt; asgn_eq _ _) (@a_shift3 Γ Δ A B C).
+  <span class="nb">intros</span> ? ? H ? v.
+  <span class="kp">do</span> <span class="mi">3</span> (dependent elimination v; <span class="nb">auto</span>).
+  <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> H.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_ren_ren_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (t ₜ⊛ᵣ f1) ₜ⊛ᵣ f2 = t ₜ⊛ᵣ (f1 ᵣ⊛ f2) .
+<span class="kn">Definition</span> <span class="nf">w_ren_ren_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (v `ᵥ⊛ᵣ f1) `ᵥ⊛ᵣ f2 = v `ᵥ⊛ᵣ (f1 ᵣ⊛ f2) .
+<span class="kn">Definition</span> <span class="nf">s_ren_ren_P</span> <span class="nv">Γ1</span> (<span class="nv">s</span> : state Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (s ₛ⊛ᵣ f1) ₛ⊛ᵣ f2 = s ₛ⊛ᵣ (f1 ᵣ⊛ f2) .
+
+<span class="kn">Lemma</span> <span class="nf">ren_ren_prf</span> : syn_ind_args t_ren_ren_P w_ren_ren_P s_ren_ren_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_ren_P, w_ren_ren_P, s_ren_ren_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">eauto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> r_shift1_comp | <span class="nb">rewrite</span> r_shift3_comp ]; <span class="nb">eauto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A)
+  : (t ₜ⊛ᵣ f1) ₜ⊛ᵣ f2 = t ₜ⊛ᵣ (f1 ᵣ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A)
+  : (v `ᵥ⊛ᵣ f1) `ᵥ⊛ᵣ f2 = v `ᵥ⊛ᵣ (f1 ᵣ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ ren_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₛ⊛ᵣ f1) ₛ⊛ᵣ f2 = s ₛ⊛ᵣ (f1 ᵣ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ ren_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">v</span> : val Γ1 A)
+  : (v ᵥ⊛ᵣ f1) ᵥ⊛ᵣ f2 = v ᵥ⊛ᵣ (f1 ᵣ⊛ f2) .
+  <span class="nb">destruct</span> A.
+  <span class="bp">now</span> <span class="nb">apply</span> w_ren_ren.
+  <span class="bp">now</span> <span class="nb">apply</span> t_ren_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_ren_id_l_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : <span class="kt">Prop</span> := t ₜ⊛ᵣ r_id = t.
+<span class="kn">Definition</span> <span class="nf">w_ren_id_l_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : <span class="kt">Prop</span> := v `ᵥ⊛ᵣ r_id = v.
+<span class="kn">Definition</span> <span class="nf">s_ren_id_l_P</span> <span class="nv">Γ</span> (<span class="nv">s</span> : state Γ) : <span class="kt">Prop</span> := s ₛ⊛ᵣ r_id  = s.
+
+<span class="kn">Lemma</span> <span class="nf">ren_id_l_prf</span> : syn_ind_args t_ren_id_l_P w_ren_id_l_P s_ren_id_l_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_id_l_P, w_ren_id_l_P, s_ren_id_l_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">eauto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> r_shift1_id | <span class="nb">rewrite</span> r_shift3_id ]; <span class="nb">eauto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_ren_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : t ₜ⊛ᵣ r_id = t.
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_ren_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : v `ᵥ⊛ᵣ r_id = v.
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ ren_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_ren_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">s</span> : state Γ) : s ₛ⊛ᵣ r_id  = s.
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ ren_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_ren_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">v</span> : val Γ A) : v ᵥ⊛ᵣ r_id = v.
+  <span class="nb">destruct</span> A.
+  <span class="bp">now</span> <span class="nb">apply</span> w_ren_id_l.
+  <span class="bp">now</span> <span class="nb">apply</span> t_ren_id_l.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">v_ren_id_r</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">f</span> : Γ ⊆ Δ) <span class="nv">A</span> (<span class="nv">i</span> : Γ ∋ A) : (Var i) ᵥ⊛ᵣ f = Var (f _ i).
+  <span class="bp">now</span> <span class="nb">destruct</span> A.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift1_id</span> {<span class="nv">Γ</span> <span class="nv">A</span>} : @a_shift1 Γ Γ A Var ≡ₐ Var.
+  <span class="nb">intros</span> [ [] | [] ] i; dependent elimination i; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift3_id</span> {<span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">C</span>} : @a_shift3 Γ Γ A B C Var ≡ₐ Var.
+  <span class="nb">intros</span> ? v; <span class="nb">cbn</span>.
+  <span class="kp">do</span> <span class="mi">3</span> (dependent elimination v; <span class="nb">cbn</span>; <span class="nb">auto</span>).
+  <span class="bp">now</span> <span class="nb">destruct</span> a.
+<span class="kn">Qed</span>.
+
+<span class="kn">Arguments</span> Var : <span class="nb">simpl</span> never.
+<span class="kn">Lemma</span> <span class="nf">a_shift1_ren_r</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">A</span>} (<span class="nv">f1</span> : Γ1 =[ val ]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3)
+      : a_shift1 (A:=A) (f1 ⊛ᵣ f2) ≡ₐ a_shift1 f1 ⊛ᵣ r_shift1 f2 .
+  <span class="nb">intros</span> ? h; dependent elimination h; <span class="nb">cbn</span>.
+  - <span class="bp">now</span> <span class="nb">rewrite</span> v_ren_id_r.
+  - <span class="bp">now</span> <span class="nb">unfold</span> v_shift1; <span class="nb">rewrite</span> <span class="mi">2</span> v_ren_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift3_ren_r</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">C</span>} (<span class="nv">f1</span> : Γ1 =[ val ]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3)
+      : a_shift3 (A:=A) (B:=B) (C:=C) (f1 ⊛ᵣ f2) ≡ₐ a_shift3 f1 ⊛ᵣ r_shift3 f2 .
+  <span class="nb">intros</span> ? v; <span class="kp">do</span> <span class="mi">3</span> (dependent elimination v; <span class="nb">cbn</span>; [ <span class="bp">now</span> <span class="nb">rewrite</span> v_ren_id_r | ]).
+  <span class="nb">unfold</span> v_shift3; <span class="bp">now</span> <span class="nb">rewrite</span> <span class="mi">2</span> v_ren_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift1_ren_l</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">A</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3)
+  : a_shift1 (A:=A) (f1 ᵣ⊛ f2) ≡ₐ r_shift1 f1 ᵣ⊛ a_shift1 f2 .
+  <span class="nb">intros</span> ? i; dependent elimination i; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift3_ren_l</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">C</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3)
+      : a_shift3 (A:=A) (B:=B) (C:=C) (f1 ᵣ⊛ f2) ≡ₐ r_shift3 f1 ᵣ⊛ a_shift3 f2 .
+  <span class="nb">intros</span> ? v; <span class="kp">do</span> <span class="mi">3</span> (dependent elimination v; <span class="nb">auto</span>).
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_sub_proper_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ =[val]&gt; Δ), f1 ≡ₐ f2 -&gt; t `ₜ⊛ f1 = t `ₜ⊛ f2 .
+<span class="kn">Definition</span> <span class="nf">w_sub_proper_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ =[val]&gt; Δ), f1 ≡ₐ f2 -&gt; v `ᵥ⊛ f1 = v `ᵥ⊛ f2 .
+<span class="kn">Definition</span> <span class="nf">s_sub_proper_P</span> <span class="nv">Γ</span> (<span class="nv">s</span> : state Γ) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ =[val]&gt; Δ), f1 ≡ₐ f2 -&gt; s ₜ⊛ f1 = s ₜ⊛ f2 .
+
+<span class="kn">Lemma</span> <span class="nf">sub_proper_prf</span> : syn_ind_args t_sub_proper_P w_sub_proper_P s_sub_proper_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_proper_P, w_sub_proper_P, s_sub_proper_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">apply</span> H | <span class="nb">apply</span> H0 | <span class="nb">apply</span> H1 | <span class="nb">apply</span> H2 ]; <span class="nb">auto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">apply</span> a_shift1_eq | <span class="nb">apply</span> a_shift3_eq ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">t_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">t</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (t_subst Γ a t Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">w_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">v</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (w_subst Γ a v Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ sub_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">s_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">s</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (s_subst Γ s Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ sub_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">v_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">v</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (v_subst Γ a v Δ).
+  <span class="nb">destruct</span> a.
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_eq.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_eq.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">a_comp_eq</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>}
+  : Proper (asgn_eq _ _ ==&gt; asgn_eq _ _ ==&gt; asgn_eq _ _) (@a_comp _ _ _ _ _ Γ1 Γ2 Γ3).
+  <span class="nb">intros</span> ? ? H1 ? ? H2 ? ?; <span class="nb">cbn</span>; <span class="nb">rewrite</span> H1; <span class="bp">now</span> <span class="nb">eapply</span> v_sub_eq.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_ren_sub_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (t `ₜ⊛ f1) ₜ⊛ᵣ f2 = t `ₜ⊛ (f1 ⊛ᵣ f2) .
+<span class="kn">Definition</span> <span class="nf">w_ren_sub_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (v `ᵥ⊛ f1) `ᵥ⊛ᵣ f2 = v `ᵥ⊛ (f1 ⊛ᵣ f2) .
+<span class="kn">Definition</span> <span class="nf">s_ren_sub_P</span> <span class="nv">Γ1</span> (<span class="nv">s</span> : state Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (s ₜ⊛ f1) ₛ⊛ᵣ f2 = s ₜ⊛ (f1 ⊛ᵣ f2) .
+<span class="kn">Lemma</span> <span class="nf">ren_sub_prf</span> : syn_ind_args t_ren_sub_P w_ren_sub_P s_ren_sub_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_sub_P, w_ren_sub_P, s_ren_sub_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> a_shift1_ren_r | <span class="nb">rewrite</span> a_shift3_ren_r ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A)
+  : (t `ₜ⊛ f1) ₜ⊛ᵣ f2 = t `ₜ⊛ (f1 ⊛ᵣ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A)
+  : (v `ᵥ⊛ f1) `ᵥ⊛ᵣ f2 = v `ᵥ⊛ (f1 ⊛ᵣ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ ren_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₜ⊛ f1) ₛ⊛ᵣ f2 = s ₜ⊛ (f1 ⊛ᵣ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ ren_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">v</span> : val Γ1 A)
+  : (v ᵥ⊛ f1) ᵥ⊛ᵣ f2 = v ᵥ⊛ (f1 ⊛ᵣ f2) .
+  <span class="nb">destruct</span> A.
+  - <span class="bp">now</span> <span class="nb">apply</span> w_ren_sub.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_ren_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_sub_ren_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (t ₜ⊛ᵣ f1) `ₜ⊛ f2 = t `ₜ⊛ (f1 ᵣ⊛ f2).
+<span class="kn">Definition</span> <span class="nf">w_sub_ren_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (v `ᵥ⊛ᵣ f1) `ᵥ⊛ f2 = v `ᵥ⊛ (f1 ᵣ⊛ f2).
+<span class="kn">Definition</span> <span class="nf">s_sub_ren_P</span> <span class="nv">Γ1</span> (<span class="nv">s</span> : state Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (s ₛ⊛ᵣ f1) ₜ⊛ f2 = s ₜ⊛ (f1 ᵣ⊛ f2).
+
+<span class="kn">Lemma</span> <span class="nf">sub_ren_prf</span> : syn_ind_args t_sub_ren_P w_sub_ren_P s_sub_ren_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_ren_P, w_sub_ren_P, s_sub_ren_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> a_shift1_ren_l | <span class="nb">rewrite</span> a_shift3_ren_l ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A)
+  : (t ₜ⊛ᵣ f1) `ₜ⊛ f2 = t `ₜ⊛ (f1 ᵣ⊛ f2).
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A)
+  : (v `ᵥ⊛ᵣ f1) `ᵥ⊛ f2 = v `ᵥ⊛ (f1 ᵣ⊛ f2).
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ sub_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₛ⊛ᵣ f1) ₜ⊛ f2 = s ₜ⊛ (f1 ᵣ⊛ f2).
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ sub_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">v</span> : val Γ1 A)
+  : (v ᵥ⊛ᵣ f1) ᵥ⊛ f2 = v ᵥ⊛ (f1 ᵣ⊛ f2).
+  <span class="nb">destruct</span> A.
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_ren.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">v_sub_id_r</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) <span class="nv">A</span> (<span class="nv">i</span> : Γ ∋ A) : Var i ᵥ⊛ f = f A i.
+  <span class="bp">now</span> <span class="nb">destruct</span> A.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift1_comp</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">A</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3)
+  : @a_shift1 _ _ A (f1 ⊛ f2) ≡ₐ a_shift1 f1 ⊛ a_shift1 f2 .
+  <span class="nb">intros</span> x i; dependent elimination i; <span class="nb">cbn</span>.
+  - <span class="bp">now</span> <span class="nb">rewrite</span> v_sub_id_r.
+  - <span class="bp">now</span> <span class="nb">unfold</span> v_shift1; <span class="nb">rewrite</span> v_ren_sub, v_sub_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift3_comp</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">C</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3)
+  : @a_shift3 _ _ A B C (f1 ⊛ f2) ≡ₐ a_shift3 f1 ⊛ a_shift3 f2 .
+  <span class="nb">intros</span> ? v; <span class="kp">do</span> <span class="mi">3</span> (dependent elimination v; <span class="nb">cbn</span>; [ <span class="bp">now</span> <span class="nb">rewrite</span> v_sub_id_r | ]).
+  <span class="bp">now</span> <span class="nb">unfold</span> v_shift3; <span class="nb">rewrite</span> v_ren_sub, v_sub_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_sub_sub_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (t `ₜ⊛ f1) `ₜ⊛ f2 = t `ₜ⊛ (f1 ⊛ f2) .
+<span class="kn">Definition</span> <span class="nf">w_sub_sub_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (v `ᵥ⊛ f1) `ᵥ⊛ f2 = v `ᵥ⊛ (f1 ⊛ f2) .
+<span class="kn">Definition</span> <span class="nf">s_sub_sub_P</span> <span class="nv">Γ1</span> (<span class="nv">s</span> : state Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (s ₜ⊛ f1) ₜ⊛ f2 = s ₜ⊛ (f1 ⊛ f2) .
+
+<span class="kn">Lemma</span> <span class="nf">sub_sub_prf</span> : syn_ind_args t_sub_sub_P w_sub_sub_P s_sub_sub_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_sub_P, w_sub_sub_P, s_sub_sub_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> a_shift1_comp | <span class="nb">rewrite</span> a_shift3_comp ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A)
+  : (t `ₜ⊛ f1) `ₜ⊛ f2 = t `ₜ⊛ (f1 ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A)
+  : (v `ᵥ⊛ f1) `ᵥ⊛ f2 = v `ᵥ⊛ (f1 ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ sub_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₜ⊛ f1) ₜ⊛ f2 = s ₜ⊛ (f1 ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ sub_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">v</span> : val Γ1 A)
+  : (v ᵥ⊛ f1) ᵥ⊛ f2 = v ᵥ⊛ (f1 ⊛ f2) .
+  <span class="nb">destruct</span> A.
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_sub.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_comp_assoc</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">Γ4</span>} (<span class="nv">u</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">v</span> : Γ2 =[val]&gt; Γ3) (<span class="nv">w</span> : Γ3 =[val]&gt; Γ4)
+           : (u ⊛ v) ⊛ w ≡ₐ u ⊛ (v ⊛ w).
+  <span class="nb">intros</span> ? i; <span class="nb">unfold</span> a_comp; <span class="bp">now</span> <span class="nb">apply</span> v_sub_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_sub_id_l_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : <span class="kt">Prop</span> := t `ₜ⊛ Var = t.
+<span class="kn">Definition</span> <span class="nf">w_sub_id_l_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : <span class="kt">Prop</span> := v `ᵥ⊛ Var = v.
+<span class="kn">Definition</span> <span class="nf">s_sub_id_l_P</span> <span class="nv">Γ</span> (<span class="nv">s</span> : state Γ) : <span class="kt">Prop</span> := s ₜ⊛ Var = s.
+
+<span class="kn">Lemma</span> <span class="nf">sub_id_l_prf</span> : syn_ind_args t_sub_id_l_P w_sub_id_l_P s_sub_id_l_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_id_l_P, w_sub_id_l_P, s_sub_id_l_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> a_shift1_id | <span class="nb">rewrite</span> a_shift3_id ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : t `ₜ⊛ Var = t.
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_sub_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : v `ᵥ⊛ Var = v.
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ sub_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_sub_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">s</span> : state Γ) : s ₜ⊛ Var = s.
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ sub_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_sub_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">v</span> : val Γ A) : v ᵥ⊛ Var = v.
+  <span class="nb">destruct</span> A.
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_id_l.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_id_l.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">sub1_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) (<span class="nv">v</span> : val Γ A) :
+  a_shift1 f ⊛ asgn1 (v ᵥ⊛ f) ≡ₐ asgn1 v ⊛ f.
+  <span class="nb">intros</span> ? h; dependent elimination h; <span class="nb">cbn</span>.
+  - <span class="bp">now</span> <span class="nb">rewrite</span> v_sub_id_r.
+  - <span class="nb">unfold</span> v_shift1; <span class="nb">rewrite</span> v_sub_ren, v_sub_id_r.
+    <span class="bp">now</span> <span class="nb">apply</span> v_sub_id_l.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">sub1_ren</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span>} (<span class="nv">f</span> : Γ ⊆ Δ) (<span class="nv">v</span> : val Γ A) :
+  r_shift1 f ᵣ⊛ asgn1 (v ᵥ⊛ᵣ f) ≡ₐ asgn1 v ⊛ᵣ f.
+  <span class="nb">intros</span> ? h; dependent elimination h; <span class="nb">auto</span>.
+  <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> v_ren_id_r.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">v_sub1_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">w</span> : val (Γ ▶ₓ A) B)
+  : (w ᵥ⊛ a_shift1 f) ᵥ⊛ <span class="err">₁</span>[ v ᵥ⊛ f ] = (w ᵥ⊛ <span class="err">₁</span>[ v ]) ᵥ⊛ f .
+  <span class="nb">cbn</span>; <span class="nb">rewrite</span> <span class="mi">2</span> v_sub_sub.
+  <span class="nb">apply</span> v_sub_eq; <span class="bp">now</span> <span class="nb">rewrite</span> sub1_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">v_sub1_ren</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f</span> : Γ ⊆ Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">w</span> : val (Γ ▶ₓ A) B)
+  : (w ᵥ⊛ᵣ r_shift1 f) ᵥ⊛ <span class="err">₁</span>[ v ᵥ⊛ᵣ f ] = (w ᵥ⊛ <span class="err">₁</span>[ v ]) ᵥ⊛ᵣ f .
+  <span class="nb">cbn</span>; <span class="nb">rewrite</span> v_sub_ren, v_ren_sub.
+  <span class="nb">apply</span> v_sub_eq; <span class="bp">now</span> <span class="nb">rewrite</span> sub1_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">s_sub1_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">s</span> : state (Γ ▶ₓ A))
+  : (s ₜ⊛ a_shift1 f) ₜ⊛ <span class="err">₁</span>[ v ᵥ⊛ f ] = (s ₜ⊛ <span class="err">₁</span>[ v ]) ₜ⊛ f .
+  <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> <span class="mi">2</span> s_sub_sub, sub1_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">s_sub3_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">C</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) (<span class="nv">s</span> : state (Γ ▶ₓ A ▶ₓ B ▶ₓ C)) <span class="nv">u</span> <span class="nv">v</span> <span class="nv">w</span>
+  : (s ₜ⊛ a_shift3 f) ₜ⊛ <span class="err">₃</span>[ u ᵥ⊛ f , v ᵥ⊛ f , w ᵥ⊛ f ] = (s ₜ⊛ <span class="err">₃</span>[ u, v , w ]) ₜ⊛ f .
+  <span class="nb">cbn</span>; <span class="nb">rewrite</span> <span class="mi">2</span> s_sub_sub; <span class="nb">apply</span> s_sub_eq.
+  <span class="nb">intros</span> ? v0; <span class="nb">cbn</span>.
+  <span class="kp">do</span> <span class="mi">3</span> (dependent elimination v0; <span class="nb">cbn</span>; [ <span class="bp">now</span> <span class="nb">rewrite</span> v_sub_id_r | ]).
+  <span class="nb">unfold</span> v_shift3; <span class="nb">rewrite</span> v_sub_ren, v_sub_id_r, &lt;- v_sub_id_l.
+  <span class="bp">now</span> <span class="nb">apply</span> v_sub_eq.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">s_sub1_ren</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span>} (<span class="nv">f</span> : Γ ⊆ Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">s</span> : state (Γ ▶ₓ A))
+  : (s ₛ⊛ᵣ r_shift1 f) ₜ⊛ <span class="err">₁</span>[ v ᵥ⊛ᵣ f ] = (s ₜ⊛ <span class="err">₁</span>[ v ]) ₛ⊛ᵣ f .
+  <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> s_sub_ren, s_ren_sub, sub1_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub1_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">t</span> : term (Γ ▶ₓ A) B)
+  : (t `ₜ⊛ a_shift1 f) `ₜ⊛ <span class="err">₁</span>[ v ᵥ⊛ f ] = (t `ₜ⊛ <span class="err">₁</span>[ v ]) `ₜ⊛ f .
+  <span class="nb">cbn</span>; <span class="nb">rewrite</span> <span class="mi">2</span> t_sub_sub.
+  <span class="nb">apply</span> t_sub_eq; <span class="bp">now</span> <span class="nb">rewrite</span> sub1_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub1_ren</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f</span> : Γ ⊆ Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">t</span> : term (Γ ▶ₓ A) B)
+  : (t ₜ⊛ᵣ r_shift1 f) `ₜ⊛ <span class="err">₁</span>[ v ᵥ⊛ᵣ f ] = (t `ₜ⊛ <span class="err">₁</span>[ v ]) ₜ⊛ᵣ f .
+  <span class="nb">cbn</span>; <span class="nb">rewrite</span> t_sub_ren, t_ren_sub.
+  <span class="nb">apply</span> t_sub_eq; <span class="bp">now</span> <span class="nb">rewrite</span> sub1_ren.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">p_app_eq</span> {<span class="nv">Γ</span> <span class="nv">A</span>} (<span class="nv">v</span> : val Γ A) (<span class="nv">m</span> : pat (t_neg A))
+  : Proper (asgn_eq _ _ ==&gt; eq) (p_app v m) .
+  <span class="nb">intros</span> u1 u2 H; <span class="nb">destruct</span> A; <span class="nb">cbn</span>.
+  <span class="bp">now</span> <span class="nb">rewrite</span> (t_sub_eq u1 u2 H).
+  <span class="bp">now</span> <span class="nb">rewrite</span> (w_sub_eq u1 u2 H).
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">refold_id_aux</span> {<span class="nv">Γ</span> : neg_ctx} <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A)
+  : (p_of_w _ v : val _ _) `ᵥ⊛ p_dom_of_w _ v = v .
+  <span class="nb">cbn</span>; funelim (p_of_w A v); <span class="nb">auto</span>.
+  - <span class="nb">destruct</span> (s_prf i).
+  - <span class="nb">destruct</span> (s_prf i).
+  - <span class="bp">now</span> <span class="nb">cbn</span>; <span class="nb">f_equal</span>. 
+  - <span class="bp">now</span> <span class="nb">cbn</span>; <span class="nb">f_equal</span>. 
+<span class="kn">Qed</span>.
+
+<span class="kn">Equations</span> <span class="nf">p_of_w_eq</span> {<span class="nv">Γ</span> : neg_ctx} <span class="nv">A</span> (<span class="nv">p</span> : pat ↑A) (<span class="nv">e</span> : pat_dom p =[val]&gt; Γ)
+          : p_of_w A ((p : val _ _) `ᵥ⊛ e) = p :=
+  p_of_w_eq (a `+ b) (PInl v) e := <span class="nb">f_equal</span> PInl (p_of_w_eq _ v e) ;
+  p_of_w_eq (a `+ b) (PInr v) e := <span class="nb">f_equal</span> PInr (p_of_w_eq _ v e) ;
+  p_of_w_eq (`<span class="mi">1</span>)     PTt      e := eq_refl ;
+  p_of_w_eq (a `× b) PPair    e := eq_refl ;
+  p_of_w_eq (a `→ b) PLam     e := eq_refl .
+
+<span class="kn">Lemma</span> <span class="nf">p_dom_of_w_eq</span> {<span class="nv">Γ</span> : neg_ctx} <span class="nv">A</span> (<span class="nv">p</span> : pat ↑A) (<span class="nv">e</span> : pat_dom p =[val]&gt; Γ)
+      : rew [<span class="kr">fun</span> <span class="nv">p</span> =&gt; pat_dom p =[ val ]&gt; Γ] p_of_w_eq A p e
+        <span class="kr">in</span> p_dom_of_w A ((p : val _ _) `ᵥ⊛ e)
+      ≡ₐ e .
+  funelim (p_of_w_eq A p e); <span class="nb">cbn</span>.
+  - <span class="nb">intros</span> ? v; <span class="kp">repeat</span> (dependent elimination v; <span class="nb">auto</span>).
+  - <span class="nb">intros</span> ? v; <span class="kp">repeat</span> (dependent elimination v; <span class="nb">auto</span>).
+  - <span class="kr">match goal with</span> | |- <span class="nl">?s</span> ≡ₐ e =&gt; <span class="nb">pose</span> (xx := s); <span class="nb">change</span> (_ ≡ₐ e) <span class="kr">with</span> (xx ≡ₐ e) <span class="kr">end</span> .
+    <span class="nb">remember</span> xx <span class="kr">as</span> xx&#39;; <span class="nb">unfold</span> xx <span class="kr">in</span> Heqxx&#39;; <span class="nb">clear</span> xx.
+    <span class="bp">now</span> <span class="nb">rewrite</span> (eq_trans Heqxx&#39; (eq_sym (rew_map _ PInl _ _))).
+  - <span class="kr">match goal with</span> | |- <span class="nl">?s</span> ≡ₐ e =&gt; <span class="nb">pose</span> (xx := s); <span class="nb">change</span> (_ ≡ₐ e) <span class="kr">with</span> (xx ≡ₐ e) <span class="kr">end</span> .
+    <span class="nb">remember</span> xx <span class="kr">as</span> xx&#39;; <span class="nb">unfold</span> xx <span class="kr">in</span> Heqxx&#39;; <span class="nb">clear</span> xx.
+    <span class="bp">now</span> <span class="nb">rewrite</span> (eq_trans Heqxx&#39; (eq_sym (rew_map _ PInr _ _))).
+  - <span class="nb">intros</span> ? v; <span class="kp">repeat</span> (dependent elimination v; <span class="nb">auto</span>).
+<span class="kn">Qed</span>.
+
+<span class="kn">Notation</span> <span class="nf">val_n</span> := (val ∘ neg_c_coe).
+<span class="kn">Notation</span> <span class="nf">state_n</span> := (state ∘ neg_c_coe).
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">val_n_monoid</span> : subst_monoid val_n .
+  <span class="nb">esplit</span>.
+  - <span class="nb">intros</span> Γ x i; <span class="bp">exact</span> (Var i).
+  - <span class="nb">intros</span> Γ x v Δ f; <span class="bp">exact</span> (v ᵥ⊛ f).
+<span class="kn">Defined</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">state_n_module</span> : subst_module val_n state_n .
+  <span class="nb">esplit</span>; <span class="nb">intros</span> Γ s Δ f; <span class="bp">exact</span> (s ₜ⊛ (f : Γ =[val]&gt; Δ)).
+<span class="kn">Defined</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">val_n_laws</span> : subst_monoid_laws val_n .
+  <span class="nb">esplit</span>.
+  - <span class="nb">intros</span> ???? &lt;- ????; <span class="bp">now</span> <span class="nb">apply</span> v_sub_eq.
+  - <span class="nb">intros</span> ?????; <span class="bp">now</span> <span class="nb">apply</span> v_sub_id_r.
+  - <span class="nb">intros</span> ???; <span class="bp">now</span> <span class="nb">apply</span> v_sub_id_l.
+  - <span class="nb">intros</span> ???????; <span class="nb">symmetry</span>; <span class="bp">now</span> <span class="nb">apply</span> v_sub_sub.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">state_n_laws</span> : subst_module_laws val_n state_n .
+  <span class="nb">esplit</span>.
+  - <span class="nb">intros</span> ??? &lt;- ????; <span class="bp">now</span> <span class="nb">apply</span> s_sub_eq.
+  - <span class="nb">intros</span> ??; <span class="bp">now</span> <span class="nb">apply</span> s_sub_id_l.
+  - <span class="nb">intros</span> ??????; <span class="nb">symmetry</span>; <span class="bp">now</span> <span class="nb">apply</span> s_sub_sub.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">var_laws</span> : var_assumptions val_n.
+  <span class="nb">esplit</span>.
+  - <span class="nb">intros</span> ? [] ?? H; <span class="bp">now</span> <span class="nb">dependent destruction</span> H.
+  - <span class="nb">intros</span> ? [] v; dependent elimination v.
+    <span class="kp">all</span>: <span class="kp">try</span> <span class="bp">exact</span> (Yes _ (Vvar _)).
+    <span class="kp">all</span>: <span class="nb">apply</span> No; <span class="nb">intro</span> H; <span class="nb">dependent destruction</span> H.
+  - <span class="nb">intros</span> ?? [] ???; <span class="nb">cbn</span> <span class="kr">in</span> v; <span class="nb">dependent induction</span> v.
+    <span class="kp">all</span>: <span class="kp">try</span> <span class="bp">now</span> <span class="nb">dependent destruction</span> X; <span class="bp">exact</span> (Vvar _).
+    <span class="kp">all</span>: <span class="nb">dependent induction</span> w; <span class="nb">dependent destruction</span> X; <span class="bp">exact</span> (Vvar _).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">sysl_machine</span> : machine val_n state_n op_copat :=
+  {| Machine.<span class="kp">eval</span> := @<span class="kp">eval</span> ; oapp := @p_app |} .
+
+<span class="kn">From</span> Coinduction <span class="kn">Require Import</span> coinduction lattice rel tactics.
+
+<span class="kn">Ltac</span> <span class="nf">refold_eval</span> :=
+  <span class="nb">change</span> (<span class="kn">Structure</span>.iter _ _ <span class="nl">?a</span>) <span class="kr">with</span> (<span class="kp">eval</span> a);
+  <span class="nb">change</span> (<span class="kn">Structure</span>.<span class="nb">subst</span> (<span class="kr">fun</span> <span class="nv">pat</span> : T1 =&gt; <span class="kr">let</span> <span class="nv">&#39;T1_0</span> := pat <span class="kr">in</span> <span class="nl">?f</span>) T1_0 <span class="nl">?u</span>)
+    <span class="kr">with</span> (bind_delay&#39; u f).
+
+<span class="kn">Definition</span> <span class="nf">upg_v</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty} : whn Γ A  -&gt; val Γ ↑A := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+<span class="kn">Definition</span> <span class="nf">upg_k</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty} : term Γ ¬A -&gt; val Γ ¬A := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+<span class="kn">Definition</span> <span class="nf">dwn_v</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty} : val Γ ↑A -&gt; whn Γ A  := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+<span class="kn">Definition</span> <span class="nf">dwn_k</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty} : val Γ ¬A -&gt; term Γ ¬A := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+
+<span class="kn">Lemma</span> <span class="nf">nf_eq_split</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span> : pre_ty} (<span class="nv">i</span> : Γ ∋ ¬A) (<span class="nv">p</span> : pat ↑A) <span class="nv">γ</span>
+  : nf_eq (i ⋅ w_split _ (dwn_v ((p : val _ _) `ᵥ⊛ γ)))
+          (i ⋅ (p : o_op op_copat ¬A) ⦇ γ ⦈).
+  <span class="nb">unfold</span> w_split, dwn_v; <span class="nb">cbn</span>.
+  <span class="nb">pose proof</span> (p_dom_of_w_eq A p γ).
+  <span class="nb">pose</span> (H&#39; := p_of_w_eq A p γ); <span class="nb">fold</span> H&#39; <span class="kr">in</span> H.
+  <span class="nb">pose</span> (a := p_dom_of_w A (v_of_p p `ᵥ⊛ γ)); <span class="nb">fold</span> a <span class="kr">in</span> H |- *.
+  <span class="nb">remember</span> a <span class="kr">as</span> a&#39;; <span class="nb">clear</span> a Heqa&#39;.
+  <span class="nb">revert</span> a&#39; H; <span class="nb">rewrite</span> H&#39;; <span class="nb">intros</span>; <span class="bp">now</span> <span class="nb">econstructor</span>.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">machine_law</span> : machine_laws val_n state_n op_copat.
+  <span class="nb">esplit</span>.
+  - <span class="nb">intros</span>; <span class="nb">apply</span> p_app_eq.
+  - <span class="nb">intros</span> ?? [] ????; <span class="nb">cbn</span>.
+    <span class="bp">now</span> <span class="nb">rewrite</span> (t_sub_sub _ _ _ _).
+    <span class="bp">now</span> <span class="nb">rewrite</span> (w_sub_sub _ _ _ _).
+  - <span class="nb">cbn</span>; <span class="nb">intros</span> Γ Δ; <span class="nb">unfold</span> comp_eq, it_eq; coinduction R CIH; <span class="nb">intros</span> c a.
+    <span class="nb">cbn</span>; funelim (eval_aux c); <span class="kp">try</span> <span class="bp">now</span> <span class="nb">destruct</span> (s_prf i).
+    + <span class="nb">change</span> (it_eqF _ <span class="nl">?RX</span> <span class="nl">?RY</span> _ _ _) <span class="kr">with</span>
+        (it_eq_map ∅ₑ RX RY T1_0
+           (<span class="kp">eval</span> (Cut (Val (v `ᵥ⊛ a)) (a _ i)))
+           (<span class="kp">eval</span> (Cut (Val ((v_of_p (p_of_w _ v) `ᵥ⊛ p_dom_of_w _ v `ᵥ⊛ a))) (a _ i)))).
+      <span class="bp">now</span> <span class="nb">rewrite</span> (refold_id_aux _ v).
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_v v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_v v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_v v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="bp">now</span> <span class="nb">change</span> (it_eqF _ <span class="nl">?RX</span> <span class="nl">?RY</span> _ _ _) <span class="kr">with</span>
+        (it_eq_map ∅ₑ RX RY T1_0
+           (<span class="kp">eval</span> (Cut (a _ i) (Fst k `ₜ⊛ a)))
+           (<span class="kp">eval</span> (Cut (a _ i) (Fst k `ₜ⊛ a)))).
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ₜ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_k v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="bp">now</span> <span class="nb">change</span> (it_eqF _ <span class="nl">?RX</span> <span class="nl">?RY</span> _ _ _) <span class="kr">with</span>
+        (it_eq_map ∅ₑ RX RY T1_0
+           (<span class="kp">eval</span> (Cut (a _ i) (Snd k `ₜ⊛ a)))
+           (<span class="kp">eval</span> (Cut (a _ i) (Snd k `ₜ⊛ a)))).
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ₜ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_k v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + simp eval_aux.
+      <span class="nb">unfold</span> p_app, app_nf, nf_var, nf_obs, nf_args, cut_l, cut_r, fill_op, fill_args.
+      <span class="nb">change</span> (it_eqF _ <span class="nl">?RX</span> <span class="nl">?RY</span> _ _ _) <span class="kr">with</span>
+        (it_eq_map ∅ₑ RX RY T1_0
+           (<span class="kp">eval</span> (Cut (a _ i) (App v k `ₜ⊛ a)))
+           (<span class="kp">eval</span> (Cut (a _ i) (PApp (p_of_w A7 v) `ₜ⊛ [ p_dom_of_w _ v ,ₓ upg_k k ] `ₜ⊛ a)))).
+      <span class="nb">cbn</span> - [ it_eq_map ].
+      <span class="nb">rewrite</span> w_sub_ren.
+      <span class="nb">change</span> (r_pop ᵣ⊛ (p_dom_of_w _ v ▶ₐ _))%asgn <span class="kr">with</span> (p_dom_of_w _ v).
+      <span class="bp">now</span> <span class="nb">rewrite</span> (refold_id_aux _ v).
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (Lam (s_subst _ _ _ _)) <span class="kr">with</span> (upg_v (Lam s) ᵥ⊛ a).
+      <span class="nb">change</span> (<span class="nl">?v</span> `ₜ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_k v ᵥ⊛ a).
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_v v ᵥ⊛ a).
+      <span class="nb">rewrite</span> s_sub3_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ₜ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_k v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+  - <span class="nb">cbn</span>; <span class="nb">intros</span> ? [ A i [ o γ ]]; <span class="nb">cbn</span>; <span class="nb">unfold</span> p_app, nf_args, cut_r, fill_args.
+    <span class="nb">cbn</span> <span class="kr">in</span> o; funelim (v_of_p o); simpl_depind; <span class="nb">inversion</span> eqargs.
+    <span class="kp">all</span>: <span class="kr">match goal with</span>
+         | H : _ = <span class="nl">?A</span>† |- _ =&gt; <span class="nb">destruct</span> A; <span class="nb">dependent destruction</span> H
+         <span class="kr">end</span>.
+    <span class="kp">all</span>: <span class="nb">dependent destruction</span> eqargs; <span class="nb">cbn</span>.
+    <span class="kp">all</span>: <span class="nb">apply</span> it_eq_unstep; <span class="nb">cbn</span>; <span class="nb">unfold</span> Var; <span class="nb">cbn</span>; <span class="nb">econstructor</span>.
+    <span class="mi">1</span>-<span class="mi">2</span>,<span class="mi">5</span>-<span class="mi">7</span>: <span class="nb">econstructor</span>; <span class="nb">intros</span> ? v; <span class="kp">repeat</span> (dependent elimination v; <span class="nb">auto</span>).
+    <span class="mi">1</span>-<span class="mi">2</span>: <span class="bp">exact</span> (nf_eq_split _ _ γ).
+    <span class="c">(* a bit of an ugly case because we didn&#39;t write proper generic functions</span>
+<span class="c">       for splitting negative values.. hence knowing this one is an App is</span>
+<span class="c">       getting in our way *)</span>
+    <span class="nb">clear</span>; <span class="nb">unfold</span> app_nf.
+    <span class="nb">rewrite</span> w_sub_ren.
+    <span class="nb">pose</span> (γ&#39; := (r_pop ᵣ⊛ γ)%asgn);
+      <span class="nb">change</span> (sub_elt _) <span class="kr">with</span> (pat_dom v : t_ctx) <span class="kr">in</span> γ&#39; <span class="nb">at</span> <span class="mi">1</span>; <span class="nb">cbn</span> <span class="kr">in</span> γ&#39;.
+    <span class="nb">change</span> (r_pop ᵣ⊛ γ)%asgn <span class="kr">with</span> γ&#39;.
+    <span class="nb">pose</span> (vv := γ _ Ctx.top); <span class="nb">cbn</span> <span class="kr">in</span> vv; <span class="nb">change</span> (γ _ Ctx.top) <span class="kr">with</span> vv.
+    <span class="nb">assert</span> (H : [ γ&#39; ,ₓ upg_k vv ] ≡ₐ γ) <span class="bp">by</span> <span class="bp">now</span> <span class="nb">intros</span> ? ii; dependent elimination ii.
+    <span class="nb">remember</span> γ&#39; <span class="kr">as</span> a; <span class="nb">remember</span> vv <span class="kr">as</span> t; <span class="nb">clear</span> γ&#39; vv Heqa Heqt.
+    <span class="nb">pose proof</span> (p_dom_of_w_eq _ v a).
+    <span class="nb">pose</span> (H&#39; := p_of_w_eq _ v a); <span class="nb">fold</span> H&#39; <span class="kr">in</span> H0.
+    <span class="nb">pose</span> (aa := p_dom_of_w _ ((v : val _ _) `ᵥ⊛ a)); <span class="nb">fold</span> aa <span class="kr">in</span> H0 |- *.
+    <span class="nb">remember</span> aa <span class="kr">as</span> a&#39;; <span class="nb">clear</span> aa Heqa&#39;.
+    <span class="nb">revert</span> a&#39; H0; <span class="nb">rewrite</span> H&#39;; <span class="nb">intros</span>; <span class="nb">econstructor</span>.
+    <span class="nb">etransitivity</span>; [ | <span class="bp">exact</span> H ].
+    <span class="nb">refine</span> (a_append_eq _ _ _ _ _ _); <span class="nb">auto</span>.
+  - <span class="nb">intros</span> A; <span class="nb">econstructor</span>; <span class="nb">intros</span> [ B m ] H; dependent elimination H;
+      <span class="nb">cbn</span> [projT1 projT2] <span class="kr">in</span> i, i0.
+    <span class="nb">destruct</span> y.
+    <span class="kp">all</span>: dependent elimination v; <span class="kp">try</span> <span class="bp">now</span> <span class="nb">destruct</span> (t0 (Vvar _)).
+    <span class="kp">all</span>: <span class="nb">clear</span> t0.
+    <span class="kp">all</span>: <span class="nb">cbn</span> <span class="kr">in</span> o; dependent elimination o; <span class="nb">cbn</span> <span class="kr">in</span> i0.
+    <span class="kp">all</span>: <span class="kr">match goal with</span>
+         | u : dom _ =[val_n]&gt; _ |- _ =&gt;
+             <span class="nb">cbn</span> <span class="kr">in</span> i0;
+             <span class="nb">pose</span> (vv := u _ Ctx.top); <span class="nb">change</span> (u _ Ctx.top) <span class="kr">with</span> vv <span class="kr">in</span> i0;
+             <span class="nb">remember</span> vv <span class="kr">as</span> v&#39;; <span class="nb">clear</span> u vv Heqv&#39;; <span class="nb">cbn</span> <span class="kr">in</span> v&#39;
+         | _ =&gt; <span class="kp">idtac</span>
+       <span class="kr">end</span>.
+    <span class="mi">1</span>-<span class="mi">10</span>: <span class="bp">now</span> <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="nb">inversion</span> i0.
+    <span class="kp">all</span>: dependent elimination v&#39;; [ | <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0 ].
+    <span class="kp">all</span>:
+      <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="nb">cbn</span> <span class="kr">in</span> i0; dependent elimination i0; <span class="nb">cbn</span> <span class="kr">in</span> r_rel;
+      <span class="nb">apply</span> noConfusion_inv <span class="kr">in</span> r_rel; <span class="nb">unfold</span> w_split <span class="kr">in</span> r_rel;
+      <span class="nb">cbn</span> <span class="kr">in</span> r_rel; <span class="nb">unfold</span> NoConfusionHom_f_cut,s_var_upg <span class="kr">in</span> r_rel; <span class="nb">cbn</span> <span class="kr">in</span> r_rel;
+      <span class="nb">pose proof</span> (H := <span class="nb">f_equal</span> pr1 r_rel); <span class="nb">cbn</span> <span class="kr">in</span> H; <span class="nb">dependent destruction</span> H;
+      <span class="nb">apply</span> DepElim.pr2_uip <span class="kr">in</span> r_rel;
+      <span class="nb">pose proof</span> (H := <span class="nb">f_equal</span> pr1 r_rel); <span class="nb">cbn</span> <span class="kr">in</span> H; <span class="nb">dependent destruction</span> H;
+      <span class="nb">apply</span> DepElim.pr2_uip <span class="kr">in</span> r_rel; <span class="nb">dependent destruction</span> r_rel.
+    <span class="kp">all</span>:
+      <span class="nb">econstructor</span>; <span class="nb">intros</span> [ t o ] H; <span class="nb">cbn</span> <span class="kr">in</span> t,o; dependent elimination H.
+    <span class="kp">all</span>: dependent elimination v; <span class="kp">try</span> <span class="bp">now</span> <span class="nb">destruct</span> (t0 (Vvar _)).
+    <span class="kp">all</span>: <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="nb">cbn</span> <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">subst_eq</span> (<span class="nv">Δ</span> : neg_ctx) {<span class="nv">Γ</span>} : relation (state Γ) :=
+  <span class="kr">fun</span> <span class="nv">u</span> <span class="nv">v</span> =&gt; <span class="kr">forall</span> (<span class="nv">σ</span> : Γ =[val]&gt; Δ), evalₒ (u ₜ⊛ σ : state_n Δ) ≈ evalₒ (v ₜ⊛ σ : state_n Δ) .
+<span class="kn">Notation</span> <span class="s2">&quot;x ≈⟦sub Δ ⟧≈ y&quot;</span> := (subst_eq Δ x y) (<span class="kn">at level</span> <span class="mi">50</span>).
+
+<span class="kn">Theorem</span> <span class="nf">subst_correct</span> (<span class="nv">Δ</span> : neg_ctx) {<span class="nv">Γ</span> : neg_ctx} (<span class="nv">x</span> <span class="nv">y</span> : state Γ)
+  : x ≈⟦ogs Δ ⟧≈ y -&gt; x ≈⟦sub Δ ⟧≈ y.
+  <span class="bp">exact</span> (ogs_correction _ x y).
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">c_of_t</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span>} (<span class="nv">t</span> : term Γ ↑A)
+           : state_n (Γ ▶ₛ {| sub_elt := ¬A ; sub_prf := stt |}) :=
+  Cut (t_shift1 _ t) (VarR Ctx.top) .
+<span class="kn">Notation</span> <span class="s2">&quot;&#39;name⁺&#39;&quot;</span> := c_of_t.
+
+<span class="kn">Definition</span> <span class="nf">a_of_sk</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> : neg_ctx} {<span class="nv">A</span>} (<span class="nv">s</span> : Γ =[val]&gt; Δ) (<span class="nv">k</span> : term Δ ¬A)
+  : (Γ ▶ₛ {| sub_elt := ¬A ; sub_prf := stt |}) =[val_n]&gt; Δ :=
+  [ s ,ₓ k : val _ ¬_ ].
+
+<span class="kn">Lemma</span> <span class="nf">sub_csk</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> : neg_ctx} {<span class="nv">A</span>} (<span class="nv">t</span> : term Γ ↑A) (<span class="nv">s</span> : Γ =[val]&gt; Δ)
+  (<span class="nv">k</span> : term Δ ¬A)
+  : Cut (t `ₜ⊛ s) k = c_of_t t ₜ⊛ a_of_sk s k.
+<span class="kn">Proof</span>.
+  <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">unfold</span> t_shift1; <span class="nb">rewrite</span> t_sub_ren; <span class="bp">now</span> <span class="nb">apply</span> t_sub_eq.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">ciu_eq</span> (<span class="nv">Δ</span> : neg_ctx) {<span class="nv">Γ</span> <span class="nv">A</span>} : relation (term Γ ↑A) :=
+  <span class="kr">fun</span> <span class="nv">u</span> <span class="nv">v</span> =&gt;
+    <span class="kr">forall</span> (<span class="nv">σ</span> : Γ =[val]&gt; Δ) (<span class="nv">k</span> : term Δ ¬A),
+      evalₒ (Cut (u `ₜ⊛ σ) k : state_n Δ) ≈ evalₒ (Cut (v `ₜ⊛ σ) k : state_n Δ) .
+<span class="kn">Notation</span> <span class="s2">&quot;x ≈⟦ciu Δ ⟧⁺≈ y&quot;</span> := (ciu_eq Δ x y) (<span class="kn">at level</span> <span class="mi">50</span>).
+
+<span class="kn">Theorem</span> <span class="nf">ciu_correct</span> (<span class="nv">Δ</span> : neg_ctx) {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span>} (<span class="nv">x</span> <span class="nv">y</span> : term Γ ↑A)
+  : (name⁺ x) ≈⟦ogs Δ ⟧≈ (name⁺ y) -&gt; x ≈⟦ciu Δ ⟧⁺≈ y.
+  <span class="nb">intros</span> H σ k; <span class="nb">rewrite</span> <span class="mi">2</span> sub_csk.
+  <span class="bp">now</span> <span class="nb">apply</span> subst_correct.
+<span class="kn">Qed</span>.</span></pre>
+</div>
+</div></body>
+</html>

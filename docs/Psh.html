@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Type families</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="type-families">
+<h1 class="title">Type families</h1>
+
+<p>This file is dully-named <tt class="docutils literal">Psh.v</tt> but in fact is actually about
+type families, that is maps <tt class="docutils literal">I → Type</tt> for some <tt class="docutils literal">I : Type</tt>.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="nf">psh</span> I := (I -&gt; <span class="kt">Type</span>).</span></span></pre><p>Pointwise arrows of families.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">arrᵢ</span> {<span class="nv">I</span>} (<span class="nv">X</span> <span class="nv">Y</span> : psh I) : <span class="kt">Type</span> := <span class="kr">forall</span> <span class="nv">i</span>, X i -&gt; Y i.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Infix</span> <span class="s2">&quot;⇒ᵢ&quot;</span> := (arrᵢ) (<span class="kn">at level</span> <span class="mi">20</span>) : indexed_scope.</span></span></pre><p>A bunch of combinators.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">voidᵢ</span> {<span class="nv">I</span> : <span class="kt">Type</span>} : I -&gt; <span class="kt">Type</span> := <span class="kr">fun</span> <span class="nv">_</span> =&gt; T0.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;∅ᵢ&quot;</span> := (voidᵢ) : indexed_scope.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">sumᵢ</span> {<span class="nv">I</span>} (<span class="nv">X</span> <span class="nv">Y</span> : psh I) : psh I := <span class="kr">fun</span> <span class="nv">i</span> =&gt; (X i + Y i)%type.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Infix</span> <span class="s2">&quot;+ᵢ&quot;</span> := (sumᵢ) (<span class="kn">at level</span> <span class="mi">20</span>) : indexed_scope.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">prodᵢ</span> {<span class="nv">I</span>} (<span class="nv">X</span> <span class="nv">Y</span> : psh I) : psh I := <span class="kr">fun</span> <span class="nv">i</span> =&gt; (X i * Y i)%type.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Infix</span> <span class="s2">&quot;×ᵢ&quot;</span> := (prodᵢ) (<span class="kn">at level</span> <span class="mi">20</span>) : indexed_scope.</span></span></pre><p>Fibers of a function are a particularly import kind of type family.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Inductive</span> <span class="nf">fiber</span> {<span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f</span> : A -&gt; B) : psh B := Fib a : fiber f (f a).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Arguments</span> Fib {A B f}.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Derive</span> <span class="nf">NoConfusion</span> <span class="kr">for</span> fiber.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">fib_extr</span> {<span class="nv">A</span> <span class="nv">B</span>} {<span class="nv">f</span> : A -&gt; B} {<span class="nv">b</span> : B} : fiber f b -&gt; A :=
+  fib_extr (Fib a) := a .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">fib_coh</span> {<span class="nv">A</span> <span class="nv">B</span>} {<span class="nv">f</span> : A -&gt; B} {<span class="nv">b</span> : B} : <span class="kr">forall</span> <span class="nv">p</span> : fiber f b, f (fib_extr p) = b :=
+  fib_coh (Fib _) := eq_refl .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">fib_constr</span> {<span class="nv">A</span> <span class="nv">B</span>} {<span class="nv">f</span> : A -&gt; B} <span class="nv">a</span> : <span class="kr">forall</span> <span class="nv">b</span> (<span class="nv">p</span> : f a = b), fiber f b :=
+  eq_rect (f a) (fiber f) (Fib a).</span></span></pre><p>These next two functions form an isomorphism <tt class="docutils literal">(fiber f ⇒ᵢ X) ≅ (∀ a → X (f a))</tt></p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">fib_into</span> {<span class="nv">A</span> <span class="nv">B</span>} {<span class="nv">f</span> : A -&gt; B} <span class="nv">X</span> (<span class="nv">h</span> : <span class="kr">forall</span> <span class="nv">a</span>, X (f a)) : fiber f ⇒ᵢ X :=
+  fib_into _ h _ (Fib a) := h a .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">fib_from</span> {<span class="nv">A</span> <span class="nv">B</span>} {<span class="nv">f</span> : A -&gt; B} <span class="nv">X</span> (<span class="nv">h</span> : fiber f ⇒ᵢ X) <span class="nv">a</span> : X (f a) :=
+  h _ (Fib a).</span></span></pre><p>Using the fiber construction, we can define a &quot;sparse&quot; type family which will
+be equal to some set at one point of the index and empty otherwise. This will
+enable us to have an isomorphism <tt class="docutils literal">(X &#64; i ⇒ᵢ Y) ≅ (X → Y i)</tt>.</p>
+<p>See the functional pearl by Conor McBride &quot;Kleisli arrows of outrageous fortune&quot;
+for background on this construction and its use.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;X @ i&quot;</span> := (fiber (<span class="kr">fun</span> (<span class="nv">_</span> : X) =&gt; i)) (<span class="kn">at level</span> <span class="mi">20</span>) : indexed_scope.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">pin</span> {<span class="nv">I</span> <span class="nv">X</span>} (<span class="nv">i</span> : I) : X -&gt; (X @ i) i := Fib.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">pin_from</span> {<span class="nv">I</span> <span class="nv">X</span> <span class="nv">Y</span>} {<span class="nv">i</span> : I} : ((X @ i) ⇒ᵢ Y) -&gt; (X -&gt; Y i) := fib_from _.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">pin_into</span> {<span class="nv">I</span> <span class="nv">X</span> <span class="nv">Y</span>} {<span class="nv">i</span> : I} : (X -&gt; Y i) -&gt; (X @ i ⇒ᵢ Y) := fib_into _.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">pin_map</span> {<span class="nv">I</span> <span class="nv">X</span> <span class="nv">Y</span>} (<span class="nv">f</span> : X -&gt; Y) {<span class="nv">i</span> : I} : (X @ i) ⇒ᵢ (Y @ i) :=
+  pin_map f _ (Fib x) := Fib (f x) .</span></span></pre>
+</div>
+</div></body>
+</html>

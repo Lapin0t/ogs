@@ -1,0 +1,1416 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>SystemD.v</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document">
+
+
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">From</span> OGS <span class="kn">Require Import</span> Prelude.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">From</span> OGS.Utils <span class="kn">Require Import</span> Psh Rel.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp"><span class="kn">From</span> OGS.Ctx <span class="kn">Require Import</span> All Ctx Covering Subset Subst.
+<span class="kn">From</span> OGS.ITree <span class="kn">Require Import</span> Event ITree Eq Delay <span class="kn">Structure</span> <span class="nf">Properties</span>.
+<span class="kn">From</span> OGS.OGS <span class="kn">Require Import</span> Soundness. </span></pre><p>In this file we instanciate our OGS construction with the fully-dual polarized mu-mu-tilde
+calculus 'System D' from P. Downen &amp; Z. Ariola. The presentation may be slightly unusual
+as we go for one-sided sequent. The only real divergence from the original calculus
+is the addition of a restricted form of recursion, making the language non-normalizing.</p>
+<div class="section" id="types">
+<h1>Types</h1>
+<p>Type have polarities, basically whether their values are CBV-biased
+or CBN-biased</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Variant</span> <span class="nf">pol</span> : <span class="kt">Type</span> := pos | neg .</span></span></pre><p>Syntax of types. We have a fully dual type system with:</p>
+<ul class="simple">
+<li><code class="highlight coq"><span class="mi">0</span></code>, positive void (no constructor),</li>
+<li><code class="highlight coq"><span class="o">⊤</span></code>, negative unit (no destructor),</li>
+<li><code class="highlight coq"><span class="o">⊥</span></code>, negative void (one trivial destructor),</li>
+<li><code class="highlight coq"><span class="mi">1</span></code>, positive unit (one trivial constructor),</li>
+<li><code class="highlight coq"><span class="n">A</span> <span class="o">⊗</span> <span class="n">B</span></code>, positive product (pairs with pattern-matching),</li>
+<li><code class="highlight coq"><span class="n">A</span> <span class="o">⅋</span> <span class="n">B</span></code>, negative sum (one binary destructor),</li>
+<li><code class="highlight coq"><span class="n">A</span> <span class="o">⊕</span> <span class="n">B</span></code>, positive sum (usual coproduct with injections),</li>
+<li><code class="highlight coq"><span class="n">A</span> <span class="o">&amp;</span> <span class="n">B</span></code>, negative product (usual product with projections),</li>
+<li><code class="highlight coq"><span class="o">↓</span> <span class="n">A</span></code>, positive shift (thunking),</li>
+<li><code class="highlight coq"><span class="o">↑</span> <span class="n">A</span></code>, negative shift ('returners'),</li>
+<li><code class="highlight coq"><span class="o">⊖</span> <span class="n">A</span></code>, positive negation (approximately continuations accepting an <code class="highlight coq"><span class="n">A</span></code>),</li>
+<li><code class="highlight coq"><span class="o">¬</span> <span class="n">A</span></code>, negative negation (approximately refutations of <code class="highlight coq"><span class="n">A</span></code>).</li>
+</ul>
+<p>We opt for an explicit treatment of polarity, by indexing the family of types.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Inductive</span> <span class="nf">pre_ty</span> : pol -&gt; <span class="kt">Type</span> :=
+| Zer : pre_ty pos
+| Top : pre_ty neg
+| One : pre_ty pos
+| Bot : pre_ty neg
+| Tens : pre_ty pos -&gt; pre_ty pos -&gt; pre_ty pos
+| Par : pre_ty neg -&gt; pre_ty neg -&gt; pre_ty neg
+| Or : pre_ty pos -&gt; pre_ty pos -&gt; pre_ty pos
+| And : pre_ty neg -&gt; pre_ty neg -&gt; pre_ty neg
+| ShiftP : pre_ty neg -&gt; pre_ty pos
+| ShiftN : pre_ty pos -&gt; pre_ty neg
+| NegP : pre_ty neg -&gt; pre_ty pos
+| NegN : pre_ty pos -&gt; pre_ty neg
+.</span></span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;0&quot;</span> := (Zer) : ty_scope .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;1&quot;</span> := (One) : ty_scope .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;⊤&quot;</span> := (Top) : ty_scope .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;⊥&quot;</span> := (Bot) : ty_scope .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;A ⊗ B&quot;</span> := (Tens A B) (<span class="kn">at level</span> <span class="mi">40</span>) : ty_scope.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;A ⅋ B&quot;</span> := (Par A B) (<span class="kn">at level</span> <span class="mi">40</span>) : ty_scope .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;A ⊕ B&quot;</span> := (Or A B) (<span class="kn">at level</span> <span class="mi">40</span>) : ty_scope.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;A &amp; B&quot;</span> := (And A B) (<span class="kn">at level</span> <span class="mi">40</span>) : ty_scope.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;↓ A&quot;</span> := (ShiftP A) (<span class="kn">at level</span> <span class="mi">40</span>) : ty_scope.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;↑ A&quot;</span> := (ShiftN A) (<span class="kn">at level</span> <span class="mi">40</span>) : ty_scope.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;⊖ A&quot;</span> := (NegP A) (<span class="kn">at level</span> <span class="mi">5</span>) : ty_scope .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;¬ A&quot;</span> := (NegN A) (<span class="kn">at level</span> <span class="mi">5</span>) : ty_scope .</span></span></pre><p>As hinted above, we go for one-sided sequents. This enables to have only one context
+instead of two, simplifying the theory of substitution. On the flip-side, as we still
+need two kinds of variables, the 'normal' ones and the co-variables, our contexts will
+not contain bare types but side-annotated types. A variable of type <code class="highlight coq"><span class="n">A</span></code> will thus be
+stored as <code class="highlight coq"><span class="o">\`-</span><span class="n">A</span></code> in the context while a co-variable of type <code class="highlight coq"><span class="n">A</span></code> will be stored as <code class="highlight coq"><span class="o">\`-</span><span class="n">A</span></code>.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Variant</span> <span class="nf">ty</span> : <span class="kt">Type</span> :=
+| LTy {p} : pre_ty p -&gt; ty
+| RTy {p} : pre_ty p -&gt; ty
+.</span></span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;&#39;`+&#39; t&quot;</span> := (LTy t) (<span class="kn">at level</span> <span class="mi">5</span>) : ty_scope .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;&#39;`-&#39; t&quot;</span> := (RTy t) (<span class="kn">at level</span> <span class="mi">5</span>) : ty_scope .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">t_neg</span> : ty -&gt; ty :=
+  t_neg `+a := `-a ;
+  t_neg `-a := `+a .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;a †&quot;</span> := (t_neg a) (<span class="kn">at level</span> <span class="mi">5</span>) : ty_scope.</span></span></pre><p>Finally we define contexts as backward lists of side-annotated types.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><input class="alectryon-toggle" id="systemd-v-chk0" style="display: none" type="checkbox"><label class="alectryon-input" for="systemd-v-chk0"><span class="kn">Definition</span> <span class="nf">t_ctx</span> : <span class="kt">Type</span> := Ctx.ctx ty.</label><small class="alectryon-output"><div><div class="alectryon-messages"><blockquote class="alectryon-message">The reference Ctx.ctx was not found <span class="kr">in</span> the current
+environment.</blockquote></div></div></small></span></pre></div>
+<div class="section" id="terms">
+<h1>Terms</h1>
+<p>We define the well-typed syntax of the language with 3 mutually defined syntactic
+categories: terms, weak head-normal forms and states ('language configurations' in
+the paper).</p>
+<p>Nothing should be too surprising. A first notable point is that by choosing to have an
+explicit notion of 'side' of a variable, we can have a single construct
+for both mu and mu-tilde. A second notable point is our new slightly exotic <code class="highlight coq"><span class="n">RecL</span></code> and
+<code class="highlight coq"><span class="n">RecR</span></code> constructions. They allow arbitrary recursion at co-terms of positive types and
+at terms of negative types. These polarity restrictions allow us to have minimal
+disruption of the evaluation rules.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Inductive</span> <span class="nf">term</span> : t_ctx -&gt; ty -&gt; <span class="kt">Type</span> :=
+| Mu {Γ A} : state (Γ ▶ₓ A†) -&gt; term Γ A
+| RecL {Γ} {A : pre_ty pos} : term (Γ ▶ₓ `-A) `-A -&gt; term Γ `-A
+| RecR {Γ} {A : pre_ty neg} : term (Γ ▶ₓ `+A) `+A -&gt; term Γ `+A
+| Whn {Γ A} : whn Γ A -&gt; term Γ A
+<span class="kr">with</span> whn : t_ctx -&gt; ty -&gt; <span class="kt">Type</span> :=
+| Var {Γ A} : Γ ∋ A -&gt; whn Γ A
+| ZerL {Γ} : whn Γ `-<span class="mi">0</span>
+| TopR {Γ} : whn Γ `+⊤
+| OneR {Γ} : whn Γ `+<span class="mi">1</span>
+| OneL {Γ} : state Γ -&gt; whn Γ `-<span class="mi">1</span>
+| BotR {Γ} : state Γ -&gt; whn Γ `+⊥
+| BotL {Γ} : whn Γ `-⊥
+| TenR {Γ A B} : whn Γ `+A -&gt; whn Γ `+B -&gt; whn Γ `+(A ⊗ B)
+| TenL {Γ A B} : state (Γ ▶ₓ `+A ▶ₓ `+B) -&gt; whn Γ `-(A ⊗ B)
+| ParR {Γ A B} : state (Γ ▶ₓ `-A ▶ₓ `-B) -&gt; whn Γ `+(A ⅋ B)
+| ParL {Γ A B} : whn Γ `-A -&gt; whn Γ `-B -&gt; whn Γ `-(A ⅋ B)
+| OrR1 {Γ A B} : whn Γ `+A -&gt; whn Γ `+(A ⊕ B)
+| OrR2 {Γ A B} : whn Γ `+B -&gt; whn Γ `+(A ⊕ B)
+| OrL {Γ A B} : state (Γ ▶ₓ `+A) -&gt; state (Γ ▶ₓ `+B) -&gt; whn Γ `-(A ⊕ B)
+| AndR {Γ A B} : state (Γ ▶ₓ `-A) -&gt; state (Γ ▶ₓ `-B) -&gt; whn Γ `+(A &amp; B)
+| AndL1 {Γ A B} : whn Γ `-A -&gt; whn Γ `-(A &amp; B)
+| AndL2 {Γ A B} : whn Γ `-B -&gt; whn Γ `-(A &amp; B)
+| ShiftPR {Γ A} : term Γ `+A -&gt; whn Γ `+(↓ A)
+| ShiftPL {Γ A} : state (Γ ▶ₓ `+A) -&gt; whn Γ `-(↓ A)
+| ShiftNR {Γ A} : state (Γ ▶ₓ `-A) -&gt; whn Γ `+(↑ A)
+| ShiftNL {Γ A} : term Γ `-A -&gt; whn Γ `-(↑ A)
+| NegPR {Γ A} : whn Γ `-A -&gt; whn Γ `+(⊖ A)
+| NegPL {Γ A} : state (Γ ▶ₓ `-A) -&gt; whn Γ `-(⊖ A)
+| NegNR {Γ A} : state (Γ ▶ₓ `+A) -&gt; whn Γ `+(¬ A)
+| NegNL {Γ A} : whn Γ `+A -&gt; whn Γ `-(¬ A)
+<span class="kr">with</span> state : t_ctx -&gt; <span class="kt">Type</span> :=
+| Cut {Γ} p {A : pre_ty p} : term Γ `+A -&gt; term Γ `-A -&gt; state Γ
+.
+
+<span class="kn">Definition</span> <span class="nf">Cut&#39;</span> {<span class="nv">Γ</span> <span class="nv">A</span>} : term Γ A -&gt; term Γ A† -&gt; state Γ :=
+  <span class="kr">match</span> A <span class="kr">with</span>
+  | `+A =&gt; <span class="kr">fun</span> <span class="nv">t1</span> <span class="nv">t2</span> =&gt; Cut _ t1 t2
+  | `-A =&gt; <span class="kr">fun</span> <span class="nv">t1</span> <span class="nv">t2</span> =&gt; Cut _ t2 t1
+  <span class="kr">end</span> .</span></pre><p>Values are not exactly weak head-normal forms, but depend on the polarity of the type.
+As positive types have CBV evaluation, their values are weak head-normal forms, but their
+co-values (evaluation contexts) are just any co-term (context) as they are delayed anyways.
+Dually for negative types, values are delayed hence can be any term while co-values must
+be weak head-normal form contexts.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">val</span> : t_ctx -&gt; ty -&gt; <span class="kt">Type</span> :=
+  val Γ (@LTy pos A) := whn Γ `+A ;
+  val Γ (@RTy pos A) := term Γ `-A ;
+  val Γ (@LTy neg A) := term Γ `+A ;
+  val Γ (@RTy neg A) := whn Γ `-A .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Arguments</span> val _ _ /.</span></span></pre><p>We provide a 'smart-constructor' for variables, embedding variables in values.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">var</span> : c_var ⇒<span class="err">₁</span> val :=
+  var _ (@LTy pos _) i := Var i ;
+  var _ (@RTy pos _) i := Whn (Var i) ;
+  var _ (@LTy neg _) i := Whn (Var i) ;
+  var _ (@RTy neg _) i := Var i .
+#[<span class="kn">global</span>] <span class="kn">Arguments</span> var {Γ} [x] / i.</span></pre></div>
+<div class="section" id="renaming">
+<h1>Renaming</h1>
+<p>Without surprise parallel renaming goes by a big mutual induction, shifting the renaming
+apropriately while going under binders. Note the use of the internal substitution hom
+to type it.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">t_rename</span> : term ⇒<span class="err">₁</span> ⟦ c_var , term ⟧<span class="err">₁</span> :=
+  t_rename _ _ (Mu c)    _ f := Mu (s_rename _ c _ (r_shift1 f)) ;
+  t_rename _ _ (RecL t)  _ f := RecL (t_rename _ _ t _ (r_shift1 f)) ;
+  t_rename _ _ (RecR t)  _ f := RecR (t_rename _ _ t _ (r_shift1 f)) ;
+  t_rename _ _ (Whn v)   _ f := Whn (w_rename _ _ v _ f) ;
+<span class="kr">with</span> w_rename : whn ⇒<span class="err">₁</span> ⟦ c_var , whn ⟧<span class="err">₁</span> :=
+  w_rename _  _ (Var i)       _ f := Var (f _ i) ;
+  w_rename _  _ (ZerL)        _ f := ZerL ;
+  w_rename _  _ (TopR)        _ f := TopR ;
+  w_rename _  _ (OneR)        _ f := OneR ;
+  w_rename _  _ (OneL c)      _ f := OneL (s_rename _ c _ f) ;
+  w_rename _  _ (BotR c)      _ f := BotR (s_rename _ c _ f) ;
+  w_rename _  _ (BotL)        _ f := BotL ;
+  w_rename _  _ (TenR v1 v2)  _ f := TenR (w_rename _ _ v1 _ f) (w_rename _ _ v2 _ f) ;
+  w_rename _  _ (TenL c)      _ f := TenL (s_rename _ c _ (r_shift2 f)) ;
+  w_rename _  _ (ParR c)      _ f := ParR (s_rename _ c _ (r_shift2 f)) ;
+  w_rename _  _ (ParL k1 k2)  _ f := ParL (w_rename _ _ k1 _ f) (w_rename _ _ k2 _ f) ;
+  w_rename _  _ (OrR1 v)      _ f := OrR1 (w_rename _ _ v _ f) ;
+  w_rename _  _ (OrR2 v)      _ f := OrR2 (w_rename _ _ v _ f) ;
+  w_rename _  _ (OrL c1 c2)   _ f := OrL (s_rename _ c1 _ (r_shift1 f))
+                                         (s_rename _ c2 _ (r_shift1 f)) ;
+  w_rename _  _ (AndR c1 c2)  _ f := AndR (s_rename _ c1 _ (r_shift1 f))
+                                          (s_rename _ c2 _ (r_shift1 f)) ;
+  w_rename _  _ (AndL1 k)     _ f := AndL1 (w_rename _ _ k _ f) ;
+  w_rename _  _ (AndL2 k)     _ f := AndL2 (w_rename _ _ k _ f) ;
+  w_rename _  _ (ShiftPR t)   _ f := ShiftPR (t_rename _ _ t _ f) ;
+  w_rename _  _ (ShiftPL c)   _ f := ShiftPL (s_rename _ c _ (r_shift1 f)) ;
+  w_rename _  _ (ShiftNR c)   _ f := ShiftNR (s_rename _ c _ (r_shift1 f)) ;
+  w_rename _  _ (ShiftNL t)   _ f := ShiftNL (t_rename _ _ t _ f) ;
+  w_rename _  _ (NegPR k)     _ f := NegPR (w_rename _ _ k _ f) ;
+  w_rename _  _ (NegPL c)     _ f := NegPL (s_rename _ c _ (r_shift1 f)) ;
+  w_rename _  _ (NegNR c)     _ f := NegNR (s_rename _ c _ (r_shift1 f)) ;
+  w_rename _  _ (NegNL v)     _ f := NegNL (w_rename _ _ v _ f) ;
+<span class="kr">with</span> s_rename : state ⇒<span class="err">₀</span> ⟦ c_var , state ⟧<span class="err">₀</span> :=
+  s_rename _ (Cut _ v k) _ f := Cut _ (t_rename _ _ v _ f) (t_rename _ _ k _ f) .</span></pre><p>We extend it to values...</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">v_rename</span> : val ⇒<span class="err">₁</span> ⟦ c_var , val ⟧<span class="err">₁</span> :=
+  v_rename _ (@LTy pos a) := w_rename _ _ ;
+  v_rename _ (@RTy pos a) := t_rename _ _ ;
+  v_rename _ (@LTy neg a) := t_rename _ _ ;
+  v_rename _ (@RTy neg a) := w_rename _ _ .</span></pre><p>... provide a couple infix notations...</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Notation</span> <span class="s2">&quot;t ₜ⊛ᵣ r&quot;</span> := (t_rename _ _ t _ r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;w `ᵥ⊛ᵣ r&quot;</span> := (w_rename _ _ w _ r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;v ᵥ⊛ᵣ r&quot;</span> := (v_rename _ _ v _ r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;s ₛ⊛ᵣ r&quot;</span> := (s_rename _ s _ r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>).</span></pre><p>... and extend it to assignments.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">a_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} : Γ1 =[val]&gt; Γ2 -&gt; Γ2 ⊆ Γ3 -&gt; Γ1 =[val]&gt; Γ3 :=
+  <span class="kr">fun</span> <span class="nv">f</span> <span class="nv">g</span> <span class="nv">_</span> <span class="nv">i</span> =&gt; v_rename _ _ (f _ i) _ g .
+<span class="kn">Arguments</span> a_ren {_ _ _} _ _ _ _ /.
+<span class="kn">Notation</span> <span class="s2">&quot;a ⊛ᵣ r&quot;</span> := (a_ren a r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>) : asgn_scope.</span></pre><p>The following bunch of shifting functions will help us define parallel substitution.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">t_shift1</span> {<span class="nv">Γ</span> <span class="nv">y</span>} : term Γ ⇒ᵢ term (Γ ▶ₓ y)  := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">t</span> =&gt; t ₜ⊛ᵣ r_pop.
+<span class="kn">Definition</span> <span class="nf">w_shift1</span> {<span class="nv">Γ</span> <span class="nv">y</span>} : whn Γ ⇒ᵢ whn (Γ ▶ₓ y)    := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">w</span> =&gt; w `ᵥ⊛ᵣ r_pop.
+<span class="kn">Definition</span> <span class="nf">s_shift1</span> {<span class="nv">Γ</span> <span class="nv">y</span>} : state Γ -&gt; state (Γ ▶ₓ y) := <span class="kr">fun</span> <span class="nv">s</span> =&gt; s ₛ⊛ᵣ r_pop.
+<span class="kn">Definition</span> <span class="nf">v_shift1</span> {<span class="nv">Γ</span> <span class="nv">y</span>} : val Γ ⇒ᵢ val (Γ ▶ₓ y)    := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">v</span> =&gt; v ᵥ⊛ᵣ r_pop.
+<span class="kn">Definition</span> <span class="nf">v_shift2</span> {<span class="nv">Γ</span> <span class="nv">y</span> <span class="nv">z</span>} : val Γ ⇒ᵢ val (Γ ▶ₓ y ▶ₓ z) := <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">v</span> =&gt; v ᵥ⊛ᵣ (r_pop ᵣ⊛ r_pop).
+<span class="kn">Definition</span> <span class="nf">a_shift1</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} [y] (a : Γ =[val]&gt; Δ) : (Γ ▶ₓ y) =[val]&gt; (Δ ▶ₓ y)
+  := [ <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">i</span> =&gt; v_shift1 _ (a _ i) ,ₓ var top ].
+<span class="kn">Definition</span> <span class="nf">a_shift2</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} [y z] (a : Γ =[val]&gt; Δ) : (Γ ▶ₓ y ▶ₓ z) =[val]&gt; (Δ ▶ₓ y ▶ₓ z)
+  := [ [ <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">i</span> =&gt; v_shift2 _ (a _ i) ,ₓ var (pop top) ] ,ₓ var top ].</span></pre><p>We also define two embeddings linking the various syntactical categories.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">v_of_w</span> <span class="nv">Γ</span> <span class="nv">A</span> : whn Γ A -&gt; val Γ A :=
+  v_of_w _ (@LTy pos _) v := v ;
+  v_of_w _ (@RTy pos _) u := Whn u ;
+  v_of_w _ (@LTy neg _) u := Whn u ;
+  v_of_w _ (@RTy neg _) k := k .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Arguments</span> v_of_w {Γ A} v.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Coercion</span> <span class="nf">v_of_w</span> : whn &gt;-&gt; val.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">t_of_v</span> <span class="nv">Γ</span> <span class="nv">A</span> : val Γ A -&gt; term Γ A :=
+  t_of_v _ (@LTy pos _) v := Whn v ;
+  t_of_v _ (@RTy pos _) u := u ;
+  t_of_v _ (@LTy neg _) u := u ;
+  t_of_v _ (@RTy neg _) k := Whn k .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Arguments</span> t_of_v {Γ A} v.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Coercion</span> <span class="nf">t_of_v</span> : val &gt;-&gt; term.</span></span></pre></div>
+<div class="section" id="substitution">
+<h1>Substitution</h1>
+<p>Having done with renaming, we reapply the same pattern to define parallel substitution.
+Note that substituting a weak head-normal form with values may not yield a weak
+head-normal form, but only a value!</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">t_subst</span> : term ⇒<span class="err">₁</span> ⟦ val , term ⟧<span class="err">₁</span> :=
+  t_subst _ _ (Mu c)    _ f := Mu (s_subst _ c _ (a_shift1 f)) ;
+  t_subst _ _ (RecL t)  _ f := RecL (t_subst _ _ t _ (a_shift1 f)) ;
+  t_subst _ _ (RecR t)  _ f := RecR (t_subst _ _ t _ (a_shift1 f)) ;
+  t_subst _ _ (Whn v)   _ f := w_subst _ _ v _ f ;
+<span class="kr">with</span> w_subst : whn ⇒<span class="err">₁</span> ⟦ val , val ⟧<span class="err">₁</span> :=
+  w_subst _  _ (Var i)      _ f := f _ i ;
+  w_subst _  _ (ZerL)       _ f := Whn ZerL ;
+  w_subst _  _ (TopR)       _ f := Whn TopR ;
+  w_subst _  _ (OneR)       _ f := OneR ;
+  w_subst _  _ (OneL c)     _ f := Whn (OneL (s_subst _ c _ f)) ;
+  w_subst _  _ (BotR c)     _ f := Whn (BotR (s_subst _ c _ f)) ;
+  w_subst _  _ (BotL)       _ f := BotL ;
+  w_subst _  _ (TenR v1 v2) _ f := TenR (w_subst _ _ v1 _ f) (w_subst _ _ v2 _ f) ;
+  w_subst _  _ (TenL c)     _ f := Whn (TenL (s_subst _ c _ (a_shift2 f))) ;
+  w_subst _  _ (ParR c)     _ f := Whn (ParR (s_subst _ c _ (a_shift2 f))) ;
+  w_subst _  _ (ParL k1 k2) _ f := ParL (w_subst _ _ k1 _ f) (w_subst _ _ k2 _ f) ;
+  w_subst _  _ (OrR1 v)     _ f := OrR1 (w_subst _ _ v _ f) ;
+  w_subst _  _ (OrR2 v)     _ f := OrR2 (w_subst _ _ v _ f) ;
+  w_subst _  _ (OrL c1 c2)  _ f := Whn (OrL (s_subst _ c1 _ (a_shift1 f))
+                                            (s_subst _ c2 _ (a_shift1 f))) ;
+  w_subst _  _ (AndR c1 c2) _ f := Whn (AndR (s_subst _ c1 _ (a_shift1 f))
+                                             (s_subst _ c2 _ (a_shift1 f))) ;
+  w_subst _  _ (AndL1 k)    _ f := AndL1 (w_subst _ _ k _ f) ;
+  w_subst _  _ (AndL2 k)    _ f := AndL2 (w_subst _ _ k _ f) ;
+  w_subst _  _ (ShiftPR t)  _ f := ShiftPR (t_subst _ _ t _ f) ;
+  w_subst _  _ (ShiftPL c)  _ f := Whn (ShiftPL (s_subst _ c _ (a_shift1 f))) ;
+  w_subst _  _ (ShiftNR c)  _ f := Whn (ShiftNR (s_subst _ c _ (a_shift1 f))) ;
+  w_subst _  _ (ShiftNL t)  _ f := ShiftNL (t_subst _ _ t _ f) ;
+  w_subst _  _ (NegPR k)    _ f := NegPR (w_subst _ _ k _ f) ;
+  w_subst _  _ (NegPL c)    _ f := Whn (NegPL (s_subst _ c _ (a_shift1 f))) ;
+  w_subst _  _ (NegNR c)    _ f := Whn (NegNR (s_subst _ c _ (a_shift1 f))) ;
+  w_subst _  _ (NegNL v)    _ f := NegNL (w_subst _ _ v _ f) ;
+<span class="kr">with</span> s_subst : state ⇒<span class="err">₀</span> ⟦ val , state ⟧<span class="err">₀</span> :=
+   s_subst _ (Cut p v k) _ f := Cut p (t_subst _ _ v _ f) (t_subst _ _ k _ f) .
+
+<span class="kn">Notation</span> <span class="s2">&quot;t `ₜ⊛ a&quot;</span> := (t_subst _ _ t _ a%asgn) (<span class="kn">at level</span> <span class="mi">30</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;w `ᵥ⊛ a&quot;</span> := (w_subst _ _ w _ a%asgn) (<span class="kn">at level</span> <span class="mi">30</span>).
+
+<span class="kn">Equations</span> <span class="nf">v_subst</span> : val ⇒<span class="err">₁</span> ⟦ val , val ⟧<span class="err">₁</span> :=
+  v_subst _ (@LTy pos a) v _ f := v `ᵥ⊛ f ;
+  v_subst _ (@RTy pos a) t _ f := t `ₜ⊛ f ;
+  v_subst _ (@LTy neg a) t _ f := t `ₜ⊛ f ;
+  v_subst _ (@RTy neg a) k _ f := k `ᵥ⊛ f .</span></pre><p>With this in hand we can instanciate the relevant part of substitution monoid and module
+structures for values and states. This will provide us with the missing infix notations.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">val_m_monoid</span> : subst_monoid val :=
+  {| v_var := @var ; v_sub := v_subst |} .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">state_module</span> : subst_module val state :=
+  {| c_sub := s_subst |} .</span></span></pre><p>We now define helpers for substituting the top one or top two variables from a context.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">asgn1</span> {<span class="nv">Γ</span> <span class="nv">a</span>} (<span class="nv">v</span> : val Γ a) : (Γ ▶ₓ a) =[val]&gt; Γ := [ var ,ₓ v ] .
+<span class="kn">Definition</span> <span class="nf">asgn2</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">b</span>} (<span class="nv">v1</span> : val Γ a) (<span class="nv">v2</span> : val Γ b) : (Γ ▶ₓ a ▶ₓ b) =[val]&gt; Γ
+  := [ [ var ,ₓ v1 ] ,ₓ v2 ].
+
+<span class="kn">Arguments</span> asgn1 {_ _} &amp; _.
+<span class="kn">Arguments</span> asgn2 {_ _ _} &amp; _ _.
+
+<span class="kn">Notation</span> <span class="s2">&quot;₁[ v ]&quot;</span> := (asgn1 v).
+<span class="kn">Notation</span> <span class="s2">&quot;₂[ v1 , v2 ]&quot;</span> := (asgn2 v1 v2).</span></pre></div>
+<div class="section" id="observations">
+<h1>Observations</h1>
+<p>When defining (co-)patterns, we will enforce a form of focalisation, where no negative
+variables are introduced. In this context, 'negative' is a new notion applying to
+side-annotated types, mixing both type polarity and side annotation: a side-annotated
+variable is positive iff it is a positive variable or a negative co-variable.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">is_neg</span> : ty -&gt; <span class="kt">SProp</span> :=
+  is_neg (@LTy pos a) := sEmpty ;
+  is_neg (@RTy pos a) := sUnit ;
+  is_neg (@LTy neg a) := sUnit ;
+  is_neg (@RTy neg a) := sEmpty .</span></span></pre><p>We define negative types as a subset of types, and negative contexts as a subset of
+contexts. Our generic infrastructure for contexts and variables really shines here as
+the type of variables in a negative context is convertible to the type of variables in
+the underlying context. See <code class="highlight coq"><span class="n">Ctx</span><span class="o">/</span><span class="n">Subset</span><span class="o">.</span><span class="n">v</span></code>.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">neg_ty</span> : <span class="kt">Type</span> := sigS is_neg.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">neg_coe</span> : neg_ty -&gt; ty := sub_elt.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Global Coercion</span> <span class="nf">neg_coe</span> : neg_ty &gt;-&gt; ty.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">neg_ctx</span> : <span class="kt">Type</span> := ctxS ty t_ctx is_neg.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">neg_c_coe</span> : neg_ctx -&gt; ctx ty := sub_elt.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Global Coercion</span> <span class="nf">neg_c_coe</span> : neg_ctx &gt;-&gt; ctx.</span></span></pre><p>We can now define patterns...</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Inductive</span> <span class="nf">pat</span> : ty -&gt; <span class="kt">Type</span> :=
+| PVarP (A : pre_ty neg) : pat `+A
+| PVarN (A : pre_ty pos) : pat `-A
+| POne : pat `+<span class="mi">1</span>
+| PBot : pat `-⊥
+| PTen {A B} : pat `+A -&gt; pat `+B -&gt; pat `+(A ⊗ B)
+| PPar {A B} : pat `-A -&gt; pat `-B -&gt; pat `-(A ⅋ B)
+| POr1 {A B} : pat `+A -&gt; pat `+(A ⊕ B)
+| POr2 {A B} : pat `+B -&gt; pat `+(A ⊕ B)
+| PAnd1 {A B} : pat `-A -&gt; pat `-(A &amp; B)
+| PAnd2 {A B} : pat `-B -&gt; pat `-(A &amp; B)
+| PShiftP A : pat `+(↓ A)
+| PShiftN A : pat `-(↑ A)
+| PNegP {A} : pat `-A -&gt; pat `+(⊖ A)
+| PNegN {A} : pat `+A -&gt; pat `-(¬ A)
+.</span></span></pre><p>... and their domain, i.e. the context they bind.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">p_dom</span> {<span class="nv">t</span>} : pat t -&gt; neg_ctx :=
+  p_dom (PVarP A)    := ∅ₛ ▶ₛ {| sub_elt := `+A ; sub_prf := stt |} ;
+  p_dom (PVarN A)    := ∅ₛ ▶ₛ {| sub_elt := `-A ; sub_prf := stt |} ;
+  p_dom (POne)       := ∅ₛ ;
+  p_dom (PBot)       := ∅ₛ ;
+  p_dom (PTen p1 p2) := p_dom p1 +▶ₛ p_dom p2 ;
+  p_dom (PPar p1 p2) := p_dom p1 +▶ₛ p_dom p2 ;
+  p_dom (POr1 p)     := p_dom p ;
+  p_dom (POr2 p)     := p_dom p ;
+  p_dom (PAnd1 p)    := p_dom p ;
+  p_dom (PAnd2 p)    := p_dom p ;
+  p_dom (PShiftP A)  := ∅ₛ ▶ₛ {| sub_elt := `+A ; sub_prf := stt |} ;
+  p_dom (PShiftN A)  := ∅ₛ ▶ₛ {| sub_elt := `-A ; sub_prf := stt |} ;
+  p_dom (PNegP p)    := p_dom p ;
+  p_dom (PNegN p)    := p_dom p .</span></pre><p>We finally instanciate the observation structure. Note that our generic formalization
+mostly cares about 'observations', that is co-patterns. As such we instanciate observations
+by patterns at the dual type.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">obs_op</span> : Oper ty neg_ctx :=
+  {| o_op A := pat A† ; o_dom _ p := p_dom p |} .</span></span></pre><p>Now come a rather tedious set of embeddings between syntactic categories related to
+patterns. We start by embedding patterns into weak head-normal forms.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">w_of_p</span> {<span class="nv">a</span>} (<span class="nv">p</span> : pat a) : whn (p_dom p) a :=
+  w_of_p (PVarP _)    := Var top ;
+  w_of_p (PVarN _)    := Var top ;
+  w_of_p (POne)       := OneR ;
+  w_of_p (PBot)       := BotL ;
+  w_of_p (PTen p1 p2) := TenR (w_of_p p1 `ᵥ⊛ᵣ r_cat_l) (w_of_p p2 `ᵥ⊛ᵣ r_cat_r) ;
+  w_of_p (PPar p1 p2) := ParL (w_of_p p1 `ᵥ⊛ᵣ r_cat_l) (w_of_p p2 `ᵥ⊛ᵣ r_cat_r) ;
+  w_of_p (POr1 p)     := OrR1 (w_of_p p) ;
+  w_of_p (POr2 p)     := OrR2 (w_of_p p) ;
+  w_of_p (PAnd1 p)    := AndL1 (w_of_p p) ;
+  w_of_p (PAnd2 p)    := AndL2 (w_of_p p) ;
+  w_of_p (PShiftP _)  := ShiftPR (Whn (Var top)) ;
+  w_of_p (PShiftN _)  := ShiftNL (Whn (Var top)) ;
+  w_of_p (PNegP p)    := NegPR (w_of_p p) ;
+  w_of_p (PNegN p)    := NegNL (w_of_p p) .
+#[<span class="kn">global</span>] <span class="kn">Coercion</span> <span class="nf">w_of_p</span> : pat &gt;-&gt; whn.</span></pre><p>Now we explain how to split (some) weak head-normal forms into a pattern filled with
+values. I am sorry in advance for your CPU-cycles wasted to typechecking these quite
+hard dependent pattern matchings. We start off by two helpers for refuting impossible
+variables in negative context, which because of the use of <code class="highlight coq"><span class="kt">SProp</span></code> give trouble to
+<code class="highlight coq"><span class="kn">Equations</span></code> for deriving functional elimination principles if inlined.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">elim_var_p</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span> : pre_ty pos} {<span class="nv">X</span> : <span class="kt">Type</span>} : Γ ∋ `+A -&gt; X
+  := <span class="kr">fun</span> <span class="nv">i</span> =&gt; <span class="kr">match</span> s_prf i <span class="kr">with</span> <span class="kr">end</span> .
+
+<span class="kn">Definition</span> <span class="nf">elim_var_n</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span> : pre_ty neg} {<span class="nv">X</span> : <span class="kt">Type</span>} : Γ ∋ `-A -&gt; X
+  := <span class="kr">fun</span> <span class="nv">i</span> =&gt; <span class="kr">match</span> s_prf i <span class="kr">with</span> <span class="kr">end</span> .
+
+<span class="kn">Equations</span> <span class="nf">p_of_w_0p</span> {<span class="nv">Γ</span> : neg_ctx} (<span class="nv">A</span> : pre_ty pos) : whn Γ `+A -&gt; pat `+A :=
+  p_of_w_0p (<span class="mi">0</span>)     (Var i)      := elim_var_p i ;
+  p_of_w_0p (<span class="mi">1</span>)     (Var i)      := elim_var_p i ;
+  p_of_w_0p (A ⊗ B) (Var i)      := elim_var_p i ;
+  p_of_w_0p (A ⊕ B) (Var i)      := elim_var_p i ;
+  p_of_w_0p (↓ A)   (Var i)      := elim_var_p i ;
+  p_of_w_0p (⊖ A)   (Var i)      := elim_var_p i ;
+  p_of_w_0p (<span class="mi">1</span>)     (OneR)       := POne ;
+  p_of_w_0p (A ⊗ B) (TenR v1 v2) := PTen (p_of_w_0p A v1) (p_of_w_0p B v2) ;
+  p_of_w_0p (A ⊕ B) (OrR1 v)     := POr1 (p_of_w_0p A v) ;
+  p_of_w_0p (A ⊕ B) (OrR2 v)     := POr2 (p_of_w_0p B v) ;
+  p_of_w_0p (↓ A)   (ShiftPR _)  := PShiftP A ;
+  p_of_w_0p (⊖ A)   (NegPR k)    := PNegP (p_of_w_0n A k) ;
+<span class="kr">with</span> p_of_w_0n {Γ : neg_ctx} (A : pre_ty neg) : whn Γ `-A -&gt; pat `-A :=
+  p_of_w_0n (⊤)     (Var i)      := elim_var_n i ;
+  p_of_w_0n (⊥)     (Var i)      := elim_var_n i ;
+  p_of_w_0n (A ⅋ B) (Var i)      := elim_var_n i ;
+  p_of_w_0n (A &amp; B) (Var i)      := elim_var_n i ;
+  p_of_w_0n (↑ A)   (Var i)      := elim_var_n i ;
+  p_of_w_0n (¬ A)   (Var i)      := elim_var_n i ;
+  p_of_w_0n (⊥)     (BotL)       := PBot ;
+  p_of_w_0n (A ⅋ B) (ParL k1 k2) := PPar (p_of_w_0n A k1) (p_of_w_0n B k2) ;
+  p_of_w_0n (A &amp; B) (AndL1 k)    := PAnd1 (p_of_w_0n A k) ;
+  p_of_w_0n (A &amp; B) (AndL2 k)    := PAnd2 (p_of_w_0n B k) ;
+  p_of_w_0n (↑ A)   (ShiftNL _)  := PShiftN A ;
+  p_of_w_0n (¬ A)   (NegNL v)    := PNegN (p_of_w_0p A v) .
+
+<span class="kn">Equations</span> <span class="nf">p_dom_of_w_0p</span> {<span class="nv">Γ</span> : neg_ctx} (<span class="nv">A</span> : pre_ty pos) (<span class="nv">v</span> : whn Γ `+A)
+          : p_dom (p_of_w_0p A v) =[val]&gt; Γ <span class="bp">by</span> <span class="kr">struct</span> A :=
+  p_dom_of_w_0p (<span class="mi">0</span>)     (Var i)      := elim_var_p i ;
+  p_dom_of_w_0p (<span class="mi">1</span>)     (Var i)      := elim_var_p i ;
+  p_dom_of_w_0p (A ⊗ B) (Var i)      := elim_var_p i ;
+  p_dom_of_w_0p (A ⊕ B) (Var i)      := elim_var_p i ;
+  p_dom_of_w_0p (↓ A)   (Var i)      := elim_var_p i ;
+  p_dom_of_w_0p (⊖ A)   (Var i)      := elim_var_p i ;
+  p_dom_of_w_0p (<span class="mi">1</span>)     (OneR)       := a_empty ;
+  p_dom_of_w_0p (A ⊗ B) (TenR v1 v2) := [ p_dom_of_w_0p A v1 , p_dom_of_w_0p B v2 ] ;
+  p_dom_of_w_0p (A ⊕ B) (OrR1 v)     := p_dom_of_w_0p A v ;
+  p_dom_of_w_0p (A ⊕ B) (OrR2 v)     := p_dom_of_w_0p B v ;
+  p_dom_of_w_0p (↓ A)   (ShiftPR x)  := a_append a_empty x ;
+  p_dom_of_w_0p (⊖ A)   (NegPR k)    := p_dom_of_w_0n A k ;
+     <span class="kr">with</span> p_dom_of_w_0n {Γ : neg_ctx} (A : pre_ty neg) (k : whn Γ `-A)
+          : p_dom (p_of_w_0n A k) =[val]&gt; Γ <span class="bp">by</span> <span class="kr">struct</span> A :=
+  p_dom_of_w_0n (⊤)     (Var i)      := elim_var_n i ;
+  p_dom_of_w_0n (⊥)     (Var i)      := elim_var_n i ;
+  p_dom_of_w_0n (A ⅋ B) (Var i)      := elim_var_n i ;
+  p_dom_of_w_0n (A &amp; B) (Var i)      := elim_var_n i ;
+  p_dom_of_w_0n (↑ A)   (Var i)      := elim_var_n i ;
+  p_dom_of_w_0n (¬ A)   (Var i)      := elim_var_n i ;
+  p_dom_of_w_0n (⊥)     (BotL)       := a_empty ;
+  p_dom_of_w_0n (A ⅋ B) (ParL k1 k2) := [ p_dom_of_w_0n A k1 , p_dom_of_w_0n B k2 ] ;
+  p_dom_of_w_0n (A &amp; B) (AndL1 k)    := p_dom_of_w_0n A k ;
+  p_dom_of_w_0n (A &amp; B) (AndL2 k)    := p_dom_of_w_0n B k ;
+  p_dom_of_w_0n (↑ A)   (ShiftNL x)  := a_append a_empty x ;
+  p_dom_of_w_0n (¬ A)   (NegNL v)    := p_dom_of_w_0p A v .</span></pre><p>We can now package up all these auxiliary functions into the following ones, abstracting
+polarity and side-annotation.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">p_of_v</span> {<span class="nv">Γ</span> : neg_ctx} <span class="nv">A</span> : val Γ A -&gt; pat A :=
+  p_of_v (@LTy pos A) v := p_of_w_0p A v ;
+  p_of_v (@RTy pos A) _ := PVarN A ;
+  p_of_v (@LTy neg A) _ := PVarP A ;
+  p_of_v (@RTy neg A) k := p_of_w_0n A k .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+<span class="kn">Equations</span> <span class="nf">p_dom_of_v</span> {<span class="nv">Γ</span> : neg_ctx} <span class="nv">A</span> (<span class="nv">v</span> : val Γ A) : p_dom (p_of_v A v) =[val]&gt; Γ :=
+  p_dom_of_v (@LTy pos A) v := p_dom_of_w_0p A v ;
+  p_dom_of_v (@RTy pos A) x := [ ! ,ₓ x ] ;
+  p_dom_of_v (@LTy neg A) x := [ ! ,ₓ x ] ;
+  p_dom_of_v (@RTy neg A) k := p_dom_of_w_0n A k .
+
+<span class="kn">Definition</span> <span class="nf">v_split_p</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span>} (<span class="nv">v</span> : whn Γ `+A) : (obs_op # val) Γ `-A
+  := (p_of_w_0p A v : o_op obs_op `-A) ⦇ p_dom_of_w_0p A v ⦈.
+
+<span class="kn">Definition</span> <span class="nf">v_split_n</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span>} (<span class="nv">v</span> : whn Γ `-A) : (obs_op # val) Γ `+A
+  := (p_of_w_0n A v : o_op obs_op `+_) ⦇ p_dom_of_w_0n A v ⦈.</span></pre></div>
+<div class="section" id="evaluation">
+<h1>Evaluation</h1>
+<p>With patterns and observations now in hand we prepare for the definition of evaluation
+and define a shorthand for normal forms. 'Normal forms' are here understood---as in the
+paper---in our slightly non-standard presentation of triplets of a variable, an
+observation and an assignment.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">nf</span> : Fam₀ ty neg_ctx := c_var ∥ₛ (obs_op # val).</span></pre><p>Now the bulk of evaluation: the step function. Once again we are greatful for
+<code class="highlight coq"><span class="kn">Equations</span></code> providing us with a justification for the fact that this complex
+dependent pattern-matching is indeed total.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">eval_aux</span> {<span class="nv">Γ</span> : neg_ctx} : state Γ -&gt; (state Γ + nf Γ) :=
+  eval_aux (Cut pos (Mu c)  (x))    := inl (c ₜ⊛ <span class="err">₁</span>[ x ]) ;
+  eval_aux (Cut neg (x)     (Mu c)) := inl (c ₜ⊛ <span class="err">₁</span>[ x ]) ;
+
+  eval_aux (Cut pos (Whn v) (Mu c))  := inl (c ₜ⊛ <span class="err">₁</span>[ v ]) ;
+  eval_aux (Cut neg (Mu c)  (Whn k)) := inl (c ₜ⊛ <span class="err">₁</span>[ k ]) ;
+
+  eval_aux (Cut pos (Whn v)  (RecL k)) := inl (Cut pos (Whn v) (k `ₜ⊛ <span class="err">₁</span>[ RecL k ])) ;
+  eval_aux (Cut neg (RecR t) (Whn k))  := inl (Cut neg (t `ₜ⊛ <span class="err">₁</span>[ RecR t ]) (Whn k)) ;
+
+  eval_aux (Cut pos (Whn v)       (Whn (Var i))) := inr (s_var_upg i ⋅ v_split_p v) ;
+  eval_aux (Cut neg (Whn (Var i)) (Whn k))       := inr (s_var_upg i ⋅ v_split_n k) ;
+
+  eval_aux (Cut pos (Whn (Var i)) (Whn _))       := elim_var_p i ;
+  eval_aux (Cut neg (Whn _)       (Whn (Var i))) := elim_var_n i ;
+
+  eval_aux (Cut pos (Whn (OneR))       (Whn (OneL c)))     := inl c ;
+  eval_aux (Cut neg (Whn (BotR c))     (Whn (BotL)))       := inl c ;
+  eval_aux (Cut pos (Whn (TenR v1 v2)) (Whn (TenL c)))     := inl (c ₜ⊛ <span class="err">₂</span>[ v1 , v2 ]) ;
+  eval_aux (Cut neg (Whn (ParR c))     (Whn (ParL k1 k2))) := inl (c ₜ⊛ <span class="err">₂</span>[ k1 , k2 ]) ;
+  eval_aux (Cut pos (Whn (OrR1 v))     (Whn (OrL c1 c2)))  := inl (c1 ₜ⊛ <span class="err">₁</span>[ v ]) ;
+  eval_aux (Cut pos (Whn (OrR2 v))     (Whn (OrL c1 c2)))  := inl (c2 ₜ⊛ <span class="err">₁</span>[ v ]) ;
+  eval_aux (Cut neg (Whn (AndR c1 c2)) (Whn (AndL1 k)))    := inl (c1 ₜ⊛ <span class="err">₁</span>[ k ]) ;
+  eval_aux (Cut neg (Whn (AndR c1 c2)) (Whn (AndL2 k)))    := inl (c2 ₜ⊛ <span class="err">₁</span>[ k ]) ;
+  eval_aux (Cut pos (Whn (ShiftPR x))  (Whn (ShiftPL c)))  := inl (c ₜ⊛ <span class="err">₁</span>[ x ]) ;
+  eval_aux (Cut neg (Whn (ShiftNR c))  (Whn (ShiftNL x)))  := inl (c ₜ⊛ <span class="err">₁</span>[ x ]) ;
+  eval_aux (Cut pos (Whn (NegPR k))    (Whn (NegPL c)))    := inl (c ₜ⊛ <span class="err">₁</span>[ k ]) ;
+  eval_aux (Cut neg (Whn (NegNR c))    (Whn (NegNL v)))    := inl (c ₜ⊛ <span class="err">₁</span>[ v ]) .</span></pre><p>Finally we define evaluation as the iteration of the step function in the Delay monad,
+and also define application of an observation with arguments to a value.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">eval</span> {<span class="nv">Γ</span> : neg_ctx} : state Γ -&gt; delay (nf Γ)
+  := iter_delay (<span class="kr">fun</span> <span class="nv">c</span> =&gt; Ret&#39; (eval_aux c)).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+<span class="kn">Definition</span> <span class="nf">p_app</span> {<span class="nv">Γ</span> <span class="nv">A</span>} (<span class="nv">v</span> : val Γ A) (<span class="nv">m</span> : pat A†) (<span class="nv">e</span> : p_dom m =[val]&gt; Γ) : state Γ :=
+  Cut&#39; v (m `ᵥ⊛ e) .</span></pre></div>
+<div class="section" id="metatheory">
+<h1>Metatheory</h1>
+<p>Now comes a rather ugly part: the metatheory of our syntax. Comments will be rather more
+sparse. For a thorough explaination of its structure, see <code class="highlight coq"><span class="n">Examples</span><span class="o">/</span><span class="n">Lambda</span><span class="o">/</span><span class="n">CBLTyped</span><span class="o">.</span><span class="n">v</span></code>.
+We will here be concerned with extensional equality preservation, identity and composition
+laws for renaming and substitution, and also refolding lemmas for splitting and embedding
+patterns. You are encouraged to just skip until line ~1300.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Scheme</span> <span class="nf">term_mut</span> := <span class="kn">Induction for</span> term <span class="kn">Sort</span> <span class="kt">Prop</span>
+  <span class="kr">with</span> whn_mut := <span class="kn">Induction for</span> whn <span class="kn">Sort</span> <span class="kt">Prop</span>
+  <span class="kr">with</span> state_mut := <span class="kn">Induction for</span> state <span class="kn">Sort</span> <span class="kt">Prop</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Record</span> <span class="nf">syn_ind_args</span>
+  (<span class="nv">P_t</span> : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span>, term Γ A -&gt; <span class="kt">Prop</span>)
+  (<span class="nv">P_w</span> : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span>, whn Γ A -&gt; <span class="kt">Prop</span>)
+  (<span class="nv">P_s</span> : <span class="kr">forall</span> <span class="nv">Γ</span>, state Γ -&gt; <span class="kt">Prop</span>) :=
+{
+  ind_mu : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">s</span> (<span class="nv">H</span> : P_s _ s), P_t Γ A (Mu s) ;
+  ind_recp : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">t</span> (<span class="nv">H</span> : P_t _ _ t), P_t Γ `-A (RecL t) ;
+  ind_recn : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">t</span> (<span class="nv">H</span> : P_t _ _ t), P_t Γ `+A (RecR t) ;
+  ind_whn : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">w</span> (<span class="nv">H</span> : P_w _ _ w), P_t Γ A (Whn w) ;
+  ind_var : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">h</span>, P_w Γ A (Var h) ;
+  ind_zerl : <span class="kr">forall</span> <span class="nv">Γ</span>, P_w Γ `-<span class="mi">0</span> ZerL ;
+  ind_topr : <span class="kr">forall</span> <span class="nv">Γ</span>, P_w Γ `+⊤ TopR ;
+  ind_oner : <span class="kr">forall</span> <span class="nv">Γ</span>, P_w Γ `+<span class="mi">1</span> OneR ;
+  ind_onel : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">s</span>, P_s Γ s -&gt; P_w Γ `-<span class="mi">1</span> (OneL s) ;
+  ind_botr : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">s</span>, P_s Γ s -&gt; P_w Γ `+⊥ (BotR s) ;
+  ind_botl : <span class="kr">forall</span> <span class="nv">Γ</span>, P_w Γ `-⊥ BotL ;
+  ind_tenr : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">w1</span> (<span class="nv">H1</span> : P_w _ _ w1) <span class="nv">w2</span> (<span class="nv">H2</span> : P_w _ _ w2), P_w Γ `+(A ⊗ B) (TenR w1 w2) ;
+  ind_tenl : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">s</span> (<span class="nv">H</span> : P_s _ s), P_w Γ `-(A ⊗ B) (TenL s) ;
+  ind_parr : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">s</span> (<span class="nv">H</span> : P_s _ s), P_w Γ `+(A ⅋ B) (ParR s) ;
+  ind_parl : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">w1</span> (<span class="nv">H1</span> : P_w _ _ w1) <span class="nv">w2</span> (<span class="nv">H2</span> : P_w Γ `-B w2), P_w Γ `-(A ⅋ B) (ParL w1 w2) ;
+  ind_orr1 : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">w</span> (<span class="nv">H</span> : P_w _ _ w), P_w Γ `+(A ⊕ B) (OrR1 w) ;
+  ind_orr2 : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">w</span> (<span class="nv">H</span> : P_w _ _ w), P_w Γ `+(A ⊕ B) (OrR2 w) ;
+  ind_orl : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">s1</span> (<span class="nv">H1</span> : P_s _ s1) <span class="nv">s2</span> (<span class="nv">H2</span> : P_s _ s2), P_w Γ `-(A ⊕ B) (OrL s1 s2) ;
+  ind_andr : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">s1</span> (<span class="nv">H1</span> : P_s _ s1) <span class="nv">s2</span> (<span class="nv">H2</span> : P_s _ s2), P_w Γ `+(A &amp; B) (AndR s1 s2) ;
+  ind_andl1 : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">w</span> (<span class="nv">H</span> : P_w _ _ w), P_w Γ `-(A &amp; B) (AndL1 w) ;
+  ind_andl2 : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span> <span class="nv">w</span> (<span class="nv">H</span> : P_w _ _ w), P_w Γ `-(A &amp; B) (AndL2 w) ;
+  ind_shiftpr : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">t</span> (<span class="nv">H</span> : P_t _ _ t), P_w Γ `+(↓ A) (ShiftPR t) ;
+  ind_shiftpl : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">s</span> (<span class="nv">H</span> : P_s _ s), P_w Γ `-(↓ A) (ShiftPL s) ;
+  ind_shiftnr : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">s</span> (<span class="nv">H</span> : P_s _ s), P_w Γ `+(↑ A) (ShiftNR s) ;
+  ind_shiftnl : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">t</span> (<span class="nv">H</span> : P_t _ _ t), P_w Γ `-(↑ A) (ShiftNL t) ;
+  ind_negpr : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">w</span> (<span class="nv">H</span> : P_w _ _ w), P_w Γ `+(⊖ A) (NegPR w) ;
+  ind_negpl : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">s</span> (<span class="nv">H</span> : P_s _ s), P_w Γ `-(⊖ A) (NegPL s) ;
+  ind_negnr : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">s</span> (<span class="nv">H</span> : P_s _ s), P_w Γ `+(¬ A) (NegNR s) ;
+  ind_negnl : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">w</span> (<span class="nv">H</span> : P_w _ _ w), P_w Γ `-(¬ A) (NegNL w) ;
+  ind_cut : <span class="kr">forall</span> <span class="nv">Γ</span> <span class="nv">p</span> <span class="nv">A</span> <span class="nv">t1</span> (<span class="nv">H1</span> : P_t _ _ t1) <span class="nv">t2</span> (<span class="nv">H2</span> : P_t _ _ t2), P_s Γ (@Cut _ p A t1 t2)
+} .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Lemma</span> <span class="nf">term_ind_mut</span> <span class="nv">P_t</span> <span class="nv">P_w</span> <span class="nv">P_s</span> (<span class="nv">H</span> : syn_ind_args P_t P_w P_s) <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">t</span> : P_t Γ A t .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">destruct</span> H; <span class="bp">now</span> <span class="nb">apply</span> (term_mut P_t P_w P_s).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Qed</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Lemma</span> <span class="nf">whn_ind_mut</span> <span class="nv">P_t</span> <span class="nv">P_w</span> <span class="nv">P_s</span> (<span class="nv">H</span> : syn_ind_args P_t P_w P_s) <span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">w</span> : P_w Γ A w .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">destruct</span> H; <span class="bp">now</span> <span class="nb">apply</span> (whn_mut P_t P_w P_s).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Qed</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Lemma</span> <span class="nf">state_ind_mut</span> <span class="nv">P_t</span> <span class="nv">P_w</span> <span class="nv">P_s</span> (<span class="nv">H</span> : syn_ind_args P_t P_w P_s) <span class="nv">Γ</span> <span class="nv">s</span> : P_s Γ s .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">destruct</span> H; <span class="bp">now</span> <span class="nb">apply</span> (state_mut P_t P_w P_s).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Qed</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+<span class="kn">Definition</span> <span class="nf">t_ren_proper_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ ⊆ Δ), f1 ≡ₐ f2 -&gt; t ₜ⊛ᵣ f1 = t ₜ⊛ᵣ f2 .
+<span class="kn">Definition</span> <span class="nf">w_ren_proper_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ ⊆ Δ), f1 ≡ₐ f2 -&gt; v `ᵥ⊛ᵣ f1 = v `ᵥ⊛ᵣ f2 .
+<span class="kn">Definition</span> <span class="nf">s_ren_proper_P</span> <span class="nv">Γ</span> (<span class="nv">s</span> : state Γ) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ ⊆ Δ), f1 ≡ₐ f2 -&gt; s ₛ⊛ᵣ f1 = s ₛ⊛ᵣ f2 .
+<span class="kn">Lemma</span> <span class="nf">ren_proper_prf</span> : syn_ind_args t_ren_proper_P w_ren_proper_P s_ren_proper_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_proper_P, w_ren_proper_P, s_ren_proper_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">eauto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">apply</span> H | <span class="nb">apply</span> H1 | <span class="nb">apply</span> H2 ]; <span class="nb">auto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">apply</span> r_shift1_eq | <span class="nb">apply</span> r_shift2_eq ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">t_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">t</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (t_rename Γ a t Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">w_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">v</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (w_rename Γ a v Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ ren_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">s_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">s</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (s_rename Γ s Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ ren_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">v_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">v</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (v_rename Γ a v Δ).
+  <span class="nb">destruct</span> a <span class="kr">as</span> [ [] | [] ].
+  <span class="bp">now</span> <span class="nb">apply</span> w_ren_eq.
+  <span class="bp">now</span> <span class="nb">apply</span> t_ren_eq.
+  <span class="bp">now</span> <span class="nb">apply</span> t_ren_eq.
+  <span class="bp">now</span> <span class="nb">apply</span> w_ren_eq.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">a_ren_eq</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>}
+  : Proper (asgn_eq _ _ ==&gt; asgn_eq _ _ ==&gt; asgn_eq _ _) (@a_ren Γ1 Γ2 Γ3).
+  <span class="nb">intros</span> r1 r2 H1 a1 a2 H2 ? i; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> H1, (v_ren_eq _ _ H2).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">a_shift1_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span>} : Proper (asgn_eq _ _ ==&gt; asgn_eq _ _) (@a_shift1 Γ Δ A).
+  <span class="nb">intros</span> ? ? H ? h.
+  dependent elimination h; <span class="nb">auto</span>; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> H.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">a_shift2_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span>} : Proper (asgn_eq _ _ ==&gt; asgn_eq _ _) (@a_shift2 Γ Δ A B).
+  <span class="nb">intros</span> ? ? H ? v.
+  <span class="kp">do</span> <span class="mi">2</span> (dependent elimination v; <span class="nb">auto</span>).
+  <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> H.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_ren_ren_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (t ₜ⊛ᵣ f1) ₜ⊛ᵣ f2 = t ₜ⊛ᵣ (f1 ᵣ⊛ f2) .
+<span class="kn">Definition</span> <span class="nf">w_ren_ren_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (v `ᵥ⊛ᵣ f1) `ᵥ⊛ᵣ f2 = v `ᵥ⊛ᵣ (f1 ᵣ⊛ f2) .
+<span class="kn">Definition</span> <span class="nf">s_ren_ren_P</span> <span class="nv">Γ1</span> (<span class="nv">s</span> : state Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (s ₛ⊛ᵣ f1) ₛ⊛ᵣ f2 = s ₛ⊛ᵣ (f1 ᵣ⊛ f2) .
+
+<span class="kn">Lemma</span> <span class="nf">ren_ren_prf</span> : syn_ind_args t_ren_ren_P w_ren_ren_P s_ren_ren_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_ren_P, w_ren_ren_P, s_ren_ren_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">eauto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> r_shift1_comp | <span class="nb">rewrite</span> r_shift2_comp ]; <span class="nb">eauto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A)
+  : (t ₜ⊛ᵣ f1) ₜ⊛ᵣ f2 = t ₜ⊛ᵣ (f1 ᵣ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A)
+  : (v `ᵥ⊛ᵣ f1) `ᵥ⊛ᵣ f2 = v `ᵥ⊛ᵣ (f1 ᵣ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ ren_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₛ⊛ᵣ f1) ₛ⊛ᵣ f2 = s ₛ⊛ᵣ (f1 ᵣ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ ren_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">v</span> : val Γ1 A)
+  : (v ᵥ⊛ᵣ f1) ᵥ⊛ᵣ f2 = v ᵥ⊛ᵣ (f1 ᵣ⊛ f2) .
+  <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ].
+  <span class="bp">now</span> <span class="nb">apply</span> w_ren_ren.
+  <span class="bp">now</span> <span class="nb">apply</span> t_ren_ren.
+  <span class="bp">now</span> <span class="nb">apply</span> t_ren_ren.
+  <span class="bp">now</span> <span class="nb">apply</span> w_ren_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_ren_id_l_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : <span class="kt">Prop</span> := t ₜ⊛ᵣ r_id = t.
+<span class="kn">Definition</span> <span class="nf">w_ren_id_l_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : <span class="kt">Prop</span> := v `ᵥ⊛ᵣ r_id = v.
+<span class="kn">Definition</span> <span class="nf">s_ren_id_l_P</span> <span class="nv">Γ</span> (<span class="nv">s</span> : state Γ) : <span class="kt">Prop</span> := s ₛ⊛ᵣ r_id  = s.
+
+<span class="kn">Lemma</span> <span class="nf">ren_id_l_prf</span> : syn_ind_args t_ren_id_l_P w_ren_id_l_P s_ren_id_l_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_id_l_P, w_ren_id_l_P, s_ren_id_l_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">eauto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> r_shift1_id | <span class="nb">rewrite</span> r_shift2_id ]; <span class="nb">eauto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_ren_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : t ₜ⊛ᵣ r_id = t.
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_ren_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : v `ᵥ⊛ᵣ r_id = v.
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ ren_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_ren_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">s</span> : state Γ) : s ₛ⊛ᵣ r_id  = s.
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ ren_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_ren_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">v</span> : val Γ A) : v ᵥ⊛ᵣ r_id = v.
+  <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ].
+  <span class="bp">now</span> <span class="nb">apply</span> w_ren_id_l.
+  <span class="bp">now</span> <span class="nb">apply</span> t_ren_id_l.
+  <span class="bp">now</span> <span class="nb">apply</span> t_ren_id_l.
+  <span class="bp">now</span> <span class="nb">apply</span> w_ren_id_l.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">v_ren_id_r</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">f</span> : Γ ⊆ Δ) <span class="nv">A</span> (<span class="nv">i</span> : Γ ∋ A) : (var i) ᵥ⊛ᵣ f = var (f _ i).
+  <span class="bp">now</span> <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ].
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift1_id</span> {<span class="nv">Γ</span> <span class="nv">A</span>} : @a_shift1 Γ Γ A var ≡ₐ var.
+  <span class="nb">intros</span> [ [] | [] ] i; dependent elimination i; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift2_id</span> {<span class="nv">Γ</span> <span class="nv">A</span> <span class="nv">B</span>} : @a_shift2 Γ Γ A B var ≡ₐ var.
+  <span class="nb">intros</span> ? v; <span class="nb">cbn</span>.
+  <span class="kp">do</span> <span class="mi">2</span> (dependent elimination v; <span class="nb">cbn</span>; <span class="nb">auto</span>).
+  <span class="bp">now</span> <span class="nb">destruct</span> a <span class="kr">as</span> [[]|[]].
+<span class="kn">Qed</span>.
+
+<span class="kn">Arguments</span> var : <span class="nb">simpl</span> never.
+<span class="kn">Lemma</span> <span class="nf">a_shift1_ren_r</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">y</span>} (<span class="nv">f1</span> : Γ1 =[ val ]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3)
+      : a_shift1 (y:=y) (f1 ⊛ᵣ f2) ≡ₐ a_shift1 f1 ⊛ᵣ r_shift1 f2 .
+  <span class="nb">intros</span> ? h; dependent elimination h; <span class="nb">cbn</span>.
+  - <span class="bp">now</span> <span class="nb">rewrite</span> v_ren_id_r.
+  - <span class="bp">now</span> <span class="nb">unfold</span> v_shift1; <span class="nb">rewrite</span> <span class="mi">2</span> v_ren_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift2_ren_r</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">y</span> <span class="nv">z</span>} (<span class="nv">f1</span> : Γ1 =[ val ]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3)
+      : a_shift2 (y:=y) (z:=z) (f1 ⊛ᵣ f2) ≡ₐ a_shift2 f1 ⊛ᵣ r_shift2 f2 .
+  <span class="nb">intros</span> ? v; <span class="kp">do</span> <span class="mi">2</span> (dependent elimination v; <span class="nb">cbn</span>; [ <span class="bp">now</span> <span class="nb">rewrite</span> v_ren_id_r | ]).
+  <span class="nb">unfold</span> v_shift2; <span class="bp">now</span> <span class="nb">rewrite</span> <span class="mi">2</span> v_ren_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift1_ren_l</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">y</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3)
+  : a_shift1 (y:=y) (f1 ᵣ⊛ f2) ≡ₐ r_shift1 f1 ᵣ⊛ a_shift1 f2 .
+  <span class="nb">intros</span> ? i; dependent elimination i; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift2_ren_l</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">y</span> <span class="nv">z</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3)
+      : a_shift2 (y:=y) (z:=z) (f1 ᵣ⊛ f2) ≡ₐ r_shift2 f1 ᵣ⊛ a_shift2 f2 .
+  <span class="nb">intros</span> ? v; <span class="kp">do</span> <span class="mi">2</span> (dependent elimination v; <span class="nb">auto</span>).
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_sub_proper_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ =[val]&gt; Δ), f1 ≡ₐ f2 -&gt; t `ₜ⊛ f1 = t `ₜ⊛ f2 .
+<span class="kn">Definition</span> <span class="nf">w_sub_proper_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ =[val]&gt; Δ), f1 ≡ₐ f2 -&gt; v `ᵥ⊛ f1 = v `ᵥ⊛ f2 .
+<span class="kn">Definition</span> <span class="nf">s_sub_proper_P</span> <span class="nv">Γ</span> (<span class="nv">s</span> : state Γ) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ =[val]&gt; Δ), f1 ≡ₐ f2 -&gt; s ₜ⊛ f1 = s ₜ⊛ f2 .
+
+<span class="kn">Lemma</span> <span class="nf">sub_proper_prf</span> : syn_ind_args t_sub_proper_P w_sub_proper_P s_sub_proper_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_proper_P, w_sub_proper_P, s_sub_proper_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>.
+  <span class="kp">all</span>: <span class="kr">match goal with</span>
+       | |- Whn _ = Whn _ =&gt; <span class="kp">do</span> <span class="mi">2</span> <span class="nb">f_equal</span>
+       | _ =&gt; <span class="nb">f_equal</span>
+       <span class="kr">end</span> .
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">apply</span> H | <span class="nb">apply</span> H1 | <span class="nb">apply</span> H2 ]; <span class="nb">auto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">apply</span> a_shift1_eq | <span class="nb">apply</span> a_shift2_eq ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">t_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">t</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (t_subst Γ a t Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">w_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">v</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (w_subst Γ a v Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ sub_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">s_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">s</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (s_subst Γ s Δ).
+  <span class="nb">intros</span> f1 f2 H1; <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ sub_proper_prf).
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">v_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">a</span> <span class="nv">v</span> <span class="nv">Δ</span>} : Proper (asgn_eq _ _ ==&gt; eq) (v_subst Γ a v Δ).
+  <span class="nb">destruct</span> a <span class="kr">as</span> [[]|[]].
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_eq.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_eq.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_eq.
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_eq.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">a_comp_eq</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>}
+  : Proper (asgn_eq _ _ ==&gt; asgn_eq _ _ ==&gt; asgn_eq _ _) (@a_comp _ _ _ _ _ Γ1 Γ2 Γ3).
+  <span class="nb">intros</span> ? ? H1 ? ? H2 ? ?; <span class="nb">cbn</span>; <span class="nb">rewrite</span> H1; <span class="bp">now</span> <span class="nb">eapply</span> v_sub_eq.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_ren_sub_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (t `ₜ⊛ f1) ₜ⊛ᵣ f2 = t `ₜ⊛ (f1 ⊛ᵣ f2) .
+<span class="kn">Definition</span> <span class="nf">w_ren_sub_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (v `ᵥ⊛ f1) ᵥ⊛ᵣ f2 = v `ᵥ⊛ (f1 ⊛ᵣ f2) .
+<span class="kn">Definition</span> <span class="nf">s_ren_sub_P</span> <span class="nv">Γ1</span> (<span class="nv">s</span> : state Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (s ₜ⊛ f1) ₛ⊛ᵣ f2 = s ₜ⊛ (f1 ⊛ᵣ f2) .
+<span class="kn">Lemma</span> <span class="nf">ren_sub_prf</span> : syn_ind_args t_ren_sub_P w_ren_sub_P s_ren_sub_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_sub_P, w_ren_sub_P, s_ren_sub_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>.
+  <span class="mi">4</span>: <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ]; <span class="nb">cbn</span>.
+  <span class="kp">all</span>: <span class="kr">match goal with</span>
+       | |- Whn _ = Whn _ =&gt; <span class="kp">do</span> <span class="mi">2</span> <span class="nb">f_equal</span>
+       | _ =&gt; <span class="nb">f_equal</span>
+       <span class="kr">end</span> ; <span class="nb">eauto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> a_shift1_ren_r | <span class="nb">rewrite</span> a_shift2_ren_r ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A)
+  : (t `ₜ⊛ f1) ₜ⊛ᵣ f2 = t `ₜ⊛ (f1 ⊛ᵣ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A)
+  : (v `ᵥ⊛ f1) ᵥ⊛ᵣ f2 = v `ᵥ⊛ (f1 ⊛ᵣ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ ren_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₜ⊛ f1) ₛ⊛ᵣ f2 = s ₜ⊛ (f1 ⊛ᵣ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ ren_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">A</span> (<span class="nv">v</span> : val Γ1 A)
+  : (v ᵥ⊛ f1) ᵥ⊛ᵣ f2 = v ᵥ⊛ (f1 ⊛ᵣ f2) .
+  <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ]; <span class="nb">cbn</span> [ v_subst ].
+  - <span class="bp">now</span> <span class="nb">apply</span> w_ren_sub.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_ren_sub.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_ren_sub.
+  - <span class="bp">now</span> <span class="nb">apply</span> w_ren_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_sub_ren_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (t ₜ⊛ᵣ f1) `ₜ⊛ f2 = t `ₜ⊛ (f1 ᵣ⊛ f2).
+<span class="kn">Definition</span> <span class="nf">w_sub_ren_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (v `ᵥ⊛ᵣ f1) `ᵥ⊛ f2 = v `ᵥ⊛ (f1 ᵣ⊛ f2).
+<span class="kn">Definition</span> <span class="nf">s_sub_ren_P</span> <span class="nv">Γ1</span> (<span class="nv">s</span> : state Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (s ₛ⊛ᵣ f1) ₜ⊛ f2 = s ₜ⊛ (f1 ᵣ⊛ f2).
+
+<span class="kn">Lemma</span> <span class="nf">sub_ren_prf</span> : syn_ind_args t_sub_ren_P w_sub_ren_P s_sub_ren_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_ren_P, w_sub_ren_P, s_sub_ren_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>.
+  <span class="kp">all</span>: <span class="kr">match goal with</span>
+       | |- Whn _ = Whn _ =&gt; <span class="kp">do</span> <span class="mi">2</span> <span class="nb">f_equal</span>
+       | _ =&gt; <span class="nb">f_equal</span>
+       <span class="kr">end</span> ; <span class="nb">eauto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> a_shift1_ren_l | <span class="nb">rewrite</span> a_shift2_ren_l ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A)
+  : (t ₜ⊛ᵣ f1) `ₜ⊛ f2 = t `ₜ⊛ (f1 ᵣ⊛ f2).
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A)
+  : (v `ᵥ⊛ᵣ f1) `ᵥ⊛ f2 = v `ᵥ⊛ (f1 ᵣ⊛ f2).
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ sub_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₛ⊛ᵣ f1) ₜ⊛ f2 = s ₜ⊛ (f1 ᵣ⊛ f2).
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ sub_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">v</span> : val Γ1 A)
+  : (v ᵥ⊛ᵣ f1) ᵥ⊛ f2 = v ᵥ⊛ (f1 ᵣ⊛ f2).
+  <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ].
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_ren.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_ren.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_ren.
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">v_sub_id_r</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) <span class="nv">A</span> (<span class="nv">i</span> : Γ ∋ A) : var i ᵥ⊛ f = f A i.
+  <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift1_comp</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">A</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3)
+  : @a_shift1 _ _ A (f1 ⊛ f2) ≡ₐ a_shift1 f1 ⊛ a_shift1 f2 .
+  <span class="nb">intros</span> x i; dependent elimination i; <span class="nb">cbn</span>.
+  - <span class="bp">now</span> <span class="nb">rewrite</span> v_sub_id_r.
+  - <span class="bp">now</span> <span class="nb">unfold</span> v_shift1; <span class="nb">rewrite</span> v_ren_sub, v_sub_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_shift2_comp</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3)
+  : @a_shift2 _ _ A B (f1 ⊛ f2) ≡ₐ a_shift2 f1 ⊛ a_shift2 f2 .
+  <span class="nb">intros</span> ? v; <span class="kp">do</span> <span class="mi">2</span> (dependent elimination v; <span class="nb">cbn</span>; [ <span class="bp">now</span> <span class="nb">rewrite</span> v_sub_id_r | ]).
+  <span class="bp">now</span> <span class="nb">unfold</span> v_shift2; <span class="nb">rewrite</span> v_ren_sub, v_sub_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_sub_sub_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (t `ₜ⊛ f1) `ₜ⊛ f2 = t `ₜ⊛ (f1 ⊛ f2) .
+<span class="kn">Definition</span> <span class="nf">w_sub_sub_P</span> <span class="nv">Γ1</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (v `ᵥ⊛ f1) ᵥ⊛ f2 = v `ᵥ⊛ (f1 ⊛ f2) .
+<span class="kn">Definition</span> <span class="nf">s_sub_sub_P</span> <span class="nv">Γ1</span> (<span class="nv">s</span> : state Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3),
+    (s ₜ⊛ f1) ₜ⊛ f2 = s ₜ⊛ (f1 ⊛ f2) .
+
+<span class="kn">Lemma</span> <span class="nf">sub_sub_prf</span> : syn_ind_args t_sub_sub_P w_sub_sub_P s_sub_sub_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_sub_P, w_sub_sub_P, s_sub_sub_P; <span class="nb">intros</span>; <span class="nb">cbn</span>.
+  <span class="mi">4</span>: <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ]; <span class="nb">cbn</span>.
+  <span class="kp">all</span>: <span class="kr">match goal with</span>
+       | |- Whn _ = Whn _ =&gt; <span class="kp">do</span> <span class="mi">2</span> <span class="nb">f_equal</span>
+       | _ =&gt; <span class="nb">f_equal</span>
+       <span class="kr">end</span> ; <span class="nb">eauto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> a_shift1_comp | <span class="nb">rewrite</span> a_shift2_comp ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">t</span> : term Γ1 A)
+  : (t `ₜ⊛ f1) `ₜ⊛ f2 = t `ₜ⊛ (f1 ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">v</span> : whn Γ1 A)
+  : (v `ᵥ⊛ f1) ᵥ⊛ f2 = v `ᵥ⊛ (f1 ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ sub_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₜ⊛ f1) ₜ⊛ f2 = s ₜ⊛ (f1 ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ sub_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val]&gt; Γ3) <span class="nv">A</span> (<span class="nv">v</span> : val Γ1 A)
+  : (v ᵥ⊛ f1) ᵥ⊛ f2 = v ᵥ⊛ (f1 ⊛ f2) .
+  <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ].
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_sub.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_sub.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_sub.
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_comp_assoc</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">Γ4</span>} (<span class="nv">u</span> : Γ1 =[val]&gt; Γ2) (<span class="nv">v</span> : Γ2 =[val]&gt; Γ3) (<span class="nv">w</span> : Γ3 =[val]&gt; Γ4)
+           : (u ⊛ v) ⊛ w ≡ₐ u ⊛ (v ⊛ w).
+  <span class="nb">intros</span> ? i; <span class="nb">unfold</span> a_comp; <span class="bp">now</span> <span class="nb">apply</span> v_sub_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">t_sub_id_l_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : <span class="kt">Prop</span> := t `ₜ⊛ var = t.
+<span class="kn">Definition</span> <span class="nf">w_sub_id_l_P</span> <span class="nv">Γ</span> <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : <span class="kt">Prop</span> := v `ᵥ⊛ var = v.
+<span class="kn">Definition</span> <span class="nf">s_sub_id_l_P</span> <span class="nv">Γ</span> (<span class="nv">s</span> : state Γ) : <span class="kt">Prop</span> := s ₜ⊛ var = s.
+
+<span class="kn">Lemma</span> <span class="nf">sub_id_l_prf</span> : syn_ind_args t_sub_id_l_P w_sub_id_l_P s_sub_id_l_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_id_l_P, w_sub_id_l_P, s_sub_id_l_P; <span class="nb">intros</span>; <span class="nb">cbn</span>.
+  <span class="mi">4</span>,<span class="mi">5</span>: <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ]; <span class="nb">cbn</span>.
+  <span class="kp">all</span>: <span class="kr">match goal with</span>
+       | |- Whn _ = Whn _ =&gt; <span class="kp">do</span> <span class="mi">2</span> <span class="nb">f_equal</span>
+       | _ =&gt; <span class="nb">f_equal</span>
+       <span class="kr">end</span>; <span class="nb">eauto</span>.
+  <span class="kp">all</span>: <span class="kp">first</span> [ <span class="nb">rewrite</span> a_shift1_id | <span class="nb">rewrite</span> a_shift2_id ]; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">t</span> : term Γ A) : t `ₜ⊛ var = t.
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">w_sub_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">v</span> : whn Γ A) : v `ᵥ⊛ var = v.
+  <span class="bp">now</span> <span class="nb">apply</span> (whn_ind_mut _ _ _ sub_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_sub_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">s</span> : state Γ) : s ₜ⊛ var = s.
+  <span class="bp">now</span> <span class="nb">apply</span> (state_ind_mut _ _ _ sub_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_sub_id_l</span> {<span class="nv">Γ</span>} <span class="nv">A</span> (<span class="nv">v</span> : val Γ A) : v ᵥ⊛ var = v.
+  <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | [] ].
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_id_l.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_id_l.
+  - <span class="bp">now</span> <span class="nb">apply</span> t_sub_id_l.
+  - <span class="bp">now</span> <span class="nb">apply</span> w_sub_id_l.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">sub1_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) (<span class="nv">v</span> : val Γ A) :
+  a_shift1 f ⊛ asgn1 (v ᵥ⊛ f) ≡ₐ asgn1 v ⊛ f.
+  <span class="nb">intros</span> ? h; dependent elimination h; <span class="nb">cbn</span>.
+  - <span class="bp">now</span> <span class="nb">rewrite</span> v_sub_id_r.
+  - <span class="nb">unfold</span> v_shift1; <span class="nb">rewrite</span> v_sub_ren, v_sub_id_r.
+    <span class="bp">now</span> <span class="nb">apply</span> v_sub_id_l.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">sub1_ren</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span>} (<span class="nv">f</span> : Γ ⊆ Δ) (<span class="nv">v</span> : val Γ A) :
+  r_shift1 f ᵣ⊛ asgn1 (v ᵥ⊛ᵣ f) ≡ₐ asgn1 v ⊛ᵣ f.
+  <span class="nb">intros</span> ? h; dependent elimination h; <span class="nb">auto</span>.
+  <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> v_ren_id_r.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">v_sub1_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">w</span> : val (Γ ▶ₓ A) B)
+  : (w ᵥ⊛ a_shift1 f) ᵥ⊛ <span class="err">₁</span>[ v ᵥ⊛ f ] = (w ᵥ⊛ <span class="err">₁</span>[ v ]) ᵥ⊛ f .
+  <span class="nb">cbn</span>; <span class="nb">rewrite</span> <span class="mi">2</span> v_sub_sub.
+  <span class="nb">apply</span> v_sub_eq; <span class="bp">now</span> <span class="nb">rewrite</span> sub1_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">v_sub1_ren</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f</span> : Γ ⊆ Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">w</span> : val (Γ ▶ₓ A) B)
+  : (w ᵥ⊛ᵣ r_shift1 f) ᵥ⊛ <span class="err">₁</span>[ v ᵥ⊛ᵣ f ] = (w ᵥ⊛ <span class="err">₁</span>[ v ]) ᵥ⊛ᵣ f .
+  <span class="nb">cbn</span>; <span class="nb">rewrite</span> v_sub_ren, v_ren_sub.
+  <span class="nb">apply</span> v_sub_eq; <span class="bp">now</span> <span class="nb">rewrite</span> sub1_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">s_sub1_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">s</span> : state (Γ ▶ₓ A))
+  : (s ₜ⊛ a_shift1 f) ₜ⊛ <span class="err">₁</span>[ v ᵥ⊛ f ] = (s ₜ⊛ <span class="err">₁</span>[ v ]) ₜ⊛ f .
+  <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> <span class="mi">2</span> s_sub_sub, sub1_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">s_sub2_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) (<span class="nv">s</span> : state (Γ ▶ₓ A ▶ₓ B)) <span class="nv">u</span> <span class="nv">v</span>
+  : (s ₜ⊛ a_shift2 f) ₜ⊛ <span class="err">₂</span>[ u ᵥ⊛ f , v ᵥ⊛ f ] = (s ₜ⊛ <span class="err">₂</span>[ u, v ]) ₜ⊛ f .
+  <span class="nb">cbn</span>; <span class="nb">rewrite</span> <span class="mi">2</span> s_sub_sub; <span class="nb">apply</span> s_sub_eq.
+  <span class="nb">intros</span> ? v0; <span class="nb">cbn</span>.
+  <span class="kp">do</span> <span class="mi">2</span> (dependent elimination v0; <span class="nb">cbn</span>; [ <span class="bp">now</span> <span class="nb">rewrite</span> v_sub_id_r | ]).
+  <span class="nb">unfold</span> v_shift2; <span class="nb">rewrite</span> v_sub_ren, v_sub_id_r, &lt;- v_sub_id_l.
+  <span class="bp">now</span> <span class="nb">apply</span> v_sub_eq.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">s_sub1_ren</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span>} (<span class="nv">f</span> : Γ ⊆ Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">s</span> : state (Γ ▶ₓ A))
+  : (s ₛ⊛ᵣ r_shift1 f) ₜ⊛ <span class="err">₁</span>[ v ᵥ⊛ᵣ f ] = (s ₜ⊛ <span class="err">₁</span>[ v ]) ₛ⊛ᵣ f .
+  <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> s_sub_ren, s_ren_sub, sub1_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub1_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f</span> : Γ =[val]&gt; Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">t</span> : term (Γ ▶ₓ A) B)
+  : (t `ₜ⊛ a_shift1 f) `ₜ⊛ <span class="err">₁</span>[ v ᵥ⊛ f ] = (t `ₜ⊛ <span class="err">₁</span>[ v ]) `ₜ⊛ f .
+  <span class="nb">cbn</span>; <span class="nb">rewrite</span> <span class="mi">2</span> t_sub_sub.
+  <span class="nb">apply</span> t_sub_eq; <span class="bp">now</span> <span class="nb">rewrite</span> sub1_sub.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub1_ren</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">A</span> <span class="nv">B</span>} (<span class="nv">f</span> : Γ ⊆ Δ) (<span class="nv">v</span> : val Γ A) (<span class="nv">t</span> : term (Γ ▶ₓ A) B)
+  : (t ₜ⊛ᵣ r_shift1 f) `ₜ⊛ <span class="err">₁</span>[ v ᵥ⊛ᵣ f ] = (t `ₜ⊛ <span class="err">₁</span>[ v ]) ₜ⊛ᵣ f .
+  <span class="nb">cbn</span>; <span class="nb">rewrite</span> t_sub_ren, t_ren_sub.
+  <span class="nb">apply</span> t_sub_eq; <span class="bp">now</span> <span class="nb">rewrite</span> sub1_ren.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">p_app_eq</span> {<span class="nv">Γ</span> <span class="nv">A</span>} (<span class="nv">v</span> : val Γ A) (<span class="nv">m</span> : pat (t_neg A))
+  : Proper (asgn_eq _ _ ==&gt; eq) (p_app v m) .
+  <span class="nb">intros</span> u1 u2 H; <span class="nb">destruct</span> A <span class="kr">as</span> [ [] | []]; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> (w_sub_eq u1 u2 H).
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">refold_id_aux_P</span> (<span class="nv">Γ</span> : neg_ctx) <span class="nv">p</span> : pre_ty p -&gt; <span class="kt">Prop</span> :=
+  <span class="kr">match</span> p <span class="kr">with</span>
+  | pos =&gt; <span class="kr">fun</span> <span class="nv">A</span> =&gt; <span class="kr">forall</span> (<span class="nv">v</span> : whn Γ `+A), p_of_w_0p _ v `ᵥ⊛ p_dom_of_w_0p _ v = v
+  | neg =&gt; <span class="kr">fun</span> <span class="nv">A</span> =&gt; <span class="kr">forall</span> (<span class="nv">v</span> : whn Γ `-A), p_of_w_0n _ v `ᵥ⊛ p_dom_of_w_0n _ v = v
+  <span class="kr">end</span> .
+
+<span class="kn">Lemma</span> <span class="nf">refold_id_aux</span> {<span class="nv">Γ</span> <span class="nv">p</span>} <span class="nv">A</span> : refold_id_aux_P Γ p A .
+  <span class="nb">induction</span> A; <span class="nb">intros</span> v.
+  - dependent elimination v; <span class="nb">destruct</span> (s_prf c).
+  - dependent elimination v; <span class="nb">destruct</span> (s_prf c).
+  - dependent elimination v; [ <span class="nb">destruct</span> (s_prf c) | ]; <span class="nb">auto</span>.
+  - dependent elimination v; [ <span class="nb">destruct</span> (s_prf c) | ]; <span class="nb">auto</span>.
+  - dependent elimination v; [ <span class="nb">destruct</span> (s_prf c) | ].
+    <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">rewrite</span> w_sub_ren.
+    <span class="nb">rewrite</span> &lt;- IHA1; <span class="nb">apply</span> w_sub_eq; <span class="bp">exact</span> (a_cat_proj_l _ _).
+    <span class="nb">rewrite</span> &lt;- IHA2; <span class="nb">apply</span> w_sub_eq; <span class="bp">exact</span> (a_cat_proj_r _ _).
+  - dependent elimination v; [ <span class="nb">destruct</span> (s_prf c) | ].
+    <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">rewrite</span> w_sub_ren.
+    <span class="nb">rewrite</span> &lt;- IHA1; <span class="nb">apply</span> w_sub_eq; <span class="bp">exact</span> (a_cat_proj_l _ _).
+    <span class="nb">rewrite</span> &lt;- IHA2; <span class="nb">apply</span> w_sub_eq; <span class="bp">exact</span> (a_cat_proj_r _ _).
+  - dependent elimination v; [ <span class="nb">destruct</span> (s_prf c) | | ];
+      <span class="nb">cbn</span>; <span class="nb">f_equal</span>; [ <span class="nb">apply</span> IHA1 | <span class="nb">apply</span> IHA2 ].
+  - dependent elimination v; [ <span class="nb">destruct</span> (s_prf c) | | ];
+      <span class="nb">cbn</span>; <span class="nb">f_equal</span>; [ <span class="nb">apply</span> IHA1 | <span class="nb">apply</span> IHA2 ].
+  - dependent elimination v; [ <span class="nb">destruct</span> (s_prf c) | ]; <span class="nb">cbn</span>; <span class="nb">f_equal</span>.
+  - dependent elimination v; [ <span class="nb">destruct</span> (s_prf c) | ]; <span class="nb">cbn</span>; <span class="nb">f_equal</span>.
+  - dependent elimination v; [ <span class="nb">destruct</span> (s_prf c) | ].
+    <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">apply</span> IHA.
+  - dependent elimination v; [ <span class="nb">destruct</span> (s_prf c) | ].
+    <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">apply</span> IHA.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">refold_id</span> {<span class="nv">Γ</span> : neg_ctx} <span class="nv">A</span> (<span class="nv">v</span> : val Γ A)
+  : p_of_v A v `ᵥ⊛ p_dom_of_v A v = v.
+  <span class="nb">destruct</span> A <span class="kr">as</span> [ [] A | [] A ]; <span class="nb">auto</span>; <span class="bp">exact</span> (refold_id_aux A v).
+<span class="kn">Qed</span>.
+
+<span class="kn">Equations</span> <span class="nf">p_of_w_eq_aux_p</span> {<span class="nv">Γ</span> : neg_ctx} (<span class="nv">A</span> : pre_ty pos) (<span class="nv">p</span> : pat `+A) (<span class="nv">e</span> : p_dom p =[val]&gt; Γ)
+          : p_of_w_0p A (p `ᵥ⊛ e) = p
+          <span class="bp">by</span> <span class="kr">struct</span> p :=
+  p_of_w_eq_aux_p (<span class="mi">1</span>)     (POne)       e := eq_refl ;
+  p_of_w_eq_aux_p (A ⊗ B) (PTen p1 p2) e := f_equal2 PTen
+        (eq_trans (<span class="nb">f_equal</span> _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_p A p1 _))
+        (eq_trans (<span class="nb">f_equal</span> _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_p B p2 _)) ;
+  p_of_w_eq_aux_p (A ⊕ B) (POr1 p)     e := <span class="nb">f_equal</span> POr1 (p_of_w_eq_aux_p A p e) ;
+  p_of_w_eq_aux_p (A ⊕ B) (POr2 p)     e := <span class="nb">f_equal</span> POr2 (p_of_w_eq_aux_p B p e) ;
+  p_of_w_eq_aux_p (↓ A)   (PShiftP _)  e := eq_refl ;
+  p_of_w_eq_aux_p (⊖ A)   (PNegP p)    e := <span class="nb">f_equal</span> PNegP (p_of_w_eq_aux_n A p e) ;
+
+<span class="kr">with</span> p_of_w_eq_aux_n {Γ : neg_ctx} (A : pre_ty neg) (p : pat `-A) (e : p_dom p =[val]&gt; Γ)
+         : p_of_w_0n A (p `ᵥ⊛ e) = p
+         <span class="bp">by</span> <span class="kr">struct</span> p :=
+  p_of_w_eq_aux_n (⊥)     (PBot)       e := eq_refl ;
+  p_of_w_eq_aux_n (A ⅋ B) (PPar p1 p2) e := f_equal2 PPar
+        (eq_trans (<span class="nb">f_equal</span> _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_n A p1 _))
+        (eq_trans (<span class="nb">f_equal</span> _ (w_sub_ren _ _ _ _)) (p_of_w_eq_aux_n B p2 _)) ;
+  p_of_w_eq_aux_n (A &amp; B) (PAnd1 p)    e := <span class="nb">f_equal</span> PAnd1 (p_of_w_eq_aux_n A p e) ;
+  p_of_w_eq_aux_n (A &amp; B) (PAnd2 p)    e := <span class="nb">f_equal</span> PAnd2 (p_of_w_eq_aux_n B p e) ;
+  p_of_w_eq_aux_n (↑ A)   (PShiftN _)  e := eq_refl ;
+  p_of_w_eq_aux_n (¬ A)   (PNegN p)    e := <span class="nb">f_equal</span> PNegN (p_of_w_eq_aux_p A p e) .
+
+<span class="kn">Definition</span> <span class="nf">p_dom_of_w_eq_P</span> (<span class="nv">Γ</span> : neg_ctx) <span class="nv">p</span> : pre_ty p -&gt; <span class="kt">Prop</span> :=
+  <span class="kr">match</span> p <span class="kr">with</span>
+  | pos =&gt; <span class="kr">fun</span> <span class="nv">A</span> =&gt; <span class="kr">forall</span> (<span class="nv">p</span> : pat `+A) (<span class="nv">e</span> : p_dom p =[val]&gt; Γ),
+      rew [<span class="kr">fun</span> <span class="nv">p</span> =&gt; p_dom p =[ val ]&gt; Γ] p_of_w_eq_aux_p A p e <span class="kr">in</span> p_dom_of_w_0p A (p `ᵥ⊛ e) ≡ₐ e
+  | neg =&gt; <span class="kr">fun</span> <span class="nv">A</span> =&gt; <span class="kr">forall</span> (<span class="nv">p</span> : pat `-A) (<span class="nv">e</span> : p_dom p =[val]&gt; Γ),
+      rew [<span class="kr">fun</span> <span class="nv">p</span> =&gt; p_dom p =[ val ]&gt; Γ] p_of_w_eq_aux_n A p e <span class="kr">in</span> p_dom_of_w_0n A (p `ᵥ⊛ e) ≡ₐ e
+  <span class="kr">end</span> .
+
+<span class="kn">Lemma</span> <span class="nf">p_dom_of_v_eq</span> {<span class="nv">Γ</span> <span class="nv">p</span>} <span class="nv">A</span> : p_dom_of_w_eq_P Γ p A .
+  <span class="nb">induction</span> A; <span class="nb">intros</span> p e; dependent elimination p; <span class="nb">cbn</span> - [ r_cat_l r_cat_r ].
+  - <span class="nb">intros</span> ? h; <span class="kp">repeat</span> (dependent elimination h; <span class="nb">auto</span>).
+  - <span class="nb">intros</span> ? h; <span class="kp">repeat</span> (dependent elimination h; <span class="nb">auto</span>).
+  - <span class="nb">pose</span> (H1 := w_sub_ren r_cat_l e `+A3 (w_of_p p)) .
+    <span class="nb">pose</span> (H2 := w_sub_ren r_cat_r e `+B (w_of_p p0)) .
+    <span class="nb">pose</span> (x1 := w_of_p p `ᵥ⊛ᵣ r_cat_l `ᵥ⊛ e).
+    <span class="nb">pose</span> (x2 := w_of_p p0 `ᵥ⊛ᵣ r_cat_r `ᵥ⊛ e).
+    <span class="nb">change</span> (w_sub_ren r_cat_l e _ _) <span class="kr">with</span> H1.
+    <span class="nb">change</span> (w_sub_ren r_cat_r e _ _) <span class="kr">with</span> H2.
+    <span class="nb">change</span> (_ `ᵥ⊛ᵣ r_cat_l `ᵥ⊛ e) <span class="kr">with</span> x1 <span class="kr">in</span> H1 |- *.
+    <span class="nb">change</span> (_ `ᵥ⊛ᵣ r_cat_r `ᵥ⊛ e) <span class="kr">with</span> x2 <span class="kr">in</span> H2 |- *.
+    <span class="nb">rewrite</span> H1, H2; <span class="nb">clear</span> H1 H2 x1 x2; <span class="nb">cbn</span> - [ r_cat_l r_cat_r ].
+    <span class="nb">pose</span> (H1 := p_of_w_eq_aux_p A3 p (r_cat_l ᵣ⊛ e));
+      <span class="nb">change</span> (p_of_w_eq_aux_p A3 _ _) <span class="kr">with</span> H1 <span class="kr">in</span> IHA1 |- *.
+    <span class="nb">pose</span> (H2 := p_of_w_eq_aux_p B p0 (r_cat_r ᵣ⊛ e));
+      <span class="nb">change</span> (p_of_w_eq_aux_p B _ _) <span class="kr">with</span> H2 <span class="kr">in</span> IHA2 |- *.
+    <span class="nb">transitivity</span> ([ rew [<span class="kr">fun</span> <span class="nv">p</span> : pat `+A3 =&gt; p_dom p =[ val ]&gt; Γ] H1
+                     <span class="kr">in</span> p_dom_of_w_0p A3 (w_of_p p `ᵥ⊛ r_cat_l ᵣ⊛ e) ,
+                    rew [<span class="kr">fun</span> <span class="nv">p</span> : pat `+B =&gt; p_dom p =[ val ]&gt; Γ] H2
+                     <span class="kr">in</span> p_dom_of_w_0p B (w_of_p p0 `ᵥ⊛ r_cat_r ᵣ⊛ e) ])%asgn.
+    <span class="bp">now</span> <span class="nb">rewrite</span> &lt;- H1, &lt;- H2, eq_refl_map2_distr.
+    <span class="nb">refine</span> (a_cat_uniq _ _ _ _ _); [ <span class="nb">apply</span> IHA1 | <span class="nb">apply</span> IHA2 ] .
+  - <span class="nb">pose</span> (H1 := w_sub_ren r_cat_l e `-A4 (w_of_p p1)) .
+    <span class="nb">pose</span> (H2 := w_sub_ren r_cat_r e `-B0 (w_of_p p2)) .
+    <span class="nb">pose</span> (x1 := w_of_p p1 `ᵥ⊛ᵣ r_cat_l `ᵥ⊛ e).
+    <span class="nb">pose</span> (x2 := w_of_p p2 `ᵥ⊛ᵣ r_cat_r `ᵥ⊛ e).
+    <span class="nb">change</span> (w_sub_ren r_cat_l e _ _) <span class="kr">with</span> H1.
+    <span class="nb">change</span> (w_sub_ren r_cat_r e _ _) <span class="kr">with</span> H2.
+    <span class="nb">change</span> (_ `ᵥ⊛ᵣ r_cat_l `ᵥ⊛ e) <span class="kr">with</span> x1 <span class="kr">in</span> H1 |- *.
+    <span class="nb">change</span> (_ `ᵥ⊛ᵣ r_cat_r `ᵥ⊛ e) <span class="kr">with</span> x2 <span class="kr">in</span> H2 |- *.
+    <span class="nb">rewrite</span> H1, H2; <span class="nb">clear</span> H1 H2 x1 x2; <span class="nb">cbn</span> - [ r_cat_l r_cat_r ].
+    <span class="nb">pose</span> (H1 := p_of_w_eq_aux_n A4 p1 (r_cat_l ᵣ⊛ e));
+      <span class="nb">change</span> (p_of_w_eq_aux_n A4 _ _) <span class="kr">with</span> H1 <span class="kr">in</span> IHA1 |- *.
+    <span class="nb">pose</span> (H2 := p_of_w_eq_aux_n B0 p2 (r_cat_r ᵣ⊛ e));
+      <span class="nb">change</span> (p_of_w_eq_aux_n B0 _ _) <span class="kr">with</span> H2 <span class="kr">in</span> IHA2 |- *.
+    <span class="nb">transitivity</span> ([ rew [<span class="kr">fun</span> <span class="nv">p</span> : pat `-A4 =&gt; p_dom p =[ val ]&gt; Γ] H1
+                     <span class="kr">in</span> p_dom_of_w_0n A4 (w_of_p p1 `ᵥ⊛ r_cat_l ᵣ⊛ e) ,
+                    rew [<span class="kr">fun</span> <span class="nv">p</span> : pat `-B0 =&gt; p_dom p =[ val ]&gt; Γ] H2
+                     <span class="kr">in</span> p_dom_of_w_0n B0 (w_of_p p2 `ᵥ⊛ r_cat_r ᵣ⊛ e) ])%asgn.
+    <span class="bp">now</span> <span class="nb">rewrite</span> &lt;- H1, &lt;- H2, eq_refl_map2_distr.
+    <span class="nb">refine</span> (a_cat_uniq _ _ _ _ _); [ <span class="nb">apply</span> IHA1 | <span class="nb">apply</span> IHA2 ] .
+  - <span class="kr">match goal with</span> | |- <span class="nl">?s</span> ≡ₐ e =&gt; <span class="nb">pose</span> (xx := s); <span class="nb">change</span> (_ ≡ₐ e) <span class="kr">with</span> (xx ≡ₐ e) <span class="kr">end</span> .
+    <span class="nb">remember</span> xx <span class="kr">as</span> xx&#39;; <span class="nb">unfold</span> xx <span class="kr">in</span> Heqxx&#39;; <span class="nb">clear</span> xx.
+    <span class="nb">rewrite</span> (eq_trans Heqxx&#39; (eq_sym (rew_map _ POr1 _ _))).
+    <span class="nb">apply</span> IHA1.
+  - <span class="kr">match goal with</span> | |- <span class="nl">?s</span> ≡ₐ e =&gt; <span class="nb">pose</span> (xx := s); <span class="nb">change</span> (_ ≡ₐ e) <span class="kr">with</span> (xx ≡ₐ e) <span class="kr">end</span> .
+    <span class="nb">remember</span> xx <span class="kr">as</span> xx&#39;; <span class="nb">unfold</span> xx <span class="kr">in</span> Heqxx&#39;; <span class="nb">clear</span> xx.
+    <span class="nb">rewrite</span> (eq_trans Heqxx&#39; (eq_sym (rew_map _ POr2 _ _))).
+    <span class="nb">apply</span> IHA2.
+  - <span class="kr">match goal with</span> | |- <span class="nl">?s</span> ≡ₐ e =&gt; <span class="nb">pose</span> (xx := s); <span class="nb">change</span> (_ ≡ₐ e) <span class="kr">with</span> (xx ≡ₐ e) <span class="kr">end</span> .
+    <span class="nb">remember</span> xx <span class="kr">as</span> xx&#39;; <span class="nb">unfold</span> xx <span class="kr">in</span> Heqxx&#39;; <span class="nb">clear</span> xx.
+    <span class="nb">rewrite</span> (eq_trans Heqxx&#39; (eq_sym (rew_map _ PAnd1 _ _))).
+    <span class="nb">apply</span> IHA1.
+  - <span class="kr">match goal with</span> | |- <span class="nl">?s</span> ≡ₐ e =&gt; <span class="nb">pose</span> (xx := s); <span class="nb">change</span> (_ ≡ₐ e) <span class="kr">with</span> (xx ≡ₐ e) <span class="kr">end</span> .
+    <span class="nb">remember</span> xx <span class="kr">as</span> xx&#39;; <span class="nb">unfold</span> xx <span class="kr">in</span> Heqxx&#39;; <span class="nb">clear</span> xx.
+    <span class="nb">rewrite</span> (eq_trans Heqxx&#39; (eq_sym (rew_map _ PAnd2 _ _))).
+    <span class="nb">apply</span> IHA2.
+  - <span class="nb">intros</span> ? v; <span class="kp">repeat</span> (dependent elimination v; <span class="nb">auto</span>).
+  - <span class="nb">intros</span> ? v; <span class="kp">repeat</span> (dependent elimination v; <span class="nb">auto</span>).
+  - <span class="kr">match goal with</span> | |- <span class="nl">?s</span> ≡ₐ e =&gt; <span class="nb">pose</span> (xx := s); <span class="nb">change</span> (_ ≡ₐ e) <span class="kr">with</span> (xx ≡ₐ e) <span class="kr">end</span> .
+    <span class="nb">remember</span> xx <span class="kr">as</span> xx&#39;; <span class="nb">unfold</span> xx <span class="kr">in</span> Heqxx&#39;; <span class="nb">clear</span> xx.
+    <span class="nb">rewrite</span> (eq_trans Heqxx&#39; (eq_sym (rew_map _ PNegP _ _))).
+    <span class="nb">apply</span> IHA.
+  - <span class="kr">match goal with</span> | |- <span class="nl">?s</span> ≡ₐ e =&gt; <span class="nb">pose</span> (xx := s); <span class="nb">change</span> (_ ≡ₐ e) <span class="kr">with</span> (xx ≡ₐ e) <span class="kr">end</span> .
+    <span class="nb">remember</span> xx <span class="kr">as</span> xx&#39;; <span class="nb">unfold</span> xx <span class="kr">in</span> Heqxx&#39;; <span class="nb">clear</span> xx.
+    <span class="nb">rewrite</span> (eq_trans Heqxx&#39; (eq_sym (rew_map _ PNegN _ _))).
+    <span class="nb">apply</span> IHA.
+<span class="kn">Qed</span>.
+
+<span class="c">(* coq unification drives me crazy!! *)</span>
+<span class="kn">Definition</span> <span class="nf">upg_vp</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty pos} : whn Γ `+A  -&gt; val Γ `+A := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+<span class="kn">Definition</span> <span class="nf">upg_kp</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty pos} : term Γ `-A -&gt; val Γ `-A := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+<span class="kn">Definition</span> <span class="nf">upg_vn</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty neg} : term Γ `+A -&gt; val Γ `+A := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+<span class="kn">Definition</span> <span class="nf">upg_kn</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty neg} : whn Γ `-A  -&gt; val Γ `-A := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+<span class="kn">Definition</span> <span class="nf">dwn_vp</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty pos} : val Γ `+A -&gt; whn Γ `+A  := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+<span class="kn">Definition</span> <span class="nf">dwn_kp</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty pos} : val Γ `-A -&gt; term Γ `-A := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+<span class="kn">Definition</span> <span class="nf">dwn_vn</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty neg} : val Γ `+A -&gt; term Γ `+A := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+<span class="kn">Definition</span> <span class="nf">dwn_kn</span> {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty neg} : val Γ `-A -&gt; whn Γ `-A  := <span class="kr">fun</span> <span class="nv">v</span> =&gt; v.
+
+<span class="kn">Lemma</span> <span class="nf">nf_eq_split_p</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span> : pre_ty pos} (<span class="nv">i</span> : Γ ∋ `-A) (<span class="nv">p</span> : pat `+A) <span class="nv">γ</span>
+  : nf_eq (i ⋅ v_split_p (dwn_vp (p `ᵥ⊛ γ)))
+          (i ⋅ (p : o_op obs_op `-A) ⦇ γ ⦈).
+  <span class="nb">unfold</span> v_split_p, dwn_vp; <span class="nb">cbn</span>.
+  <span class="nb">pose proof</span> (p_dom_of_v_eq A p γ).
+  <span class="nb">pose</span> (H&#39; := p_of_w_eq_aux_p A p γ); <span class="nb">fold</span> H&#39; <span class="kr">in</span> H.
+  <span class="nb">pose</span> (a := p_dom_of_w_0p A (w_of_p p `ᵥ⊛ γ)); <span class="nb">fold</span> a <span class="kr">in</span> H |- *.
+  <span class="nb">remember</span> a <span class="kr">as</span> a&#39;; <span class="nb">clear</span> a Heqa&#39;.
+  <span class="nb">revert</span> a&#39; H; <span class="nb">rewrite</span> H&#39;; <span class="nb">intros</span>; <span class="bp">now</span> <span class="nb">econstructor</span>.
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">nf_eq_split_n</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span> : pre_ty neg} (<span class="nv">i</span> : Γ ∋ `+A) (<span class="nv">p</span> : pat `-A) <span class="nv">γ</span>
+  : nf_eq (i ⋅ v_split_n (dwn_kn (p `ᵥ⊛ γ)))
+          (i ⋅ (p : o_op obs_op `+A) ⦇ γ ⦈).
+  <span class="nb">unfold</span> v_split_n, dwn_kn; <span class="nb">cbn</span>.
+  <span class="nb">pose proof</span> (p_dom_of_v_eq A p γ).
+  <span class="nb">pose</span> (H&#39; := p_of_w_eq_aux_n A p γ); <span class="nb">fold</span> H&#39; <span class="kr">in</span> H.
+  <span class="nb">pose</span> (a := p_dom_of_w_0n A (w_of_p p `ᵥ⊛ γ)); <span class="nb">fold</span> a <span class="kr">in</span> H |- *.
+  <span class="nb">remember</span> a <span class="kr">as</span> a&#39;; <span class="nb">clear</span> a Heqa&#39;.
+  <span class="nb">revert</span> a&#39; H; <span class="nb">rewrite</span> H&#39;; <span class="nb">intros</span>; <span class="bp">now</span> <span class="nb">econstructor</span>.
+<span class="kn">Qed</span>.</span></pre><p>Finally we can return to saner pursuits.</p>
+</div>
+<div class="section" id="ogs-instanciation">
+<h1>OGS Instanciation</h1>
+<p>The notion of values and configurations we will pass to the generic OGS construction
+are our mu-mu-tilde values and states, but restricted to negative typing contexts. As
+such, while we have proven all the metatheory for arbitrary typing contexts, we still
+need a tiny bit of work to provide the laws in this special case. Once again, thanks to
+our tricky notion of subset context (<code class="highlight coq"><span class="n">Ctx</span><span class="o">/</span><span class="n">Subset</span><span class="o">.</span><span class="n">v</span></code>), there is no need to cross a
+complex isomorphism (between contexts of negative types and contexts of types where
+all types are negative). We start by instanciating the substitution structures and
+their laws.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Notation</span> <span class="nf">val_n</span> := (val ∘ neg_c_coe).
+<span class="kn">Notation</span> <span class="nf">state_n</span> := (state ∘ neg_c_coe).
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">val_n_monoid</span> : subst_monoid val_n .
+  <span class="nb">esplit</span>.
+  - <span class="nb">intros</span> Γ x i; <span class="bp">exact</span> (var i).
+  - <span class="nb">intros</span> Γ x v Δ f; <span class="bp">exact</span> (v ᵥ⊛ f).
+<span class="kn">Defined</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">state_n_module</span> : subst_module val_n state_n .
+  <span class="nb">esplit</span>; <span class="nb">intros</span> Γ s Δ f; <span class="bp">exact</span> (s ₜ⊛ (f : Γ =[val]&gt; Δ)).
+<span class="kn">Defined</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">val_n_laws</span> : subst_monoid_laws val_n .
+  <span class="nb">esplit</span>.
+  - <span class="nb">intros</span> ???? &lt;- ????; <span class="bp">now</span> <span class="nb">apply</span> v_sub_eq.
+  - <span class="nb">intros</span> ?????; <span class="bp">now</span> <span class="nb">apply</span> v_sub_id_r.
+  - <span class="nb">intros</span> ???; <span class="bp">now</span> <span class="nb">apply</span> v_sub_id_l.
+  - <span class="nb">intros</span> ???????; <span class="nb">symmetry</span>; <span class="bp">now</span> <span class="nb">apply</span> v_sub_sub.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">state_n_laws</span> : subst_module_laws val_n state_n .
+  <span class="nb">esplit</span>.
+  - <span class="nb">intros</span> ??? &lt;- ????; <span class="bp">now</span> <span class="nb">apply</span> s_sub_eq.
+  - <span class="nb">intros</span> ??; <span class="bp">now</span> <span class="nb">apply</span> s_sub_id_l.
+  - <span class="nb">intros</span> ??????; <span class="nb">symmetry</span>; <span class="bp">now</span> <span class="nb">apply</span> s_sub_sub.
+<span class="kn">Qed</span>.</span></pre><p>Variable assumptions, that is, lemmata related to decidability of a value being a variable
+are easily proven inline.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">var_laws</span> : var_assumptions val_n.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">esplit</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">intros</span> ? [[]|[]] ?? H; <span class="bp">now</span> <span class="nb">dependent destruction</span> H.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">intros</span> ? [[]|[]] v; dependent elimination v.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="mi">10</span>,<span class="mi">13</span>: dependent elimination w.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: <span class="kp">try</span> <span class="bp">exact</span> (Yes _ (Vvar _)).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: <span class="nb">apply</span> No; <span class="nb">intro</span> H; <span class="nb">dependent destruction</span> H.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">intros</span> ?? [[]|[]] ???; <span class="nb">cbn</span> <span class="kr">in</span> v; <span class="nb">dependent induction</span> v.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: <span class="kp">try</span> <span class="bp">now</span> <span class="nb">dependent destruction</span> X; <span class="bp">exact</span> (Vvar _).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: <span class="nb">dependent induction</span> w; <span class="nb">dependent destruction</span> X; <span class="bp">exact</span> (Vvar _).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Qed</span>.</span></span></pre><p>And we conclude the easy part by instanciating the relevant part of the language
+machine.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">sysd_machine</span> : machine val_n state_n obs_op :=
+  {| Machine.<span class="kp">eval</span> := @<span class="kp">eval</span> ; oapp := @p_app |} .</span></span></pre><p>It now suffices to prove the remaining assumptions on the language machine: that
+evaluation respects substitution and that the 'bad-instanciation' relation has finite
+chains. For this we pull in some tooling for coinductive reasoning.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">From</span> Coinduction <span class="kn">Require Import</span> coinduction lattice rel tactics.
+
+<span class="kn">Ltac</span> <span class="nf">refold_eval</span> :=
+  <span class="nb">change</span> (<span class="kn">Structure</span>.iter _ _ <span class="nl">?a</span>) <span class="kr">with</span> (<span class="kp">eval</span> a);
+  <span class="nb">change</span> (<span class="kn">Structure</span>.<span class="nb">subst</span> (<span class="kr">fun</span> <span class="nv">pat</span> : T1 =&gt; <span class="kr">let</span> <span class="nv">&#39;T1_0</span> := pat <span class="kr">in</span> <span class="nl">?f</span>) T1_0 <span class="nl">?u</span>)
+    <span class="kr">with</span> (bind_delay&#39; u f).</span></pre><p>Let's go.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">machine_law</span> : machine_laws val_n state_n obs_op.</span></span></pre><p>First we have easy lemmata on observation application.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">esplit</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">intros</span>; <span class="nb">apply</span> p_app_eq.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">intros</span> ?? [[]|[]] ????; <span class="nb">cbn</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    <span class="mi">1</span>,<span class="mi">4</span>: <span class="nb">change</span> (<span class="nl">?a</span> `ₜ⊛ <span class="nl">?b</span>) <span class="kr">with</span> (a ᵥ⊛ b); <span class="bp">now</span> <span class="nb">rewrite</span> (w_sub_sub _ _ _ _).
+    <span class="kp">all</span>: <span class="nb">change</span> (<span class="nl">?a</span> `ᵥ⊛ <span class="nl">?b</span>) <span class="kr">with</span> (a ᵥ⊛ b) <span class="nb">at</span> <span class="mi">1</span>; <span class="bp">now</span> <span class="nb">rewrite</span> (w_sub_sub _ _ _ _).</span></pre><p>Next we prove the core argument of OGS soundness: evaluating a substitution is like
+evaluating the configuration, substituting the result and evaluating again.
+While tedious the proof is basically direct, going by induction on the structure of
+one-step evaluation.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">cbn</span>; <span class="nb">intros</span> Γ Δ; <span class="nb">unfold</span> comp_eq, it_eq; coinduction R CIH; <span class="nb">intros</span> c a.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">cbn</span>; funelim (eval_aux c); <span class="kp">try</span> <span class="bp">now</span> <span class="nb">destruct</span> (s_prf i).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input">+</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">      <span class="nb">change</span> (<span class="nl">?t</span> `ₜ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_kp t ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?t</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_vp t ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (RecL (<span class="nl">?t</span> `ₜ⊛ a_shift1 <span class="nl">?a</span>)) <span class="kr">with</span> (upg_kp (RecL t) ᵥ⊛ a); <span class="nb">rewrite</span> t_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">change</span> (it_eqF _ <span class="nl">?RX</span> <span class="nl">?RY</span> _ _ _) <span class="kr">with</span>
+        (it_eq_map ∅ₑ RX RY T1_0
+           (<span class="kp">eval</span> (Cut _ (Whn (v `ᵥ⊛ a)) (a `- A i)))
+           (<span class="kp">eval</span> (Cut _
+              (Whn ((w_of_p (p_of_w_0p A v) `ᵥ⊛ nf_args (s_var_upg i ⋅ v_split_p v)) `ᵥ⊛ a))
+              (var (s_var_upg i) `ₜ⊛ a)))).
+      <span class="nb">unfold</span> nf_args, v_split_p, cut_r, fill_args.
+      <span class="bp">now</span> <span class="nb">rewrite</span> (refold_id_aux A v).
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval; <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_vp v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub2_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_vp v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_vp v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ₜ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_vn v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_kn v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ₜ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_vn v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_kn v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (RecR (<span class="nl">?t</span> `ₜ⊛ a_shift1 <span class="nl">?a</span>)) <span class="kr">with</span> (upg_vn (RecR t) ᵥ⊛ a); <span class="nb">rewrite</span> t_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">change</span> (it_eqF _ <span class="nl">?RX</span> <span class="nl">?RY</span> _ _ _) <span class="kr">with</span>
+        (it_eq_map ∅ₑ RX RY T1_0
+           (<span class="kp">eval</span> (Cut _ (a `+ A i) (Whn (k `ᵥ⊛ a))))
+           (<span class="kp">eval</span> (Cut _
+              (var (s_var_upg i) `ₜ⊛ a)
+              (Whn ((w_of_p (p_of_w_0n A k) `ᵥ⊛ nf_args (s_var_upg i ⋅ v_split_n k))
+                      `ᵥ⊛ a))))).
+      <span class="nb">unfold</span> nf_args, v_split_n, cut_r, fill_args.
+      <span class="bp">now</span> <span class="nb">rewrite</span> (refold_id_aux A k).
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval; <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_kn v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub2_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_kn v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_kn v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ₜ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_kp v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">cbn</span>; <span class="nb">econstructor</span>; refold_eval.
+      <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> (upg_vp v ᵥ⊛ a); <span class="nb">rewrite</span> s_sub1_sub.
+      <span class="nb">apply</span> CIH.</span></pre><p>Next we prove that evaluating a normal form is just returning this normal form. This
+goes by approximately induction on observations.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">cbn</span>; <span class="nb">intros</span> ? [ A i [ o γ ]]; <span class="nb">cbn</span>; <span class="nb">unfold</span> p_app, nf_args, cut_r, fill_args.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">cbn</span> <span class="kr">in</span> o; funelim (w_of_p o); simpl_depind; <span class="nb">inversion</span> eqargs.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: <span class="kr">match goal with</span>
+         | H : _ = <span class="nl">?A</span>† |- _ =&gt; <span class="nb">destruct</span> A; <span class="nb">dependent destruction</span> H
+         <span class="kr">end</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="mi">1</span>-<span class="mi">2</span>: <span class="nb">unfold</span> c_var <span class="kr">in</span> i; <span class="nb">destruct</span> (s_prf i).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: <span class="nb">dependent destruction</span> eqargs; <span class="nb">cbn</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: <span class="nb">apply</span> it_eq_unstep; <span class="nb">cbn</span> -[w_of_p]; <span class="nb">econstructor</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="mi">1</span>-<span class="mi">2</span>: <span class="bp">now</span> <span class="nb">econstructor</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    <span class="kp">all</span>: <span class="kr">match goal with</span>
+         | γ : dom <span class="nl">?p</span> =[val_n]&gt; _ |- _ =&gt; <span class="kp">first</span> [ <span class="bp">exact</span> (nf_eq_split_p _ p γ)
+                                              | <span class="bp">exact</span> (nf_eq_split_n _ p γ) ]
+         <span class="kr">end</span>.</span></pre><p>Finally we prove the finite chain property. The proof here is quite tedious again, with
+numerous cases, but it is still by brutally walking through the structure of one-step
+evaluation and finding the needed redex.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">intros</span> A; <span class="nb">econstructor</span>; <span class="nb">intros</span> [ B m ] H; dependent elimination H;
+      <span class="nb">cbn</span> [projT1 projT2] <span class="kr">in</span> i, i0.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">destruct</span> y <span class="kr">as</span> [ [] | [] ].</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: dependent elimination v; <span class="kp">try</span> <span class="bp">now</span> <span class="nb">destruct</span> (t0 (Vvar _)).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: <span class="nb">clear</span> t0.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: dependent elimination o; <span class="nb">cbn</span> <span class="kr">in</span> i0.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    <span class="kp">all</span>: <span class="kr">match goal with</span>
+         | u : dom _ =[val_n]&gt; _ |- _ =&gt;
+             <span class="nb">cbn</span> <span class="kr">in</span> i0;
+             <span class="nb">pose</span> (vv := u _ Ctx.top); <span class="nb">change</span> (u _ Ctx.top) <span class="kr">with</span> vv <span class="kr">in</span> i0;
+             <span class="nb">remember</span> vv <span class="kr">as</span> v&#39;; <span class="nb">clear</span> u vv Heqv&#39;; <span class="nb">cbn</span> <span class="kr">in</span> v&#39;
+         | _ =&gt; <span class="kp">idtac</span>
+       <span class="kr">end</span>.
+    <span class="mi">7</span>-<span class="mi">18</span>,<span class="mi">25</span>-<span class="mi">36</span>: <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0.
+    <span class="mi">1</span>-<span class="mi">9</span>,<span class="mi">19</span>-<span class="mi">24</span>: <span class="kr">match goal with</span>
+       | t : term _ _ |- _ =&gt;
+           dependent elimination t;
+           [ <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0
+           | <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0
+           | ]
+       | _ =&gt; <span class="kp">idtac</span>
+         <span class="kr">end</span>.
+    <span class="kp">all</span>: 
+      <span class="kr">match goal with</span>
+      | t : evalₒ (Cut _ (Whn <span class="nl">?w</span>) _) ≊ _ |- _ =&gt;
+          dependent elimination w;
+          [ | <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0 ]
+      | t : evalₒ (Cut _ _ (Whn <span class="nl">?w</span>)) ≊ _ |- _ =&gt;
+          dependent elimination w;
+          [ | <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0 ]
+      | _ =&gt; <span class="kp">idtac</span>
+      <span class="kr">end</span>.
+    <span class="kp">all</span>:
+      <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="nb">cbn</span> <span class="kr">in</span> i0; dependent elimination i0; <span class="nb">cbn</span> <span class="kr">in</span> r_rel;
+      <span class="nb">apply</span> noConfusion_inv <span class="kr">in</span> r_rel; <span class="nb">unfold</span> v_split_n,v_split_p <span class="kr">in</span> r_rel;
+      <span class="nb">cbn</span> <span class="kr">in</span> r_rel; <span class="nb">unfold</span> NoConfusionHom_f_cut,s_var_upg <span class="kr">in</span> r_rel; <span class="nb">cbn</span> <span class="kr">in</span> r_rel;
+      <span class="nb">pose proof</span> (H := <span class="nb">f_equal</span> pr1 r_rel); <span class="nb">cbn</span> <span class="kr">in</span> H; <span class="nb">dependent destruction</span> H;
+      <span class="nb">apply</span> DepElim.pr2_uip <span class="kr">in</span> r_rel;
+      <span class="nb">pose proof</span> (H := <span class="nb">f_equal</span> pr1 r_rel); <span class="nb">cbn</span> <span class="kr">in</span> H; <span class="nb">dependent destruction</span> H;
+      <span class="nb">apply</span> DepElim.pr2_uip <span class="kr">in</span> r_rel; <span class="nb">dependent destruction</span> r_rel.
+    <span class="kp">all</span>:
+      <span class="nb">econstructor</span>; <span class="nb">intros</span> [ t o ] H; <span class="nb">cbn</span> <span class="kr">in</span> t,o; dependent elimination H;
+      dependent elimination v;
+      [ <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="nb">cbn</span> <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0
+      | <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="nb">cbn</span> <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0 
+      | ].
+    <span class="kp">all</span>:
+      <span class="kr">match goal with</span>
+      | H : <span class="nb">is_var</span> (Whn <span class="nl">?w</span>) -&gt; _ |- _ =&gt;
+          dependent elimination w;
+          <span class="kp">try</span> <span class="bp">now</span> <span class="nb">destruct</span> (H (Vvar _))
+      <span class="kr">end</span>.
+    <span class="kp">all</span>: <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="nb">cbn</span> <span class="kr">in</span> i0; dependent elimination i0.
+<span class="kn">Qed</span>.</span></pre></div>
+<div class="section" id="final-theorem">
+<h1>Final theorem</h1>
+<p>We have finished instanciating our generic OGS construction on the System D calculus. For
+good measure we give here the concrete instanciation of the soundness theorem, stating
+that bisimilarity of the OGS strategies substitution equivalence.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">subst_eq</span> (<span class="nv">Δ</span> : neg_ctx) {<span class="nv">Γ</span>} : relation (state Γ) :=
+  <span class="kr">fun</span> <span class="nv">u</span> <span class="nv">v</span> =&gt; <span class="kr">forall</span> (<span class="nv">σ</span> : Γ =[val]&gt; Δ), evalₒ (u ₜ⊛ σ : state_n Δ) ≈ evalₒ (v ₜ⊛ σ : state_n Δ) .
+<span class="kn">Notation</span> <span class="s2">&quot;x ≈⟦sub Δ ⟧≈ y&quot;</span> := (subst_eq Δ x y) (<span class="kn">at level</span> <span class="mi">50</span>).
+
+<span class="kn">Theorem</span> <span class="nf">subst_correct</span> (<span class="nv">Δ</span> : neg_ctx) {<span class="nv">Γ</span> : neg_ctx} (<span class="nv">x</span> <span class="nv">y</span> : state Γ)
+  : x ≈⟦ogs Δ ⟧≈ y -&gt; x ≈⟦sub Δ ⟧≈ y.
+  <span class="bp">exact</span> (ogs_correction _ x y).
+<span class="kn">Qed</span>.</span></pre><p>Finally it does not cost much to recover the more standard CIU equivalence, which we
+derive here for the case of terms (not co-terms).</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">c_of_t</span> {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span> : pre_ty pos} (<span class="nv">t</span> : term Γ `+A)
+           : state_n (Γ ▶ₛ {| sub_elt := `-A ; sub_prf := stt |}) :=
+  Cut _ (t_shift1 _ t) (Whn (Var Ctx.top)) .
+<span class="kn">Notation</span> <span class="s2">&quot;&#39;name⁺&#39;&quot;</span> := c_of_t.
+
+<span class="kn">Definition</span> <span class="nf">a_of_sk</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> : neg_ctx} {<span class="nv">A</span> : pre_ty pos} (<span class="nv">s</span> : Γ =[val]&gt; Δ) (<span class="nv">k</span> : term Δ `-A)
+  : (Γ ▶ₛ {| sub_elt := `-A ; sub_prf := stt |}) =[val_n]&gt; Δ :=
+  [ s ,ₓ k : val Δ `-A ].
+
+<span class="kn">Lemma</span> <span class="nf">sub_csk</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> : neg_ctx} {<span class="nv">A</span> : pre_ty pos} (<span class="nv">t</span> : term Γ `+A) (<span class="nv">s</span> : Γ =[val]&gt; Δ)
+  (<span class="nv">k</span> : term Δ `-A)
+  : Cut _ (t `ₜ⊛ s) k = c_of_t t ₜ⊛ a_of_sk s k.
+<span class="kn">Proof</span>.
+  <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">unfold</span> t_shift1; <span class="nb">rewrite</span> t_sub_ren; <span class="bp">now</span> <span class="nb">apply</span> t_sub_eq.
+<span class="kn">Qed</span>.
+
+<span class="kn">Definition</span> <span class="nf">ciu_eq</span> (<span class="nv">Δ</span> : neg_ctx) {<span class="nv">Γ</span>} {<span class="nv">A</span> : pre_ty pos} : relation (term Γ `+A) :=
+  <span class="kr">fun</span> <span class="nv">u</span> <span class="nv">v</span> =&gt;
+    <span class="kr">forall</span> (<span class="nv">σ</span> : Γ =[val]&gt; Δ) (<span class="nv">k</span> : term Δ `-A),
+      evalₒ (Cut _ (u `ₜ⊛ σ) k : state_n Δ) ≈ evalₒ (Cut _ (v `ₜ⊛ σ) k : state_n Δ) .
+<span class="kn">Notation</span> <span class="s2">&quot;x ≈⟦ciu Δ ⟧⁺≈ y&quot;</span> := (ciu_eq Δ x y) (<span class="kn">at level</span> <span class="mi">50</span>).
+
+<span class="kn">Theorem</span> <span class="nf">ciu_correct</span> (<span class="nv">Δ</span> : neg_ctx) {<span class="nv">Γ</span> : neg_ctx} {<span class="nv">A</span>} (<span class="nv">x</span> <span class="nv">y</span> : term Γ `+A)
+  : (name⁺ x) ≈⟦ogs Δ ⟧≈ (name⁺ y) -&gt; x ≈⟦ciu Δ ⟧⁺≈ y.
+  <span class="nb">intros</span> H σ k; <span class="nb">rewrite</span> <span class="mi">2</span> sub_csk.
+  <span class="bp">now</span> <span class="nb">apply</span> subst_correct.
+<span class="kn">Qed</span>.</span></pre></div>
+</div>
+</div></body>
+</html>
