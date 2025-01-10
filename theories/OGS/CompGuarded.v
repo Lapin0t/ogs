@@ -1,12 +1,12 @@
 (*|
-Eventual guardedness of the composition
-=======================================
+Eventual guardedness of the composition (Prop. 6)
+=================================================
 
 We want to prove adequacy by unicity of solutions to the set of equations defining the
 composition. To do so, we rely on the notion of guarded iteration introduced in
 `ITree/Guarded.v <Guarded.html>`_. Through this file, we prove that the composition is
-indeed eventually guarded. As described in §6.3, the proof relies crucially on the
-``eval_app_not_var`` assumption (Def 6.21).
+indeed eventually guarded. The proof relies crucially on the "focused redex" assumption
+(Def. 28, here denoted by the law ``eval_app_not_var``).
 
 .. coq:: none
 |*)
@@ -244,7 +244,7 @@ of the interactions until we attain a resume and can apply our main lemma.
 (*|
 From the previous proof we can directly apply the strong fixed point construction on
 eventually guarded equations and obtain a composition operator without any ``Tau`` node
-at interaction points.
+at interaction points (Prop. 6).
 |*)
   Definition compo_ev_guarded {Δ a} (u : m_strat_act Δ a) (v : m_strat_pas Δ a)
     : delay (obs∙ Δ)
@@ -252,6 +252,3 @@ at interaction points.
 
 End with_param.
 #[global] Notation "u ∥g v" := (compo_ev_guarded u v) (at level 40).
-
-
-

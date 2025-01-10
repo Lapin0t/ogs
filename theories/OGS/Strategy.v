@@ -246,6 +246,11 @@ version, working pointwise.
   Definition m_strat_pas_eqv {Δ} : relᵢ (m_strat_pas Δ) (m_strat_pas Δ) :=
     fun i x y => forall m, m_strat_resp x m ≈ₐ m_strat_resp y m .
   Notation "x ≈ₚ y" := (m_strat_pas_eqv _ x y).
+
+  #[global] Instance m_strat_act_eqv_refl {Δ} : Reflexiveᵢ (@m_strat_act_eqv Δ).
+  Proof. intros ??; unfold m_strat_act_eqv; reflexivity. Qed.
+  #[global] Instance m_strat_pas_eqv_refl {Δ} : Reflexiveᵢ (@m_strat_pas_eqv Δ).
+  Proof. intros ???; reflexivity. Qed.
 (*|
 A technical lemma explaining how the infinite strategy unfolds.
 |*)

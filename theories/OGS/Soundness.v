@@ -1,5 +1,5 @@
 (*|
-Soundness (Theorem 6.12)
+Soundness (Theorem 8)
 ========================
 
 Finally, all the pieces are in place to prove that bisimilarity of induced LTS is sound
@@ -27,7 +27,7 @@ appropriate axiomatization.
   Context {obs : obs_struct T C} {M : machine val conf obs} {ML : machine_laws val conf obs}.
   Context {VV : var_assumptions val}.
 (*|
-We define substitution equivalence of two language machine configurations (Def 4.24).
+We define substitution equivalence of two language machine configurations (Def. 15).
 
 .. coq::
    :name: substeq
@@ -35,25 +35,6 @@ We define substitution equivalence of two language machine configurations (Def 4
   Definition substeq {Γ} Δ (a b : conf Γ) : Prop
     := forall γ : Γ =[val]> Δ, evalₒ (a ₜ⊛ γ) ≈ evalₒ (b ₜ⊛ γ).
   Notation "x ≈⟦sub Δ ⟧≈ y" := (substeq Δ x y) (at level 50).
-(*|
-We define an intermediate notion of equivalence, stating that for any assignment ``γ``,
-the induced LTS are bisimilar when composed with the passive interpretation of ``γ``.
-|*)
-  Definition barb {Γ} Δ (x y : conf Γ) : Prop
-    := forall γ : Γ =[val]> Δ,
-         (inj_init_act Δ x ∥ inj_init_pas γ)
-       ≈ (inj_init_act Δ y ∥ inj_init_pas γ).
-  Notation "x ≈⟦barb Δ ⟧≈ y" := (barb Δ x y) (at level 50).
-(*|
-Barbed equivalence is sound w.r.t. substitution equivalence, by swapping the naive
-composition with the guarded one and then applying adequacy.
-|*)
-  Theorem barb_correction {Γ} Δ (x y : conf Γ) : x ≈⟦barb Δ⟧≈ y -> x ≈⟦sub Δ⟧≈ y.
-  Proof.
-    intros H e.
-    rewrite (adequacy x e), (adequacy y e).
-    apply H.
-  Qed.
 (*|
 Our main theorem: bisimilarity of induced OGS machine strategies is sound w.r.t.
 substitution equivalence, by applying barbed equivalence soundness, swapping the naive
@@ -64,10 +45,8 @@ composition with the `opaque one <Congruence.html>`_ and then applying congruenc
 |*)
   Theorem ogs_correction {Γ} Δ (x y : conf Γ) : x ≈⟦ogs Δ⟧≈ y -> x ≈⟦sub Δ⟧≈ y.
   Proof.
-    intro H; apply barb_correction.
-    intro e.
-    apply compo_proper; auto.
-    intros ?; unfold m_strat_act_eqv; reflexivity.
+    intros H γ; unfold m_conf_eqv in H.
+    now rewrite 2 adequacy, H.
   Qed.
 End with_param.
 (*|
