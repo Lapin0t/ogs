@@ -20,6 +20,7 @@ serve:
 
 docker:
 	docker build -t coq-ogs:latest .
+	docker image save coq-ogs:latest | gzip > docker_coq-ogs.tar.gz
 
 
 clean:
