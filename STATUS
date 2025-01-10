@@ -1,0 +1,25 @@
+We apply for all three badges for this code artifact.
+
+Available
+---------
+
+The current version of the code has been archived on Zenodo (on top of the
+public github repository), so it should be clear that the artifact is indeed
+available.
+
+Functional
+----------
+
+Our provided Coq code typechecks without any warnings, furthermore we believe
+that it faithfully encodes every statement from the paper. Although some small
+differences remain, we argue that they are more related to a space limitation
+and readibily considerations on the side of the paper, than any simplification
+or inacuracy on the side of the code.
+
+Reusable
+--------
+
+We believe that our thorough comments throughout the source, online alectryon
+documentation and standard dune packaging of the library qualify our artifact
+as reusable. Evidently the library is still in its early stages, but we believe
+that it can provide a sound starting point to develop it further.
