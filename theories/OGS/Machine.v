@@ -11,8 +11,8 @@ we have realized a posteriori a more elegant way to decompose the abstract
 machine as exposed in the paper.
 
 Here, instead of only requiring an embedding of normal forms into
-configurations (``refold``, from Def. 11), we require an _observation
-application_ function ``oapp`` describing how to build a configuration
+configurations (``refold``, from Def. 11), we require an *observation
+application* function ``oapp`` describing how to build a configuration
 from a value, an observation, and an assignment. Since normal forms are triples
 of a variable, an observation and an assignment, the sole difference is in the
 first component: instead of just a variable, ``oapp`` takes any value. Both
@@ -97,8 +97,8 @@ Variant head_inst_nostep `{machine val conf obs} {VM : subst_monoid val}
 Finally we define the structure containing all the remaining axioms of a language
 machine (Def. 13).
 |*)
-Class machine_laws val conf obs {M : machine val conf obs} {VM : subst_monoid val}
-      {CM : subst_module val conf} := {
+Class machine_laws val conf obs {M : machine val conf obs}
+  {VM : subst_monoid val} {CM : subst_module val conf} := {
 (*|
 ``oapp`` respects pointwise equality of assignments.
 |*)
@@ -117,12 +117,16 @@ equation at the end of Def. 13, in terms of ``oapp`` instead of ``refold``.
 soundness, stating essentially "substituting, then evaluating" is equivalent to
 "evaluating, then substituting, then evaluating once more". It is the equvalent
 of the first equation at the end of Def. 13.
+
+.. coq::
 |*)
    eval_sub {Γ Δ} (c : conf Γ) (a : Γ =[val]> Δ)
    : eval (c ₜ⊛ a) ≋ bind_delay' (eval c) (fun n => eval (emb n ₜ⊛ a)) ;
 (*|
 Evaluating the embedding of a normal form is equivalent to returning the normal
 form. This is part of the evaluation structure (Def. 11) in the paper.
+
+.. coq::
 |*)
    eval_nf_ret {Γ} (u : nf obs val Γ)
    : eval (emb u) ≋ ret_delay u ;
@@ -130,6 +134,8 @@ form. This is part of the evaluation structure (Def. 11) in the paper.
 At last the mystery hypothesis, stating that the machine has focused redexes (Def. 28).
 It is necessary for establishing that the composition can be defined by eventually
 guarded iteration.
+
+.. coq::
 |*)
     eval_app_not_var : well_founded head_inst_nostep ;
   } .

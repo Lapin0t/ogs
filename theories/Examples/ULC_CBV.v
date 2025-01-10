@@ -743,7 +743,7 @@ We can now obtain a correctness theorem with respect to standard
 CIU-equivalence by embedding terms into states. Proving that CIU-equivalence
 entails our substitution equivalence is left to the reader!
 |*)
-Theorem stlc_ciu_correct Δ {Γ} (x y : term Γ)
+Theorem ulc_ciu_correct Δ {Γ} (x y : term Γ)
   : c_init x ≈⟦ogs Δ⟧≈ c_init y -> x ≈⟦ciu Δ⟧≈ y .
   intros H σ k; rewrite 2 sub_init.
   now apply ulc_subst_correct.
