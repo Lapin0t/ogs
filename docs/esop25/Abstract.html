@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Abstract contexts structures</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="abstract-contexts-structures">
+<h1 class="title">Abstract contexts structures</h1>
+
+<p>Our whole development utilizes well-scoped and well-typed terms. In this style, the most
+common binder representation is by using lists as contexts and well-typed DeBruijn indices
+as variables. This is nice and good, but sometimes we would rather have had another,
+isomorphic, representation. Indeed in an intensional type theory like Coq, sometimes
+crossing an isomorphism is pretty painful.</p>
+<p>As such, we here define what it means for an alternate definition of contexts to
+&quot;behave like lists and DeBruijn indices&quot;.</p>
+<p>This is a very natural extension to the theory of substitution by Marcelo Fiore and
+Dimitri Szamozvancev, and in fact a variant of the &quot;Nameless, Painless&quot; approach by
+Nicolas Pouillard.</p>
+<div class="section" id="theory">
+<h1>Theory</h1>
+<p>Categorically, it very simple. Contexts are represented by a set <tt class="docutils literal">C</tt>, a distinguished
+element <tt class="docutils literal">∅</tt> and a binary operation <tt class="docutils literal">- +▶ -</tt>. Additionally it has a map representing
+variable <tt class="docutils literal">𝐯 : C → 𝐀</tt> where <tt class="docutils literal">𝐀</tt> is a sufficiently well-behaved category, typically a
+presheaf category. We then ask that</p>
+<ul class="simple">
+<li><tt class="docutils literal">𝐯 ∅ ≈ ⊥</tt>, where <tt class="docutils literal">⊥</tt> is the initial object in <tt class="docutils literal">𝐀</tt> and</li>
+<li><tt class="docutils literal">𝐯 (Γ +▶ Δ) ≈ 𝐯 Γ + 𝐯 Δ</tt> where <code class="highlight coq"><span class="o">+</span></code> is the coproduct in <tt class="docutils literal">𝐀</tt>.</li>
+</ul>
+<p>Our category of contexts is then the full image of <tt class="docutils literal">𝐯</tt>, which has the structure of a
+commutative monoid. Then, given a family <tt class="docutils literal">X : C → 𝐀</tt>, it is easy to define
+assignments as:</p>
+<pre class="code literal-block">
+Γ =[X]&gt; Δ ≔ 𝐀[ 𝐯 Γ , X Δ ]
+</pre>
+<p>And renamings as:</p>
+<pre class="code literal-block">
+Γ ⊆ Δ ≔ Γ =[ 𝐯 ]&gt; Δ
+      ≔ 𝐀[ 𝐯 Γ , 𝐯 Δ ]
+</pre>
+<p>Assuming <tt class="docutils literal">𝐀</tt> is (co-)powered over <tt class="docutils literal">Set</tt>, the substitution tensor product and substitution
+internal hom in <tt class="docutils literal">C → 𝐀</tt> are given by:</p>
+<pre class="code literal-block">
+( X ⊗ Y ) Γ ≔ ∫^Δ  X Δ × (Δ =[ Y ]&gt; Γ)
+⟦ X , Y ⟧ Γ ≔ ∫_Δ  (Γ =[ X ]&gt; Δ) → Y Δ
+</pre>
+<p>More generally, given a category <tt class="docutils literal">𝐁</tt> (co-)powered over <tt class="docutils literal">Set</tt> we can define the the
+following functors, generalizing the substitution tensor and hom to heretogeneous
+settings:</p>
+<pre class="code literal-block">
+( - ⊗ - ) : (C → 𝐁) → (C → 𝐀) → (C → 𝐁)
+( X ⊗ Y ) Γ ≔ ∫^Δ  X Δ × (Δ =[ Y ]&gt; Γ)
+
+⟦ - , - ⟧ : (C → 𝐀) → (C → 𝐁) → (C → 𝐁)
+⟦ X , Y ⟧ Γ ≔ ∫_Δ  (Γ =[ X ]&gt; Δ) → Y Δ
+</pre>
+</div>
+<div class="section" id="concretely">
+<h1>Concretely</h1>
+<p>We here apply the above theory to the case where <tt class="docutils literal">𝐀</tt> is the family category <tt class="docutils literal">T → Set</tt>
+for some set <tt class="docutils literal">T</tt>. Taking <tt class="docutils literal">T</tt> to the set of types of some object language, families
+<tt class="docutils literal">C → 𝐀</tt>, ie <tt class="docutils literal">C → T → Set</tt>, model nicely well-scoped and well-typed families. To
+capture non-typed syntactic categories, indexed only by a scope, we develop the special
+case where <tt class="docutils literal">𝐁</tt> is just <tt class="docutils literal">Set</tt>.</p>
+<p>We then instanciate this abstract structure with the usual lists and DeBruijn indices,
+but also with two useful instances: the direct sum, where the notion of variables <tt class="docutils literal">𝐯</tt>
+is the pointwise coproduct and the subset, where the notion of variables is preserved.</p>
+<p>In further work we wish to tacle this in more generality, notable treating the case for
+the idiomatic presentation of well-scoped untyped syntax where <tt class="docutils literal">𝐀</tt> is <tt class="docutils literal">Set</tt>, <tt class="docutils literal">C</tt>
+is <tt class="docutils literal">ℕ</tt> and <tt class="docutils literal">𝐯</tt> is <tt class="docutils literal">Fin</tt>. Currently, we do treat untyped syntax, but using the
+non-idiomatic &quot;unityped&quot; presentation.</p>
+<p>The first part of the context structure: the distinguished empty context, the binary
+concatenation and the family of variables.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Class</span> <span class="nf">context</span> (<span class="nv">T</span> <span class="nv">C</span> : <span class="kt">Type</span>) := {
+  c_emp : C ;
+  c_cat : C -&gt; C -&gt; C ;
+  c_var : C -&gt; T -&gt; <span class="kt">Type</span> ;
+}.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;∅&quot;</span> := c_emp : ctx_scope.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;Γ +▶ Δ&quot;</span> := (c_cat Γ Δ) : ctx_scope.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;Γ ∋ t&quot;</span> := (c_var Γ%ctx t).</span></span></pre><p>Next we need to formalize the isomorphisms stating that variables map the empty context
+to the initial family and the concatenation to the coproduct family. To do this we will
+not write the usual forward map and backward map that compose to the identity, but we
+will rather formalize injections with inhabited fibers. The reason for this equivalent
+presentation is that it will ease dependent pattern matching by providing the isomorphisms
+as &quot;views&quot; (see &quot;The view from the left&quot; by Conor McBride).</p>
+<p>First lets define the two injection maps.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Class</span> <span class="nf">context_cat_wkn</span> (<span class="nv">T</span> <span class="nv">C</span> : <span class="kt">Type</span>) {<span class="nv">CC</span> : <span class="kp">context</span> T C} := {
+  r_cat_l {Γ Δ} [t] : Γ ∋ t -&gt; Γ +▶ Δ ∋ t ;
+  r_cat_r {Γ Δ} [t] : Δ ∋ t -&gt; Γ +▶ Δ ∋ t ;
+}.</span></span></pre><p>Then, assuming such a structure, we define two inductive families characterizing the
+fibers.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Section</span> <span class="nf">with_param</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Context</span> `{C : context_cat_wkn X T}.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Variant</span> <span class="nf">c_emp_view</span> <span class="nv">t</span> : ∅ ∋ t -&gt; <span class="kt">Type</span> := .</span></span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Variant</span> <span class="nf">c_cat_view</span> <span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">t</span> : Γ +▶ Δ ∋ t -&gt; <span class="kt">Type</span> :=
+  | Vcat_l (i : Γ ∋ t) : c_cat_view Γ Δ t (r_cat_l i)
+  | Vcat_r (j : Δ ∋ t) : c_cat_view Γ Δ t (r_cat_r j)
+  .</span></span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">End</span> <span class="nf">with_param</span>.</span></span></pre><p>Finally we give the rest of the laws: functions witnessing the inhabitedness of the fibers
+and the injectivity of the two injection maps. This last statement is split into 3 as we
+have separated the embedding for coproducts into two separate maps.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Class</span> <span class="nf">context_laws</span> <span class="nv">T</span> <span class="nv">C</span> {<span class="nv">CC</span> : <span class="kp">context</span> T C} := {
+  c_var_cat :: context_cat_wkn T C ;
+  c_view_emp {t} i : c_emp_view t i ;
+  c_view_cat {Γ Δ t} i : c_cat_view Γ Δ t i ;
+  r_cat_l_inj {Γ Δ t} : injective (@r_cat_l _ _ _ _ Γ Δ t) ;
+  r_cat_r_inj {Γ Δ t} : injective (@r_cat_r _ _ _ _ Γ Δ t) ;
+  r_cat_disj {Γ Δ t} (i : Γ ∋ t) (j : Δ ∋ t) : ¬ (r_cat_l i = r_cat_r j) ;
+} .</span></span></pre></div>
+</div>
+</div></body>
+</html>

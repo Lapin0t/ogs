@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Adequacy (Prop. 7)</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="adequacy-prop-7">
+<h1 class="title">Adequacy (Prop. 7)</h1>
+
+<p>We prove in this module that the composition of strategy is adequate.
+The proof essentially proceeds by showing that &quot;evaluating and observing&quot;,
+i.e., <tt class="docutils literal">reduce</tt>, is a solution of the same equations as is the composition
+of strategies.</p>
+<p>This argument assumes we can rely on the unicity of such a solution (Prop. 6):
+we prove this fact by proving that these equations are eventually guarded in
+<a class="reference external" href="CompGuarded.html">OGS/CompGuarded.v</a>.</p>
+<p>We consider a language abstractly captured as a machine satisfying an
+appropriate axiomatization.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Context</span> {<span class="nv">T</span> <span class="nv">C</span>} {<span class="nv">CC</span> : <span class="kp">context</span> T C} {<span class="nv">CL</span> : context_laws T C}.
+  <span class="kn">Context</span> {<span class="nv">val</span>} {<span class="nv">VM</span> : subst_monoid val} {<span class="nv">VML</span> : subst_monoid_laws val}.
+  <span class="kn">Context</span> {<span class="nv">conf</span>} {<span class="nv">CM</span> : subst_module val conf} {<span class="nv">CML</span> : subst_module_laws val conf}.
+  <span class="kn">Context</span> {<span class="nv">obs</span> : obs_struct T C} {<span class="nv">M</span> : machine val conf obs} {<span class="nv">ML</span> : machine_laws val conf obs}.
+  <span class="kn">Context</span> {<span class="nv">VV</span> : var_assumptions val}.</span></pre><p>We define <tt class="docutils literal">reduce</tt>, called &quot;zip-then-eval-then-observe&quot; (<tt class="docutils literal"><span class="pre">z-e-obs</span></tt>) in the paper.</p>
+<pre class="alectryon-io highlight" id="zeobs"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Definition</span> <span class="nf">reduce</span> {<span class="nv">Δ</span>} (<span class="nv">x</span> : reduce_t Δ)
+    : delay (obs∙ Δ)
+    := evalₒ (x.(red_act).(ms_conf)
+              ₜ⊛ [ a_id , bicollapse x.(red_act).(ms_env) x.(red_pas) ]) .
+
+  <span class="kn">Definition</span> <span class="nf">reduce&#39;</span> {<span class="nv">Δ</span>} : <span class="kr">forall</span> <span class="nv">i</span>, reduce_t Δ -&gt; itree ∅ₑ (<span class="kr">fun</span> <span class="nv">_</span> : T1 =&gt; obs∙ Δ) i
+    := <span class="kr">fun</span> <span class="nv">&#39;T1_0</span> =&gt; reduce .</span></pre><p>Equipped with eventually guarded equations, we are ready to prove the adequacy.</p>
+<p>First a technical lemma, which unfolds one step of composition, then reduce to a simpler
+more explicit form.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Lemma</span> <span class="nf">compo_reduce_simpl</span> {<span class="nv">Δ</span>} (<span class="nv">x</span> : reduce_t Δ) :
+    (compo_body x &gt;&gt;= <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">r</span> =&gt;
+         <span class="kr">match</span> r <span class="kr">with</span>
+         | inl y =&gt; reduce&#39; _ y
+         | inr o =&gt; Ret&#39; (o : (<span class="kr">fun</span> <span class="nv">_</span> =&gt; obs∙ _) _)
+         <span class="kr">end</span>)
+      ≊
+      (<span class="kp">eval</span> x.(red_act).(ms_conf) &gt;&gt;= <span class="kr">fun</span> <span class="nv">_</span> <span class="nv">n</span> =&gt;
+           <span class="kr">match</span> c_view_cat (nf_var n) <span class="kr">with</span>
+           | Vcat_l i =&gt; Ret&#39; (i ⋅ nf_obs n)
+           | Vcat_r j =&gt; reduce&#39; _ (RedT (m_strat_resp x.(red_pas) (j ⋅ nf_obs n))
+                                        (x.(red_act).(ms_env) ;⁻ nf_args n))
+           <span class="kr">end</span>).
+  <span class="kn">Proof</span>.
+    <span class="kp">do</span> <span class="mi">2</span> (<span class="nb">etransitivity</span>; [ <span class="bp">now</span> <span class="nb">apply</span> fmap_bind_com | ]).
+    <span class="nb">apply</span> (subst_eq (RX := <span class="kr">fun</span> <span class="nv">_</span> =&gt; eq)); <span class="nb">eauto</span>.
+    <span class="nb">intros</span> ? [ ? i [ ? ? ] ] ? &lt;-.
+    <span class="nb">unfold</span> m_strat_wrap; <span class="nb">cbn</span>.
+    <span class="bp">now</span> <span class="nb">destruct</span> (c_view_cat i).
+  <span class="kn">Qed</span>.</span></pre><p>Next we derive a variant of &quot;evaluation respects substitution&quot;, working with
+partial assignments <tt class="docutils literal">[ a_id , e ]</tt> instead of full assignments.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Definition</span> <span class="nf">eval_split_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">c</span> : conf (Δ +▶ Γ)) (<span class="nv">e</span> : Γ =[val]&gt; Δ)
+    : delay (nf obs val Δ)
+    := <span class="kp">eval</span> c &gt;&gt;= <span class="kr">fun</span> <span class="nv">&#39;T1_0</span> <span class="nv">n</span> =&gt;
+         <span class="kr">match</span> c_view_cat (nf_var n) <span class="kr">with</span>
+         | Vcat_l i =&gt; Ret&#39; (i ⋅ nf_obs n ⦇ nf_args n ⊛ [ v_var,  e ] ⦈)
+         | Vcat_r j =&gt; <span class="kp">eval</span> (e _ j ⊙ nf_obs n ⦗ nf_args n ⊛ [ v_var,  e ] ⦘)
+         <span class="kr">end</span> .
+
+  <span class="kn">Lemma</span> <span class="nf">eval_split</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">c</span> : conf (Δ +▶ Γ)) (<span class="nv">e</span> : Γ =[val]&gt; Δ) :
+    <span class="kp">eval</span> (c ₜ⊛ [ a_id , e ]) ≋ eval_split_sub c e .
+  <span class="kn">Proof</span>.
+    <span class="nb">unfold</span> eval_split_sub.
+    <span class="nb">rewrite</span> (eval_sub c ([ v_var , e ])).
+    <span class="nb">apply</span> (subst_eq (RX := <span class="kr">fun</span> <span class="nv">_</span> =&gt; eq)); <span class="nb">eauto</span>.
+    <span class="nb">intros</span> [] [ ? i [ o a ] ] ? &lt;-; <span class="nb">unfold</span> emb; <span class="nb">cbn</span>.
+    <span class="nb">destruct</span> (c_view_cat i).
+    + <span class="nb">unfold</span> nf_args, fill_args, cut_r.
+      <span class="nb">rewrite</span> app_sub, v_sub_var.
+      <span class="nb">cbn</span>; <span class="nb">rewrite</span> c_view_cat_simpl_l.
+      <span class="bp">now</span> <span class="nb">apply</span> (eval_nf_ret (i ⋅ o ⦇ a ⊛ [a_id, e] ⦈)).
+    + <span class="nb">rewrite</span> app_sub, v_sub_var.
+      <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> c_view_cat_simpl_r.
+  <span class="kn">Qed</span>.</span></pre><p>Note the use of <tt class="docutils literal">iter_evg_uniq</tt>: the proof of adequacy is proved by unicity
+of the fixed point, which is made possible by equivalently viewing the fixpoint
+combinator used to define the composition of strategy as a fixpoint of eventually
+guarded equations. We here prove the generalization of adequacy, namely that
+<tt class="docutils literal">reduce</tt> is a fixed point of the composition equation.</p>
+<pre class="alectryon-io highlight" id="zeo-fix"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Lemma</span> <span class="nf">adequacy_gen</span> {<span class="nv">Δ</span> <span class="nv">a</span>} (<span class="nv">c</span> : m_strat_act Δ a) (<span class="nv">e</span> : m_strat_pas Δ a) :
+    reduce (RedT c e) ≊ (c ∥g e).
+  <span class="kn">Proof</span>.
+    <span class="nb">refine</span> (iter_evg_uniq (<span class="kr">fun</span> <span class="nv">&#39;T1_0</span> <span class="nv">u</span> =&gt; compo_body u) (<span class="kr">fun</span> <span class="nv">&#39;T1_0</span> <span class="nv">u</span> =&gt; reduce u) _ _ T1_0 _).
+    <span class="nb">clear</span> a c e; <span class="nb">intros</span> [] [ ? [ u v ] ].
+    <span class="nb">etransitivity</span>; [ | <span class="nb">symmetry</span>; <span class="nb">apply</span> compo_reduce_simpl ].
+    <span class="nb">unfold</span> reduce <span class="nb">at</span> <span class="mi">1</span>, evalₒ <span class="nb">at</span> <span class="mi">1</span>; <span class="nb">rewrite</span> eval_split.
+    <span class="nb">etransitivity</span>; [ <span class="nb">apply</span> bind_fmap_com | ].
+    <span class="nb">apply</span> (subst_eq (RX := <span class="kr">fun</span> <span class="nv">_</span> =&gt; eq)); <span class="nb">eauto</span>.
+    <span class="nb">intros</span> [] [ ? i [ o a ] ] ? &lt;-; <span class="nb">unfold</span> emb; <span class="nb">cbn</span>.
+    <span class="nb">destruct</span> (c_view_cat i).
+    - <span class="nb">rewrite</span> c_view_cat_simpl_l.
+      <span class="nb">apply</span> it_eq_unstep; <span class="nb">cbn</span>; <span class="kp">do</span> <span class="mi">2</span> <span class="nb">econstructor</span>.
+    - <span class="nb">rewrite</span> c_view_cat_simpl_r.
+      <span class="nb">unfold</span> reduce; <span class="nb">cbn</span>; <span class="nb">unfold</span> nf_args, cut_r, fill_args; <span class="nb">cbn</span>.
+      <span class="nb">assert</span> (H : (bicollapse v red_pas cut_ty j ⊙ o ⦗ a ⊛ [a_id, bicollapse v red_pas] ⦘)
+                  = ((ₐ↓ red_pas cut_ty j ᵥ⊛ r_emb r_cat3_1) ⊙ o ⦗ r_cat_rr ᵣ⊛ a_id ⦘
+       ₜ⊛ [a_id, [bicollapse v red_pas, a ⊛ [a_id, bicollapse v red_pas]]])).             
+        <span class="nb">rewrite</span> app_sub, &lt;- v_sub_sub.
+
+        <span class="c">(* AAAAA setoid rewriting!!!! *)</span>
+        <span class="nb">etransitivity</span>; <span class="nb">cycle</span> <span class="mi">1</span>.
+        <span class="nb">unshelve</span> <span class="nb">erewrite</span> v_sub_proper.
+        <span class="mi">5</span>: { <span class="nb">rewrite</span> (a_ren_r_simpl _ r_cat3_1 _).
+             <span class="bp">now</span> <span class="nb">rewrite</span> r_cat3_1_simpl; <span class="nb">eauto</span>.
+           }
+        <span class="mi">3</span>,<span class="mi">4</span>: <span class="bp">reflexivity</span>.
+
+        <span class="nb">change</span> (<span class="nl">?r</span> ᵣ⊛ a_id)%asgn <span class="kr">with</span> (r_emb r); <span class="nb">rewrite</span> a_ren_r_simpl.
+        <span class="nb">unfold</span> r_cat_rr; <span class="nb">rewrite</span> a_ren_l_comp.
+        <span class="nb">rewrite</span> <span class="mi">2</span> a_cat_proj_r.
+
+        <span class="nb">pose proof</span> (H := collapse_fix_pas v red_pas _ j).
+        <span class="nb">cbn</span> <span class="kr">in</span> H; <span class="bp">now</span> <span class="nb">rewrite</span> H.
+        <span class="bp">exact</span> _.
+
+      <span class="nb">pose</span> (xx := bicollapse v red_pas cut_ty j ⊙ o ⦗ a ⊛ [a_id, bicollapse v red_pas] ⦘).
+      <span class="nb">change</span> (bicollapse v _ _ _ ⊙ o ⦗ _ ⦘) <span class="kr">with</span> xx <span class="kr">in</span> H |- *.
+      <span class="bp">now</span> <span class="nb">rewrite</span> H.
+  <span class="kn">Qed</span>.</span></pre><p>Adequacy (Prop. 7) holds.</p>
+<pre class="alectryon-io highlight" id="adequacy"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Lemma</span> <span class="nf">adequacy</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">c</span> : conf Γ) (<span class="nv">e</span> : Γ =[val]&gt; Δ) :
+    evalₒ (c ₜ⊛ e) ≈ (inj_init_act Δ c ∥ inj_init_pas e).
+  <span class="kn">Proof</span>.
+    <span class="nb">transitivity</span> (inj_init_act Δ c ∥g inj_init_pas e).
+    <span class="nb">rewrite</span> &lt;- adequacy_gen; <span class="nb">unfold</span> reduce; <span class="nb">cbn</span>.
+    <span class="bp">now</span> <span class="nb">rewrite</span> &lt;- c_sub_sub, a_ren_r_simpl,
+          a_ren_l_comp, <span class="mi">2</span> a_cat_proj_r,
+          a_ren_comp, a_cat_proj_l, a_comp_id.
+    <span class="nb">apply</span> iter_evg_iter.
+  <span class="kn">Qed</span>.
+<span class="kn">End</span> <span class="nf">with_param</span>.</span></pre>
+</div>
+</div></body>
+</html>

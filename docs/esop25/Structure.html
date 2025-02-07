@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Interaction Trees: Structure</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="interaction-trees-structure">
+<h1 class="title">Interaction Trees: Structure</h1>
+
+<p>ITrees form an iterative monad. The <tt class="docutils literal">iter</tt> combinator provided here iterates over
+arbitrary sets of equations. The file <a class="reference external" href="Guarded.html">ITree/Guarded.v</a> provides a
+finer iterator, restricted to notions of guarded equations, enjoying an additional
+uniqueness property.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Section</span> <span class="nf">monad</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Context</span> {<span class="nv">I</span>} {<span class="nv">E</span> : event I I}.</span></span></pre><p>Functorial action on maps.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">fmap</span> {<span class="nv">X</span> <span class="nv">Y</span>} (<span class="nv">f</span> : X ⇒ᵢ Y) : itree E X ⇒ᵢ itree E Y :=
+    <span class="kr">cofix</span> _fmap _ u :=
+      go <span class="kr">match</span> u.(_observe) <span class="kr">with</span>
+         | RetF r =&gt; RetF (f _ r)
+         | TauF t =&gt; TauF (_fmap _ t)
+         | VisF e k =&gt; VisF e (<span class="kr">fun</span> <span class="nv">r</span> =&gt; _fmap _ (k r))
+         <span class="kr">end</span>.</span></span></pre><p>Monadic bind.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">subst</span> {<span class="nv">X</span> <span class="nv">Y</span>} (<span class="nv">f</span> : X ⇒ᵢ itree E Y) : itree E X ⇒ᵢ itree E Y :=
+    <span class="kr">cofix</span> _subst _ u :=
+      go <span class="kr">match</span> u.(_observe) <span class="kr">with</span>
+         | RetF r =&gt; (f _ r).(_observe)
+         | TauF t =&gt; TauF (_subst _ t)
+         | VisF e k =&gt; VisF e (<span class="kr">fun</span> <span class="nv">r</span> =&gt; _subst _ (k r))
+         <span class="kr">end</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">bind</span> {<span class="nv">X</span> <span class="nv">Y</span> <span class="nv">i</span>} <span class="nv">x</span> <span class="nv">f</span> := @<span class="nb">subst</span> X Y f i x.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">kcomp</span> {<span class="nv">X</span> <span class="nv">Y</span> <span class="nv">Z</span>} (<span class="nv">f</span> : X ⇒ᵢ itree E Y) (<span class="nv">g</span> : Y ⇒ᵢ itree E Z) : X ⇒ᵢ itree E Z :=
+    <span class="kr">fun</span> <span class="nv">i</span> <span class="nv">x</span> =&gt; bind (f i x) g.</span></span></pre><p>Iteration operator (Def. 31).</p>
+<pre class="alectryon-io highlight" id="iter"><!-- Generator: Alectryon --><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">iter</span> {<span class="nv">X</span> <span class="nv">Y</span>} (<span class="nv">f</span> : X ⇒ᵢ itree E (X +ᵢ Y)) : X ⇒ᵢ itree E Y :=
+    <span class="kr">cofix</span> _iter _ x :=
+      bind (f _ x) (<span class="kr">fun</span> <span class="nv">_</span> <span class="nv">r</span> =&gt; go <span class="kr">match</span> r <span class="kr">with</span>
+                              | inl x =&gt; TauF (_iter _ x)
+                              | inr y =&gt; RetF y
+                              <span class="kr">end</span>) .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">End</span> <span class="nf">monad</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;f &lt;$&gt; x&quot;</span> := (fmap f _ x) (<span class="kn">at level</span> <span class="mi">30</span>).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;x &gt;&gt;= f&quot;</span> := (bind x f) (<span class="kn">at level</span> <span class="mi">30</span>).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;f =&lt;&lt; x&quot;</span> := (<span class="nb">subst</span> f _ x) (<span class="kn">at level</span> <span class="mi">30</span>).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Notation</span> <span class="s2">&quot;f &gt;=&gt; g&quot;</span> := (kcomp f g) (<span class="kn">at level</span> <span class="mi">30</span>).</span></span></pre>
+</div>
+</div></body>
+</html>

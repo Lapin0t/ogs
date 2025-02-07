@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Checks.v</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document">
+
+
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">From</span> OGS <span class="kn">Require Import</span> Prelude.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp"><span class="kn">From</span> OGS.Ctx <span class="kn">Require Import</span> All Subst.
+<span class="kn">From</span> OGS.OGS <span class="kn">Require Import</span> Game <span class="kn">Strategy</span>.
+<span class="kn">From</span> OGS.OGS <span class="kn">Require</span> Soundness.
+<span class="kn">From</span> OGS.Examples <span class="kn">Require</span> STLC_CBV ULC_CBV SystemL_CBV SystemD.
+
+<span class="kn">Module</span> <span class="nf">generic</span>.
+  <span class="kn">Import</span> Soundness.
+<span class="kn">Goal</span> <span class="kt">True</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;=============================&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;Generic OGS soundness theorem&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;=============================&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;1. Arguments and type&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;-----------------------------&quot;</span>.
+<span class="kn">Abort</span>.
+<span class="kn">About</span> Soundness.ogs_correction.
+<span class="kn">Goal</span> <span class="kt">True</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;--------------&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;2. Assumptions&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;--------------&quot;</span>.
+<span class="kn">Abort</span>.
+<span class="kn">Print Assumptions</span> Soundness.ogs_correction.
+<span class="kn">End</span> <span class="nf">generic</span>.
+
+<span class="kn">Module</span> <span class="nf">stlc</span>.
+<span class="kn">Import</span> STLC_CBV.
+<span class="kn">Goal</span> <span class="kt">True</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;===================================================&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot; Simply-typed lambda-calculus OGS soundness theorem&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;===================================================&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;1. Arguments and type&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;---------------------------------------------------&quot;</span>.
+<span class="kn">Abort</span>.
+<span class="kn">About</span> STLC_CBV.stlc_ciu_correct.
+<span class="kn">Goal</span> <span class="kt">True</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;--------------&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;2. Assumptions&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;--------------&quot;</span>.
+<span class="kn">Abort</span>.
+<span class="kn">Print Assumptions</span> STLC_CBV.stlc_ciu_correct.
+<span class="kn">End</span> <span class="nf">stlc</span>.
+
+<span class="kn">Module</span> <span class="nf">ulc</span>.
+<span class="kn">Import</span> ULC_CBV.
+<span class="kn">Goal</span> <span class="kt">True</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;==============================================&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot; Untyped lambda-calculus OGS soundness theorem&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;==============================================&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;1. Arguments and type&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;----------------------------------------------&quot;</span>.
+<span class="kn">Abort</span>.
+<span class="kn">About</span> ULC_CBV.ulc_ciu_correct.
+<span class="kn">Goal</span> <span class="kt">True</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;--------------&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;2. Assumptions&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;--------------&quot;</span>.
+<span class="kn">Abort</span>.
+<span class="kn">Print Assumptions</span> ULC_CBV.ulc_ciu_correct.
+<span class="kn">End</span> <span class="nf">ulc</span>.
+
+<span class="kn">Module</span> <span class="nf">systeml</span>.
+<span class="kn">Import</span> SystemL_CBV.
+<span class="kn">Goal</span> <span class="kt">True</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;===================================&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot; CBV System L OGS soundness theorem&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;===================================&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;1. Arguments and type&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;-----------------------------------&quot;</span>.
+<span class="kn">Abort</span>.
+<span class="kn">About</span> SystemL_CBV.ciu_correct.
+<span class="kn">Goal</span> <span class="kt">True</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;--------------&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;2. Assumptions&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;--------------&quot;</span>.
+<span class="kn">Abort</span>.
+<span class="kn">Print Assumptions</span> SystemL_CBV.ciu_correct.
+<span class="kn">End</span> <span class="nf">systeml</span>.
+
+<span class="kn">Module</span> <span class="nf">systemd</span>.
+<span class="kn">Import</span> SystemD.
+<span class="kn">Goal</span> <span class="kt">True</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;=========================================&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot; Polarized System D OGS soundness theorem&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;=========================================&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;1. Arguments and type&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;-----------------------------------------&quot;</span>.
+<span class="kn">Abort</span>.
+<span class="kn">About</span> SystemD.ciu_correct.
+<span class="kn">Goal</span> <span class="kt">True</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;--------------&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;2. Assumptions&quot;</span>.
+  <span class="kp">idtac</span> <span class="s2">&quot;--------------&quot;</span>.
+<span class="kn">Abort</span>.
+<span class="kn">Print Assumptions</span> SystemD.ciu_correct.
+<span class="kn">End</span> <span class="nf">systemd</span>.</span></pre>
+</div>
+</div></body>
+</html>

@@ -1,0 +1,684 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Un(i)typed Call-by-value Lambda Calculus</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="un-i-typed-call-by-value-lambda-calculus">
+<h1 class="title">Un(i)typed Call-by-value Lambda Calculus</h1>
+
+<p>This file follows very closely its sibling <code class="highlight coq"><span class="n">CBVTyped</span><span class="o">.</span><span class="n">v</span></code>. It is recommended to read that
+one first: the comments on this one will be quite more terse and focus on the differences.</p>
+<div class="section" id="syntax">
+<h1>Syntax</h1>
+<p>As our framework is &quot;well-typed well-scoped&quot;, when we mean untyped, we really mean
+unityped, i.e., we will take the single element set as set of types. Although, the
+typing rules will not be as uninteresting as it would seem. Indeed, as we adopt a
+single-sided sequent-calculus style of presentation, we do give types to continuations
+(formally negated types), and we thus have not one type, but two: the type of terms
+<code class="highlight coq"><span class="o">⊕</span></code> and the type of continuations <code class="highlight coq"><span class="o">⊖</span></code>.</p>
+<p>Typing contexts, terms, values, evaluation contexts and configurations work
+straightforwardly.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Variant</span> <span class="nf">ty</span> : <span class="kt">Type</span> :=
+| Left : ty
+| Right : ty
+.</span></span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;⊕&quot;</span> := (Left) (<span class="kn">at level</span> <span class="mi">20</span>) : ty_scope .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Notation</span> <span class="s2">&quot;⊖&quot;</span> := (Right) (<span class="kn">at level</span> <span class="mi">20</span>) : ty_scope .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><input class="alectryon-toggle" id="ulc-cbv-v-chk0" style="display: none" type="checkbox"><label class="alectryon-input" for="ulc-cbv-v-chk0"><span class="kn">Definition</span> <span class="nf">t_ctx</span> : <span class="kt">Type</span> := Ctx.ctx ty .</label><small class="alectryon-output"><div><div class="alectryon-messages"><blockquote class="alectryon-message">The reference Ctx.ctx was not found <span class="kr">in</span> the current
+environment.</blockquote></div></div></small><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp"><span class="kn">Bind Scope</span> ctx_scope <span class="kr">with</span> t_ctx .</span></pre><p>Note that is is the proper pure untyped lambda calculus: in constrast with our STLC example,
+the lambda is not recursive and there is no unit value nor base type, only functions.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Inductive</span> <span class="nf">term</span> (<span class="nv">Γ</span> : t_ctx) : <span class="kt">Type</span> :=
+| Val : val Γ -&gt; term Γ
+| App : term Γ -&gt; term Γ -&gt; term Γ
+<span class="kr">with</span> val (Γ : t_ctx) : <span class="kt">Type</span> :=
+| Var : Γ ∋ ⊕ -&gt; val Γ
+| Lam : term (Γ ▶ₓ ⊕) -&gt; val Γ
+.</span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Inductive</span> <span class="nf">ev_ctx</span> (<span class="nv">Γ</span> : t_ctx) : <span class="kt">Type</span> :=
+| K0 : Γ ∋ ⊖ -&gt; ev_ctx Γ
+| K1 : term Γ -&gt; ev_ctx Γ -&gt; ev_ctx Γ
+| K2 : val Γ -&gt; ev_ctx Γ -&gt; ev_ctx Γ
+.</span></pre><pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Variant</span> <span class="nf">state</span> (<span class="nv">Γ</span> : t_ctx) : <span class="kt">Type</span> :=
+| Cut : term Γ -&gt; ev_ctx Γ -&gt; state Γ
+.</span></span></pre><p>We introduce the sorted family of generalized values, together with the generalized
+variable.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">val_m</span> : t_ctx -&gt; ty -&gt; <span class="kt">Type</span> :=
+  val_m Γ (⊕) := val Γ ;
+  val_m Γ (⊖) := ev_ctx Γ .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+<span class="kn">Equations</span> <span class="nf">a_id</span> {<span class="nv">Γ</span>} : Γ =[val_m]&gt; Γ :=
+  a_id (⊕) i := Var i ;
+  a_id (⊖) i := K0 i .</span></pre></div>
+<div class="section" id="substitution-and-renaming">
+<h1>Substitution and Renaming</h1>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">t_rename</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} : Γ ⊆ Δ -&gt; term Γ -&gt; term Δ :=
+  t_rename f (Val v)     := Val (v_rename f v) ;
+  t_rename f (App t1 t2) := App (t_rename f t1) (t_rename f t2) ;
+<span class="kr">with</span> v_rename {Γ Δ} : Γ ⊆ Δ -&gt; val Γ -&gt; val Δ :=
+  v_rename f (Var i) := Var (f _ i) ;
+  v_rename f (Lam t) := Lam (t_rename (r_shift1 f) t) .
+
+<span class="kn">Equations</span> <span class="nf">e_rename</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} : Γ ⊆ Δ -&gt; ev_ctx Γ -&gt; ev_ctx Δ :=
+  e_rename f (K0 i)   := K0 (f _ i) ;
+  e_rename f (K1 t π) := K1 (t_rename f t) (e_rename f π) ;
+  e_rename f (K2 v π) := K2 (v_rename f v) (e_rename f π) .
+
+<span class="kn">Equations</span> <span class="nf">s_rename</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} : Γ ⊆ Δ -&gt; state Γ -&gt; state Δ :=
+  s_rename f (Cut t π) := Cut (t_rename f t) (e_rename f π).
+
+<span class="kn">Equations</span> <span class="nf">m_rename</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} : Γ ⊆ Δ -&gt; val_m Γ ⇒ᵢ val_m Δ :=
+  m_rename f (⊕) v := v_rename f v ;
+  m_rename f (⊖) π := e_rename f π .</span></pre><p>Renaming an assigment on the left.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">a_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} : Γ1 =[val_m]&gt; Γ2 -&gt; Γ2 ⊆ Γ3 -&gt; Γ1 =[val_m]&gt; Γ3 :=
+  <span class="kr">fun</span> <span class="nv">f</span> <span class="nv">g</span> <span class="nv">_</span> <span class="nv">i</span> =&gt; m_rename g _ (f _ i) .
+<span class="kn">Arguments</span> a_ren _ _ _ /.</span></pre><p>The following bunch of notations will help us to keep the code readable:</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Notation</span> <span class="s2">&quot;t ₜ⊛ᵣ r&quot;</span> := (t_rename r%asgn t) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;v ᵥ⊛ᵣ r&quot;</span> := (v_rename r%asgn v) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;π ₑ⊛ᵣ r&quot;</span> := (e_rename r%asgn π) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;v ₘ⊛ᵣ r&quot;</span> := (m_rename r%asgn _ v) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;s ₛ⊛ᵣ r&quot;</span> := (s_rename r%asgn s) (<span class="kn">at level</span> <span class="mi">14</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;a ⊛ᵣ r&quot;</span> := (a_ren a%asgn r%asgn) (<span class="kn">at level</span> <span class="mi">14</span>) : asgn_scope.</span></pre><p>The weakenings we will need for substitution..</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">t_shift1</span> {<span class="nv">Γ</span> <span class="nv">a</span>} := @t_rename Γ (Γ ▶ₓ a) r_pop.
+<span class="kn">Definition</span> <span class="nf">v_shift1</span> {<span class="nv">Γ</span> <span class="nv">a</span>} := @v_rename Γ (Γ ▶ₓ a) r_pop.
+<span class="kn">Definition</span> <span class="nf">m_shift1</span> {<span class="nv">Γ</span> <span class="nv">a</span>} := @m_rename Γ (Γ ▶ₓ a) r_pop.
+<span class="kn">Definition</span> <span class="nf">a_shift1</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">a</span>} (<span class="nv">f</span> : Γ =[val_m]&gt; Δ) :=
+  [ a_map f m_shift1 ,ₓ a_id a top ]%asgn .</span></pre><div class="section" id="substitutions">
+<h2>Substitutions</h2>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">t_subst</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} : Γ =[val_m]&gt; Δ -&gt; term Γ -&gt; term Δ :=
+  t_subst f (Val v)     := Val (v_subst f v) ;
+  t_subst f (App t1 t2) := App (t_subst f t1) (t_subst f t2) ;
+<span class="kr">with</span> v_subst {Γ Δ} : Γ =[val_m]&gt; Δ -&gt; val Γ -&gt; val Δ :=
+  v_subst f (Var i) := f _ i ;
+  v_subst f (Lam t) := Lam (t_subst (a_shift1 f) t) .
+
+<span class="kn">Equations</span> <span class="nf">e_subst</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} : Γ =[val_m]&gt; Δ -&gt; ev_ctx Γ -&gt; ev_ctx Δ :=
+  e_subst f (K0 i)   := f _ i ;
+  e_subst f (K1 t π) := K1 (t_subst f t) (e_subst f π) ;
+  e_subst f (K2 v π) := K2 (v_subst f v) (e_subst f π) .
+
+<span class="kn">Notation</span> <span class="s2">&quot;t `ₜ⊛ a&quot;</span> := (t_subst a%asgn t) (<span class="kn">at level</span> <span class="mi">30</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;v `ᵥ⊛ a&quot;</span> := (v_subst a%asgn v) (<span class="kn">at level</span> <span class="mi">30</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;π `ₑ⊛ a&quot;</span> := (e_subst a%asgn π) (<span class="kn">at level</span> <span class="mi">30</span>).
+
+<span class="kn">Equations</span> <span class="nf">m_subst</span> : val_m ⇒<span class="err">₁</span> ⟦ val_m , val_m ⟧<span class="err">₁</span> :=
+  m_subst _ (⊕) v _ f := v `ᵥ⊛ f ;
+  m_subst _ (⊖) π _ f := π `ₑ⊛ f .
+
+<span class="kn">Equations</span> <span class="nf">s_subst</span> : state ⇒<span class="err">₀</span> ⟦ val_m , state ⟧<span class="err">₀</span> :=
+  s_subst _ (Cut t π) _ f := Cut (t `ₜ⊛ f) (π `ₑ⊛ f) .</span></pre><p>We can now instanciate the substitution monoid and module structures.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">val_m_monoid</span> : subst_monoid val_m :=
+  {| v_var := @a_id ; v_sub := m_subst |} .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">state_module</span> : subst_module val_m state :=
+  {| c_sub := s_subst |} .</span></span></pre><p>Single-variable substitution.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">assign1</span> {<span class="nv">Γ</span> <span class="nv">a</span>} <span class="nv">v</span> : (Γ ▶ₓ a) =[val_m]&gt; Γ := a_id ▶ₐ v .
+<span class="kn">Definition</span> <span class="nf">t_subst1</span> {<span class="nv">Γ</span> <span class="nv">a</span>} (<span class="nv">t</span> : term _) <span class="nv">v</span> := t `ₜ⊛ @assign1 Γ a v.
+<span class="kn">Notation</span> <span class="s2">&quot;t /[ v ]&quot;</span> := (t_subst1 t v) (<span class="kn">at level</span> <span class="mi">50</span>, <span class="kn">left associativity</span>).</span></pre></div>
+</div>
+<div class="section" id="an-evaluator">
+<h1>An Evaluator</h1>
+<div class="section" id="patterns-and-observations">
+<h2>Patterns and Observations</h2>
+<p>As before we define observations (copatterns), as there are only functions and
+continuations there is exactly one pattern at each type. Knowing this, we could
+have made this type (<code class="highlight coq"><span class="n">obs</span></code>) disappear, but it is kept here for the sake of being
+more explicit.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Variant</span> <span class="nf">obs</span> : ty -&gt; <span class="kt">Type</span> :=
+| ORet : obs (⊖)
+| OApp : obs (⊕)
+.</span></span></pre><p>Observation still behave as binders, returning bind a term (what we are returning) and
+applying binds a term (the argument) and a continuation.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">obs_dom</span> {<span class="nv">a</span>} : obs a -&gt; t_ctx :=
+  obs_dom (@ORet) := ∅ ▶ₓ ⊕ ;
+  obs_dom (@OApp) := ∅ ▶ₓ ⊕ ▶ₓ ⊖ .
+
+<span class="kn">Definition</span> <span class="nf">obs_op</span> : Oper ty t_ctx :=
+  {| o_op := obs ; o_dom := @obs_dom |} .
+<span class="kn">Notation</span> <span class="nf">ORet&#39;</span> := (ORet : o_op obs_op _).
+<span class="kn">Notation</span> <span class="nf">OApp&#39;</span> := (OApp : o_op obs_op _).</span></pre><p>We now define applying an observation with arguments to a value.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">obs_app</span> {<span class="nv">Γ</span> <span class="nv">a</span>} (<span class="nv">v</span> : val_m Γ a) (<span class="nv">p</span> : obs a) (<span class="nv">γ</span> : obs_dom p =[val_m]&gt; Γ) : state Γ :=
+  obs_app v (OApp) γ := Cut (Val v) (K2 (γ _ (pop top)) (γ _ top)) ;
+  obs_app π (ORet) γ := Cut (Val (γ _ top)) π .</span></pre></div>
+<div class="section" id="normal-forms">
+<h2>Normal forms</h2>
+<p>Normal forms take the exact same form as for ULC: a head variable and an observation on it,
+with arguments.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">nf</span> := c_var ∥ₛ (obs_op # val_m).</span></pre></div>
+<div class="section" id="the-cbv-machine">
+<h2>The CBV Machine</h2>
+<p>The evaluator as a state machine.</p>
+<ol class="arabic simple">
+<li><code class="highlight coq"><span class="o">⟨</span> <span class="n">t1</span> <span class="n">t2</span> <span class="o">|</span> <span class="n">π</span> <span class="o">⟩</span> <span class="o">→</span> <span class="o">⟨</span> <span class="n">t2</span> <span class="o">|</span> <span class="n">t1</span> <span class="o">⋅</span><span class="mi">1</span> <span class="n">π</span> <span class="o">⟩</span></code></li>
+<li><code class="highlight coq"><span class="o">⟨</span> <span class="n">v</span> <span class="o">|</span> <span class="n">x</span> <span class="o">⟩</span></code> normal</li>
+<li><code class="highlight coq"><span class="o">⟨</span> <span class="n">v</span> <span class="o">|</span> <span class="n">t</span> <span class="o">⋅</span><span class="mi">1</span> <span class="n">π</span> <span class="o">⟩</span> <span class="o">→</span>  <span class="o">⟨</span> <span class="n">t</span> <span class="o">|</span> <span class="n">v</span> <span class="o">⋅</span><span class="mi">2</span> <span class="n">π</span> <span class="o">⟩</span></code></li>
+<li><code class="highlight coq"><span class="o">⟨</span> <span class="n">x</span> <span class="o">|</span> <span class="n">v</span> <span class="o">⋅</span><span class="mi">2</span> <span class="n">π</span> <span class="o">⟩</span></code> normal</li>
+<li><code class="highlight coq"><span class="o">⟨</span> <span class="kr">λ</span><span class="nv">x</span><span class="o">.</span><span class="n">t</span> <span class="o">|</span> <span class="n">v</span> <span class="o">⋅</span><span class="mi">2</span> <span class="n">π</span> <span class="o">⟩</span> <span class="o">→</span> <span class="o">⟨</span> <span class="n">t</span><span class="o">[</span><span class="n">x</span><span class="o">↦</span><span class="n">v</span><span class="o">]</span> <span class="o">|</span>  <span class="n">π</span> <span class="o">⟩</span></code></li>
+</ol>
+<p>Rules 1,3,5 step to a new configuration, while cases 2,4 are stuck on normal
+forms.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">eval_step</span> {<span class="nv">Γ</span> : t_ctx} : state Γ -&gt; (state Γ + nf Γ) :=
+  eval_step (Cut (App t1 t2)   (π))      := inl (Cut t2 (K1 t1 π)) ;
+  eval_step (Cut (Val v)       (K0 i))   := inr (i ⋅ ORet&#39; ⦇ ! ▶ₐ v ⦈) ;
+  eval_step (Cut (Val v)       (K1 t π)) := inl (Cut t (K2 v π)) ;
+  eval_step (Cut (Val (Var i)) (K2 v π)) := inr (i ⋅ OApp&#39; ⦇ ! ▶ₐ v ▶ₐ π ⦈) ;
+  eval_step (Cut (Val (Lam t)) (K2 v π)) := inl (Cut (t /[ v ]) π) .
+
+<span class="kn">Definition</span> <span class="nf">ulc_eval</span> {<span class="nv">Γ</span> : t_ctx} : state Γ -&gt; delay (nf Γ)
+  := iter_delay (ret_delay ∘ eval_step).</span></pre></div>
+</div>
+<div class="section" id="properties">
+<h1>Properties</h1>
+<p>We now tackle the basic syntactic lemmas on renaming and substitution. See you in 400 lines.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Scheme</span> <span class="nf">term_mut</span> := <span class="kn">Induction for</span> term <span class="kn">Sort</span> <span class="kt">Prop</span>
+   <span class="kr">with</span> val_mut := <span class="kn">Induction for</span> val <span class="kn">Sort</span> <span class="kt">Prop</span> .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Record</span> <span class="nf">syn_ind_args</span> (<span class="nv">P_t</span> : <span class="kr">forall</span> <span class="nv">Γ</span>, term Γ -&gt; <span class="kt">Prop</span>)
+                    (<span class="nv">P_v</span> : <span class="kr">forall</span> <span class="nv">Γ</span>, val Γ -&gt; <span class="kt">Prop</span>)
+                    (<span class="nv">P_e</span> : <span class="kr">forall</span> <span class="nv">Γ</span>, ev_ctx Γ -&gt; <span class="kt">Prop</span>) :=
+  {
+    ind_val {Γ} v (_ : P_v Γ v) : P_t Γ (Val v) ;
+    ind_app {Γ} t1 (_ : P_t Γ t1) t2 (_ : P_t Γ t2) : P_t Γ (App t1 t2) ;
+    ind_var {Γ} i : P_v Γ (Var i) ;
+    ind_lam {Γ} t (_ : P_t _ t) : P_v Γ (Lam t) ;
+    ind_kvar {Γ} i : P_e Γ (K0 i) ;
+    ind_kfun {Γ} t (_ : P_t Γ t) π (_ : P_e Γ π) : P_e Γ (K1 t π) ;
+    ind_karg {Γ} v (_ : P_v Γ v) π (_ : P_e Γ π) : P_e Γ (K2 v π)
+  } .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Lemma</span> <span class="nf">term_ind_mut</span> <span class="nv">P_t</span> <span class="nv">P_v</span> <span class="nv">P_e</span> (<span class="nv">H</span> : syn_ind_args P_t P_v P_e) <span class="nv">Γ</span> <span class="nv">t</span> : P_t Γ t .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">destruct</span> H; <span class="bp">now</span> <span class="nb">apply</span> (term_mut P_t P_v).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Qed</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Lemma</span> <span class="nf">val_ind_mut</span> <span class="nv">P_t</span> <span class="nv">P_v</span> <span class="nv">P_e</span> (<span class="nv">H</span> : syn_ind_args P_t P_v P_e) <span class="nv">Γ</span> <span class="nv">v</span> : P_v Γ v .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">destruct</span> H; <span class="bp">now</span> <span class="nb">apply</span> (val_mut P_t P_v).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Qed</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Lemma</span> <span class="nf">ctx_ind_mut</span> <span class="nv">P_t</span> <span class="nv">P_v</span> <span class="nv">P_e</span> (<span class="nv">H</span> : syn_ind_args P_t P_v P_e) <span class="nv">Γ</span> <span class="nv">π</span> : P_e Γ π .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">induction</span> π.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">apply</span> (ind_kvar _ _ _ H).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">apply</span> (ind_kfun _ _ _ H); <span class="nb">auto</span>; <span class="nb">apply</span> (term_ind_mut _ _ _ H).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">apply</span> (ind_karg _ _ _ H); <span class="nb">auto</span>; <span class="nb">apply</span> (val_ind_mut _ _ _ H).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Qed</span>.</span></span></pre><p>Renaming respects pointwise equality of assignments.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">t_ren_proper_P</span> <span class="nv">Γ</span> (<span class="nv">t</span> : term Γ) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ ⊆ Δ), f1 ≡ₐ f2 -&gt; t ₜ⊛ᵣ f1 = t ₜ⊛ᵣ f2 .
+<span class="kn">Definition</span> <span class="nf">v_ren_proper_P</span> <span class="nv">Γ</span> (<span class="nv">v</span> : val Γ) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ ⊆ Δ), f1 ≡ₐ f2 -&gt; v ᵥ⊛ᵣ f1 = v ᵥ⊛ᵣ f2 .
+<span class="kn">Definition</span> <span class="nf">e_ren_proper_P</span> <span class="nv">Γ</span> (<span class="nv">π</span> : ev_ctx Γ) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ ⊆ Δ), f1 ≡ₐ f2 -&gt; π ₑ⊛ᵣ f1 = π ₑ⊛ᵣ f2 .
+<span class="kn">Lemma</span> <span class="nf">ren_proper_prf</span> : syn_ind_args t_ren_proper_P v_ren_proper_P e_ren_proper_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_proper_P, v_ren_proper_P, e_ren_proper_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="kp">all</span>: <span class="nb">apply</span> H.
+  <span class="bp">now</span> <span class="nb">apply</span> r_shift1_eq.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">t_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>}
+  : Proper (asgn_eq _ _ ==&gt; eq ==&gt; eq) (@t_rename Γ Δ).
+  <span class="nb">intros</span> f1 f2 H1 x y -&gt;; <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_proper_prf).
+<span class="kn">Qed</span>.
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">v_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>}
+  : Proper (asgn_eq _ _ ==&gt; eq ==&gt; eq) (@v_rename Γ Δ).
+  <span class="nb">intros</span> f1 f2 H1 x y -&gt;; <span class="bp">now</span> <span class="nb">apply</span> (val_ind_mut _ _ _ ren_proper_prf).
+<span class="kn">Qed</span>.
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">e_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>}
+  : Proper (asgn_eq _ _ ==&gt; eq ==&gt; eq) (@e_rename Γ Δ).
+  <span class="nb">intros</span> f1 f2 H1 x y -&gt;; <span class="bp">now</span> <span class="nb">apply</span> (ctx_ind_mut _ _ _ ren_proper_prf).
+<span class="kn">Qed</span>.
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">m_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>}
+  : Proper (asgn_eq _ _ ==&gt; forall_relation (<span class="kr">fun</span> <span class="nv">a</span> =&gt; eq ==&gt; eq)) (@m_rename Γ Δ).
+  <span class="nb">intros</span> ? ? H1 [] _ ? -&gt;; <span class="nb">cbn</span> <span class="kr">in</span> *; <span class="bp">now</span> <span class="nb">rewrite</span> H1.
+<span class="kn">Qed</span>.
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">s_ren_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>}
+  : Proper (asgn_eq _ _ ==&gt; eq ==&gt; eq) (@s_rename Γ Δ).
+  <span class="nb">intros</span> ? ? H1 _ x -&gt;; <span class="nb">destruct</span> x; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> H1.
+<span class="kn">Qed</span>.
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">a_ren_eq</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>}
+  : Proper (asgn_eq _ _ ==&gt; asgn_eq _ _ ==&gt; asgn_eq _ _) (@a_ren Γ1 Γ2 Γ3).
+  <span class="nb">intros</span> ?? H1 ?? H2 ??; <span class="nb">apply</span> (m_ren_eq _ _ H2), H1.
+<span class="kn">Qed</span>.
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">a_shift_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">x</span>} : Proper (asgn_eq _ _ ==&gt; asgn_eq _ _) (@a_shift1 Γ Δ x).
+  <span class="nb">intros</span> ? ? H ? h; dependent elimination h; <span class="nb">cbn</span>; <span class="nb">auto</span>.
+  <span class="bp">now</span> <span class="nb">rewrite</span> H.
+<span class="kn">Qed</span>.</span></pre><p>Renaming-renaming assocativity.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">t_ren_ren_P</span> <span class="nv">Γ1</span> (<span class="nv">t</span> : term Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (t ₜ⊛ᵣ f1) ₜ⊛ᵣ f2 = t ₜ⊛ᵣ (f1 ᵣ⊛ f2)  .
+<span class="kn">Definition</span> <span class="nf">v_ren_ren_P</span> <span class="nv">Γ1</span> (<span class="nv">v</span> : val Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (v ᵥ⊛ᵣ f1) ᵥ⊛ᵣ f2 = v ᵥ⊛ᵣ (f1 ᵣ⊛ f2)  .
+<span class="kn">Definition</span> <span class="nf">e_ren_ren_P</span> <span class="nv">Γ1</span> (<span class="nv">π</span> : ev_ctx Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3),
+    (π ₑ⊛ᵣ f1) ₑ⊛ᵣ f2 = π ₑ⊛ᵣ (f1 ᵣ⊛ f2)  .
+
+<span class="kn">Lemma</span> <span class="nf">ren_ren_prf</span> : syn_ind_args t_ren_ren_P v_ren_ren_P e_ren_ren_P .
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_ren_P, v_ren_ren_P, e_ren_ren_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="nb">rewrite</span> H; <span class="nb">apply</span> t_ren_eq; <span class="nb">auto</span>.
+  <span class="nb">intros</span> ? h; dependent elimination h; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">t</span> : term Γ1)
+  : (t ₜ⊛ᵣ f1) ₜ⊛ᵣ f2 = t ₜ⊛ᵣ (f1 ᵣ⊛ f2)  .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">v</span> : val Γ1)
+  : (v ᵥ⊛ᵣ f1) ᵥ⊛ᵣ f2 = v ᵥ⊛ᵣ (f1 ᵣ⊛ f2)  .
+  <span class="bp">now</span> <span class="nb">apply</span> (val_ind_mut _ _ _ ren_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">e_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">π</span> : ev_ctx Γ1)
+  : (π ₑ⊛ᵣ f1) ₑ⊛ᵣ f2 = π ₑ⊛ᵣ (f1 ᵣ⊛ f2)  .
+  <span class="bp">now</span> <span class="nb">apply</span> (ctx_ind_mut _ _ _ ren_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">m_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">a</span> (<span class="nv">v</span> : val_m Γ1 a)
+  : (v ₘ⊛ᵣ f1) ₘ⊛ᵣ f2 = v ₘ⊛ᵣ (f1 ᵣ⊛ f2)  .
+  <span class="nb">destruct</span> a; [ <span class="bp">now</span> <span class="nb">apply</span> v_ren_ren | <span class="bp">now</span> <span class="nb">apply</span> e_ren_ren ].
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_ren_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₛ⊛ᵣ f1) ₛ⊛ᵣ f2 = s ₛ⊛ᵣ (f1 ᵣ⊛ f2)  .
+  <span class="nb">destruct</span> s; <span class="nb">apply</span> (f_equal2 Cut); [ <span class="bp">now</span> <span class="nb">apply</span> t_ren_ren | <span class="bp">now</span> <span class="nb">apply</span> e_ren_ren ].
+<span class="kn">Qed</span>.</span></pre><p>Left identity law of renaming.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">t_ren_id_l_P</span> <span class="nv">Γ</span> (<span class="nv">t</span> : term Γ) : <span class="kt">Prop</span> := t ₜ⊛ᵣ r_id = t .
+<span class="kn">Definition</span> <span class="nf">v_ren_id_l_P</span> <span class="nv">Γ</span> (<span class="nv">v</span> : val Γ) : <span class="kt">Prop</span> := v ᵥ⊛ᵣ r_id = v .
+<span class="kn">Definition</span> <span class="nf">e_ren_id_l_P</span> <span class="nv">Γ</span> (<span class="nv">π</span> : ev_ctx Γ) : <span class="kt">Prop</span> := π ₑ⊛ᵣ r_id = π .
+<span class="kn">Lemma</span> <span class="nf">ren_id_l_prf</span> : syn_ind_args t_ren_id_l_P v_ren_id_l_P e_ren_id_l_P .
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_id_l_P, v_ren_id_l_P, e_ren_id_l_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="nb">rewrite</span> &lt;- H <span class="nb">at</span> <span class="mi">2</span>; <span class="nb">apply</span> t_ren_eq; <span class="nb">auto</span>.
+  <span class="nb">intros</span> ? h; dependent elimination h; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_ren_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">t</span> : term Γ) : t ₜ⊛ᵣ r_id = t.
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_ren_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">v</span> : val Γ) : v ᵥ⊛ᵣ r_id = v .
+  <span class="bp">now</span> <span class="nb">apply</span> (val_ind_mut _ _ _ ren_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">e_ren_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">π</span> : ev_ctx Γ) : π ₑ⊛ᵣ r_id = π.
+  <span class="bp">now</span> <span class="nb">apply</span> (ctx_ind_mut _ _ _ ren_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">m_ren_id_l</span> {<span class="nv">Γ</span> <span class="nv">a</span>} (<span class="nv">v</span> : val_m Γ a) : v ₘ⊛ᵣ r_id = v .
+  <span class="nb">destruct</span> a; [ <span class="bp">now</span> <span class="nb">apply</span> v_ren_id_l | <span class="bp">now</span> <span class="nb">apply</span> e_ren_id_l ].
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_ren_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">s</span> : state Γ) : s ₛ⊛ᵣ r_id = s .
+  <span class="nb">destruct</span> s; <span class="nb">apply</span> (f_equal2 Cut); [ <span class="bp">now</span> <span class="nb">apply</span> t_ren_id_l | <span class="bp">now</span> <span class="nb">apply</span> e_ren_id_l ].
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">m_ren_id_r</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">f</span> : Γ ⊆ Δ) {<span class="nv">a</span>} (<span class="nv">i</span> : Γ ∋ a) : a_id _ i ₘ⊛ᵣ f = a_id _ (f _ i) .
+  <span class="bp">now</span> <span class="nb">destruct</span> a.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">a_ren_id_r</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">f</span> : Γ ⊆ Δ) : a_id ⊛ᵣ f ≡ₐ f ᵣ⊛ a_id .
+  <span class="nb">intros</span> ??; <span class="bp">now</span> <span class="nb">apply</span> m_ren_id_r.
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">a_shift_id</span> {<span class="nv">Γ</span> <span class="nv">x</span>} : @a_shift1 Γ Γ x a_id ≡ₐ a_id.
+  <span class="nb">intros</span> ? v; dependent elimination v; <span class="nb">auto</span>.
+  <span class="bp">exact</span> (m_ren_id_r _ _).
+<span class="kn">Qed</span>.</span></pre><p>Lemma 5: shifting assigments commutes with left and right renaming.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Lemma</span> <span class="nf">a_shift1_s_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">a</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3)
+  : @a_shift1 _ _ a (f1 ᵣ⊛ f2) ≡ₐ r_shift1 f1 ᵣ⊛ a_shift1 f2 .
+  <span class="nb">intros</span> ? v; dependent elimination v; <span class="nb">auto</span>.
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">a_shift1_a_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">a</span>} (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3)
+      : @a_shift1 _ _ a (f1 ⊛ᵣ f2) ≡ₐ a_shift1 f1 ⊛ᵣ r_shift1 f2 .
+  <span class="nb">intros</span> ? v.
+  dependent elimination v.
+  <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> m_ren_id_r.
+  <span class="nb">cbn</span>; <span class="nb">unfold</span> m_shift1, r_shift1; <span class="bp">now</span> <span class="nb">rewrite</span> <span class="mi">2</span> m_ren_ren.
+<span class="kn">Qed</span>.</span></pre><p>Lemma 6: substitution respects pointwise equality of assigments.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">t_sub_proper_P</span> <span class="nv">Γ</span> (<span class="nv">t</span> : term Γ) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ =[val_m]&gt; Δ), f1 ≡ₐ f2 -&gt; t `ₜ⊛ f1 = t `ₜ⊛ f2 .
+<span class="kn">Definition</span> <span class="nf">v_sub_proper_P</span> <span class="nv">Γ</span> (<span class="nv">v</span> : val Γ) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ =[val_m]&gt; Δ), f1 ≡ₐ f2 -&gt; v `ᵥ⊛ f1 = v `ᵥ⊛ f2 .
+<span class="kn">Definition</span> <span class="nf">e_sub_proper_P</span> <span class="nv">Γ</span> (<span class="nv">π</span> : ev_ctx Γ) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Δ</span> (<span class="nv">f1</span> <span class="nv">f2</span> : Γ =[val_m]&gt; Δ), f1 ≡ₐ f2 -&gt; π `ₑ⊛ f1 = π `ₑ⊛ f2.
+<span class="kn">Lemma</span> <span class="nf">sub_proper_prf</span> : syn_ind_args t_sub_proper_P v_sub_proper_P e_sub_proper_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_proper_P, v_sub_proper_P, e_sub_proper_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="bp">now</span> <span class="nb">apply</span> H, a_shift_eq.
+<span class="kn">Qed</span>.
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">t_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>}
+  : Proper (asgn_eq _ _ ==&gt; eq ==&gt; eq) (@t_subst Γ Δ).
+  <span class="nb">intros</span> ? ? H1 _ ? -&gt;; <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_proper_prf).
+<span class="kn">Qed</span>.
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">v_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>}
+  : Proper (asgn_eq _ _ ==&gt; eq ==&gt; eq) (@v_subst Γ Δ).
+  <span class="nb">intros</span> ? ? H1 _ ? -&gt;; <span class="bp">now</span> <span class="nb">apply</span> (val_ind_mut _ _ _ sub_proper_prf).
+<span class="kn">Qed</span>.
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">e_sub_eq</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>}
+  : Proper (asgn_eq _ _ ==&gt; eq ==&gt; eq) (@e_subst Γ Δ).
+  <span class="nb">intros</span> ? ? H1 _ ? -&gt;; <span class="bp">now</span> <span class="nb">apply</span> (ctx_ind_mut _ _ _ sub_proper_prf).
+<span class="kn">Qed</span>.
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">m_sub_eq</span>
+  : Proper (<span class="kr">∀</span><span class="nv">ₕ</span> <span class="nv">Γ</span>, <span class="kr">∀</span><span class="nv">ₕ</span> <span class="nv">_</span>, eq ==&gt; <span class="kr">∀</span><span class="nv">ₕ</span> <span class="nv">Δ</span>, asgn_eq Γ Δ ==&gt; eq) m_subst.
+  <span class="nb">intros</span> ? [] ?? -&gt; ??? H1; <span class="nb">cbn</span> <span class="kr">in</span> *; <span class="bp">now</span> <span class="nb">rewrite</span> H1.
+<span class="kn">Qed</span>.
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">s_sub_eq</span>
+  : Proper (<span class="kr">∀</span><span class="nv">ₕ</span> <span class="nv">Γ</span>, eq ==&gt; <span class="kr">∀</span><span class="nv">ₕ</span> <span class="nv">Δ</span>, asgn_eq Γ Δ ==&gt; eq) s_subst.
+  <span class="nb">intros</span> ??[] -&gt; ??? H1; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> H1.
+<span class="kn">Qed</span>.
+<span class="c">(*</span>
+<span class="c">#[global] Instance a_comp_eq {Γ1 Γ2 Γ3} : Proper (ass_eq _ _ ==&gt; ass_eq _ _ ==&gt; ass_eq _ _) (@a_comp Γ1 Γ2 Γ3).</span>
+<span class="c">  intros ? ? H1 ? ? H2 ? ?; unfold a_comp, s_map; now rewrite H1, H2.</span>
+<span class="c">Qed.</span>
+<span class="c">*)</span></span></pre><p>Lemma 7: renaming-substitution &quot;associativity&quot;.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">t_ren_sub_P</span> <span class="nv">Γ1</span> (<span class="nv">t</span> : term Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) ,
+    (t `ₜ⊛ f1) ₜ⊛ᵣ f2 = t `ₜ⊛ (f1 ⊛ᵣ f2) .
+<span class="kn">Definition</span> <span class="nf">v_ren_sub_P</span> <span class="nv">Γ1</span> (<span class="nv">v</span> : val Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) ,
+    (v `ᵥ⊛ f1) ᵥ⊛ᵣ f2 = v `ᵥ⊛ (f1 ⊛ᵣ f2) .
+<span class="kn">Definition</span> <span class="nf">e_ren_sub_P</span> <span class="nv">Γ1</span> (<span class="nv">π</span> : ev_ctx Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) ,
+    (π `ₑ⊛ f1) ₑ⊛ᵣ f2 = π `ₑ⊛ (f1 ⊛ᵣ f2) .
+<span class="kn">Lemma</span> <span class="nf">ren_sub_prf</span> : syn_ind_args t_ren_sub_P v_ren_sub_P e_ren_sub_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_ren_sub_P, v_ren_sub_P, e_ren_sub_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="nb">change</span> (a_shift1 (<span class="kr">fun</span> <span class="nv">x</span> =&gt; _)) <span class="kr">with</span> (a_shift1 (a:=⊕) (f1 ⊛ᵣ f2)); <span class="bp">now</span> <span class="nb">rewrite</span> a_shift1_a_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">t</span> : term Γ1)
+  : (t `ₜ⊛ f1) ₜ⊛ᵣ f2 = t `ₜ⊛ (f1 ⊛ᵣ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ ren_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">v</span> : val Γ1)
+  : (v `ᵥ⊛ f1) ᵥ⊛ᵣ f2 = v `ᵥ⊛ (f1 ⊛ᵣ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (val_ind_mut _ _ _ ren_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">e_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">π</span> : ev_ctx Γ1)
+  : (π `ₑ⊛ f1) ₑ⊛ᵣ f2 = π `ₑ⊛ (f1 ⊛ᵣ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (ctx_ind_mut _ _ _ ren_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">m_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) <span class="nv">a</span> (<span class="nv">v</span> : val_m Γ1 a)
+  : (v ᵥ⊛ f1) ₘ⊛ᵣ f2 = v ᵥ⊛ (f1 ⊛ᵣ f2) .
+  <span class="nb">destruct</span> a; [ <span class="bp">now</span> <span class="nb">apply</span> v_ren_sub | <span class="bp">now</span> <span class="nb">apply</span> e_ren_sub ].
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_ren_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 ⊆ Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₜ⊛ f1) ₛ⊛ᵣ f2 = s ₜ⊛ (f1 ⊛ᵣ f2) .
+  <span class="nb">destruct</span> s; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> t_ren_sub, e_ren_sub.
+<span class="kn">Qed</span>.</span></pre><p>Lemma 8: substitution-renaming &quot;associativity&quot;.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">t_sub_ren_P</span> <span class="nv">Γ1</span> (<span class="nv">t</span> : term Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) ,
+  (t ₜ⊛ᵣ f1) `ₜ⊛ f2 = t `ₜ⊛ (f1 ᵣ⊛ f2) .
+<span class="kn">Definition</span> <span class="nf">v_sub_ren_P</span> <span class="nv">Γ1</span> (<span class="nv">v</span> : val Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) ,
+  (v ᵥ⊛ᵣ f1) `ᵥ⊛ f2 = v `ᵥ⊛ (f1 ᵣ⊛ f2) .
+<span class="kn">Definition</span> <span class="nf">e_sub_ren_P</span> <span class="nv">Γ1</span> (<span class="nv">π</span> : ev_ctx Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) ,
+  (π ₑ⊛ᵣ f1) `ₑ⊛ f2 = π `ₑ⊛ (f1 ᵣ⊛ f2) .
+<span class="kn">Lemma</span> <span class="nf">sub_ren_prf</span> : syn_ind_args t_sub_ren_P v_sub_ren_P e_sub_ren_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_ren_P, v_sub_ren_P, e_sub_ren_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="bp">now</span> <span class="nb">rewrite</span> a_shift1_s_ren.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) (<span class="nv">t</span> : term Γ1)
+  : (t ₜ⊛ᵣ f1) `ₜ⊛ f2 = t `ₜ⊛ (f1 ᵣ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) (<span class="nv">v</span> : val Γ1)
+  : (v ᵥ⊛ᵣ f1) `ᵥ⊛ f2 = v `ᵥ⊛ (f1 ᵣ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (val_ind_mut _ _ _ sub_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">e_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) (<span class="nv">π</span> : ev_ctx Γ1)
+  : (π ₑ⊛ᵣ f1) `ₑ⊛ f2 = π `ₑ⊛ (f1 ᵣ⊛ f2) .
+  <span class="bp">now</span> <span class="nb">apply</span> (ctx_ind_mut _ _ _ sub_ren_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">m_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) <span class="nv">a</span> (<span class="nv">v</span> : val_m Γ1 a)
+  : (v ₘ⊛ᵣ f1) ᵥ⊛ f2 = v ᵥ⊛ (f1 ᵣ⊛ f2) .
+  <span class="nb">destruct</span> a; [ <span class="bp">now</span> <span class="nb">apply</span> v_sub_ren | <span class="bp">now</span> <span class="nb">apply</span> e_sub_ren ].
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_sub_ren</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 ⊆ Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) (<span class="nv">s</span> : state Γ1)
+  : (s ₛ⊛ᵣ f1) ₜ⊛ f2 = s ₜ⊛ (f1 ᵣ⊛ f2) .
+  <span class="nb">destruct</span> s; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> t_sub_ren, e_sub_ren.
+<span class="kn">Qed</span>.</span></pre><p>Lemma 9: left identity law of substitution.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">t_sub_id_l_P</span> <span class="nv">Γ</span> (<span class="nv">t</span> : term Γ) : <span class="kt">Prop</span> := t `ₜ⊛ a_id = t .
+<span class="kn">Definition</span> <span class="nf">v_sub_id_l_P</span> <span class="nv">Γ</span> (<span class="nv">v</span> : val Γ) : <span class="kt">Prop</span> := v `ᵥ⊛ a_id = v .
+<span class="kn">Definition</span> <span class="nf">e_sub_id_l_P</span> <span class="nv">Γ</span> (<span class="nv">π</span> : ev_ctx Γ) : <span class="kt">Prop</span> := π `ₑ⊛ a_id = π .
+<span class="kn">Lemma</span> <span class="nf">sub_id_l_prf</span> : syn_ind_args t_sub_id_l_P v_sub_id_l_P e_sub_id_l_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_id_l_P, v_sub_id_l_P, e_sub_id_l_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="bp">now</span> <span class="nb">rewrite</span> a_shift_id.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">t</span> : term Γ) : t `ₜ⊛ a_id = t .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_sub_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">v</span> : val Γ) : v `ᵥ⊛ a_id = v .
+  <span class="bp">now</span> <span class="nb">apply</span> (val_ind_mut _ _ _ sub_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">e_sub_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">π</span> : ev_ctx Γ) : π `ₑ⊛ a_id = π .
+  <span class="bp">now</span> <span class="nb">apply</span> (ctx_ind_mut _ _ _ sub_id_l_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">m_sub_id_l</span> {<span class="nv">Γ</span>} <span class="nv">a</span> (<span class="nv">v</span> : val_m Γ a) : v ᵥ⊛ a_id = v .
+  <span class="nb">destruct</span> a; [ <span class="bp">now</span> <span class="nb">apply</span> v_sub_id_l | <span class="bp">now</span> <span class="nb">apply</span> e_sub_id_l ].
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_sub_id_l</span> {<span class="nv">Γ</span>} (<span class="nv">s</span> : state Γ) : s ₜ⊛ a_id = s .
+  <span class="nb">destruct</span> s; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> t_sub_id_l, e_sub_id_l.
+<span class="kn">Qed</span>.</span></pre><p>Lemma 9: right identity law of substitution. As for renaming, this one is
+mostly by definition.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Lemma</span> <span class="nf">m_sub_id_r</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span>} {<span class="nv">a</span>} (<span class="nv">i</span> : Γ1 ∋ a) (<span class="nv">f</span> : Γ1 =[val_m]&gt; Γ2) : a_id a i ᵥ⊛ f = f a i.
+  <span class="bp">now</span> <span class="nb">destruct</span> a.
+<span class="kn">Qed</span>.</span></pre><p>Lemma 10: shifting assigments respects composition.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Lemma</span> <span class="nf">a_shift1_comp</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> <span class="nv">a</span>} (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) 
+  : @a_shift1 _ _ a (f1 ⊛ f2) ≡ₐ a_shift1 f1 ⊛ a_shift1 f2 .
+  <span class="nb">intros</span> ? v; dependent elimination v; <span class="nb">cbn</span>.
+  <span class="bp">now</span> <span class="nb">rewrite</span> m_sub_id_r.
+  <span class="nb">unfold</span> m_shift1; <span class="bp">now</span> <span class="nb">rewrite</span> m_ren_sub, m_sub_ren.
+<span class="kn">Qed</span>.</span></pre><p>Lemma 11: substitution-substitution associativity, ie composition law.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">t_sub_sub_P</span> <span class="nv">Γ1</span> (<span class="nv">t</span> : term Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) ,
+  t `ₜ⊛ (f1 ⊛ f2) = (t `ₜ⊛ f1) `ₜ⊛ f2 .
+<span class="kn">Definition</span> <span class="nf">v_sub_sub_P</span> <span class="nv">Γ1</span> (<span class="nv">v</span> : val Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) ,
+  v `ᵥ⊛ (f1 ⊛ f2) = (v `ᵥ⊛ f1) `ᵥ⊛ f2 .
+<span class="kn">Definition</span> <span class="nf">e_sub_sub_P</span> <span class="nv">Γ1</span> (<span class="nv">π</span> : ev_ctx Γ1) : <span class="kt">Prop</span> :=
+  <span class="kr">forall</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span> (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) ,
+  π `ₑ⊛ (f1 ⊛ f2) = (π `ₑ⊛ f1) `ₑ⊛ f2 .
+<span class="kn">Lemma</span> <span class="nf">sub_sub_prf</span> : syn_ind_args t_sub_sub_P v_sub_sub_P e_sub_sub_P.
+  <span class="nb">econstructor</span>.
+  <span class="kp">all</span>: <span class="nb">unfold</span> t_sub_sub_P, v_sub_sub_P, e_sub_sub_P.
+  <span class="kp">all</span>: <span class="nb">intros</span>; <span class="nb">cbn</span>; <span class="nb">f_equal</span>; <span class="nb">auto</span>.
+  <span class="bp">now</span> <span class="nb">rewrite</span> a_shift1_comp.
+<span class="kn">Qed</span>.
+
+<span class="kn">Lemma</span> <span class="nf">t_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) (<span class="nv">t</span> : term Γ1)
+  : t `ₜ⊛ (f1 ⊛ f2) = (t `ₜ⊛ f1) `ₜ⊛ f2 .
+  <span class="bp">now</span> <span class="nb">apply</span> (term_ind_mut _ _ _ sub_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">v_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) (<span class="nv">v</span> : val Γ1)
+  : v `ᵥ⊛ (f1 ⊛ f2) = (v `ᵥ⊛ f1) `ᵥ⊛ f2 .
+  <span class="bp">now</span> <span class="nb">apply</span> (val_ind_mut _ _ _ sub_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">e_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) (<span class="nv">π</span> : ev_ctx Γ1)
+  : π `ₑ⊛ (f1 ⊛ f2) = (π `ₑ⊛ f1) `ₑ⊛ f2 .
+  <span class="bp">now</span> <span class="nb">apply</span> (ctx_ind_mut _ _ _ sub_sub_prf).
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">m_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} <span class="nv">a</span> (<span class="nv">v</span> : val_m Γ1 a) (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3)
+  : v ᵥ⊛ (f1 ⊛ f2) = (v ᵥ⊛ f1) ᵥ⊛ f2 .
+  <span class="nb">destruct</span> a; [ <span class="bp">now</span> <span class="nb">apply</span> v_sub_sub | <span class="bp">now</span> <span class="nb">apply</span> e_sub_sub ].
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">s_sub_sub</span> {<span class="nv">Γ1</span> <span class="nv">Γ2</span> <span class="nv">Γ3</span>} (<span class="nv">s</span> : state Γ1) (<span class="nv">f1</span> : Γ1 =[val_m]&gt; Γ2) (<span class="nv">f2</span> : Γ2 =[val_m]&gt; Γ3) 
+  : s ₜ⊛ (f1 ⊛ f2) = (s ₜ⊛ f1) ₜ⊛ f2 .
+  <span class="nb">destruct</span> s; <span class="nb">cbn</span>; <span class="bp">now</span> <span class="nb">rewrite</span> t_sub_sub, e_sub_sub.
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">a_sub1_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">a</span>} (<span class="nv">f</span> : Γ =[val_m]&gt; Δ) (<span class="nv">v</span> : val_m Γ a)
+  : a_shift1 f ⊛ assign1 (v ᵥ⊛ f) ≡ₐ (assign1 v) ⊛ f .
+  <span class="nb">intros</span> ? i; dependent elimination i; <span class="nb">cbn</span>.
+  <span class="bp">now</span> <span class="nb">rewrite</span> m_sub_id_r.
+  <span class="nb">unfold</span> m_shift1; <span class="nb">rewrite</span> m_sub_ren, m_sub_id_r; <span class="bp">now</span> <span class="nb">apply</span> m_sub_id_l.
+<span class="kn">Qed</span>.
+<span class="kn">Lemma</span> <span class="nf">t_sub1_sub</span> {<span class="nv">Γ</span> <span class="nv">Δ</span> <span class="nv">x</span>} (<span class="nv">f</span> : Γ =[val_m]&gt; Δ) (<span class="nv">t</span> : term (Γ ▶ₓ x)) <span class="nv">v</span>
+  : (t `ₜ⊛ a_shift1 f) /[ v ᵥ⊛ f ] = (t /[ v ]) `ₜ⊛ f.
+  <span class="nb">unfold</span> t_subst1; <span class="bp">now</span> <span class="nb">rewrite</span> &lt;- <span class="mi">2</span> t_sub_sub, a_sub1_sub.
+<span class="kn">Qed</span>.</span></pre></div>
+<div class="section" id="the-actual-instance">
+<h1>The Actual Instance</h1>
+<p>We can now instanciate the generic OGS construction.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">ulc_val_laws</span> : subst_monoid_laws val_m :=
+  {| v_sub_proper := @m_sub_eq ;
+     v_sub_var := @m_sub_id_r ;
+     v_var_sub := @m_sub_id_l ;
+     Subst.v_sub_sub := @m_sub_sub |} .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">ulc_conf_laws</span> : subst_module_laws val_m state :=
+  {| c_sub_proper := @s_sub_eq ;
+     c_var_sub := @s_sub_id_l ;
+     c_sub_sub := @s_sub_sub |} .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">ulc_var_laws</span> : var_assumptions val_m.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">econstructor</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">intros</span> ? [] ?? H; <span class="bp">now</span> <span class="nb">dependent destruction</span> H.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">intros</span> ? [] []; <span class="kp">try</span> <span class="bp">now</span> <span class="nb">apply</span> Yes; <span class="bp">exact</span> (Vvar _).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">    </span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kp">all</span>: <span class="nb">apply</span> No; <span class="nb">intro</span> H; <span class="nb">dependent destruction</span> H.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">  </span><span class="alectryon-sentence"><span class="alectryon-input">-</span><span class="alectryon-wsp"> </span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="nb">intros</span> ?? [] v r H; <span class="nb">induction</span> v; <span class="nb">dependent destruction</span> H; <span class="bp">exact</span> (Vvar _).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Qed</span>.</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input">#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">ulc_machine</span> : machine val_m state obs_op :=
+  {| <span class="kp">eval</span> := @ulc_eval ;
+     oapp := @obs_app |} .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+<span class="kn">From</span> Coinduction <span class="kn">Require Import</span> coinduction lattice rel tactics.
+<span class="kn">From</span> OGS.ITree <span class="kn">Require Import</span> Eq.
+
+<span class="kn">Ltac</span> <span class="nf">refold_eval</span> :=
+  <span class="nb">change</span> (<span class="kn">Structure</span>.iter _ _ <span class="nl">?a</span>) <span class="kr">with</span> (ulc_eval a);
+  <span class="nb">change</span> (<span class="kn">Structure</span>.<span class="nb">subst</span> (<span class="kr">fun</span> <span class="nv">pat</span> : T1 =&gt; <span class="kr">let</span> <span class="nv">&#39;T1_0</span> := pat <span class="kr">in</span> <span class="nl">?f</span>) T1_0 <span class="nl">?u</span>)
+    <span class="kr">with</span> (bind_delay&#39; u f).
+
+#[<span class="kn">global</span>] <span class="kn">Instance</span> <span class="nf">ulc_machine_law</span> : machine_laws val_m state obs_op.
+  <span class="nb">econstructor</span>; <span class="nb">cbn</span>; <span class="nb">intros</span>.
+  - <span class="nb">intros</span> ?? H1; dependent elimination o; <span class="nb">cbn</span>; <span class="kp">repeat</span> (<span class="nb">f_equal</span>; <span class="nb">auto</span>).
+  - <span class="nb">destruct</span> x; dependent elimination o; <span class="nb">cbn</span>; <span class="nb">f_equal</span>.
+  - <span class="nb">revert</span> c a; <span class="nb">unfold</span> comp_eq, it_eq; coinduction R CIH; <span class="nb">intros</span> c e.
+    <span class="nb">cbn</span>; funelim (eval_step c); <span class="nb">cbn</span>.
+    + <span class="nb">destruct</span> (e (⊖) i); <span class="nb">auto</span>.
+      <span class="nb">remember</span> (v `ᵥ⊛ e) <span class="kr">as</span> v&#39;; <span class="nb">clear</span> H v Heqv&#39;.
+      dependent elimination v&#39;; <span class="nb">cbn</span>; <span class="nb">auto</span>.
+    + <span class="nb">econstructor</span>; refold_eval; <span class="nb">apply</span> CIH.
+    + <span class="nb">remember</span> (e (⊕) i) <span class="kr">as</span> vv; <span class="nb">clear</span> H i Heqvv.
+      dependent elimination vv; <span class="nb">cbn</span>; <span class="nb">auto</span>.
+    + <span class="nb">econstructor</span>;
+       refold_eval;
+       <span class="nb">change</span> (<span class="nl">?v</span> `ᵥ⊛ <span class="nl">?a</span>) <span class="kr">with</span> ((v : val_m _ (⊕)) ᵥ⊛ a).
+      <span class="nb">rewrite</span> t_sub1_sub.
+      <span class="nb">apply</span> CIH.
+    + <span class="nb">econstructor</span>; refold_eval; <span class="nb">apply</span> CIH.
+  - <span class="nb">destruct</span> u <span class="kr">as</span> [ a i [ p γ ] ]; <span class="nb">cbn</span>.
+    dependent elimination p; <span class="nb">cbn</span>.
+    <span class="kp">all</span>: <span class="nb">unfold</span> comp_eq; <span class="nb">apply</span> it_eq_unstep; <span class="nb">cbn</span>; <span class="nb">econstructor</span>.
+    <span class="kp">all</span>: <span class="nb">econstructor</span>; <span class="nb">intros</span> ? v; <span class="kp">do</span> <span class="mi">3</span> (dependent elimination v; <span class="nb">auto</span>).
+  - <span class="nb">intros</span> [ x p ].
+    <span class="nb">destruct</span> x; dependent elimination p; <span class="nb">econstructor</span>.
+    * <span class="nb">intros</span> [ z p ] H.
+      dependent elimination p; dependent elimination H.
+      <span class="kp">all</span>: dependent elimination v; <span class="kp">try</span> <span class="bp">now</span> <span class="nb">destruct</span> (t0 (Vvar _)).
+      <span class="kp">all</span>: <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0.
+    * <span class="nb">intros</span> [ z p ] H.
+      dependent elimination p; dependent elimination H; <span class="nb">cbn</span> <span class="kr">in</span> *.
+      dependent elimination v; <span class="kp">try</span> <span class="bp">now</span> <span class="nb">destruct</span> (t0 (Vvar _)).
+      + <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="bp">now</span> <span class="nb">inversion</span> i0.
+      + <span class="nb">remember</span> (a _ Ctx.top) <span class="kr">as</span> vv; <span class="nb">clear</span> a Heqvv.
+        dependent elimination vv;
+          <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i0; <span class="nb">cbn</span> <span class="kr">in</span> i0; dependent elimination i0.
+        <span class="nb">inversion</span> r_rel.
+      + <span class="nb">econstructor</span>; <span class="nb">intros</span> [ z p ] H.
+        dependent elimination p; dependent elimination H.
+        <span class="kp">all</span>: dependent elimination v0; <span class="kp">try</span> <span class="bp">now</span> <span class="nb">destruct</span> (t1 (Vvar _)).
+        <span class="kp">all</span>: <span class="nb">apply</span> it_eq_step <span class="kr">in</span> i2; <span class="bp">now</span> <span class="nb">inversion</span> i2.
+<span class="kn">Qed</span>.</span></pre></div>
+<div class="section" id="concrete-soundness-theorem">
+<h1>Concrete soundness theorem</h1>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">subst_eq</span> <span class="nv">Δ</span> {<span class="nv">Γ</span>} : relation (state Γ) :=
+  <span class="kr">fun</span> <span class="nv">u</span> <span class="nv">v</span> =&gt; <span class="kr">forall</span> <span class="nv">σ</span> : Γ =[val_m]&gt; Δ, evalₒ (u ₜ⊛ σ) ≈ evalₒ (v ₜ⊛ σ) .
+<span class="kn">Notation</span> <span class="s2">&quot;x ≈⟦sub Δ ⟧≈ y&quot;</span> := (subst_eq Δ x y) (<span class="kn">at level</span> <span class="mi">10</span>).
+
+<span class="kn">Theorem</span> <span class="nf">ulc_subst_correct</span> <span class="nv">Δ</span> {<span class="nv">Γ</span>} (<span class="nv">x</span> <span class="nv">y</span> : state Γ)
+  : x ≈⟦ogs Δ⟧≈ y -&gt; x ≈⟦sub Δ⟧≈ y .
+  <span class="bp">exact</span> (ogs_correction Δ x y).
+<span class="kn">Qed</span>.</span></pre><div class="section" id="recovering-ciu-equivalence">
+<h2>Recovering CIU-equivalence</h2>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">ciu_eq</span> <span class="nv">Δ</span> {<span class="nv">Γ</span>} : relation (term Γ) :=
+  <span class="kr">fun</span> <span class="nv">u</span> <span class="nv">v</span> =&gt; <span class="kr">forall</span> (<span class="nv">σ</span> : Γ =[val_m]&gt; Δ) (<span class="nv">π</span> : ev_ctx Δ),
+      evalₒ (Cut (u `ₜ⊛ σ) π) ≈ evalₒ (Cut (v `ₜ⊛ σ) π) .
+<span class="kn">Notation</span> <span class="s2">&quot;x ≈⟦ciu Δ ⟧≈ y&quot;</span> := (ciu_eq Δ x y) (<span class="kn">at level</span> <span class="mi">10</span>).
+
+<span class="kn">Definition</span> <span class="nf">c_init</span> {<span class="nv">Γ</span>} (<span class="nv">t</span> : term Γ) : state (Γ ▶ₓ ⊖)
+  := Cut (t_shift1 t) (K0 Ctx.top) .
+
+<span class="kn">Definition</span> <span class="nf">a_of_sk</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">σ</span> : Γ =[val_m]&gt; Δ) (<span class="nv">π</span> : ev_ctx Δ)
+  : (Γ ▶ₓ ⊖) =[val_m]&gt; Δ := σ ▶ₐ (π : val_m _ (⊖)) .
+
+<span class="kn">Lemma</span> <span class="nf">sub_init</span> {<span class="nv">Γ</span> <span class="nv">Δ</span>} (<span class="nv">t</span> : term Γ) (<span class="nv">σ</span> : Γ =[val_m]&gt; Δ) (<span class="nv">π</span> : ev_ctx Δ)
+  : Cut (t `ₜ⊛ σ) π = c_init t ₜ⊛ a_of_sk σ π  .
+  <span class="nb">cbn</span>; <span class="nb">unfold</span> t_shift1; <span class="bp">now</span> <span class="nb">rewrite</span> t_sub_ren.
+<span class="kn">Qed</span>.</span></pre><p>We can now obtain a correctness theorem with respect to standard
+CIU-equivalence by embedding terms into states. Proving that CIU-equivalence
+entails our substitution equivalence is left to the reader!</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Theorem</span> <span class="nf">ulc_ciu_correct</span> <span class="nv">Δ</span> {<span class="nv">Γ</span>} (<span class="nv">x</span> <span class="nv">y</span> : term Γ)
+  : c_init x ≈⟦ogs Δ⟧≈ c_init y -&gt; x ≈⟦ciu Δ⟧≈ y .
+  <span class="nb">intros</span> H σ k; <span class="nb">rewrite</span> <span class="mi">2</span> sub_init.
+  <span class="bp">now</span> <span class="nb">apply</span> ulc_subst_correct.
+<span class="kn">Qed</span>.</span></pre></div>
+</div>
+<div class="section" id="example-terms">
+<h1>Example terms</h1>
+<p>Following a trick by Conor McBride we provide a cool notation for writing terms
+without any DeBruijn indices, instead leveraging Coq's binders. For this we need
+a bit of infrastructure, for manipulating terms that only have term variables.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Equations</span> <span class="nf">n_ctx</span> : nat -&gt; t_ctx :=
+  n_ctx O     := ∅ ;
+  n_ctx (S n) := n_ctx n ▶ₓ ⊕ .
+
+<span class="kn">Notation</span> <span class="nf">var&#39;</span> n := (n_ctx n ∋ ⊕).
+<span class="kn">Notation</span> <span class="nf">term&#39;</span> n := (term (n_ctx n)).
+
+<span class="kn">Equations</span> <span class="nf">v_emb</span> (<span class="nv">n</span> : nat) : var&#39; (S n) :=
+  v_emb O     := Ctx.top ;
+  v_emb (S n) := pop (v_emb n) .
+
+<span class="kn">Equations</span> <span class="nf">v_lift</span> {<span class="nv">n</span>} : var&#39; n -&gt; var&#39; (S n) :=
+  @v_lift (S _) Ctx.top     := Ctx.top ;
+  @v_lift (S _) (pop i) := pop (v_lift i) .</span></pre><p>Here starts the magic.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Equations</span> <span class="nf">mk_var</span> (<span class="nv">m</span> : nat) : <span class="kr">forall</span> <span class="nv">n</span>, var&#39; (m + S n) :=
+  mk_var O     := v_emb ;
+  mk_var (S m) := v_lift ∘ mk_var m .</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-wsp">
+</span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Definition</span> <span class="nf">mk_lam</span> {<span class="nv">m</span> : nat} (<span class="nv">f</span> : (<span class="kr">forall</span> <span class="nv">n</span>, term&#39; (m + S n)) -&gt; term&#39; (S m)) : term&#39; m
+  := Val (Lam (f (Val ∘ Var ∘ mk_var m))).</span><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Arguments</span> mk_lam {_} &amp; _ .</span></span></pre><p>Now a bit of syntactic sugar.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Declare Custom Entry</span> lambda.
+<span class="kn">Notation</span> <span class="s2">&quot;✨ e ✨&quot;</span> := (e : term&#39; <span class="mi">0</span>) (e <span class="kn">custom</span> lambda <span class="kn">at level</span> <span class="mi">2</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;x&quot;</span> := (x _) (<span class="kn">in custom</span> lambda <span class="kn">at level</span> <span class="mi">0</span>, x <span class="kn">ident</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;( x )&quot;</span> := x (<span class="kn">in custom</span> lambda <span class="kn">at level</span> <span class="mi">0</span>, x <span class="kn">at level</span> <span class="mi">2</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;x y&quot;</span> := (App x y)
+  (<span class="kn">in custom</span> lambda <span class="kn">at level</span> <span class="mi">1</span>, <span class="kn">left associativity</span>).
+<span class="kn">Notation</span> <span class="s2">&quot;&#39;λ&#39; x .. y ⇒ U&quot;</span> :=
+  (mk_lam (<span class="kr">fun</span> <span class="nv">x</span> =&gt; .. (mk_lam (<span class="kr">fun</span> <span class="nv">y</span> =&gt; U)) ..))
+  (<span class="kn">in custom</span> lambda <span class="kn">at level</span> <span class="mi">1</span>, x <span class="kn">binder</span>, y <span class="kn">binder</span>, U <span class="kn">at level</span> <span class="mi">2</span>).</span></pre><p>Aren't these beautiful?</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp"><span class="kn">Definition</span> <span class="nf">Delta</span> := ✨ (<span class="kr">λ</span> <span class="nv">x</span> ⇒ x x) ✨ .
+<span class="kn">Definition</span> <span class="nf">Omega</span> := ✨ (<span class="kr">λ</span> <span class="nv">x</span> ⇒ x x) (<span class="kr">λ</span> <span class="nv">x</span> ⇒ x x) ✨ .
+<span class="kn">Definition</span> <span class="nf">Upsilon</span> := ✨ <span class="kr">λ</span> <span class="nv">f</span> ⇒ (<span class="kr">λ</span> <span class="nv">x</span> ⇒ f (x x)) (<span class="kr">λ</span> <span class="nv">x</span> ⇒ f (x x)) ✨.
+<span class="kn">Definition</span> <span class="nf">Theta</span> := ✨ (<span class="kr">λ</span> <span class="nv">x</span> <span class="nv">f</span> ⇒ f (x x f)) (<span class="kr">λ</span> <span class="nv">x</span> <span class="nv">f</span> ⇒ f (x x f)) ✨.</span></pre><p>You can check the actual lambda-term they unwrap to
+by running eg:</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><span class="alectryon-input"><span class="kn">Eval</span> <span class="nb">cbv</span> <span class="kr">in</span> Upsilon.</span></span></pre></div>
+</div>
+</div></body>
+</html>

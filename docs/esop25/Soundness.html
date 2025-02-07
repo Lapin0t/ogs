@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" class="alectryon-standalone" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.21.2: https://docutils.sourceforge.io/" />
+<title>Soundness (Theorem 8)</title>
+<link rel="stylesheet" href="alectryon.css" type="text/css" />
+<link rel="stylesheet" href="docutils_basic.css" type="text/css" />
+<link rel="stylesheet" href="pygments.css" type="text/css" />
+<script type="text/javascript" src="alectryon.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/IBM-type/0.5.4/css/ibm-type.min.css" integrity="sha512-sky5cf9Ts6FY1kstGOBHSybfKqdHR41M0Ldb0BjNiv3ifltoQIsg0zIaQ+wwdwgQ0w9vKFW7Js50lxH9vqNSSw==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/firacode/5.2.0/fira_code.min.css" integrity="sha512-MbysAYimH1hH2xYzkkMHB6MqxBqfP0megxsCLknbYqHVwXTCg9IqHbk+ZP/vnhO8UEW6PaXAkKe2vQ+SWACxxA==" crossorigin="anonymous" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="alectryon-root alectryon-windowed"><div class="alectryon-banner">Built with <a href="https://github.com/cpitclaudel/alectryon/">Alectryon</a>, running Coq+SerAPI v8.17.0+0.17.3. Bubbles (<span class="alectryon-bubble"></span>) indicate interactive fragments: hover for details, tap to reveal contents. Use <kbd>Ctrl+↑</kbd> <kbd>Ctrl+↓</kbd> to navigate, <kbd>Ctrl+🖱️</kbd> to focus. On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</div><div class="document" id="soundness-theorem-8">
+<h1 class="title">Soundness (Theorem 8)</h1>
+
+<p>Finally, all the pieces are in place to prove that bisimilarity of induced LTS is sound
+w.r.t. substitution equivalence. Having worked hard to establish
+<a class="reference external" href="Adequacy.html">adequacy</a> and <a class="reference external" href="Congruence.html">congruence</a>
+of weak bisimilarity for composition, very little remains to do here.</p>
+<p>We consider a language abstractly captured as a machine satisfying an
+appropriate axiomatization.</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Context</span> {<span class="nv">T</span> <span class="nv">C</span>} {<span class="nv">CC</span> : <span class="kp">context</span> T C} {<span class="nv">CL</span> : context_laws T C}.
+  <span class="kn">Context</span> {<span class="nv">val</span>} {<span class="nv">VM</span> : subst_monoid val} {<span class="nv">VML</span> : subst_monoid_laws val}.
+  <span class="kn">Context</span> {<span class="nv">conf</span>} {<span class="nv">CM</span> : subst_module val conf} {<span class="nv">CML</span> : subst_module_laws val conf}.
+  <span class="kn">Context</span> {<span class="nv">obs</span> : obs_struct T C} {<span class="nv">M</span> : machine val conf obs} {<span class="nv">ML</span> : machine_laws val conf obs}.
+  <span class="kn">Context</span> {<span class="nv">VV</span> : var_assumptions val}.</span></pre><p>We define substitution equivalence of two language machine configurations (Def. 15).</p>
+<pre class="alectryon-io highlight" id="substeq"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Definition</span> <span class="nf">substeq</span> {<span class="nv">Γ</span>} <span class="nv">Δ</span> (<span class="nv">a</span> <span class="nv">b</span> : conf Γ) : <span class="kt">Prop</span>
+    := <span class="kr">forall</span> <span class="nv">γ</span> : Γ =[val]&gt; Δ, evalₒ (a ₜ⊛ γ) ≈ evalₒ (b ₜ⊛ γ).
+  <span class="kn">Notation</span> <span class="s2">&quot;x ≈⟦sub Δ ⟧≈ y&quot;</span> := (substeq Δ x y) (<span class="kn">at level</span> <span class="mi">50</span>).</span></pre><p>Our main theorem: bisimilarity of induced OGS machine strategies is sound w.r.t.
+substitution equivalence, by applying barbed equivalence soundness, swapping the naive
+composition with the <a class="reference external" href="Congruence.html">opaque one</a> and then applying congruence.</p>
+<pre class="alectryon-io highlight" id="soundness"><!-- Generator: Alectryon --><span class="alectryon-wsp">  <span class="kn">Theorem</span> <span class="nf">ogs_correction</span> {<span class="nv">Γ</span>} <span class="nv">Δ</span> (<span class="nv">x</span> <span class="nv">y</span> : conf Γ) : x ≈⟦ogs Δ⟧≈ y -&gt; x ≈⟦sub Δ⟧≈ y.
+  <span class="kn">Proof</span>.
+    <span class="nb">intros</span> H γ; <span class="nb">unfold</span> m_conf_eqv <span class="kr">in</span> H.
+    <span class="bp">now</span> <span class="nb">rewrite</span> <span class="mi">2</span> adequacy, H.
+  <span class="kn">Qed</span>.
+<span class="kn">End</span> <span class="nf">with_param</span>.</span></pre><p>If you wish to double check these results you can run the following commands at
+this point in the file:</p>
+<pre class="alectryon-io highlight"><!-- Generator: Alectryon --><span class="alectryon-sentence"><input class="alectryon-toggle" id="soundness-v-chk0" style="display: none" type="checkbox"><label class="alectryon-input" for="soundness-v-chk0"><span class="kn">About</span> ogs_correction.</label><small class="alectryon-output"><div><div class="alectryon-messages"><blockquote class="alectryon-message">ogs_correction not a defined object.</blockquote></div></div></small><span class="alectryon-wsp">
+</span></span><span class="alectryon-sentence"><input class="alectryon-toggle" id="soundness-v-chk1" style="display: none" type="checkbox"><label class="alectryon-input" for="soundness-v-chk1"><span class="kn">Print Assumptions</span> ogs_correction.</label><small class="alectryon-output"><div><div class="alectryon-messages"><blockquote class="alectryon-message">The reference ogs_correction was not found
+<span class="kr">in</span> the current environment.</blockquote></div></div></small></span></pre><p>The first command will explicit the assumptions of the theorem, which we show how
+to provide with several examples:</p>
+<ul class="simple">
+<li><a class="reference external" href="STLC_CBV.html">simply-typed call-by-value λ-calculus</a></li>
+<li><a class="reference external" href="ULC_CBV.html">untyped pure call-by-value λ-calculus</a></li>
+<li><a class="reference external" href="SystemL_CBV.html">call-by-value System L</a></li>
+<li><a class="reference external" href="SystemD.html">polarized System D</a></li>
+</ul>
+<p>The second command will explicit if any axiom has been used to establish the
+result. As stated in the <a class="reference external" href="Prelude.html">prelude</a>, we exclusively use
+<a class="reference external" href="https://coq.inria.fr/library/Coq.Logic.Eqdep.html#Eq_rect_eq.eq_rect_eq">Eq_rect_eq.eq_rect_eq</a>, ie Streicher's axiom K.</p>
+</div>
+</div></body>
+</html>
